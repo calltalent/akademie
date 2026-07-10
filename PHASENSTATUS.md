@@ -124,7 +124,33 @@
 
 **Block 4 vollständig verifiziert (Josip, 11.07.2026):** Video-Upload, Bunny-Dashboard-Eintrag und Player in der Lernansicht funktionieren wie erwartet.
 
-**Nächster Schritt:** Block 6 (Nutzerverwaltung + CSV-Import) — letzter offener Block für den Phase-1-Kern-DoD (CSV-Import 100 Nutzer < 30 s).
+**Block 6 — Nutzerverwaltung + CSV-Import: erstellt (Cowork, lokal zu prüfen):**
+1. src/lib/auth/staff.ts erweitert: `checkAdminAccess()`/`requireAdminTenant()` — strenger als der bestehende Staff-Check, da RLS `memberships_admin_write` Schreiben auf `memberships` NUR owner/admin erlaubt (trainer zählt hier bewusst NICHT, anders als bei `is_staff`).
+2. src/lib/users/csv.ts — einfacher CSV-Parser (Kopfzeile `email,full_name,course_slug`, `full_name`/`course_slug` optional), zod-Validierung pro Zeile, Duplikat-Erkennung innerhalb der Datei, Zeilennummern in Fehlermeldungen.
+3. src/lib/users/csv.test.ts — Vitest: gültige Zeilen, fehlende Spalten, ungültige E-Mail, Duplikate, leere Datei.
+4. src/lib/users/import.ts — server-only Bulk-Import über Admin-Client (service_role, umgeht RLS bewusst): `inviteUserByEmail()` pro Zeile, bei „bereits registriert" Fallback auf Suche per E-Mail (`listUsers`) statt Fehler; Upsert `profiles` (inkl. Pflichtfeld `email`) + `memberships` (Rolle `member`, Status `active`) + optional `enrollments` (`source: 'import'`) bei gesetztem `course_slug`. Verarbeitung in 10er-Batches parallel für die 30-Sekunden-DoD bei 100 Zeilen.
+5. src/app/api/admin/users/import/route.ts — POST-Route, `requireAdminTenant()`-Gate, zod-Body-Validierung, Zeilenlimit 500, gibt Zusammenfassung inkl. Dauer zurück.
+6. src/lib/users/actions.ts — Server Actions: `inviteSingleUser` (Einzeleinladung, nutzt dieselbe Import-Logik), `disableMembership`/`enableMembership` (Soft-Delete statt Hard-Delete, damit Fortschritts-/Enrollment-Historie erhalten bleibt).
+7. src/components/admin/invite-user-form.tsx, csv-import-form.tsx, membership-row-actions.tsx — Formulare/Upload/Statusumschalter.
+8. src/app/(admin)/admin/nutzer/page.tsx — eigenes Admin-Gate (`checkAdminAccess`, strenger als das Layout-weite Staff-Gate), Mitgliederliste mit Rolle/Status, Einzel-Einladung + CSV-Import nebeneinander.
+9. src/app/(admin)/admin/layout.tsx — Navigation „Kurse"/„Nutzer" im Header ergänzt.
+
+**Bewusste Vereinfachung:** kein Massen-Rollenwechsel (nur Aktivieren/Deaktivieren) — Rollenänderung ist in Phase 1 seltener Einzelfall, direkt in Supabase möglich, kein UI-Aufwand gerechtfertigt. `findUserByEmail` liest bis zu 1000 Nutzer auf einer Seite (Supabase Admin API kennt keine direkte E-Mail-Suche) — für Phase-1-Mandantengrößen ausreichend, bei Bedarf später auf Pagination umstellen.
+
+**Bugfix (Josip, 11.07.2026, beim ersten Test gefunden):** CSV-Import mit 2 Testzeilen schlug komplett fehl mit „email rate limit exceeded". Ursache: `inviteUserByEmail()` verschickt pro Zeile eine echte Auth-E-Mail über Supabase' Standard-SMTP, das ein sehr niedriges eingebautes Rate-Limit hat (greift schon bei 2-3 Mails) — hätte die 30-Sekunden/100-Nutzer-DoD unabhängig von unserer Batch-Parallelisierung unmöglich gemacht. Fix in `src/lib/users/import.ts`: Konto-Anlage von E-Mail-Versand entkoppelt, `createUser()` (kein Mail-Versand, kein Rate-Limit) statt `inviteUserByEmail()`. Status-Feld dadurch umbenannt: `invited` → `created` (in `ImportRowResult`/`ImportSummary`, sowie in `csv-import-form.tsx` und `invite-user-form.tsx` entsprechend anpasst). Die eigentliche Einladungs-/Willkommens-Mail ist jetzt bewusst auf Phase 2 verschoben (Resend, siehe CLAUDE.md-Stack) — neue Konten sind aber sofort aktiv, Login z. B. über „Passwort vergessen"/Magic Link möglich.
+
+**Block 6 mit Bugfix verifiziert (Josip, 11.07.2026):** CSV-Import mit 2 Testzeilen erfolgreich („2 Konten neu angelegt, 0 Fehler", 0,6 s), Mitgliederliste zeigt Test Eins/Test Zwei korrekt mit Deaktivieren-Button.
+
+**Kern-DoD „CSV-Import 100 Nutzer < 30 s" ERFÜLLT (Josip, 11.07.2026):** 100-Zeilen-Import in 19,4 s — 97 Konten neu angelegt, 2 bestehenden Nutzern zugeordnet (die 2 aus dem vorherigen Test), 1 transienter Fehler (`fetch failed` unter paralleler Last). Testdatei fehlte zunächst die Kopfzeile (`email,full_name,course_slug`) — dabei zwei echte Bugs gefunden und behoben:
+1. `csv-import-form.tsx` zeigte bei Server-Fehlern nur eine generische Meldung („Keine gültigen Zeilen gefunden") und verschluckte die eigentlichen `parseErrors` (z. B. „Fehlende Spalten") — jetzt werden Zeilendetails auch im Fehlerfall angezeigt.
+2. `import.ts`: 1 von 100 Zeilen schlug mit transientem `fetch failed` fehl. Fix: `importOneUserWithRetry()` — ein automatischer Retry mit 300 ms Verzögerung, sicher wiederholbar, weil alle Schreibvorgänge (createUser fällt bei „existiert bereits" auf den linked-Pfad zurück, memberships/enrollments sind Upserts) idempotent sind.
+Die von mir erzeugte `test100.csv` wurde nach dem Test wieder gelöscht (kein Teil des Projekts).
+
+**Nächste Schritte vor Phasenabschluss:**
+1. Git-Commit „feat: Block 6 - Nutzerverwaltung und CSV-Import (inkl. Rate-Limit-Fix und Retry)".
+2. Tester-Agent: Vitest- und Playwright-Suiten tatsächlich ausführen (bisher nur geschrieben, nie gelaufen: env.test.ts, schema.test.ts, compute.test.ts, csv.test.ts, auth.spec.ts).
+3. npm-audit-Vulnerabilities gezielt prüfen (5 moderate, 1 high, 1 critical seit Block 1 offen).
+4. security-reviewer-Agent: RLS-Audit über alle Phase-1-Tabellen/Storage-Policies, OWASP-Checkliste, Secret-Scan.
 
 ## Phase 2 — Geschäft ⬜
 

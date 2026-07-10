@@ -27,10 +27,18 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen">
-      <header className="border-b px-6 py-4">
+      <header className="flex items-center justify-between border-b px-6 py-4">
         <a href="/admin/kurse" className="text-lg font-semibold" style={{ color: "var(--color-primary)" }}>
           {access.tenant.name} — Admin
         </a>
+        <nav className="flex gap-4 text-base">
+          <a href="/admin/kurse" className="hover:underline">
+            Kurse
+          </a>
+          <a href="/admin/nutzer" className="hover:underline">
+            Nutzer
+          </a>
+        </nav>
       </header>
       <div className="px-6 py-6">{children}</div>
     </div>
