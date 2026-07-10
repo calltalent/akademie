@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { ModuleLessonTree, DeleteLessonButton } from "@/components/admin/module-lesson-tree";
 import { BlockEditor } from "@/components/editor/block-editor";
+import { LessonPublishToggle } from "@/components/admin/publish-toggle";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
 
 export default async function CourseEditorPage({
@@ -82,11 +83,18 @@ export default async function CourseEditorPage({
               initialTitle={activeLesson.title}
               initialBlocks={activeLessonBlocks}
             />
-            <DeleteLessonButton
-              lessonId={activeLesson.id}
-              courseId={courseId}
-              title={activeLesson.title}
-            />
+            <div className="flex items-center justify-between border-t pt-3">
+              <LessonPublishToggle
+                lessonId={activeLesson.id}
+                courseId={courseId}
+                status={activeLesson.status}
+              />
+              <DeleteLessonButton
+                lessonId={activeLesson.id}
+                courseId={courseId}
+                title={activeLesson.title}
+              />
+            </div>
           </div>
         ) : (
           <p className="flex-1 text-base text-gray-500">

@@ -95,7 +95,24 @@
 
 **Block 3 vollständig verifiziert (Josip, 10.07.2026 spätnachts):** Kurs „Test-Kurs" mit zwei Modulen und zwei Lektionen angelegt, Text-Block hinzugefügt und beschrieben, Autosave bestätigt (Reload-Test: Inhalt blieb erhalten → wirklich in DB, nicht nur Browser-State).
 
-**Nächster Schritt:** Block 4 (Bunny-Upload + Player) oder Block 5 (Lernansicht + Fortschritt) — mit Josip abstimmen, welcher zuerst.
+**Entscheidung:** Block 5 vor Block 4 (Lernansicht zuerst testbar ohne Video-Infrastruktur).
+
+**Block 5 — Lernansicht + Fortschritt + Abschlusslogik: erstellt (Cowork, lokal zu prüfen):**
+1. src/lib/progress/compute.ts — reine Funktionen: computeCourseProgress (Zähler/Prozent/isComplete), flattenLessonIds + findAdjacentLessonIds (Vor/Zurück-Navigation modulübergreifend).
+2. src/lib/progress/compute.test.ts — Vitest, deckt Randfälle ab (leerer Kurs, erste/letzte Lektion).
+3. src/lib/progress/actions.ts — completeLesson(): Upsert auf `progress` (unique user_id+lesson_id), RLS `progress_own` erzwingt Eigentümerschaft ohne Enrollment-Prüfung.
+4. src/components/learn/block-renderer.tsx — read-only Darstellung aller 9 Blocktypen (Video/Quiz/Abgabe als Platzhalter mit Verweis auf späteren Block/Phase 2).
+5. src/components/learn/complete-lesson-button.tsx — Abschließen-Button, springt danach automatisch zur nächsten Lektion.
+6. src/app/(learn)/kurs/[slug]/page.tsx — Kursübersicht: Fortschrittsbalken, Modul-/Lektionsliste mit Häkchen, „Kurs starten"/„Weiterlernen".
+7. src/app/(learn)/kurs/[slug]/l/[lessonId]/page.tsx — Lernansicht: Blöcke, Vor/Zurück, Abschließen.
+8. src/app/page.tsx umgebaut zu „Meine Kurse": Liste veröffentlichter Kurse mit Fortschrittsbalken je Kurs; Link zu /admin/kurse falls Staff.
+9. src/components/admin/publish-toggle.tsx + Einbau in admin/kurse (Kursliste) und admin/kurse/[id] (Lektion) — Veröffentlichen/Entwurf-Umschalter, ohne den gab es keinen Weg, Kern-DoD zu testen (Lernende sehen nur `status='published'`).
+
+**Bewusste Vereinfachung:** keine Enrollment-Zeilen für Sichtbarkeit — RLS `courses_member_select` zeigt jedem Mandanten-Mitglied alle veröffentlichten Kurse (nicht nur zugewiesene). Formale Kurs-Zuweisung/Enrollment kommt mit Block 6 (Nutzerverwaltung) bzw. Stripe-Kauf in Phase 2. `progress`-Tracking funktioniert unabhängig davon schon jetzt korrekt (RLS `progress_own`).
+
+**Block 5 vollständig verifiziert (Josip, 10.07.2026 nachts):** „Test-Kurs" veröffentlicht, beide Lektionen veröffentlicht und abgeschlossen, Startseite zeigt „2/2 Lektionen — abgeschlossen 🎉" mit vollem Fortschrittsbalken. Kompletter Lernpfad (Meine Kurse → Kursübersicht → Lernansicht → Abschließen → zurück) funktioniert E2E. Kern-DoD Satz „Kurs anlegen und als Lernender abschließen" damit erfüllt — nur noch ohne Video (Block 4 fehlt).
+
+**Nächster Schritt:** Block 4 (Bunny-Upload + Player) oder Block 6 (Nutzerverwaltung + CSV-Import) — mit Josip abstimmen.
 
 ## Phase 2 — Geschäft ⬜
 
