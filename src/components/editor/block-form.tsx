@@ -1,6 +1,7 @@
 "use client";
 
 import type { Block } from "@/lib/courses/schema";
+import { VideoUpload } from "@/components/editor/video-upload";
 
 /**
  * Ein Formular je Block-Typ. Bewusst einfach gehalten (Textarea/Input statt
@@ -70,10 +71,10 @@ export function BlockForm({
 
     case "video":
       return (
-        <p className="text-sm text-gray-500">
-          Video-Upload folgt in Block 4 (Bunny Stream). Aktuell:{" "}
-          {block.bunnyVideoId ?? "kein Video zugewiesen"}.
-        </p>
+        <VideoUpload
+          currentVideoId={block.bunnyVideoId}
+          onUploaded={(videoId) => onChange({ ...block, bunnyVideoId: videoId })}
+        />
       );
 
     case "audio":

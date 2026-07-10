@@ -112,7 +112,19 @@
 
 **Block 5 vollständig verifiziert (Josip, 10.07.2026 nachts):** „Test-Kurs" veröffentlicht, beide Lektionen veröffentlicht und abgeschlossen, Startseite zeigt „2/2 Lektionen — abgeschlossen 🎉" mit vollem Fortschrittsbalken. Kompletter Lernpfad (Meine Kurse → Kursübersicht → Lernansicht → Abschließen → zurück) funktioniert E2E. Kern-DoD Satz „Kurs anlegen und als Lernender abschließen" damit erfüllt — nur noch ohne Video (Block 4 fehlt).
 
-**Nächster Schritt:** Block 4 (Bunny-Upload + Player) oder Block 6 (Nutzerverwaltung + CSV-Import) — mit Josip abstimmen.
+**Block 4 — Bunny-Upload (TUS) + Player: erstellt (Cowork, lokal zu prüfen):**
+1. src/lib/bunny/client.ts — server-only: createBunnyVideo() (Create-Video-API), generateTusCredentials() (SHA256-Signatur aus libraryId+apiKey+expirationTime+videoId, 24h Gültigkeit), deleteBunnyVideo(), getPlayerConfig() (liefert nur libraryId, keine geheime Information — steckt ohnehin in jeder Embed-URL).
+2. src/app/api/bunny/create-video/route.ts — POST-Route: requireStaffTenant()-Gate, zod-Body-Validierung, legt Bunny-Video an, gibt signierte TUS-Credentials zurück. Datei selbst läuft NIE durch unseren Server.
+3. src/components/editor/video-upload.tsx — Client-Komponente: Typ-Whitelist (MP4/MOV/WebM/MKV) + Größen-Whitelist (max. 2 GB), tus-js-client lädt direkt zu Bunny hoch (video.bunnycdn.com/tusupload), Fortschrittsanzeige, Resume bei Abbruch (TUS-Standard).
+4. src/components/editor/block-form.tsx — Video-Block nutzt jetzt VideoUpload statt Platzhaltertext.
+5. src/components/player/bunny-player.tsx — iframe-Player (iframe.mediadelivery.net/embed/{libraryId}/{videoId}), Server Component.
+6. src/components/learn/block-renderer.tsx — Video-Block rendert jetzt BunnyPlayer statt Platzhalter (Fallback-Text falls Bunny nicht konfiguriert).
+
+**Bewusst nicht in Block 4 (laut Entscheidung 10.07.2026):** Encoding-Webhook (Status „fertig kodiert") — verschoben auf Phase 3 zusammen mit der STT-Entscheidung. Aktuell wird direkt nach Upload-Ende der Player eingebettet; Bunny kodiert im Hintergrund weiter, das ist normales Bunny-Verhalten und nicht in unserer Kontrolle.
+
+**Block 4 vollständig verifiziert (Josip, 11.07.2026):** Video-Upload, Bunny-Dashboard-Eintrag und Player in der Lernansicht funktionieren wie erwartet.
+
+**Nächster Schritt:** Block 6 (Nutzerverwaltung + CSV-Import) — letzter offener Block für den Phase-1-Kern-DoD (CSV-Import 100 Nutzer < 30 s).
 
 ## Phase 2 — Geschäft ⬜
 

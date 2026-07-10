@@ -1,4 +1,6 @@
 import type { Block } from "@/lib/courses/schema";
+import { getPlayerConfig } from "@/lib/bunny/client";
+import { BunnyPlayer } from "@/components/player/bunny-player";
 
 /**
  * Read-only-Darstellung der Blöcke in der Lernansicht.
@@ -43,14 +45,25 @@ function BlockView({ block }: { block: Block }) {
       // eslint-disable-next-line @next/next/no-img-element -- externe/Storage-URLs, kein next/image-Loader konfiguriert
       return <img src={block.url} alt={block.alt} className="w-full rounded-md" />;
 
-    case "video":
-      return (
-        <div className="rounded-md border p-6 text-center text-base text-gray-500">
-          {block.bunnyVideoId
-            ? `Video-Player folgt in Block 4 (Bunny-ID: ${block.bunnyVideoId})`
-            : "Kein Video zugewiesen."}
-        </div>
-      );
+    case "video": {
+      if (!block.bunnyVideoId) {
+        return (
+          <div className="rounded-md border p-6 text-center text-base text-gray-500">
+            Kein Video zugewiesen.
+          </div>
+        );
+      }
+      try {
+        const { libraryId } = getPlayerConfig();
+        return <BunnyPlayer libraryId={libraryId} videoId={block.bunnyVideoId} />;
+      } catch {
+        return (
+          <div className="rounded-md border p-6 text-center text-base text-gray-500">
+            Video-Player nicht verfügbar (Bunny Stream nicht konfiguriert).
+          </div>
+        );
+      }
+    }
 
     case "audio":
       return <audio controls src={block.url} className="w-full" />;
