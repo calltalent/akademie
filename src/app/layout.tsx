@@ -14,7 +14,10 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang="de">
+    <html lang="de" suppressHydrationWarning>
+      {/* suppressHydrationWarning: bekannte Fehlmeldung durch Browser-Erweiterungen
+          (z. B. LanguageTool, data-lt-installed), die vor React-Hydration ins
+          <html>-Tag schreiben. Betrifft nur dieses Tag, keine Kindelemente. */}
       <body className="min-h-screen bg-white text-gray-900 antialiased">
         <NextIntlClientProvider messages={messages}>
           {children}

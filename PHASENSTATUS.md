@@ -53,14 +53,20 @@
 9. src/app/layout.tsx, src/app/page.tsx — Root-Layout mit NextIntlClientProvider, Platzhalter-Startseite
 10. vitest.config.ts, src/test/setup.ts, src/lib/env.test.ts, playwright.config.ts, e2e/auth.spec.ts
 
-**Offen — zwingend vor Weiterarbeit (nächste lokale Sitzung mit Claude Code, Modell Sonnet):**
-1. **Git:** defekten `.git`-Ordner (falls vorhanden) löschen, dann `git init -b main && git add -A && git commit -m "chore: Phase 0 + Block 1 Grundgerüst"`. Cowork-Sandbox kann das wegen Netz-Mount-Sperre nicht selbst ausführen (bestätigt getestet).
-2. `npm install` lokal ausführen (Sandbox hält keine dauerhaften Hintergrundprozesse — jeder Bash-Aufruf ist isoliert, npm install bricht ab).
-3. `npm run dev` lokal starten, Block 1 prüfen (Login, Registrierung, Magic Link E2E) — tester-Agent einsetzen.
-4. Vor erstem Commit: Secret-Scan .env vs. .gitignore (service_role/Anthropic/Bunny-Keys dürfen nicht ins Repo).
-5. Danach Block 2 (Mandanten-Auflösung + Branding) mit builder-Agent starten.
+**Erledigt (lokal durch Josip, 10.07.2026 spätabends):**
+1. Git init lokal erfolgreich: `main`-Branch, erster Commit `dcd1faa "chore: Phase 0 + Block 1 Grundgerüst"`.
+2. `npm install` erfolgreich (515 Pakete). 7 npm-audit-Hinweise (5 moderate, 1 high, 1 critical) — bewusst noch NICHT mit `--force` gefixt (Breaking-Change-Risiko); vor Phasenabschluss gezielt prüfen.
+3. `npm run dev` erfolgreich, Next.js 16.2.10.
+4. Next.js-16-Fix: `src/middleware.ts` → `src/proxy.ts` umbenannt (Next 16 verlangt neue Namenskonvention, Funktionsname `middleware` → `proxy`, Runtime jetzt Node.js statt Edge). Alte Datei gelöscht.
+5. Hydration-Fix: `suppressHydrationWarning` auf `<html>` in layout.tsx (Ursache: Browser-Erweiterung LanguageTool schreibt `data-lt-installed` vor React-Hydration ins DOM — kein App-Bug).
+6. `next-intl` von `^3` auf `latest` gesetzt (Next 16.2.10 war zu neu für next-intl@3-Peer-Dependency).
+7. **E2E bestätigt:** Registrierung mit office@calltalent.ai → E-Mail-Bestätigung → Login → Session aktiv → Abmelden-Button sichtbar. profiles-Zeile wird bei Erstanmeldung automatisch angelegt (RLS `profiles_own` greift).
 
-**Wichtige Erkenntnis:** Cowork-Sandbox eignet sich für Datei-Erstellung/-Bearbeitung, aber NICHT für npm install, Dev-Server oder Testausführung (Prozesse enden zwischen Aufrufen). Ab jetzt produktiv weiterarbeiten: lokal mit Claude Code im Ordner `SOFTWARE/calltalent-akademie/`.
+**Block 1 damit fertig und verifiziert.** Offen für Phasenabschluss (nicht blockierend für Block 2): npm-audit-Vulnerabilities gezielt prüfen, Vitest/Playwright-Suite tatsächlich laufen lassen (env.test.ts, auth.spec.ts wurden nur geschrieben, noch nicht ausgeführt).
+
+**Wichtige Erkenntnis:** Cowork-Sandbox eignet sich für Datei-Erstellung/-Bearbeitung, aber NICHT für npm install, Dev-Server oder Testausführung (Prozesse enden zwischen Aufrufen). Ausführung/Verifikation läuft lokal bei Josip (PowerShell), Dateiänderungen weiterhin über Cowork.
+
+**Nächster Schritt:** Block 2 — Mandanten-Auflösung + Branding (zwei Test-Mandanten mit unterschiedlichem Branding, `{slug}.localhost:3000`).
 
 ## Phase 2 — Geschäft ⬜
 

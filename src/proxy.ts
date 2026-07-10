@@ -3,10 +3,14 @@ import { createServerClient } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env";
 
 /**
+ * Next.js 16: middleware.ts wurde zu proxy.ts (Funktionsname `proxy`,
+ * läuft auf Node.js-Runtime, nicht mehr Edge — hier unkritisch, da wir
+ * ohnehin Supabase-SSR-Cookies serverseitig verarbeiten).
+ *
  * Block 1: nur Session-Refresh (Supabase-Auth-Cookies erneuern).
  * Block 2 ergänzt hier die Mandanten-Auflösung (Host → tenant_id als Header).
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
