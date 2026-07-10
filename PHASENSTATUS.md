@@ -66,7 +66,22 @@
 
 **Wichtige Erkenntnis:** Cowork-Sandbox eignet sich für Datei-Erstellung/-Bearbeitung, aber NICHT für npm install, Dev-Server oder Testausführung (Prozesse enden zwischen Aufrufen). Ausführung/Verifikation läuft lokal bei Josip (PowerShell), Dateiänderungen weiterhin über Cowork.
 
-**Nächster Schritt:** Block 2 — Mandanten-Auflösung + Branding (zwei Test-Mandanten mit unterschiedlichem Branding, `{slug}.localhost:3000`).
+**Block 2 — Mandanten-Auflösung + Branding: erstellt (Cowork, DB-Teil live gegen Supabase, Code-Teil lokal zu prüfen):**
+1. Migration `0002_storage` LIVE angewendet (Supabase MCP): Storage-Buckets `branding`, `course-assets` (öffentlich lesbar), `submissions`, `certificates` (privat), Policies nach `{tenant_id}/...`-Pfadkonvention, Staff-Schreibrechte über `member_role`/`is_staff`.
+2. Zwei Demo-Mandanten LIVE angelegt (synthetische Daten): `demo-blau` (Akzent #1d4ed8, radius 0.5rem) und `demo-gruen` (Akzent #15803d, radius 1rem). Josip als `owner` in `demo-blau` eingetragen (office@calltalent.ai).
+3. src/lib/tenant/types.ts — PublicTenant (strikt sichere Teilmenge von tenants), DEFAULT_BRANDING-Fallback.
+4. src/lib/tenant/resolve.ts — resolveTenantBySlug/-ByCustomDomain/-ById/-ByHost, ALLE über Admin-Client (service_role), weil RLS `tenants_member_select` Mitgliedschaft verlangt und anonyme Besucher noch keine sind. Strikte Spaltenliste, kein `select *`.
+5. src/proxy.ts erweitert: Host → resolveTenantByHost → `x-tenant-id`/`x-tenant-slug` als REQUEST-Header (nicht nur Response — wichtig für next/headers() in Server Components).
+6. src/lib/tenant/context.ts — getTenant() mit React cache(), liest Header, lädt vollen Tenant nach.
+7. src/components/branding/theme-style.tsx — injiziert CSS-Variablen (--color-primary, --color-background, --radius) im `<head>`; einfache Whitelist-Validierung gegen CSS-Injection über Branding-Felder.
+8. src/app/layout.tsx, src/app/page.tsx angepasst: Branding wird angewendet, Mandantenname als Titel/Überschrift; Root-Domain ohne Subdomain zeigt Dev-Hinweis mit den zwei Demo-URLs statt Absturz.
+
+**Offen — lokal zu prüfen (nächster Schritt):**
+1. Dev-Server neu starten (`Strg+C`, `npm run dev`).
+2. `http://demo-blau.localhost:3000` und `http://demo-gruen.localhost:3000` öffnen — unterschiedliche Akzentfarbe/Eckenradius prüfen (Kern-DoD Satz 1: zwei Mandanten mit Branding parallel).
+3. `http://localhost:3000` (ohne Subdomain) — Dev-Hinweis-Seite sollte erscheinen, kein Fehler.
+4. Auf `demo-blau` mit office@calltalent.ai einloggen — sollte funktionieren (Mitgliedschaft vorhanden). Auf `demo-gruen` einloggen — Login sollte technisch gehen, aber KEINE Mitgliedschaft (relevant erst ab Block 3, wenn Kurszugriff RLS-geprüft wird).
+5. Danach: git add -A / commit, dann Block 3 (Kurs-/Modul-/Lektions-Editor).
 
 ## Phase 2 — Geschäft ⬜
 

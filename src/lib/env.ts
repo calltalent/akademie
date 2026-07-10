@@ -6,6 +6,12 @@ import { z } from "zod";
  * Sicherheitsregel CLAUDE.md §2.2: Secrets nur serverseitig.
  */
 
+/** `VAR=` in .env liefert "" (leerer String), nicht undefined — als "nicht gesetzt" behandeln. */
+const optionalString = z.preprocess(
+  (v) => (v === "" ? undefined : v),
+  z.string().min(1).optional(),
+);
+
 const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
@@ -13,13 +19,13 @@ const publicSchema = z.object({
 
 const serverOnlySchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
-  ANTHROPIC_API_KEY: z.string().min(1).optional(),
-  BUNNY_STREAM_LIBRARY_ID: z.string().min(1).optional(),
-  BUNNY_STREAM_API_KEY: z.string().min(1).optional(),
-  BUNNY_STREAM_CDN_HOSTNAME: z.string().min(1).optional(),
-  STRIPE_SECRET_KEY: z.string().min(1).optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
-  RESEND_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_API_KEY: optionalString,
+  BUNNY_STREAM_LIBRARY_ID: optionalString,
+  BUNNY_STREAM_API_KEY: optionalString,
+  BUNNY_STREAM_CDN_HOSTNAME: optionalString,
+  STRIPE_SECRET_KEY: optionalString,
+  STRIPE_WEBHOOK_SECRET: optionalString,
+  RESEND_API_KEY: optionalString,
 });
 
 function parsePublicEnv() {
