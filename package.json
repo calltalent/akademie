@@ -23,13 +23,15 @@
     "class-variance-authority": "^0.7",
     "tailwind-merge": "^2",
     "lucide-react": "^0.460",
-    "tus-js-client": "^4"
+    "tus-js-client": "^4",
+    "sanitize-html": "^2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sanitize-html": "^2",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",

@@ -146,11 +146,32 @@
 2. `import.ts`: 1 von 100 Zeilen schlug mit transientem `fetch failed` fehl. Fix: `importOneUserWithRetry()` — ein automatischer Retry mit 300 ms Verzögerung, sicher wiederholbar, weil alle Schreibvorgänge (createUser fällt bei „existiert bereits" auf den linked-Pfad zurück, memberships/enrollments sind Upserts) idempotent sind.
 Die von mir erzeugte `test100.csv` wurde nach dem Test wieder gelöscht (kein Teil des Projekts).
 
-**Nächste Schritte vor Phasenabschluss:**
-1. Git-Commit „feat: Block 6 - Nutzerverwaltung und CSV-Import (inkl. Rate-Limit-Fix und Retry)".
-2. Tester-Agent: Vitest- und Playwright-Suiten tatsächlich ausführen (bisher nur geschrieben, nie gelaufen: env.test.ts, schema.test.ts, compute.test.ts, csv.test.ts, auth.spec.ts).
-3. npm-audit-Vulnerabilities gezielt prüfen (5 moderate, 1 high, 1 critical seit Block 1 offen).
-4. security-reviewer-Agent: RLS-Audit über alle Phase-1-Tabellen/Storage-Policies, OWASP-Checkliste, Secret-Scan.
+**Git-Commit erledigt (Josip, 11.07.2026):** „feat: Block 6 - Nutzerverwaltung und CSV-Import (inkl. Rate-Limit-Fix und Retry)". Damit ist der gesamte Phase-1-Code (alle 6 Blöcke) versioniert.
+
+**Testsuiten ausgeführt und alle grün (Josip, 11.07.2026):**
+1. Vitest: 15/15 bestanden. Bug gefunden+behoben: `vitest.config.ts` lud `.env` nicht in `process.env` (anders als `next dev`), dadurch schlug `env.test.ts` mit „Ungültige öffentliche Umgebungsvariablen" fehl. Fix: `test.env: loadEnv("", process.cwd(), "")` aus `vite` (nicht `vitest/config` — dort nicht exportiert) ergänzt.
+2. Playwright: 1/1 bestanden. Bug gefunden+behoben: `e2e/auth.spec.ts` nutzte `getByLabel("E-Mail")`/`getByLabel("Passwort")` ohne `exact: true` — matcht auf der Login-Seite per Teilstring sowohl das Passwort- als auch das Magic-Link-E-Mail-Feld (bzw. das `aria-label` des umgebenden Formulars „Mit Passwort anmelden"). Fix: `exact: true` gesetzt, zusätzliche Prüfung für das Magic-Link-Feld ergänzt.
+
+**npm-audit geprüft (Josip, 11.07.2026):** `npm audit --omit=dev` (nur Produktions-Abhängigkeiten) zeigt ausschließlich 2 moderate Funde (postcss/next-Kette, „XSS via Unescaped `</style>` in CSS Stringify Output") — kein high, kein critical im produktiven Code. Die ursprünglich gemeldeten 1 high + 1 critical (und 3 der 5 moderate) stecken vollständig in der Vitest/Vite/esbuild-Kette, also reinem Test-Tooling (devDependencies), das nie mit ausgeliefert wird.
+- postcss/next: `npm audit fix --force` würde Next.js auf 9.3.3 downgraden (absurder Breaking Change) — bewusst NICHT angewendet, Risiko vernachlässigbar (kein Verarbeiten von nutzergeneriertem CSS).
+- esbuild-Kette: betrifft nur den lokalen Dev-/Test-Server (CORS-Schwäche), nie den produktiven Server. Fix würde Vitest v2→v4 heben (Breaking Change, gefährdet die gerade grün gewordene Suite) — bewusst zurückgestellt, kein Blocker für Phase-1-Abschluss. Als Folge-Task vorgemerkt: Vitest-4-Upgrade vor Phase 2.
+
+**security-reviewer-Agent-Durchgang abgeschlossen (11.07.2026):** vollständiges RLS-/OWASP-/Secret-Audit gegen CLAUDE.md-Checkliste, inkl. Live-Supabase-Advisor-Abgleich. Ergebnis: 0 KRITISCH, 1 HOCH (phasenblockierend laut CLAUDE.md-Regel), 5 MITTEL, 3 NIEDRIG.
+
+**HOCH-Fund SOFORT behoben (blockierte die Phase):** Stored XSS im Text-Block. `src/components/learn/block-renderer.tsx` rendert `block.html` ungefiltert über `dangerouslySetInnerHTML`; jedes Staff-Mitglied inkl. Trainer (RLS `lessons_staff_write` erlaubt das schon der niedrigsten Staff-Rolle) hätte beliebiges Script einschleusen können — ausgeführt im Browser jedes Members UND jedes Owners/Admins beim Ansehen der Lektion (Rechte-Eskalation innerhalb des Mandanten). Fix in `src/lib/courses/schema.ts`: `sanitize-html`-Whitelist-Sanitizing direkt im zod-Schema (`textBlockSchema.html` via `.transform()`) — greift bei JEDEM Schreibpfad (`saveLessonBlocks`), unabhängig vom Editor-Frontend. Erlaubte Tags: Absätze, Formatierung, Listen, Überschriften H2-H4, Links (mit `rel="noopener noreferrer"`), Zitat, Code. `package.json`: `sanitize-html` + `@types/sanitize-html` ergänzt (Josip muss `npm install` erneut laufen lassen). Zwei neue Vitest-Fälle in `schema.test.ts` (Script/Event-Handler werden entfernt, erlaubte Tags bleiben erhalten).
+
+**MITTEL-Funde (nicht phasenblockierend, für Phase 2 vorgemerkt):**
+1. Bunny-Video ohne Mandantenbindung — kein `bunny_videos(tenant_id, video_id)`-Mapping, Wiedergabe-URL ungeschützt. Fix: Tabelle ergänzen + Prüfung in `saveLessonBlocks`.
+2. Kein Rate Limiting auf Auth-/API-Routen (`/api/admin/users/import`, `/api/bunny/create-video`, Login/Registrierung).
+3. Storage-Buckets `branding`/`course-assets`: Policy erlaubt Listing bucket-weit statt objektbezogen — Metadaten-Leak über Mandantengrenzen (Dateinamen/Tenant-UUIDs sichtbar, Inhalte selbst sind gewollt öffentlich). Supabase-Advisor bestätigt WARN.
+4. Supabase Auth „Leaked Password Protection" ist deaktiviert — Ein-Klick-Fix im Dashboard (Authentication → Policies), kein Code nötig.
+5. `products_public_select`-RLS-Policy (Phase-2-Tabelle, aktuell 0 Zeilen) filtert nicht nach Mandant — vor Phase-2-Start schließen.
+
+**NIEDRIG-Funde:** fehlende `tenant_id`-Filter als Defense-in-Depth in `courses/actions.ts`-Queries (RLS greift bereits korrekt, aber kein zweites Sicherheitsnetz auf Code-Ebene); kein DSGVO-Hard-Delete-Pfad (nur Soft-Delete via `disableMembership`, Phase-4-Thema); `findUserByEmail` paginiert nicht über 1000 Nutzer hinaus.
+
+**Positivbefunde (verifiziert):** alle 25 Tabellen mit aktiver RLS; Mandantentrennung für member/trainer/admin/owner/anon durchgehend korrekt; `memberships_admin_write` vs. `is_staff` korrekt unterschiedlich streng, im Code (`requireAdminTenant`/`requireStaffTenant`) korrekt gespiegelt; CSV-Import-`tenantId` kommt ausschließlich aus dem serverseitig geprüften Kontext, nie aus Client-/CSV-Daten; `admin.ts` (service_role) korrekt mit `server-only` geschützt, kein Import in Client-Komponenten; keine Secrets im Repo; Quiz-Antworten (`questions`-Tabelle) haben ausschließlich `questions_staff_all`, keine Member-Select-Policy — kein Lösungs-Leak trotz bereits existierendem Datenmodell; Bunny-Upload-Whitelist und private Storage-Buckets korrekt umgesetzt.
+
+**Phase 1 damit inhaltlich abgeschlossen** — der einzige phasenblockierende Fund ist behoben. Offen für den Nutzer: `npm install` (wegen `sanitize-html`), danach `npm run test` zur Bestätigung der neuen Sanitize-Tests, dann Commit.
 
 ## Phase 2 — Geschäft ⬜
 

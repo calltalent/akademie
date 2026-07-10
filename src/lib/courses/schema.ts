@@ -1,4 +1,5 @@
 import { z } from "zod";
+import sanitizeHtml from "sanitize-html";
 
 /**
  * Block-Typen laut SPEC.md §3 (Must-Liste) und Migration-Kommentar
@@ -12,9 +13,38 @@ const baseBlock = z.object({
   id: z.string().uuid(),
 });
 
+/**
+ * Sicherheits-Fix (security-reviewer-Audit 11.07.2026, HOCH — blockierte
+ * Phase-1-Abschluss): Text-Block-HTML wurde ungeprüft über
+ * dangerouslySetInnerHTML gerendert (src/components/learn/block-renderer.tsx).
+ * Jedes Staff-Mitglied inkl. Trainer (RLS lessons_staff_write erlaubt das
+ * auch der niedrigsten Staff-Rolle) hätte beliebiges Script einschleusen
+ * können — ausgeführt im Browser jedes Members UND jedes Owners/Admins beim
+ * Ansehen der Lektion. Fix: striktes Server-seitiges Whitelist-Sanitizing
+ * direkt im zod-Schema, greift bei JEDEM Schreibpfad (saveLessonBlocks),
+ * unabhängig vom Editor-Frontend.
+ */
+const ALLOWED_TEXT_TAGS = [
+  "p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li",
+  "h2", "h3", "h4", "blockquote", "code", "pre", "span",
+];
+
+function sanitizeLessonHtml(html: string): string {
+  return sanitizeHtml(html, {
+    allowedTags: ALLOWED_TEXT_TAGS,
+    allowedAttributes: {
+      a: ["href", "title", "target", "rel"],
+    },
+    allowedSchemes: ["http", "https", "mailto"],
+    transformTags: {
+      a: sanitizeHtml.simpleTransform("a", { rel: "noopener noreferrer" }),
+    },
+  });
+}
+
 export const textBlockSchema = baseBlock.extend({
   type: z.literal("text"),
-  html: z.string().max(20000),
+  html: z.string().max(20000).transform(sanitizeLessonHtml),
 });
 
 export const imageBlockSchema = baseBlock.extend({

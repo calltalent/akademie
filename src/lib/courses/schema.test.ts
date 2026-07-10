@@ -16,6 +16,29 @@ describe("blockSchema", () => {
     const blocks = [createEmptyBlock("callout"), createEmptyBlock("video")];
     expect(blocksSchema.safeParse(blocks).success).toBe(true);
   });
+
+  it("entfernt <script> und Event-Handler-Attribute aus Text-Block-HTML (Stored-XSS-Fix)", () => {
+    const block = {
+      ...createEmptyBlock("text"),
+      html: '<p onclick="alert(1)">Hallo</p><script>alert(2)</script>',
+    };
+    const result = blockSchema.safeParse(block);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === "text") {
+      expect(result.data.html).not.toContain("<script");
+      expect(result.data.html).not.toContain("onclick");
+      expect(result.data.html).toContain("Hallo");
+    }
+  });
+
+  it("behält erlaubte Formatierungs-Tags in Text-Block-HTML", () => {
+    const block = { ...createEmptyBlock("text"), html: "<p><strong>Fett</strong> und <em>kursiv</em></p>" };
+    const result = blockSchema.safeParse(block);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === "text") {
+      expect(result.data.html).toContain("<strong>Fett</strong>");
+    }
+  });
 });
 
 describe("courseSchema", () => {
