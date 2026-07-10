@@ -1,0 +1,13 @@
+{
+  "common": {
+    "appName": "Calltalent-Akademie",
+    "loading": "Wird geladen …",
+    "save": "Speichern",
+    "cancel": "Abbrechen"
+  },
+  "auth": {
+    "login": "Anmelden",
+    "register": "Registrieren",
+    "logout": "Abmelden"
+  }
+}

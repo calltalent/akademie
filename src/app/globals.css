@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+/*
+ * Design-Leitplanken SPEC.md §4.5: ruhiges, helles Interface, eine
+ * Akzentfarbe je Mandant, Inter als Standardschrift, keine dekorativen
+ * Verläufe. Mandanten-Branding (Block 2) überschreibt --color-primary
+ * per CSS-Variable im Layout, nicht hier.
+ */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --color-primary: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--color-primary);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 16px;
+}
