@@ -76,12 +76,26 @@
 7. src/components/branding/theme-style.tsx — injiziert CSS-Variablen (--color-primary, --color-background, --radius) im `<head>`; einfache Whitelist-Validierung gegen CSS-Injection über Branding-Felder.
 8. src/app/layout.tsx, src/app/page.tsx angepasst: Branding wird angewendet, Mandantenname als Titel/Überschrift; Root-Domain ohne Subdomain zeigt Dev-Hinweis mit den zwei Demo-URLs statt Absturz.
 
-**Offen — lokal zu prüfen (nächster Schritt):**
-1. Dev-Server neu starten (`Strg+C`, `npm run dev`).
-2. `http://demo-blau.localhost:3000` und `http://demo-gruen.localhost:3000` öffnen — unterschiedliche Akzentfarbe/Eckenradius prüfen (Kern-DoD Satz 1: zwei Mandanten mit Branding parallel).
-3. `http://localhost:3000` (ohne Subdomain) — Dev-Hinweis-Seite sollte erscheinen, kein Fehler.
-4. Auf `demo-blau` mit office@calltalent.ai einloggen — sollte funktionieren (Mitgliedschaft vorhanden). Auf `demo-gruen` einloggen — Login sollte technisch gehen, aber KEINE Mitgliedschaft (relevant erst ab Block 3, wenn Kurszugriff RLS-geprüft wird).
-5. Danach: git add -A / commit, dann Block 3 (Kurs-/Modul-/Lektions-Editor).
+**Block 2 vollständig verifiziert (Josip, 10.07.2026 spätnachts):** demo-blau (blau) und demo-gruen (grün) zeigen unterschiedliches Branding parallel; Root-Domain zeigt Dev-Hinweis statt Fehler; Login auf demo-blau funktioniert mit bestehender Mitgliedschaft. Ein Bug unterwegs behoben: env.ts akzeptierte leere `.env`-Strings (`VAR=`) nicht als "nicht gesetzt" — jetzt `optionalString`-Preprocessing in src/lib/env.ts.
+
+**Block 3 — Kurs-/Modul-/Lektions-Editor mit Blöcken: erstellt (Cowork, lokal zu prüfen):**
+1. src/lib/courses/schema.ts — 9 Block-Typen als zod discriminatedUnion (text, image, video, audio, file, quiz, submission, callout, embed), createEmptyBlock()-Factory, courseSchema mit Slug-Regex-Validierung.
+2. src/lib/courses/schema.test.ts — Vitest für Block- und Slug-Validierung.
+3. src/lib/auth/staff.ts — checkStaffAccess() (für Layouts, wirft nie) + requireStaffTenant() (für Server Actions, wirft) — beide rufen `is_staff(tenant_id)` per RPC als zweite Verteidigungslinie neben RLS.
+4. src/lib/courses/actions.ts — Server Actions: createCourse, updateCourseStatus, deleteCourse, createModule, deleteModule, moveModule (Auf/Ab), createLesson, deleteLesson, updateLessonStatus, saveLessonBlocks (zod-validiertes Autosave), updateLessonTitle.
+5. src/app/(admin)/admin/layout.tsx — Staff-Guard mit klaren Meldungen (kein Mandant / nicht angemeldet / kein Zugriff).
+6. src/app/(admin)/admin/kurse/page.tsx + src/components/admin/create-course-form.tsx — Kursliste + Anlage-Formular.
+7. src/app/(admin)/admin/kurse/[id]/page.tsx — Editor: Strukturbaum (Module/Lektionen) links, Block-Editor rechts, per `?lesson=`-Query-Param.
+8. src/components/admin/module-lesson-tree.tsx — Modul-/Lektionsbaum mit Anlegen/Löschen/Verschieben.
+9. src/components/editor/block-editor.tsx, block-form.tsx — Block-Liste mit Hinzufügen/Entfernen/Auf-Ab-Verschieben, Autosave 1s-Debounce, Speicherstatus-Anzeige.
+
+**Bewusste Vereinfachung gegenüber architect-Plan:** kein Drag & Drop (Reihenfolge per Pfeiltasten-Buttons) — spart eine Dependency, funktional gleichwertig für Phase 1. Rich-Text ist eine einfache Textarea, kein WYSIWYG. Beides bei Bedarf später nachrüstbar, kein Rearchitecture nötig.
+
+**Bug unterwegs behoben:** `src/lib/courses/actions.ts` (eine "use server"-Datei) exportierte `initialCourseActionState` als Objekt — Next.js 16 erlaubt in "use server"-Dateien nur async-Funktions-Exporte. Fix: Konstante + Typ nach `src/lib/courses/state.ts` ausgelagert, drei Komponenten entsprechend umgestellt.
+
+**Block 3 vollständig verifiziert (Josip, 10.07.2026 spätnachts):** Kurs „Test-Kurs" mit zwei Modulen und zwei Lektionen angelegt, Text-Block hinzugefügt und beschrieben, Autosave bestätigt (Reload-Test: Inhalt blieb erhalten → wirklich in DB, nicht nur Browser-State).
+
+**Nächster Schritt:** Block 4 (Bunny-Upload + Player) oder Block 5 (Lernansicht + Fortschritt) — mit Josip abstimmen, welcher zuerst.
 
 ## Phase 2 — Geschäft ⬜
 

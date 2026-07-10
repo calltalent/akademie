@@ -1,34 +1,49 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
+import type { PublicTenant } from "@/lib/tenant/types";
 
 /**
  * Zweite Verteidigungslinie neben RLS (Sicherheitsregel-Geist §2.1):
  * RLS (`is_staff(tenant_id)`) verhindert das eigentliche Schreiben/Lesen
- * bereits hart in der DB. Diese Funktion liefert zusätzlich eine
+ * bereits hart in der DB. Diese Funktionen liefern zusätzlich eine
  * benutzerfreundliche Fehlermeldung/Redirect-Grundlage in der UI-Schicht,
  * bevor überhaupt eine Anfrage an Supabase geht.
  */
-export async function requireStaffTenant() {
+
+type StaffCheckResult =
+  | { ok: true; tenant: PublicTenant; user: { id: string; email?: string } }
+  | { ok: false; reason: "no-tenant" | "not-authenticated" | "not-staff" };
+
+/** Für Server Components (Layouts/Seiten) — wirft nie, gibt Status zurück. */
+export async function checkStaffAccess(): Promise<StaffCheckResult> {
   const tenant = await getTenant();
-  if (!tenant) {
-    throw new Error("Kein Mandant zu diesem Host gefunden.");
-  }
+  if (!tenant) return { ok: false, reason: "no-tenant" };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error("Nicht angemeldet.");
+  if (!user) return { ok: false, reason: "not-authenticated" };
+
+  const { data: isStaff } = await supabase.rpc("is_staff", { t: tenant.id });
+  if (!isStaff) return { ok: false, reason: "not-staff" };
+
+  return { ok: true, tenant, user };
+}
+
+/** Für Server Actions — wirft, damit try/catch in actions.ts einheitlich greift. */
+export async function requireStaffTenant() {
+  const result = await checkStaffAccess();
+  if (!result.ok) {
+    const messages: Record<typeof result.reason, string> = {
+      "no-tenant": "Kein Mandant zu diesem Host gefunden.",
+      "not-authenticated": "Nicht angemeldet.",
+      "not-staff": "Kein Zugriff — nur für Team-Mitglieder (Staff).",
+    };
+    throw new Error(messages[result.reason]);
   }
 
-  const { data: isStaff, error } = await supabase.rpc("is_staff", {
-    t: tenant.id,
-  });
-  if (error || !isStaff) {
-    throw new Error("Kein Zugriff — nur für Team-Mitglieder (Staff).");
-  }
-
-  return { tenant, user, supabase };
+  const supabase = await createClient();
+  return { tenant: result.tenant, user: result.user, supabase };
 }
