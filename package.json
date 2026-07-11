@@ -26,7 +26,8 @@
     "tus-js-client": "^4",
     "sanitize-html": "^2",
     "resend": "^4",
-    "pdf-lib": "^1"
+    "pdf-lib": "^1",
+    "stripe": "^18"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

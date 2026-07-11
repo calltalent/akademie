@@ -73,5 +73,48 @@
     "profileTitle": "Mein Profil",
     "profileCertificatesTitle": "Meine Zertifikate",
     "profilePasswordHint": "Passwort ändern: über „Passwort vergessen“ auf der Login-Seite anfordern."
+  },
+  "payments": {
+    "kinds": {
+      "one_time": "Einmalkauf",
+      "subscription": "Abo (monatlich)"
+    },
+    "buyButton": "Kaufen",
+    "buyPending": "Wird vorbereitet …",
+    "loginRequired": "Bitte melde dich an, um dieses Produkt zu kaufen.",
+    "login": "Anmelden",
+    "register": "Registrieren",
+    "paymentsDisabled": "Zahlungen sind für diese Akademie aktuell nicht verfügbar.",
+    "productUnavailable": "Dieses Produkt ist nicht verfügbar.",
+    "rateLimited": "Zu viele Anfragen. Bitte kurz warten und erneut versuchen.",
+    "admin": {
+      "title": "Zahlungen",
+      "subtitle": "Produkte, Preise und Bestellungen dieses Mandanten.",
+      "newProduct": "Neues Produkt",
+      "products": "Produkte",
+      "noProducts": "Noch keine Produkte angelegt.",
+      "active": "Aktiv",
+      "inactive": "Deaktiviert",
+      "deactivate": "Deaktivieren (im Shop verbergen)",
+      "reactivate": "Wieder aktivieren",
+      "titleLabel": "Titel",
+      "slugLabel": "Slug (URL, z. B. einsteiger-kurs)",
+      "kindLabel": "Art",
+      "priceLabel": "Preis in Euro",
+      "courseLabel": "Verknüpfter Kurs (optional)",
+      "noCourse": "Kein Kurs",
+      "activeLabel": "Aktiv (im Shop sichtbar)",
+      "save": "Änderungen speichern",
+      "create": "Produkt anlegen",
+      "saved": "Gespeichert.",
+      "orders": "Bestellungen",
+      "noOrders": "Noch keine Bestellungen.",
+      "orderStatuses": {
+        "pending": "Ausstehend",
+        "paid": "Bezahlt",
+        "refunded": "Erstattet",
+        "failed": "Fehlgeschlagen"
+      }
+    }
   }
 }

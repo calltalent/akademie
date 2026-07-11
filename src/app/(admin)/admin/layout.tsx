@@ -41,6 +41,9 @@ export default async function AdminLayout({
           <a href="/admin/nutzer" className="hover:underline">
             Nutzer
           </a>
+          <a href="/admin/zahlungen" className="hover:underline">
+            Zahlungen
+          </a>
         </nav>
       </header>
       <div className="px-6 py-6">{children}</div>
