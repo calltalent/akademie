@@ -93,13 +93,12 @@ export async function GET(request: Request) {
 /**
  * POST /api/v1/enrollments — schreibt einen bestehenden Nutzer (muss
  * bereits ein `profiles`-Konto haben, z. B. über `POST /api/v1/users`
- * angelegt) in einen Kurs des Mandanten ein. `source: "api"` (neuer
- * Enum-Wert existiert bereits nicht in `enrollments.source` CHECK —
- * verwendet stattdessen `"manual"`, da das Schema (0001_init.sql Zeile 133)
- * nur `manual|purchase|import` erlaubt und NICHT verändert werden darf
- * (CLAUDE.md §4: 0001_init.sql niemals editieren). Siehe Bericht/
- * PHASENSTATUS.md für diese kleine, dokumentierte Abweichung vom
- * Plan-Wortlaut `source: "api"`.
+ * angelegt) in einen Kurs des Mandanten ein. `source: "api"` — eigener
+ * Enum-Wert (Migration `20260711223000_enrollments_source_add_api`,
+ * Josips Entscheidung 11.07.2026 nach ursprünglich dokumentierter
+ * Abweichung auf `"manual"`), ermöglicht saubere Unterscheidung zwischen
+ * Staff-Admin-UI-Einträgen und externen API-Integrationen im
+ * Reporting/Audit.
  */
 export async function POST(request: Request) {
   try {
@@ -172,7 +171,7 @@ export async function POST(request: Request) {
     const { data: enrollment, error } = await admin
       .from("enrollments")
       .upsert(
-        { tenant_id: tenantId, course_id: courseId, user_id: userId, source: "manual" },
+        { tenant_id: tenantId, course_id: courseId, user_id: userId, source: "api" },
         { onConflict: "course_id,user_id" },
       )
       .select("id, course_id, user_id, source, enrolled_at")

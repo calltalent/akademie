@@ -1031,3 +1031,16 @@ Ich gebe diesen Plan jetzt an den `builder`-Agenten weiter.
 **Phase 3 ist damit aus Sicherheitssicht NICHT mehr blockiert** (beide HOCH-Funde behoben) — vorbehaltlich Josips lokalem Testlauf.
 
 **Nachfund beim manuellen Test, `/admin/einstellungen` auf `demo-gruen` (Josip, 11.07.2026) — sofort behoben:** Next.js-Build-Fehler „Code generation for chunk item errored ... the chunking context (unknown) does not support external modules (request: node:dns/promises)". Ursache: derselbe strukturelle Fehlertyp wie beim `server-only`-Fund in Block 7 (siehe oben), aber diesmal mit Node-Built-ins statt dem `server-only`-Paket — der SSRF-Fix hatte `assertSafeWebhookUrl()` (nutzt `node:dns/promises`) direkt in `deliver.ts` importiert, das aber transitiv auch von der Client-Komponente `webhooks-panel.tsx` gebündelt wird (für `WEBHOOK_EVENTS`). Fix: `deliverWebhookAttempt()` in eine neue, server-only Datei `src/lib/webhooks/deliver-attempt.ts` (`import "server-only"`) ausgelagert; `deliver.ts` enthält jetzt nur noch die wirklich client-sicheren Bausteine (`WEBHOOK_EVENTS`, `webhookEventSchema`, `signPayload`, `DeliveryResult`-Typ) — kein Node-Built-in außer `node:crypto` mehr. `dispatch.ts` re-exportiert weiterhin aus beiden Quellen, bestehende Aufrufer (Retry-Endpunkt, alle 7 Hook-Punkte) unverändert. `url-safety.ts` zusätzlich mit eigenem `import "server-only"` versehen (Defense-in-Depth). `dispatch.test.ts` unverändert grün (importiert nur `signPayload`).
+
+**Manueller Test vollständig durchgeführt (Josip + Cowork, 11.07.2026):** `/suche` funktioniert normal (Rate-Limit unauffällig unterhalb der Schwelle), Tutor-Chat antwortet normal (Prompt-Marker ändern das Verhalten nicht), Cross-Tenant-Enrollment-Test bestätigt den Fix — API-Key von `demo-gruen` + `userId` eines `demo-blau`-only-Nutzers liefert jetzt korrekt `404 "Nutzer ist kein aktives Mitglied dieses Mandanten..."` (vor dem Fix wäre das `201` gewesen). `npm run test`: 148/148 grün nach der Datei-Umstrukturierung.
+
+**Commit bestätigt (Josip, 11.07.2026):** `407af58` „fix: security-reviewer Phase 3 - RLS-Publish-Filter embeddings, Mitgliedschaftsprüfung enrollments, SSRF-Schutz Webhooks, Rate-Limit Suche, Prompt-Injection-Härtung", 12 Dateien, 368 Zeilen.
+
+**Phase 3 (KI) damit vollständig abgeschlossen: gebaut, getestet, security-reviewed, alle Funde behoben, committet.**
+
+## Letzter offener Punkt aus Block 7: `enrollments.source` (11.07.2026)
+
+Josips Entscheidung nach Cowork-Empfehlung: eigener Wert `"api"` statt der bisherigen Abweichung `"manual"`. Migration `20260711223000_enrollments_source_add_api` live angewendet + lokal nachgezogen (`enrollments_source_check` um `'api'` erweitert, additiv, kein Datenverlust für bestehende Zeilen). `src/app/api/v1/enrollments/route.ts` angepasst: `source: "manual"` → `source: "api"`, Dateikopf-Kommentar aktualisiert. Keine weiteren Code-Stellen betroffen (kein zod-Enum o. Ä. schränkt `source` sonst ein, per Grep geprüft).
+
+**Offen für Josip:** `npm run test` (keine neue Logik, reine Konstante — sollte unverändert grün bleiben), danach Commit:
+`fix: enrollments.source um eigenen Wert "api" erweitern (statt "manual")`
