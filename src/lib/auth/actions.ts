@@ -7,6 +7,7 @@ import {
   passwordSignInSchema,
   passwordSignUpSchema,
 } from "@/lib/auth/schema";
+import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 
 export type AuthActionState = { error: string | null; success?: boolean };
 
@@ -33,6 +34,12 @@ export async function signInWithPassword(
   _prevState: AuthActionState,
   formData: FormData,
 ): Promise<AuthActionState> {
+  // IP-basiert, da vor dem Login noch kein Nutzer/Mandant bekannt ist —
+  // schützt gegen Passwort-Brute-Force (Security-Fix 11.07.2026).
+  if (!(await checkRateLimit("auth-login", { maxRequests: 10, windowSeconds: 60 }))) {
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
   const parsed = passwordSignInSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -55,6 +62,10 @@ export async function signUpWithPassword(
   _prevState: AuthActionState,
   formData: FormData,
 ): Promise<AuthActionState> {
+  if (!(await checkRateLimit("auth-signup", { maxRequests: 5, windowSeconds: 300 }))) {
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
   const parsed = passwordSignUpSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -87,6 +98,12 @@ export async function signInWithMagicLink(
   _prevState: AuthActionState,
   formData: FormData,
 ): Promise<AuthActionState> {
+  // Zusätzlich zum Supabase-eigenen SMTP-Rate-Limit (siehe import.ts-Fix) —
+  // verhindert, dass eine einzelne IP fremde Postfächer mit Magic Links flutet.
+  if (!(await checkRateLimit("auth-magic-link", { maxRequests: 5, windowSeconds: 300 }))) {
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
   const parsed = magicLinkSchema.safeParse({ email: formData.get("email") });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };

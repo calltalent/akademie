@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaffTenant } from "@/lib/auth/staff";
 import { createBunnyVideo, generateTusCredentials } from "@/lib/bunny/client";
+import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 
 const bodySchema = z.object({
   title: z.string().min(1).max(300),
@@ -17,11 +18,23 @@ const bodySchema = z.object({
  * Speichern der video_bunny_id über Server Action).
  */
 export async function POST(request: Request) {
+  let ctx: Awaited<ReturnType<typeof requireStaffTenant>>;
   try {
-    await requireStaffTenant();
+    ctx = await requireStaffTenant();
   } catch (e) {
     const message = e instanceof Error ? e.message : "Kein Zugriff.";
     return NextResponse.json({ error: message }, { status: 403 });
+  }
+
+  // Pro Mandant — jeder Aufruf legt ein kostenpflichtiges Bunny-Video an.
+  if (
+    !(await checkRateLimit("bunny-create-video", {
+      maxRequests: 30,
+      windowSeconds: 3600,
+      extraKey: ctx.tenant.id,
+    }))
+  ) {
+    return NextResponse.json({ error: RATE_LIMIT_MESSAGE }, { status: 429 });
   }
 
   const json = await request.json().catch(() => null);
@@ -36,6 +49,24 @@ export async function POST(request: Request) {
   try {
     const video = await createBunnyVideo(parsed.data.title);
     const { libraryId, expirationTime, signature } = generateTusCredentials(video.guid);
+
+    // Mandantenbindung (Security-Fix 11.07.2026): ohne diese Zeile könnte
+    // saveLessonBlocks (courses/actions.ts) nicht prüfen, ob eine
+    // bunnyVideoId wirklich dem eigenen Mandanten gehört.
+    const { error: bindError } = await ctx.supabase.from("bunny_videos").insert({
+      tenant_id: ctx.tenant.id,
+      video_id: video.guid,
+      created_by: ctx.user.id,
+    });
+    if (bindError) {
+      // Video existiert bei Bunny bereits, aber ohne DB-Zuordnung — lieber
+      // hart fehlschlagen als eine unverknüpfte Video-ID ausliefern.
+      await import("@/lib/bunny/client").then((m) => m.deleteBunnyVideo(video.guid));
+      return NextResponse.json(
+        { error: "Video konnte nicht zugeordnet werden: " + bindError.message },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({
       videoId: video.guid,
