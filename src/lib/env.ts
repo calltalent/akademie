@@ -15,6 +15,15 @@ const optionalString = z.preprocess(
 const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  // Phase 4, Block 1 (Betreiber-Portal-Fundament): Host, unter dem das
+  // Betreiber-Portal erreichbar ist — src/proxy.ts prüft ihn VOR der
+  // Mandanten-Auflösung. Dev-Default portal.localhost, Prod z. B.
+  // portal.calltalent.ai (siehe SPEC.md §4.3/§9.1). "" wie überall als
+  // "nicht gesetzt" behandeln, damit der Default greift.
+  NEXT_PUBLIC_PORTAL_HOST: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(1).default("portal.localhost"),
+  ),
 });
 
 const serverOnlySchema = z.object({
@@ -42,6 +51,7 @@ function parsePublicEnv() {
   const result = publicSchema.safeParse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_PORTAL_HOST: process.env.NEXT_PUBLIC_PORTAL_HOST,
   });
   if (!result.success) {
     throw new Error(

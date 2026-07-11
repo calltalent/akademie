@@ -1042,5 +1042,81 @@ Ich gebe diesen Plan jetzt an den `builder`-Agenten weiter.
 
 Josips Entscheidung nach Cowork-Empfehlung: eigener Wert `"api"` statt der bisherigen Abweichung `"manual"`. Migration `20260711223000_enrollments_source_add_api` live angewendet + lokal nachgezogen (`enrollments_source_check` um `'api'` erweitert, additiv, kein Datenverlust für bestehende Zeilen). `src/app/api/v1/enrollments/route.ts` angepasst: `source: "manual"` → `source: "api"`, Dateikopf-Kommentar aktualisiert. Keine weiteren Code-Stellen betroffen (kein zod-Enum o. Ä. schränkt `source` sonst ein, per Grep geprüft).
 
-**Offen für Josip:** `npm run test` (keine neue Logik, reine Konstante — sollte unverändert grün bleiben), danach Commit:
-`fix: enrollments.source um eigenen Wert "api" erweitern (statt "manual")`
+**Erledigt (Josip, 11.07.2026):** `npm run test` — 148/148 grün. Commit `d9298bd` „fix: enrollments.source um eigenen Wert api erweitern (statt manual)", 3 Dateien.
+
+**Damit ist Phase 3 (KI) wirklich vollständig abgeschlossen** — alle 7 Blöcke gebaut, getestet, security-reviewed, alle Funde (inkl. der beiden HOCH-Funde und dieser letzten offenen Design-Frage) behoben, alles committet. Keine offenen Punkte mehr in Phase 3.
+
+## Phase 4 — Skalierung (architect-Plan, Cowork, 11.07.2026)
+
+**Ziel laut CLAUDE.md §6/SPEC.md §8 DoD 4:** Betreiber-Portal (neuer Mandant inkl. Domain < 5 Min. produktiv), PWA, vollständige Playwright-E2E-Suite (grün), Lighthouse ≥ 90, DSGVO-Paket (AVV-Muster, TOMs, Datenexport je Mandant), Migrations-Importer (CSV + Video-Reupload).
+
+**Kernbefund vor Planung:** `tenants`-Tabelle, `plan`/`status`-Spalten und die RLS-Policy-Kommentare in `0001_init.sql` (Zeile 439: „Anlegen nur ueber service_role (Betreiber-Portal)") sowie der Kommentar in `src/proxy.ts` (Zeile 15-16: „/admin-Betreiber-Routen ... kommen in Phase 4") zeigen: das Betreiber-Portal war von Anfang an mitgedacht, aber es existiert bisher KEINE plattformweite (nicht-mandantengebundene) Rolle — `memberships` ist immer an genau einen `tenant_id` gebunden. Neue Migration nötig: `platform_admins`-Tabelle.
+
+**7 Blöcke, in dieser Reihenfolge:**
+
+### Block 1 — Betreiber-Portal: Fundament (Auth + Host-Erkennung)
+1. Migration `platform_admins(user_id references profiles(id), created_at)` — RLS: keine Client-Policies (nur service_role liest/schreibt, Prüfung ausschließlich serverseitig über Admin-Client, analog zum bereits bestehenden Muster, dass sensible Cross-Tenant-Daten nie direkt per RLS an `authenticated` freigegeben werden).
+2. `src/proxy.ts` erweitert: NEUER Check VOR `resolveTenantByHost()` — wenn Hostname dem Portal-Host entspricht (`NEXT_PUBLIC_PORTAL_HOST`, Dev-Default `portal.localhost`, Prod-Default `portal.calltalent.ai`, gleiches Muster wie `extractTenantSlugFromHost`), wird NICHT als Mandant aufgelöst, sondern die Anfrage per `NextResponse.rewrite()` auf `/portal${pathname}` umgeschrieben (verhindert, dass Portal-Traffic überhaupt in den Mandanten-Auflösungspfad gerät — sauberer als ein Flag).
+3. `src/lib/platform/auth.ts` — `requirePlatformAdmin()`/`checkPlatformAccess()`, exakt gespiegelt an `requireAdminTenant()`/`checkAdminAccess()` (`src/lib/auth/staff.ts`), aber gegen `platform_admins` statt `memberships` geprüft (per Admin-Client, da keine Client-RLS existiert).
+4. `src/app/portal/layout.tsx` — eigenes Root-Layout OHNE Mandanten-Branding (Calltalent-eigenes Design), Login-Gate.
+5. `src/app/portal/login/page.tsx` — wiederverwendet bestehende `src/lib/auth/actions.ts`-Login-Funktionen (kein neues Auth-System), leitet nach Login gegen `requirePlatformAdmin()` weiter.
+6. Erster Platform-Admin: da `platform_admins` nur per service_role beschreibbar ist, trage ich (Cowork) Josips Konto (`office@calltalent.ai`) nach Anwenden der Migration direkt per Supabase-MCP ein — kein Henne-Ei-Problem.
+
+### Block 2 — Betreiber-Portal: Mandant anlegen + Übersicht
+1. `src/lib/platform/actions.ts` — `createTenant(name, slug, plan)`: Slug-Validierung (gleicher Regex wie DB-Constraint), Anlage über Admin-Client, legt den aufrufenden Platform-Admin NICHT automatisch als Mandanten-Mitglied an (Betreiber und Mandanten-Owner sind unterschiedliche Rollen — Owner-Einladung erfolgt separat, z. B. per bestehendem CSV-Import/Einzel-Einladung-Flow aus Phase 1 Block 6).
+2. `src/app/portal/mandanten/page.tsx` + `neu/page.tsx` — Liste aller Mandanten (Name, Slug, Plan, Status, erstellt am) + Anlage-Formular. DoD-Messung: Formular ausfüllen → Submit → Mandant sofort erreichbar unter `{slug}.localhost:3000` = der „< 5 Minuten"-Test.
+3. `src/app/portal/mandanten/[id]/page.tsx` — Detailseite: Plan/Status ändern (`updateTenantStatus`), `custom_domain` eintragen (Freitext-Feld — echte Cloudflare-for-SaaS-Automatisierung ist Infra-/DNS-Arbeit außerhalb der App und bewusst NICHT Teil dieses Blocks, siehe „Offene Punkte" unten), Nutzungsübersicht: aggregiert `usage_counters`/`ai_jobs` (bereits aus Phase 3 vorhanden) für diesen Mandanten — KI-Kosten je Mandant, wiederverwendet die Kosten-Berechnungslogik aus `src/lib/ai/` (Block 1 Phase 3), keine neue Preislogik.
+
+### Block 3 — DSGVO: Datenexport + Löschung
+1. `src/lib/gdpr/export.ts` — `exportUserData(userId)`: sammelt alle personenbezogenen Daten EINES Nutzers über alle Mandanten hinweg, bei denen er Mitglied ist (`profiles`, `memberships`, `progress`, `submissions`, `attempts`, `certificates`, `orders`, `tutor_conversations`/`tutor_messages` — genau die in Block 7s Security-Review als DSGVO-relevant vorgemerkten Tabellen), Ausgabe als JSON-Datei zum Download.
+2. `src/app/profil/page.tsx` erweitert: „Meine Daten exportieren"-Button (Self-Service, Art. 15/20 DSGVO) + „Konto löschen beantragen"-Button (schreibt einen `deletion_requests`-Eintrag statt Sofort-Löschung — Löschung selbst bleibt manueller Prozess mit Prüfung auf Aufbewahrungspflichten, z. B. Rechnungen; Auto-Hard-Delete ist zu riskant für einen Block ohne separates Rechts-Review).
+3. `src/app/portal/mandanten/[id]/export/route.ts` — Mandanten-Gesamtexport für den Betreiber (Art. 28 DSGVO, Verantwortlicher-Pflicht gegenüber dem Mandanten als datenschutzrechtlich Verantwortlichem) — alle Daten EINES Mandanten als ZIP/JSON.
+
+### Block 4 — Migrations-Importer
+1. `src/lib/import/course-import.ts` — Kurs-Struktur-Import aus JSON (Titel/Module/Lektionen/Blöcke), validiert gegen das bestehende `courseSchema`/`blocksSchema` (Phase 1 Block 3, `src/lib/courses/schema.ts`) — kein neues Datenformat, direkte Wiederverwendung.
+2. `src/lib/import/video-reupload.ts` — Video-Reupload per URL: nutzt Bunnys „Fetch"-API (Bunny lädt die Datei server-seitig direkt von einer angegebenen URL, KEIN Proxy-Upload durch unseren Server — vermeidet Timeout-/Speicher-Probleme bei großen Videodateien), reuses `createBunnyVideo()` aus `src/lib/bunny/client.ts` (Phase 1 Block 4).
+3. `src/app/(admin)/admin/import/page.tsx` + Server Action — Staff-UI im bestehenden Mandanten-Admin-Bereich (NICHT im Betreiber-Portal — jeder Mandant importiert seine eigenen Altdaten), JSON-Upload + Fortschrittsanzeige.
+
+### Block 5 — PWA
+1. `public/manifest.json` (mandantenfähig: Name/Icons/Theme-Color idealerweise aus `tenants.branding` generiert statt statisch — kleine dynamische Route `src/app/manifest.ts` statt statischer Datei, Next.js unterstützt das nativ) + Icon-Set.
+2. Service Worker (minimal: App-Shell-Caching für Kernrouten, kein aggressives Offline-Caching von Kursvideos — Bunny-Videos bleiben online-only).
+3. Web-Push-Grundgerüst (VAPID-Keys, `push_subscriptions`-Tabelle, `subscribeToPush()`-Client-Action) — bewusst NUR das Fundament + EIN Trigger-Beispiel (z. B. „Kurs abgeschlossen"), kein vollständiges Benachrichtigungssystem über alle 7 Webhook-Events hinweg (das wäre ein eigener Block, hier reicht der Nachweis „Push funktioniert").
+
+### Block 6 — Vollständige E2E-Suite (Playwright)
+Ergänzt die bisher einzige Playwright-Datei (`e2e/auth.spec.ts`, Phase 1) um Kern-Workflows aus Phase 1-3: Kurs anlegen+abschließen, CSV-Import, Quiz-Versuch, Abgabe+Bewertung, Zertifikat-Download, Stripe-Checkout (Testmodus), Tutor-Chat-Antwort, Kurs-Generator-Übernahme. Deckt direkt die DoD-Zeilen aus SPEC.md §8 ab.
+
+### Block 7 — Abschluss: Security-Audit (Gesamtplattform) + DSGVO-Dokumente
+1. `security-reviewer`-Durchgang über die GESAMTE Plattform (nicht nur Phase 4) — wie nach Phase 1, aber diesmal vollständig statt phasenweise, inkl. Lighthouse-Check (Performance-Budget aus CLAUDE.md §3.3).
+2. AVV-Muster (Auftragsverarbeitungsvertrag, Art. 28 DSGVO) + TOMs (Technische und organisatorische Maßnahmen, Art. 32 DSGVO) — das sind RECHTSDOKUMENTE, kein Code. Ich erstelle diese direkt als Word-Dokumente (docx-Skill), zugeschnitten auf den tatsächlichen Stack (Supabase EU-Frankfurt, Bunny EU, Stripe, Resend, Anthropic — mit den bereits in der ICO/AdSense-Vorarbeit dokumentierten Unternehmensdaten), NICHT über den `builder`-Agenten.
+
+**Design-Entscheidungen (dokumentiert, kein Rückfragebedarf):**
+1. `platform_admins` statt Erweiterung von `memberships` um `tenant_id: null` — sauberer, kein Sonderfall in bestehenden RLS-Policies/Queries, die `tenant_id` als `not null` annehmen.
+2. Host-basierte Portal-Erkennung + Rewrite in `proxy.ts` statt eigener Next.js-Multi-App-Struktur — konsistent mit dem bestehenden Mandanten-Auflösungsmuster, kein neues Deployment-Konzept nötig.
+3. Löschung als Antrag (`deletion_requests`), nicht Sofort-Hard-Delete — Aufbewahrungspflichten (z. B. Rechnungen, HGB/AO) würden ein automatisches Hard-Delete rechtlich riskant machen.
+4. Migrations-Importer bewusst mandanten-seitig (`/admin/import`), nicht betreiber-seitig — jeder Mandant kennt seine eigenen Altdaten, der Betreiber nicht.
+
+**Offene Punkte (nicht blockierend, für später vorgemerkt):**
+1. Produktions-Domain `portal.calltalent.ai` — echte DNS/Cloudflare-Einrichtung folgt beim Deploy (SPEC.md-Vorschlag wird als Default übernommen, siehe Design-Entscheidung oben).
+2. Cloudflare-for-SaaS-Automatisierung für Custom-Domains je Mandant (SSL-Zertifikat automatisch bei Domain-Eintrag) — Block 2 legt nur das Datenfeld an, echte Automatisierung ist eigenständiges Infra-Thema, außerhalb App-Codes.
+3. Web-Push in Block 5 bewusst minimal (ein Trigger-Beispiel) — vollständige Anbindung an alle 7 Business-Events wäre ein eigener, größerer Block, bei Bedarf später.
+
+Ich beginne jetzt mit Block 1 (Betreiber-Portal-Fundament) und gebe den Auftrag an den `builder`-Agenten weiter.
+
+**Migration `20260711224500_platform_admins` live angewendet + lokal nachgezogen** (Cowork, per Supabase-MCP): Tabelle `platform_admins(user_id, created_at)`, RLS aktiv ohne Client-Policies (Standard-Deny, nur service_role). Josip (`office@calltalent.ai`) direkt als erster Platform-Admin eingetragen (Henne-Ei-Problem gelöst — Tabelle ist sonst nur per service_role beschreibbar).
+
+**Block 1 — Betreiber-Portal-Fundament: erstellt (builder, Cowork, 11.07.2026):**
+1. `src/lib/env.ts` — `NEXT_PUBLIC_PORTAL_HOST` ergänzt (Default `portal.localhost`, gleiches Leerstring-Preprocessing-Muster wie bestehende Felder).
+2. `src/proxy.ts` — Host-Check VOR `resolveTenantByHost()`: bei Treffer auf `NEXT_PUBLIC_PORTAL_HOST` keine Mandanten-Auflösung, stattdessen `NextResponse.rewrite()` auf `/portal${pathname}` (Doppel-Rewrite-Schutz). Zusätzlicher Header `x-portal-pathname` für den Layout-Gate (Redirect-Loop-Schutz auf `/portal/login`).
+3. `src/lib/platform/auth.ts` (neu) — `checkPlatformAccess()`/`requirePlatformAdmin()`, gespiegelt an `staff.ts`, prüft `platform_admins` über Admin-Client (fail-closed).
+4. `src/app/portal/layout.tsx` (neu) — eigenständiges dunkles Design, kein Mandanten-Branding, Gate über `checkPlatformAccess()`.
+5. `src/app/portal/login/page.tsx` (neu) — wiederverwendet bestehende Login-Server-Actions, kein neues Auth-System.
+6. `src/app/portal/page.tsx` (neu) — minimale Startseite mit Platzhalter-Link zu `/portal/mandanten` (Block 2).
+
+**Architect-Verifikation (Cowork, 11.07.2026):** alle 6 Dateien einzeln gelesen und geprüft — Rewrite-Logik korrekt, Root-Layout (`src/app/layout.tsx`) rendert `{children}` unabhängig vom Mandanten (kein Konflikt mit dem Rewrite-Pfad), `checkPlatformAccess()` korrekt fail-closed über Admin-Client, Redirect-Loop-Schutz auf `/portal/login` per Header korrekt verdrahtet, Passwort-Login-Redirect funktioniert korrekt auf dem Portal-Host (bleibt dort, `proxy.ts` schreibt `/` intern auf `/portal` um). Keine Bugs gefunden.
+
+**Vom builder dokumentierte offene Punkte:**
+1. Magic-Link-Login im Portal landet nach Klick auf der Haupt-Site-Root statt zurück im Portal (`signInWithMagicLink` nutzt `NEXT_PUBLIC_SITE_URL` statt host-bewusstem Redirect) — Passwort-Login funktioniert korrekt. Nicht blockierend, da Josip bisher durchgehend Passwort-Login nutzt; bei Bedarf später beheben.
+2. Deutsche UI-Texte hartkodiert statt in `messages/de.json` — folgt damit bewusst dem bestehenden Muster von `(admin)/admin/layout.tsx`/`(auth)/login/page.tsx`, die ebenfalls nicht next-intl nutzen.
+3. `/portal/mandanten` existiert noch nicht (Block 2).
+
+**Offen für Josips manuellen Test:** `npm install`/`npm run test` (kein neues Paket, reiner Code), danach `portal.localhost:3000` im Browser aufrufen (funktioniert automatisch wie `demo-blau.localhost` — keine Hosts-Datei nötig) — sollte zu `/portal/login` weiterleiten, nach Passwort-Login zur Portal-Startseite mit „Willkommen im Betreiber-Portal". Danach Commit.
