@@ -38,6 +38,9 @@ export default async function AdminLayout({
           <a href="/admin/kurse" className="hover:underline">
             Kurse
           </a>
+          <a href="/admin/ki" className="hover:underline">
+            KI-Generator
+          </a>
           <a href="/admin/abgaben" className="hover:underline">
             Abgaben
           </a>

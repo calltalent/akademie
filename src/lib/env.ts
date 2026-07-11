@@ -27,6 +27,10 @@ const serverOnlySchema = z.object({
   STRIPE_SECRET_KEY: optionalString,
   STRIPE_WEBHOOK_SECRET: optionalString,
   RESEND_API_KEY: optionalString,
+  // Phase 3, Block 5 (Kurs-Generator): geteiltes Geheimnis für den
+  // Cron-Prozess-Endpunkt (src/app/api/admin/ki/process/route.ts) — wird
+  // vom Cloudflare Cron Trigger per Header mitgeschickt, KEIN Supabase-Auth.
+  CRON_PROCESS_SECRET: optionalString,
 });
 
 function parsePublicEnv() {
@@ -54,6 +58,7 @@ function parseServerEnv() {
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
+    CRON_PROCESS_SECRET: process.env.CRON_PROCESS_SECRET,
   });
   if (!result.success) {
     throw new Error(

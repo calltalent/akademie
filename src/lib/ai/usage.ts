@@ -163,6 +163,58 @@ export async function recordAiJob(params: {
 }
 
 /**
+ * NACHGEHOLT in Block 5 (Kurs-Generator, Phase 3): `recordAiJob()` kann nur
+ * INSERTen (Job-Anlage). Die Kurs-Generator-Zustandsmaschine
+ * (src/lib/generator/process.ts) braucht zusätzlich Status-ÜBERGÄNGE für
+ * einen bereits angelegten Job (queued -> running -> done/error, Fortschritt
+ * in `output`) — dafür gibt es laut 0001_init.sql keine UPDATE-Policy für
+ * irgendeine Rolle (siehe Dateikopf-Kommentar zu `recordAiJob()`), deshalb
+ * ausschließlich über den Admin-Client, fail-soft geloggt wie die übrigen
+ * Funktionen dieser Datei.
+ *
+ * Vertrag: `tokensIn`/`tokensOut`, falls übergeben, sind die NEUEN
+ * GESAMTWERTE des Jobs (nicht Deltas/Zuwächse) — der Aufrufer ist für das
+ * Aufsummieren über mehrere Pipeline-Schritte hinweg verantwortlich (liest
+ * den bisherigen `tokens_in`/`tokens_out`-Stand vor dem Aufruf und addiert
+ * die neuen Werte des gerade abgeschlossenen Schritts). `cost_usd` wird nur
+ * neu berechnet, wenn sowohl `model` als auch beide Token-Werte im selben
+ * Aufruf mitgegeben werden (sonst bleibt der bisherige `cost_usd`-Stand
+ * unangetastet, z. B. bei einem reinen Fehler-Update ohne Token-Verbrauch).
+ */
+export async function updateAiJob(
+  jobId: string,
+  params: {
+    status?: "queued" | "running" | "done" | "error";
+    output?: Record<string, unknown>;
+    tokensIn?: number;
+    tokensOut?: number;
+    error?: string;
+    model?: string;
+  },
+): Promise<void> {
+  const admin = createAdminClient();
+
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (params.status !== undefined) update.status = params.status;
+  if (params.output !== undefined) update.output = params.output;
+  if (params.error !== undefined) update.error = params.error;
+  if (params.model !== undefined) update.model = params.model;
+  if (params.tokensIn !== undefined) update.tokens_in = params.tokensIn;
+  if (params.tokensOut !== undefined) update.tokens_out = params.tokensOut;
+  if (params.model !== undefined && params.tokensIn !== undefined && params.tokensOut !== undefined) {
+    update.cost_usd = computeCost(params.model, params.tokensIn, params.tokensOut);
+  }
+
+  const { error } = await admin.from("ai_jobs").update(update).eq("id", jobId);
+  if (error) {
+    // Fail-soft wie recordAiJob(): ein Protokollierfehler darf den bereits
+    // abgeschlossenen Pipeline-Schritt nicht rückgängig machen — trotzdem
+    // laut geloggt, damit Kosten-/Protokolllücken auffallen.
+    console.error("[ai/usage] updateAiJob fehlgeschlagen:", error.message);
+  }
+}
+
+/**
  * NACHGEHOLT in Block 4 (Tutor-Chat, Phase 3): war in Block 1 bewusst nur
  * als TODO vorgemerkt (siehe Git-Historie), weil die Funktionsform vom
  * damals noch nicht existierenden RAG-/Eskalations-Entwurf abhing.

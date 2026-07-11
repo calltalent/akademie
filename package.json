@@ -28,7 +28,8 @@
     "sanitize-html": "^2",
     "resend": "^4",
     "pdf-lib": "^1",
-    "stripe": "^18"
+    "stripe": "^18",
+    "unpdf": "^0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

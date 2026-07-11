@@ -1,0 +1,36 @@
+{
+  // ACHTUNG (Phase 3, Block 5 — Kurs-Generator): dies ist bewusst nur ein
+  // SCHABLONEN-Eintrag für den Cloudflare Cron Trigger. Die eigentliche
+  // Cloudflare-Workers/OpenNext-Deployment-Infrastruktur (compatibility_date/
+  // -flags fürs komplette Next.js-Deployment, `main`-Entrypoint,
+  // opennext.config.ts, das Paket "@opennextjs/cloudflare", der
+  // "deploy"-npm-Script) existiert in diesem Repo noch nicht — CLAUDE.md
+  // nennt Cloudflare Workers via OpenNext als Zielstack, aber bisher wurde
+  // ausschließlich lokal per `npm run dev` gearbeitet (siehe PHASENSTATUS.md).
+  //
+  // Wichtiger technischer Hinweis für die spätere Fertigstellung: ein
+  // Cloudflare Cron Trigger ruft NICHT direkt eine HTTP-Route auf, sondern
+  // den `scheduled(event, env, ctx)`-Handler des Workers. Sobald das
+  // eigentliche OpenNext-Cloudflare-Deployment aufgesetzt ist, braucht es
+  // zusätzlich einen kleinen `scheduled()`-Handler (Custom-Entrypoint bzw.
+  // von @opennextjs/cloudflare unterstützter Mechanismus), der intern
+  // `fetch("https://<domain>/api/admin/ki/process", { method: "POST",
+  // headers: { "x-cron-secret": env.CRON_PROCESS_SECRET } })` aufruft. Das
+  // ist NICHT Teil dieses Blocks (kein Deployment ohne Freigabe, CLAUDE.md
+  // §4.6) — als offener Punkt in PHASENSTATUS.md vermerkt.
+  //
+  // Lokal/während der Entwicklung: kein Cron verfügbar — Josip kann
+  // stattdessen /api/admin/ki/process manuell wiederholt aufrufen (z. B.
+  // per PowerShell Invoke-RestMethod), um einen Job Schritt für Schritt
+  // durchzuspielen.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "calltalent-akademie",
+  "compatibility_date": "2026-07-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "triggers": {
+    // Alle 2 Minuten - ein ai_jobs-Schritt braucht typischerweise wenige
+    // Sekunden bis niedrige zweistellige Sekunden (ein Claude-Sonnet-Aufruf),
+    // ein Kursentwurf (3 Schritte) ist damit binnen weniger Minuten fertig.
+    "crons": ["*/2 * * * *"]
+  }
+}

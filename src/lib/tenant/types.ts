@@ -24,6 +24,7 @@ export type PublicTenant = {
   settings: {
     payments_enabled?: boolean;
     tutor_enabled?: boolean;
+    course_generator_enabled?: boolean;
     default_locale?: string;
   };
 };
