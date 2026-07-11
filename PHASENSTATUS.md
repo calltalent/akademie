@@ -559,3 +559,26 @@ Alle 6 Blöcke des architect-Plans (E-Mail-Fundament, Quiz/Prüfungen, Abgaben-I
 7. Übergabe an `tester`-Agent (Vitest — Playwright optional, der neue Button ist ein einfacher Klick-Test).
 
 **Block 2 vollständig verifiziert (11.07.2026):** Alle offenen Punkte erledigt, inkl. kritischem Sicherheitsfix und funktionalem End-to-End-Nachweis (Button-Klick → Embeddings in DB → RPC liefert korrekten Treffer).
+
+**Block 3 — Semantische Suche `/suche`: erstellt (Cowork, lokal zu prüfen):**
+
+**Neue Dateien:**
+1. `src/lib/ai/search.ts` (`import "server-only"`) — `searchLessons({tenantId, userId, query}): Promise<SearchResult[]>`. Ablauf: a) lädt über den regulären RLS-Client die für den Mandanten sichtbaren, veröffentlichten Kurs-IDs (`courses` mit `tenant_id`+`status='published'`, RLS `courses_member_select` greift bereits korrekt — kein Admin-Client nötig); b) ruft `retrieveChunks({tenantId, courseIds, query, k: 8})` auf (großzügigeres `k` als der spätere Tutor-RAG, da hier noch nachgefiltert wird); c) **sicherheitskritischer Nachfilter** (Begründung siehe unten); d) baut `SearchResult` mit `snippet` (Chunk-Text, an Wortgrenze auf 200 Zeichen gekürzt mit „…"-Suffix); e) dedupliziert nicht (verschiedene Chunks derselben Lektion können beide relevant sein), sortiert nach `similarity` absteigend; f) leere/Whitespace-Anfrage → sofort `[]`, ohne `retrieveChunks()`/Voyage-Aufruf.
+2. `src/app/(learn)/suche/page.tsx` — Server Component, `searchParams: Promise<{q?: string}>` (Next.js-16-Muster wie andere Seiten). Gleiches Zugriffsmuster wie `kurs/[slug]/page.tsx`: `supabase.auth.getUser()` + `redirect("/login")`, `getTenant()`, kein Staff-Check. Klassisches GET-`<form>` (`<input name="q">`, `<label htmlFor="q" className="sr-only">`, kein JavaScript/useState nötig), Ergebnisliste als `<ul>`/`<li>` mit Link zu `/kurs/{courseSlug}/l/{lessonId}`, leere Trefferliste zeigt „Keine Treffer für „…"." Fehler aus `searchLessons()` (z. B. fehlender `VOYAGE_API_KEY`) werden per explizitem try/catch in der Page abgefangen (Server-Component-Fehler in der Render-Funktion werden von Next.js' Error Boundary nicht automatisch gefangen) und als deutsche Meldung (`role="alert"`) angezeigt statt als Absturz.
+
+**Geänderte Datei:**
+3. `src/app/page.tsx` — kein eigenes Lernenden-Layout gefunden (`src/app/(learn)/layout.tsx` existiert nicht, per Glob geprüft), deshalb Link „Suche" auf der „Meine Kurse"-Startseite ergänzt, neben dem bestehenden „Profil"-Link im Kopfbereich.
+
+**Sicherheitskritischer Nachfilter — genau umgesetzt wie im Auftrag verlangt (Begründung):** `embedLesson()`/`embedCourse()` aus Block 2 embedden jede Lektion eines Kurses unabhängig von deren `status`, auch Entwurfs-Lektionen. Die `embeddings`-Tabelle hat keine `status`-Spalte. `search.ts` lädt deshalb zu den von `retrieveChunks()` zurückgegebenen `lessonId`s die aktuellen `lessons`-Zeilen (`status`, `title`, `module_id`, zusätzlich `.eq("tenant_id", tenantId)` als Defense-in-Depth — `lessons` hat im Gegensatz zu einer ursprünglichen Annahme in Block 2 sehr wohl eine eigene `tenant_id`-Spalte, per `0001_init.sql` verifiziert) über den regulären RLS-Client und verwirft alle Treffer, deren Lektion nicht (mehr) `status='published'` ist. Für die verbleibenden Treffer wird zusätzlich frisch (nicht aus der bereits in Schritt a geladenen Kursliste wiederverwendet) nach den zugehörigen `courses` (`title`, `slug`, `status='published'`) gefragt — zweite Verteidigungslinie gegen den Fall, dass ein Kurs zwischen Schritt a und der Anzeige wieder auf Entwurf gesetzt wurde. Beide Prüfungen laufen gegen den aktuellen DB-Stand, nicht gegen den Stand zum Zeitpunkt des Embeddings.
+
+**Bewusste Vereinfachungen (wie im Auftrag vorgegeben):** keine Autocomplete/Instant-Search (klassisches GET-Formular reicht für v1); kein Highlighting der Suchbegriffe im Snippet; keine Paginierung (k=8 vor Nachfilterung reicht für die aktuellen Kursgrößen).
+
+**Offen (Josip, lokal zu prüfen):**
+1. `npm install` (kein neues Paket in diesem Block, aber falls seit dem letzten Mal nicht gelaufen).
+2. `npm run test` (kein neuer Testfall in diesem Block — `search.ts` ist primär Orchestrierung von bereits getesteten Bausteinen (`retrieveChunks`, RLS) ohne eigene komplexe reine Logik außer `buildSnippet()`; bei Bedarf lässt sich dafür ein kleiner Vitest-Fall nachziehen).
+3. Manueller Test: `/suche` aufrufen, nach „tthdefgthdgf" suchen (der Test-Text aus Block 2) — sollte einen Treffer mit Link zur richtigen Lektion liefern.
+4. Test des Sichtbarkeits-Nachfilters — optional, nicht durchgeführt.
+5. Git-Commit-Vorschlag: `feat: Block 3 - Semantische Suche /suche`.
+6. Übergabe an `tester`-Agent.
+
+**Block 3 vollständig verifiziert (Josip, 11.07.2026):** 79/79 Tests grün, `/suche?q=tthdefgthdgf` liefert korrekt „Lektion 2" (Test-Kurs) mit passendem Snippet als einzigen Treffer.

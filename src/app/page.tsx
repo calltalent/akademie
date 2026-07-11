@@ -91,6 +91,9 @@ export default async function HomePage() {
           {tenant.name}
         </h1>
         <div className="flex items-center gap-3">
+          <a href="/suche" className="text-sm underline">
+            Suche
+          </a>
           <a href="/profil" className="text-sm underline">
             Profil
           </a>
