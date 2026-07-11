@@ -6,6 +6,7 @@ import { requireAdminTenant } from "@/lib/auth/staff";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { generateApiKey, generateWebhookSecret } from "@/lib/webhooks/keys";
 import { webhookEventSchema } from "@/lib/webhooks/dispatch";
+import { assertSafeWebhookUrl } from "@/lib/webhooks/url-safety";
 
 /**
  * Phase 3, Block 7 — Server Actions für `/admin/einstellungen`
@@ -100,6 +101,14 @@ export async function createWebhook(url: string, events: string[]): Promise<Webh
     const parsed = webhookCreateSchema.safeParse({ url, events });
     if (!parsed.success) {
       return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+
+    // Security-Fix (security-reviewer-Durchgang Phase 3, 11.07.2026, MITTEL):
+    // SSRF-Schutz — siehe Dateikopf-Kommentar in url-safety.ts.
+    try {
+      await assertSafeWebhookUrl(parsed.data.url);
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Ungültige Webhook-URL." };
     }
 
     const secret = generateWebhookSecret();

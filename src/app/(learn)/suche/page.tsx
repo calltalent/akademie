@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { searchLessons, type SearchResult } from "@/lib/ai/search";
+import { RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 
 /**
  * Phase 3, Block 3 — Semantische Suche über den kompletten sichtbaren
@@ -37,9 +38,14 @@ export default async function SearchPage({
   if (query.length > 0) {
     try {
       results = await searchLessons({ tenantId: tenant!.id, userId: user.id, query });
-    } catch {
+    } catch (e) {
+      // Rate-Limit-Fehler (searchLessons() wirft mit RATE_LIMIT_MESSAGE als
+      // .message, siehe src/lib/ai/search.ts) wird 1:1 durchgereicht, alle
+      // anderen Fehler (z. B. fehlender VOYAGE_API_KEY) bleiben generisch.
       searchError =
-        "Die semantische Suche ist gerade nicht verfügbar. Bitte später erneut versuchen.";
+        e instanceof Error && e.message === RATE_LIMIT_MESSAGE
+          ? RATE_LIMIT_MESSAGE
+          : "Die semantische Suche ist gerade nicht verfügbar. Bitte später erneut versuchen.";
     }
   }
 

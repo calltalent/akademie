@@ -12,9 +12,24 @@ import { z } from "zod";
  * `generator/pipeline.ts`) und `tutor/prompt.ts` (getrennt von
  * `tutor/actions.ts`) an anderer Stelle im Projekt.
  *
- * `dispatch.ts` re-exportiert alles aus dieser Datei für bestehende
- * Aufrufer (Settings-Actions, Retry-Endpunkt, Hook-Punkte) — nur
- * `dispatch.test.ts` importiert jetzt direkt von hier.
+ * WICHTIG (Security-Fix-Nachfund, Cowork, 11.07.2026): `deliverWebhookAttempt()`
+ * lag ursprünglich ebenfalls hier, wurde aber bei der SSRF-Schutz-Ergänzung
+ * (security-reviewer-Durchgang) nach `deliver-attempt.ts` ausgelagert — sie
+ * importiert `assertSafeWebhookUrl()` aus `url-safety.ts`, welches
+ * `node:dns/promises` nutzt. `deliver.ts` HIER wird nicht nur von
+ * `dispatch.test.ts` importiert, sondern transitiv auch von der
+ * Client-Komponente `webhooks-panel.tsx` (für `WEBHOOK_EVENTS`/
+ * `WebhookEvent`) — Node-Built-ins wie `node:dns` können dort nicht gebündelt
+ * werden ("does not support external modules"). Diese Datei bleibt deshalb
+ * STRIKT frei von jedem Node-Built-in außer `node:crypto` (das bündelt
+ * Next.js/Turbopack clientseitig automatisch per Polyfill/Shim) und von
+ * jedem Server-only-Import.
+ *
+ * `dispatch.ts` re-exportiert alles aus dieser Datei (WEBHOOK_EVENTS/
+ * webhookEventSchema/signPayload) UND aus `deliver-attempt.ts`
+ * (deliverWebhookAttempt) für bestehende Aufrufer (Settings-Actions,
+ * Retry-Endpunkt, Hook-Punkte) — nur `dispatch.test.ts` importiert jetzt
+ * direkt von hier.
  */
 export const WEBHOOK_EVENTS = [
   "user.created",
@@ -29,59 +44,9 @@ export const WEBHOOK_EVENTS = [
 export const webhookEventSchema = z.enum(WEBHOOK_EVENTS);
 export type WebhookEvent = z.infer<typeof webhookEventSchema>;
 
-const DELIVERY_TIMEOUT_MS = 5000;
-
 /** Reine, testbare Funktion: HMAC-SHA256-Hex-Signatur über den JSON-Body. */
 export function signPayload(secret: string, body: string): string {
   return createHmac("sha256", secret).update(body).digest("hex");
 }
 
 export type DeliveryResult = { statusCode: number | null };
-
-/**
- * Ein einzelner Zustellversuch (KEIN Datenbankzugriff) — von
- * `dispatchWebhookEvent()` (Erstversuch) UND von
- * `/api/admin/webhooks/retry` (Wiederholung) genutzt, damit Envelope-/
- * Signatur-Logik an genau einer Stelle steht. Wirft NIE: Netzwerkfehler
- * oder Timeout liefern `statusCode: null`, der Aufrufer entscheidet über
- * Protokollierung/nächsten Versuch.
- */
-export async function deliverWebhookAttempt(
-  url: string,
-  secret: string,
-  event: WebhookEvent,
-  payload: unknown,
-  tenantId: string,
-): Promise<DeliveryResult> {
-  const body = JSON.stringify({
-    event,
-    tenant_id: tenantId,
-    data: payload,
-    sent_at: new Date().toISOString(),
-  });
-  const signature = signPayload(secret, body);
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Calltalent-Event": event,
-        "X-Calltalent-Signature": `sha256=${signature}`,
-      },
-      body,
-      signal: controller.signal,
-    });
-    return { statusCode: response.status };
-  } catch (e) {
-    console.error(
-      `[webhooks/deliver] Zustellung an ${url} fehlgeschlagen (wird protokolliert, kein Werfen):`,
-      e instanceof Error ? e.message : e,
-    );
-    return { statusCode: null };
-  } finally {
-    clearTimeout(timeout);
-  }
-}

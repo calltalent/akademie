@@ -1,21 +1,28 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { deliverWebhookAttempt, type WebhookEvent } from "@/lib/webhooks/deliver";
+import { deliverWebhookAttempt } from "@/lib/webhooks/deliver-attempt";
+import type { WebhookEvent } from "@/lib/webhooks/deliver";
 
 /**
  * Phase 3, Block 7 — zentrale ausgehende Webhook-Zustellung. Diese Datei
  * trägt jetzt bewusst `import "server-only"` (Korrektur, Cowork
  * 11.07.2026): sie importiert `createAdminClient` und darf deshalb NIE in
  * einen Client-/Test-Pfad gelangen. Die reinen, testbaren Bausteine
- * (`signPayload()`, `deliverWebhookAttempt()`, `WEBHOOK_EVENTS`,
- * `webhookEventSchema`) leben jetzt in `src/lib/webhooks/deliver.ts` (KEIN
- * `server-only`) — von dort re-exportiert, damit bestehende Aufrufer
- * (Settings-Actions, Retry-Endpunkt, alle 7 Hook-Punkte) unverändert
- * `from "@/lib/webhooks/dispatch"` importieren können. Nur
- * `dispatch.test.ts` importiert jetzt direkt von `deliver.ts`.
+ * (`signPayload()`, `WEBHOOK_EVENTS`, `webhookEventSchema`) leben in
+ * `src/lib/webhooks/deliver.ts` (KEIN `server-only`) — von dort
+ * re-exportiert. `deliverWebhookAttempt()` lag ursprünglich ebenfalls in
+ * `deliver.ts`, wurde aber beim SSRF-Fix (11.07.2026, Nachfund beim
+ * manuellen Test) nach `deliver-attempt.ts` verschoben, weil sie seither
+ * `node:dns/promises` (via `url-safety.ts`) braucht — das ließ sich nicht
+ * mehr in der clientseitig gebündelten `deliver.ts` unterbringen. Damit
+ * bestehende Aufrufer (Settings-Actions, Retry-Endpunkt, alle 7
+ * Hook-Punkte) unverändert `from "@/lib/webhooks/dispatch"` importieren
+ * können, re-exportiert diese Datei aus BEIDEN Quellen. Nur
+ * `dispatch.test.ts` importiert `signPayload` direkt von `deliver.ts`.
  */
-export { WEBHOOK_EVENTS, webhookEventSchema, signPayload, deliverWebhookAttempt } from "@/lib/webhooks/deliver";
+export { WEBHOOK_EVENTS, webhookEventSchema, signPayload } from "@/lib/webhooks/deliver";
 export type { WebhookEvent, DeliveryResult } from "@/lib/webhooks/deliver";
+export { deliverWebhookAttempt };
 
 /**
  * FAIL-SOFT: wirft NIEMALS — jeder interne Fehler wird geloggt, die

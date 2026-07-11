@@ -145,6 +145,30 @@ export async function POST(request: Request) {
       );
     }
 
+    // Sicherheits-Fix (security-reviewer-Durchgang Phase 3, 11.07.2026, HOCH-Fund #2):
+    // `profiles.id` existiert plattformweit, nicht nur beim aufrufenden Mandanten —
+    // ohne diese Prüfung konnte ein API-Key-Inhaber von Mandant A eine beliebige,
+    // bereits existierende profiles.id eines Nutzers aus Mandant B einschreiben,
+    // obwohl diese Person nie Mitglied von Mandant A war. Die „fremde" Einschreibung
+    // wäre danach über GET /api/v1/progress und /api/v1/reports/course/[id] inkl.
+    // Name/E-Mail sichtbar gewesen — Cross-Tenant-PII-Leck im Reporting-Pfad.
+    const { data: membership } = await admin
+      .from("memberships")
+      .select("user_id")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle();
+    if (!membership) {
+      return NextResponse.json(
+        {
+          error:
+            "Nutzer ist kein aktives Mitglied dieses Mandanten — zuerst über POST /api/v1/users anlegen.",
+        },
+        { status: 404 },
+      );
+    }
+
     const { data: enrollment, error } = await admin
       .from("enrollments")
       .upsert(

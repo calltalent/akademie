@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { retrieveChunks } from "@/lib/ai/retrieve";
+import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 
 /**
  * Semantische Suche über den kompletten sichtbaren Kursinhalt eines
@@ -57,10 +58,26 @@ export async function searchLessons(params: {
   userId: string;
   query: string;
 }): Promise<SearchResult[]> {
-  const { tenantId, query } = params;
+  const { tenantId, userId, query } = params;
 
   const trimmedQuery = query.trim();
   if (trimmedQuery.length === 0) return [];
+
+  // Security-Fix (security-reviewer-Durchgang Phase 3, 11.07.2026, MITTEL):
+  // Anders als Tutor (`tutor-ask`, 30/3600s) und Reembed (`reembed-course`,
+  // 10/3600s) hatte dieser kostenpflichtige KI-Pfad (Voyage-Embedding pro
+  // Anfrage) KEINE Begrenzung — jedes Mandanten-Mitglied konnte über viele
+  // eindeutige Query-Strings unbegrenzt Kosten verursachen. Je Nutzer statt
+  // IP-basiert (Lernende sind immer angemeldet).
+  if (
+    !(await checkRateLimit("ai-search", {
+      maxRequests: 30,
+      windowSeconds: 60,
+      extraKey: userId,
+    }))
+  ) {
+    throw new Error(RATE_LIMIT_MESSAGE);
+  }
 
   const supabase = await createClient();
 
