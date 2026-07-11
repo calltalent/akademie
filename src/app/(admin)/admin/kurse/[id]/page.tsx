@@ -3,6 +3,7 @@ import { getTenant } from "@/lib/tenant/context";
 import { ModuleLessonTree, DeleteLessonButton } from "@/components/admin/module-lesson-tree";
 import { BlockEditor } from "@/components/editor/block-editor";
 import { LessonPublishToggle } from "@/components/admin/publish-toggle";
+import { ReembedCourseButton } from "@/components/admin/reembed-course-button";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
 
 export default async function CourseEditorPage({
@@ -71,9 +72,12 @@ export default async function CourseEditorPage({
     <div className="mx-auto flex max-w-6xl flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{course.title}</h1>
-        <a href="/admin/kurse" className="text-sm underline">
-          Zurück zur Kursliste
-        </a>
+        <div className="flex items-center gap-4">
+          <ReembedCourseButton courseId={courseId} />
+          <a href="/admin/kurse" className="text-sm underline">
+            Zurück zur Kursliste
+          </a>
+        </div>
       </div>
 
       <div className="flex gap-6">

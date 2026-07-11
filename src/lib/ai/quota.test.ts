@@ -24,6 +24,19 @@ describe("computeCost", () => {
   it("liefert 0 bei 0 Tokens", () => {
     expect(computeCost("sonnet", 0, 0)).toBe(0);
   });
+
+  it("berechnet Kosten für Voyage-Embeddings korrekt (0,06$ pro 1M Input-Tokens, Block 2)", () => {
+    // 500.000 Input-Tokens * 0,06$ = 0,03
+    expect(computeCost("voyage-3", 500_000, 0)).toBe(0.03);
+  });
+
+  it("ignoriert tokensOut bei Voyage-Modellen (Embeddings haben keine Output-Tokens)", () => {
+    expect(computeCost("voyage-3", 500_000, 999_999)).toBe(0.03);
+  });
+
+  it("erkennt auch künftige Voyage-Modellnamen über das 'voyage-'-Präfix", () => {
+    expect(computeCost("voyage-4-lite", 1_000_000, 0)).toBe(0.06);
+  });
 });
 
 describe("remainingQuota", () => {

@@ -1,4 +1,9 @@
-import { AI_COST_RATES_USD_PER_MILLION, type AiModelAlias } from "@/lib/ai/config";
+import {
+  AI_COST_RATES_USD_PER_MILLION,
+  VOYAGE_COST_USD_PER_MILLION_TOKENS,
+  VOYAGE_MODEL,
+  type AiModelAlias,
+} from "@/lib/ai/config";
 
 /**
  * Reine, testbare Funktionen (kein I/O) — Kostenberechnung und
@@ -13,15 +18,31 @@ function findModelAlias(model: string): AiModelAlias | null {
 }
 
 /**
- * Berechnet die Kosten in USD für einen Claude-Aufruf. `model` kann sowohl
- * der Alias ("sonnet"/"haiku") als auch der volle Modellname sein (z. B.
- * "claude-sonnet-4-5-20250929", wie er tatsächlich in `ai_jobs.model`/
- * `tutor_messages` gespeichert wird — siehe `recordAiJob()` in usage.ts).
- * Unbekannte Modelle liefern 0 (fail-safe: lieber sichtbar falsche
- * 0-Kosten beim Protokollieren als ein Absturz nach einem bereits
- * erfolgten, kostenpflichtigen KI-Aufruf).
+ * Berechnet die Kosten in USD für einen Claude- ODER Voyage-Aufruf. `model`
+ * kann der Claude-Alias ("sonnet"/"haiku"), der volle Claude-Modellname
+ * (z. B. "claude-sonnet-4-5-20250929", wie er tatsächlich in
+ * `ai_jobs.model`/`tutor_messages` gespeichert wird — siehe `recordAiJob()`
+ * in usage.ts) oder der Voyage-Modellname (`VOYAGE_MODEL`, aktuell
+ * "voyage-3", siehe `embed.ts`) sein. Unbekannte Modelle liefern 0
+ * (fail-safe: lieber sichtbar falsche 0-Kosten beim Protokollieren als ein
+ * Absturz nach einem bereits erfolgten, kostenpflichtigen KI-Aufruf).
+ *
+ * Erweiterung Block 2 (Embeddings): Voyage-Embeddings sind reine
+ * Input-Kosten (`tokensOut` wird für Voyage-Modelle ignoriert — eine
+ * Embedding-Antwort hat keine "Output-Tokens" im Chat-Sinn). Ohne diese
+ * Erweiterung würde `recordAiJob({ kind: "embed", model: VOYAGE_MODEL, ... })`
+ * aus `embed.ts` stillschweigend `cost_usd = 0` protokollieren (Voyage ist
+ * weder "sonnet" noch "haiku") — das widerspräche CLAUDE.md §3.7 ("jeder
+ * Claude-Aufruf schreibt ai_jobs ... mit Tokens und Kosten"), das laut
+ * `ai_jobs.kind`-Check-Constraint (0001_init.sql) explizit auch `'embed'`
+ * als Job-Art vorsieht.
  */
 export function computeCost(model: string, tokensIn: number, tokensOut: number): number {
+  if (model === VOYAGE_MODEL || model.startsWith("voyage-")) {
+    const cost = (tokensIn / 1_000_000) * VOYAGE_COST_USD_PER_MILLION_TOKENS;
+    return Math.round(cost * 10_000) / 10_000;
+  }
+
   const alias =
     model in AI_COST_RATES_USD_PER_MILLION ? (model as AiModelAlias) : findModelAlias(model);
   if (!alias) return 0;
