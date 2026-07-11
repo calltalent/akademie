@@ -161,6 +161,36 @@ export function certificateIssued({
   return renderLayout({ tenantName, accentColor, heading: "Zertifikat ausgestellt", bodyHtml });
 }
 
+/**
+ * Eskalations-Mail an ein Staff-Mitglied (Phase 3, Block 4 — Tutor-Chat,
+ * "An Trainer weiterleiten"). Kein Tiefen-Link zu einer Admin-Ansicht, da es
+ * in diesem Block keine eskalierte-Konversationen-Inbox gibt (bewusste
+ * Vereinfachung, siehe PHASENSTATUS.md) — reicht ein Hinweistext mit
+ * Konversations-ID/Kursname/Lernenden-Name.
+ */
+export function tutorEscalation({
+  tenantName,
+  recipientName,
+  learnerName,
+  courseTitle,
+  conversationId,
+  accentColor,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  learnerName: string;
+  courseTitle: string;
+  conversationId: string;
+  accentColor?: string;
+}): string {
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName)}</p>
+    <p style="margin:0 0 16px 0;"><strong>${escapeHtml(learnerName)}</strong> hat eine Tutor-Konversation im Kurs <strong>${escapeHtml(courseTitle)}</strong> an dich als Trainer weitergeleitet, weil der KI-Assistent die Frage nicht aus dem Kursinhalt beantworten konnte.</p>
+    <p style="margin:0;font-size:13px;color:#6b7280;">Konversations-ID: ${escapeHtml(conversationId)}</p>
+  `;
+  return renderLayout({ tenantName, accentColor, heading: "Tutor-Frage weitergeleitet", bodyHtml });
+}
+
 export function orderPaid({
   tenantName,
   recipientName,

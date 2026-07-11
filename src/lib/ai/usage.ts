@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PLAN_AI_LIMITS } from "@/lib/ai/config";
+import { AI_MODELS, PLAN_AI_LIMITS } from "@/lib/ai/config";
 import { computeCost, remainingQuota } from "@/lib/ai/quota";
 
 type QuotaKind = "tutor" | "course_gen";
@@ -163,14 +163,54 @@ export async function recordAiJob(params: {
 }
 
 /**
- * TODO (Block 4 — Tutor-Chat): `recordTutorMessage()` schreibt Nutzer-/
- * Assistenten-Nachrichten in `tutor_messages` (inkl. `source_lessons`,
- * `escalated`, Tokens/Kosten, Art.-50-KI-VO-Kennzeichnung). Bewusst NICHT
- * in Block 1 gebaut — dieser Auftrag umfasst nur das KI-Fundament
- * (Kontingent + Kostenprotokoll + Clients); `tutor_conversations`/
- * `tutor_messages`-Handling gehört fachlich zu Block 4 (RAG +
- * Eskalationslogik). Ein Grundgerüst hier vorwegzunehmen wäre Überbau
- * außerhalb des Auftrags (CLAUDE.md §4.5: "einfachste Lösung wählen") —
- * die Funktionsform hängt vom tatsächlichen Block-4-Entwurf (RAG-Kontext,
- * Eskalationskriterien) ab, der noch nicht existiert.
+ * NACHGEHOLT in Block 4 (Tutor-Chat, Phase 3): war in Block 1 bewusst nur
+ * als TODO vorgemerkt (siehe Git-Historie), weil die Funktionsform vom
+ * damals noch nicht existierenden RAG-/Eskalations-Entwurf abhing.
+ *
+ * `recordTutorMessage()` schreibt eine Nutzer- ODER Assistenten-Nachricht in
+ * `tutor_messages` (Protokollpflicht CLAUDE.md §3.7). Admin-Client nötig:
+ * `tutor_messages` hat laut 0001_init.sql nur `tutor_msg_own_select`
+ * (Lesen), `tutor_msg_own_insert` (Einfügen NUR für `role = 'user'` durch
+ * den einloggten Nutzer selbst) und `tutor_msg_staff_select` — keine Policy
+ * erlaubt das Einfügen einer `role = 'assistant'`-Zeile über den regulären
+ * RLS-Client. Diese Funktion läuft deshalb für BEIDE Rollen einheitlich über
+ * den Admin-Client (ein Pfad statt zwei, keine Sonderbehandlung im Aufrufer
+ * src/lib/tutor/actions.ts nötig).
+ *
+ * Kosten werden ausschließlich für die Assistenten-Antwort ungleich null
+ * sein (der eigentliche Claude-Aufruf) — bei der Nutzer-Nachricht werden
+ * `tokensIn`/`tokensOut` als `0` übergeben, `computeCost()` liefert dafür
+ * `0`. Modell ist bewusst fest `AI_MODELS.haiku` (SPEC §6: "Tutor-Chat |
+ * claude-haiku"), nicht als Parameter — der Tutor nutzt laut CLAUDE.md §1.6
+ * kein anderes Modell.
  */
+export async function recordTutorMessage(params: {
+  tenantId: string;
+  conversationId: string;
+  role: "user" | "assistant";
+  content: string;
+  sourceLessons?: string[];
+  tokensIn: number;
+  tokensOut: number;
+}): Promise<void> {
+  const admin = createAdminClient();
+  const cost = computeCost(AI_MODELS.haiku, params.tokensIn, params.tokensOut);
+
+  const { error } = await admin.from("tutor_messages").insert({
+    tenant_id: params.tenantId,
+    conversation_id: params.conversationId,
+    role: params.role,
+    content: params.content,
+    source_lessons: params.sourceLessons ?? [],
+    tokens_in: params.tokensIn,
+    tokens_out: params.tokensOut,
+    cost_usd: cost,
+  });
+
+  if (error) {
+    // Fail-soft wie recordAiJob()/sendEmail(): ein Protokollierfehler darf
+    // die bereits erfolgte Tutor-Antwort nicht rückgängig machen — trotzdem
+    // laut geloggt, damit Kosten-/Protokolllücken auffallen.
+    console.error("[ai/usage] recordTutorMessage fehlgeschlagen:", error.message);
+  }
+}

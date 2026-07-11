@@ -5,6 +5,7 @@ import { blocksSchema, type Block } from "@/lib/courses/schema";
 import { flattenLessonIds, findAdjacentLessonIds } from "@/lib/progress/compute";
 import { BlockRenderer } from "@/components/learn/block-renderer";
 import { CompleteLessonButton } from "@/components/learn/complete-lesson-button";
+import { TutorPanel } from "@/components/learn/tutor-panel";
 
 export default async function LessonPage({
   params,
@@ -93,6 +94,17 @@ export default async function LessonPage({
           nextHref={nextId ? `/kurs/${slug}/l/${nextId}` : null}
         />
       </div>
+
+      {/* Tutor-Panel (falls aktiv) — SPEC Zeile 34. Strikter Vergleich
+          (=== true, kein Fallback auf "truthy"), gleiches Muster wie
+          settings.payments_enabled in stripe/checkout.ts: Demo-Mandanten
+          ohne gesetztes Feld sehen den Tutor bewusst NICHT (siehe
+          PHASENSTATUS.md). Tutor ist kursweit, nicht lektionsweit
+          (SPEC §6: "pgvector-Suche über Kurs-Chunks"), deshalb courseId
+          statt lessonId. */}
+      {tenant!.settings.tutor_enabled === true && (
+        <TutorPanel courseId={course.id} courseSlug={slug} currentLessonId={lessonId} />
+      )}
     </main>
   );
 }
