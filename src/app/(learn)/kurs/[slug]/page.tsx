@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/compute";
+import { CertificateBadge } from "@/components/learn/certificate-badge";
 
 export default async function CourseOverviewPage({
   params,
@@ -80,6 +81,8 @@ export default async function CourseOverviewPage({
         {progress.completed} von {progress.total} Lektionen abgeschlossen
         {progress.isComplete && " — Kurs abgeschlossen! 🎉"}
       </p>
+
+      <CertificateBadge tenantId={tenant!.id} courseId={course.id} isComplete={progress.isComplete} />
 
       {firstLessonId && (
         <a

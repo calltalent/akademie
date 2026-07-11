@@ -61,5 +61,17 @@
       "save": "Bewertung speichern",
       "saved": "Gespeichert — Lernende(r) wird per Mail benachrichtigt."
     }
+  },
+  "certificates": {
+    "issued": "Zertifikat ausgestellt",
+    "pending": "Zertifikat wird ausgestellt — bitte die Seite in Kürze neu laden.",
+    "issuedOn": "Ausgestellt am {date}",
+    "serialLabel": "Seriennummer",
+    "download": "Zertifikat herunterladen (PDF)",
+    "downloadUnavailable": "Download aktuell nicht verfügbar.",
+    "empty": "Noch keine Zertifikate ausgestellt.",
+    "profileTitle": "Mein Profil",
+    "profileCertificatesTitle": "Meine Zertifikate",
+    "profilePasswordHint": "Passwort ändern: über „Passwort vergessen“ auf der Login-Seite anfordern."
   }
 }

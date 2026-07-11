@@ -25,7 +25,8 @@
     "lucide-react": "^0.460",
     "tus-js-client": "^4",
     "sanitize-html": "^2",
-    "resend": "^4"
+    "resend": "^4",
+    "pdf-lib": "^1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

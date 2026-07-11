@@ -90,11 +90,16 @@ export default async function HomePage() {
         <h1 className="text-2xl font-semibold" style={{ color: "var(--color-primary)" }}>
           {tenant.name}
         </h1>
-        <form action="/auth/signout" method="post">
-          <button type="submit" className="rounded-md border px-3 py-1 text-sm">
-            Abmelden
-          </button>
-        </form>
+        <div className="flex items-center gap-3">
+          <a href="/profil" className="text-sm underline">
+            Profil
+          </a>
+          <form action="/auth/signout" method="post">
+            <button type="submit" className="rounded-md border px-3 py-1 text-sm">
+              Abmelden
+            </button>
+          </form>
+        </div>
       </div>
 
       {isStaff && (

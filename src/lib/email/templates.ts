@@ -21,8 +21,13 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Nur ein valides Hex-Farbformat durchlassen, sonst Fallback — Schutz gegen CSS-Injection über Branding-Felder. */
-function safeAccentColor(accentColor?: string): string {
+/**
+ * Nur ein valides Hex-Farbformat durchlassen, sonst Fallback — Schutz gegen
+ * CSS-Injection über Branding-Felder. Exportiert (Phase 2, Block 4), damit
+ * `src/lib/certificates/pdf.ts` dieselbe Validierung/denselben Fallback für
+ * die PDF-Akzentfarbe wiederverwenden kann statt sie zu duplizieren.
+ */
+export function safeAccentColor(accentColor?: string): string {
   return accentColor && HEX_COLOR_PATTERN.test(accentColor) ? accentColor : DEFAULT_ACCENT_COLOR;
 }
 
