@@ -3,6 +3,9 @@ import { getPlayerConfig } from "@/lib/bunny/client";
 import { BunnyPlayer } from "@/components/player/bunny-player";
 import { loadQuizForLearner } from "@/lib/quiz/load";
 import { QuizRunner } from "@/components/learn/quiz-runner";
+import { createClient } from "@/lib/supabase/server";
+import { SubmissionForm, type LastSubmission } from "@/components/learn/submission-form";
+import type { SubmissionKind, SubmissionStatus } from "@/lib/submissions/schema";
 
 /**
  * Read-only-Darstellung der Blöcke in der Lernansicht.
@@ -16,13 +19,14 @@ import { QuizRunner } from "@/components/learn/quiz-runner";
  * quiz-Fall lädt das verknüpfte Quiz serverseitig über loadQuizForLearner
  * und übergibt nur die whitelisted Daten als Props an den Client-Component
  * QuizRunner — folgt demselben "Server lädt, Client rendert"-Muster wie
- * BunnyPlayer/getPlayerConfig weiter unten).
+ * BunnyPlayer/getPlayerConfig weiter unten; der submission-Fall (Block 3)
+ * folgt demselben Muster für die letzte eigene Abgabe des Nutzers).
  */
-export function BlockRenderer({ blocks }: { blocks: Block[] }) {
+export function BlockRenderer({ blocks, lessonId }: { blocks: Block[]; lessonId: string }) {
   return (
     <div className="flex flex-col gap-4">
       {blocks.map((block) => (
-        <BlockView key={block.id} block={block} />
+        <BlockView key={block.id} block={block} lessonId={lessonId} />
       ))}
       {blocks.length === 0 && (
         <p className="text-base text-gray-500">Diese Lektion hat noch keinen Inhalt.</p>
@@ -31,7 +35,7 @@ export function BlockRenderer({ blocks }: { blocks: Block[] }) {
   );
 }
 
-async function BlockView({ block }: { block: Block }) {
+async function BlockView({ block, lessonId }: { block: Block; lessonId: string }) {
   switch (block.type) {
     case "text":
       return (
@@ -109,13 +113,40 @@ async function BlockView({ block }: { block: Block }) {
       return <QuizRunner quiz={result.quiz} />;
     }
 
-    case "submission":
+    case "submission": {
+      // submissions hat kein block_id-Feld (siehe lib/submissions/schema.ts) —
+      // "letzte eigene Abgabe" wird pro lessonId ermittelt. Mehrere
+      // Abgabe-Blöcke in derselben Lektion würden sich dieselbe Historie
+      // teilen (dokumentierte Vereinfachung, siehe PHASENSTATUS.md).
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      let lastSubmission: LastSubmission | null = null;
+      if (user) {
+        const { data } = await supabase
+          .from("submissions")
+          .select("id, kind, status, feedback, created_at")
+          .eq("lesson_id", lessonId)
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (data) {
+          lastSubmission = {
+            id: data.id,
+            kind: data.kind as SubmissionKind,
+            status: data.status as SubmissionStatus,
+            feedback: data.feedback,
+            createdAt: data.created_at,
+          };
+        }
+      }
+
       return (
-        <div className="rounded-md border p-4 text-base">
-          <p className="mb-2 font-medium">Abgabe</p>
-          <p className="text-gray-700">{block.instructions}</p>
-          <p className="mt-2 text-sm text-gray-500">Upload-Funktion folgt in Phase 2.</p>
-        </div>
+        <SubmissionForm lessonId={lessonId} instructions={block.instructions} lastSubmission={lastSubmission} />
       );
+    }
   }
 }

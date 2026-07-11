@@ -74,7 +74,7 @@ export default async function LessonPage({
       </a>
       <h1 className="text-2xl font-semibold">{lesson.title}</h1>
 
-      <BlockRenderer blocks={blocks} />
+      <BlockRenderer blocks={blocks} lessonId={lessonId} />
 
       <div className="flex items-center justify-between border-t pt-4">
         <div>

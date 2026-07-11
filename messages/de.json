@@ -32,5 +32,34 @@
     "noQuizLinked": "Kein Quiz verknüpft.",
     "quizUnavailable": "Quiz aktuell nicht verfügbar.",
     "rateLimited": "Zu viele Anfragen. Bitte kurz warten und erneut versuchen."
+  },
+  "submissions": {
+    "statuses": {
+      "submitted": "Eingereicht",
+      "approved": "Angenommen",
+      "revision": "Überarbeitung nötig",
+      "rejected": "Abgelehnt"
+    },
+    "modeText": "Text",
+    "modeFile": "Datei",
+    "textLabel": "Dein Text",
+    "fileLabel": "Datei auswählen (PDF, Word, PNG/JPG, ZIP, MP4, MP3 — max. 50 MB)",
+    "submit": "Abgabe einreichen",
+    "submitting": "Wird eingereicht …",
+    "uploading": "Datei wird hochgeladen …",
+    "statusLabel": "Status",
+    "submittedAt": "Eingereicht am {date}",
+    "feedbackLabel": "Feedback",
+    "rateLimited": "Zu viele Anfragen. Bitte kurz warten und erneut versuchen.",
+    "inbox": {
+      "title": "Abgaben",
+      "filterAll": "Alle",
+      "empty": "Keine Abgaben gefunden.",
+      "download": "Datei herunterladen (Link 5 Min. gültig)",
+      "gradeLabel": "Note/Bewertung (optional, Freitext)",
+      "feedbackToLearner": "Feedback für Lernende (optional)",
+      "save": "Bewertung speichern",
+      "saved": "Gespeichert — Lernende(r) wird per Mail benachrichtigt."
+    }
   }
 }
