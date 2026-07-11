@@ -248,12 +248,13 @@ Josip entschied: erst alle MITTEL-Funde aus dem security-reviewer-Audit schließ
 - **Währung:** kein UI-Feld, serverseitig fix `eur` (DB-Default) — keine Mehrwährungs-Anforderung in SPEC/Migration für v1.
 
 **Noch offen für Josips lokale Prüfung:**
-1. `npm install` (neues Paket `stripe`, Versionsnummer ggf. anpassen, siehe oben).
-2. `npm run test` (dieser Block brachte bewusst keine neue Vitest-Datei — reine zod-Schemas/Server Actions ohne isolierbare reine Bewertungslogik wie z. B. `grade.ts`; Regressionscheck der bestehenden 51 Tests genügt).
-3. **`STRIPE_WEBHOOK_SECRET` einrichten** (Stripe-Dashboard-Endpoint oder lokal `stripe listen --print-secret`), Wert in `.env` eintragen — ohne diesen Schritt liefert die Webhook-Route bewusst einen klaren 500er statt zu verarbeiten.
-4. Manueller Test mit Stripe-Testkarte `4242 4242 4242 4242` im Testmodus: Produkt in `/admin/zahlungen` anlegen (Kurs verknüpfen) → `/kaufen/[slug]` aufrufen → Checkout mit Testkarte abschließen → prüfen, ob Bestellung in „Bestellungen" erscheint, Einschreibung entsteht, Kurs für den Käufer sichtbar wird und die „Zahlung erhalten"-Mail ankommt.
-5. Abo-Testfall zusätzlich: Testkauf im `subscription`-Modus, prüfen ob `subscriptions`-Zeile entsteht und das Billing-Portal (`createPortalSession()`, aktuell noch ohne eigenen UI-Einstiegspunkt außer direktem Aufruf) funktioniert.
-6. Git-Commit (`feat: Block 5 - Stripe (Produkte, Checkout, Webhook, Portal, oeffentliche Kaufseite)`), danach Übergabe an `tester`-Agent gemäß CLAUDE.md §4.3.
+1. ~~`npm install`~~ — erledigt (11.07.2026), `stripe` installiert, 4 Vulnerabilities unverändert (unkritisch, wie bei vorherigen Blöcken).
+2. ~~`npm run test`~~ — erledigt (11.07.2026), 51/51 Tests bestanden (Regressionscheck, keine neue Datei für diesen Block, siehe oben).
+3. ~~`STRIPE_WEBHOOK_SECRET` einrichten~~ — erledigt (11.07.2026). Wichtige Lehre für spätere Blöcke: `stripe listen --print-secret` gibt das Secret aus und **beendet sich danach sofort** — für dauerhaftes Weiterleiten von Events muss `stripe listen --forward-to ...` OHNE `--print-secret` laufen. Führte anfangs zu scheinbar "verschwundenen" Webhook-Events (Zahlung lief bei Stripe durch, aber `checkout.session.completed` kam nie am lokalen Server an).
+4. ~~Manueller Test mit Stripe-Testkarte `4242 4242 4242 4242`~~ — **E2E erfolgreich verifiziert (11.07.2026, Josip):** Produkt „Einmalkauf" (1,00 €, ohne Kursbindung) in `/admin/zahlungen` (demo-blau) angelegt → `/kaufen/einmalkauf` → Checkout mit Testkarte abgeschlossen → Bestellung erscheint in „Bestellungen" (`office@calltalent.ai · Einmalkauf · Bezahlt · 1,00 €`) → „Zahlung erhalten"-Mail kam an. Einschreibungs-Test bewusst ausgelassen (Produkt ohne Kurs-Zuordnung angelegt) — Code-Pfad (`enrollFromProduct`) aber unverändert vom Block-4-Muster, kein zusätzliches Risiko.
+   - **Datenfix während des Tests (kein Code-Bug):** `tenants.settings.payments_enabled` stand für `demo-blau`/`demo-gruen` noch auf `false` (alte Platzhalter-Einstellung aus Phase-0/1-Seed-Daten, vor Block 5 gesetzt) — auf `true` korrigiert (direkte SQL-Korrektur über Supabase MCP), sonst blockiert die Kaufseite mit „Zahlungen sind für diese Akademie aktuell nicht verfügbar."
+5. Abo-Testfall (`subscription`-Modus) und Billing-Portal (`createPortalSession()`, noch ohne eigenen UI-Einstiegspunkt) — **noch nicht getestet**, optional nachholen.
+6. ~~Git-Commit~~ — erledigt (11.07.2026), Commit `002dbcc` „feat: Block 5 - Stripe (Produkte, Checkout, Webhook, Portal, oeffentliche Kaufseite)", 19 Dateien.
 
 **Block 1 — E-Mail-Fundament (Resend) + nachgeholte Einladungsmail: erstellt (Cowork, lokal zu prüfen):**
 1. `src/lib/email/client.ts` — Resend-SDK-Wrapper (`import "server-only"` an erster Stelle), zentrale Funktion `sendEmail({ to, subject, html, tenant })`. Absender `noreply@calltalent.ai`, Anzeigename `"${tenant.name} <noreply@calltalent.ai>"` falls `tenant` übergeben, sonst `"Calltalent-Akademie <noreply@calltalent.ai>"`. FAIL-SOFT wie gefordert: `RESEND_API_KEY` fehlt oder Resend-API-Fehler → NIE eine Exception, stattdessen `console.error` mit Kontext + `{ success: false, error }`; bei Erfolg `{ success: true, id }`. Auch ein Fehler beim Lesen von `getServerEnv()` selbst wird abgefangen (fail-soft bis ganz nach unten).
@@ -399,6 +400,46 @@ Josip entschied: erst alle MITTEL-Funde aus dem security-reviewer-Audit schließ
 **Noch offen:**
 1. Git-Commit von Block 4 (`feat: Block 4 - Zertifikate (PDF)`).
 2. Übergabe an `tester`-Agent gemäß CLAUDE.md §4.3.
+
+**Block 6 — Reporting v1 + CSV-Export: erstellt (Cowork, lokal zu prüfen):**
+
+**Vorabprüfung `0001_init.sql` (wie vorgeschrieben zuerst gelesen, wörtlicher Auftrag verlangte das VOR jeder Zeile Code):** Spaltennamen bestätigt: `progress(id, tenant_id, user_id, lesson_id, status, seconds_watched, completed_at, updated_at)`, `attempts(id, tenant_id, quiz_id, user_id, started_at, submitted_at, answers, score_pct, passed)`, `enrollments(id, tenant_id, course_id, user_id, source, enrolled_at, expires_at)`, `quizzes(id, tenant_id, course_id, lesson_id, title, kind, pass_pct, settings)`, `memberships(…, role check in ('owner','admin','trainer','member'))`. Keine späteren Migrationen (geprüft: `20260710233735_security_hardening…`, `20260710233815_bunny_videos…`, `20260710235500_rate_limits`, `20260710205101/205205_hardening…`, `20260710214020_0002_storage`) ändern RLS auf `progress`/`attempts`/`enrollments`/`courses`/`modules`/`lessons`/`quizzes`/`profiles` — die 0001-Policies gelten unverändert.
+
+**Admin-Client-Frage (Kernfrage des Auftrags) beantwortet: Admin-Client NICHT nötig.** Anders als bei `certificates/issue.ts` (keine INSERT/UPDATE-Policy auf `certificates`) oder `stripe/storefront.ts` (`products_member_select` verlangt Mitgliedschaft, sperrt anonyme Kaufseiten-Besucher aus) existieren für Reporting bereits vollständige Staff-Read-RLS-Policies in `0001_init.sql`:
+- `progress_staff_select` (Zeilen 495-496) — `is_staff(tenant_id)` liest ALLE progress-Zeilen des Mandanten, nicht nur eigene.
+- `attempts_staff_select` (Zeilen 513-514) — analog für attempts.
+- `enrollments_staff_all` (Zeilen 489-490) — `for all`, deckt select ab.
+- `courses_staff_write` / `modules_staff_write` / `lessons_staff_write` (Zeilen 470-471, 475-476, 483-484) — jeweils `for all`, Staff sieht auch unveröffentlichte Module/Lektionen (für die Fortschrittsberechnung nötig).
+- `quizzes_staff_write` (Zeilen 501-502) — `for all`.
+- `profiles_staff_select` (Zeilen 448-453) — Staff sieht Profile aller Mitglieder des eigenen Mandanten über den `memberships`-Join.
+Der reguläre Server-Client (`createClient()`, RLS aktiv, Session des angemeldeten Staff-Nutzers) genügt deshalb für alle drei Report-Queries vollständig — siehe ausführliche Begründung im Dateikopf von `src/lib/reporting/queries.ts`. Jede Query setzt trotzdem explizites `.eq("tenant_id", tenantId)` (Defense-in-Depth, gleiches Muster wie `admin/abgaben`/`admin/zahlungen`).
+
+**Neue Dateien:**
+1. `src/lib/reporting/csv.ts` — reine Funktion `toCsv(headers, rows)`. RFC-4180-artiges Escaping (Feld in `"…"` bei Komma/Anführungszeichen/Zeilenumbruch, `"` verdoppelt), Zeilentrenner CRLF, UTF-8-BOM (U+FEFF) vorangestellt für korrekte Umlaut-Darstellung in Excel. Kein I/O, keine Dependency (Eigenbau statt CSV-Bibliothek, wie im Auftrag als bevorzugt vorgegeben).
+2. `src/lib/reporting/csv.test.ts` — 5 Vitest-Fälle: einfache Zeile, Komma im Feld, Anführungszeichen im Feld (Verdopplung), leeres Datenset (nur BOM+Header), Zeilenumbruch im Feld (zusätzlich zu den 3 im Auftrag genannten Pflichtfällen ergänzt).
+3. `src/lib/reporting/queries.ts` (`import "server-only"`) — `getCourseReport(tenantId)`, `getUserReport(tenantId, courseId?)`, `getQuizReport(tenantId)` mit den Rückgabetypen `CourseReportRow[]`/`UserReportRow[]`/`QuizReportRow[]`. Lädt Kurs-/Modul-/Lektionsstruktur (nur veröffentlichte Lektionen, exakt dieselbe Definition wie `certificates/issue.ts`) einmal gemeinsam für Kurs- und Nutzerbericht, indiziert `progress` nach `${userId}|${courseId}` und **nutzt `computeCourseProgress()` aus `src/lib/progress/compute.ts` wieder** (wie im Auftrag vorgeschlagen, „Form passt") statt eine eigene Fortschrittsberechnung zu bauen — pro Nutzer/Kurs wird daraus `{total, completed, percent, isComplete}` gewonnen. „Aktiv" (Kursbericht) = mindestens eine `progress`-Zeile (begonnen ODER abgeschlossen) in diesem Kurs — bewusst KEIN 30-Tage-Fenster (das ist die separate `/admin`-Dashboard-Kachel, außerhalb dieses Auftrags, siehe unten). „Abgeschlossen" = `computeCourseProgress().isComplete`. Quiz-Auswertung zählt „Versuche" über ALLE `attempts`-Zeilen, aber bestanden/nicht-bestanden/Durchschnitt NUR über abgeschickte (`submitted_at is not null`), da `score_pct`/`passed` erst dann gesetzt sind.
+4. `src/app/(admin)/admin/reporting/page.tsx` — Server Component, Staff-Gate aus `admin/layout.tsx`, lädt alle drei Berichte parallel (`Promise.all`), drei Abschnitte mit `ReportTable` + je einem CSV-Export-Link (`<a href="/api/admin/reporting/csv?type=…">`, gleiches Linkmuster wie die bestehende Admin-Navigation).
+5. `src/app/api/admin/reporting/csv/route.ts` — `GET`, `requireStaffTenant()`, Rate-Limit `reporting-csv` (30/3600s, `extraKey: tenant.id`), zod-Query (`type: "courses"|"users"|"quiz"`, optional `courseId: uuid`). **Sicherheitskritische courseId-Prüfung wie im Auftrag verlangt:** bei `type=users` mit gesetztem `courseId` wird VOR dem Aufruf von `getUserReport()` explizit geprüft, dass `courses.id = courseId AND courses.tenant_id = tenant.id` existiert (404 sonst) — verhindert, dass ein Mandant über eine fremde `courseId` Nutzerdaten eines anderen Mandanten abgreifen könnte (auch wenn `queries.ts`s `.eq("tenant_id", …)`-Filter auf `enrollments` das ohnehin schon verhindert hätte — hier zusätzlich als saubere 404 statt einer stillschweigend leeren CSV). Liefert `text/csv; charset=utf-8` + `Content-Disposition: attachment; filename="<typ>-<mandant-slug>-<datum>.csv"`. Keine internen IDs in der CSV (nur Name/E-Mail/Kurs-/Quiztitel/Prozentzahlen/Zeitstempel, wie im Auftrag verlangt).
+6. `src/components/admin/report-table.tsx` — generische `<table>`-Komponente (Props `caption`, `headers`, `rows`, optional `emptyMessage`), `scope="col"` auf jeder Kopfzelle, `<caption className="sr-only">` — gleiches Barrierefreiheits-Muster wie `orders-table.tsx`.
+
+**Geänderte Dateien:**
+7. `src/app/(admin)/admin/layout.tsx` — Nav-Eintrag „Reporting" zwischen „Abgaben" und „Nutzer" ergänzt (Link zu `/admin/reporting`).
+8. `messages/de.json` — neuer `reporting`-Namensraum ergänzt (gleiche dokumentierte Abweichung wie in Block 1-5: Code nutzt weiterhin inline-Deutsch, `de.json` bleibt vorbereitete Textquelle für eine spätere i18n-Umstellung).
+
+**Bewusste Vereinfachungen/Abweichungen (wie in Regel 1 gefordert dokumentiert):**
+- **Keine UI-Auswahl für den `courseId`-Filter des Nutzerberichts** — die Tabelle auf `/admin/reporting` zeigt immer alle Einschreibungen über alle Kurse (eine Zeile je Nutzer-Kurs-Paar); `getUserReport()` und die CSV-Route unterstützen den Filter bereits vollständig, nur ohne UI-Steuerelement (per `?courseId=` direkt am CSV-Export nutzbar). Wie im Auftrag als akzeptierte Vereinfachung vorgegeben.
+- **Keine Pagination/Datumsbereich-Filter** — wie im Auftrag vorgegeben, Datenmengen pro Mandant in Phase 2 überschaubar.
+- **„Aktive Lernende (30 Tage)"-Kachel auf `/admin` ist NICHT Teil dieses Blocks** — wie im Auftrag explizit ausgeschlossen; „aktiv" im Kursbericht bedeutet hier „hat irgendwann mindestens eine Lektion begonnen/abgeschlossen", kein Zeitfenster.
+- **Aggregation in TypeScript, nicht per SQL-View/RPC** — wie im Auftrag als ausreichend vorgegeben (überschaubare Datenmengen pro Mandant in Phase 2).
+- **`avgScorePct` ist `null` statt `0`, wenn ein Quiz noch keine abgeschickten Versuche hat** — vermeidet eine irreführende „0 %"-Anzeige; CSV/Tabelle zeigen dafür „—".
+
+**Noch offen für Josips lokale Prüfung:**
+1. `npm install` — keine neue Dependency in diesem Block (Eigenbau-CSV wie im Auftrag bevorzugt), sollte ohne Änderungen durchlaufen.
+2. `npm run test` — neue Datei `src/lib/reporting/csv.test.ts` (5 Fälle), Regressionscheck der bestehenden Suiten.
+3. Manueller Test: `/admin/reporting` mit vorhandenen Testdaten aus den Blöcken 2/4/5 aufrufen (Test-Kurs mit Abschlüssen aus Block 4, Quiz-Versuch aus Block 2, Bestellung aus Block 5) und prüfen, ob Kursbericht/Nutzerbericht/Quiz-Auswertung die erwarteten Zahlen zeigen (bekannt aus den früheren E2E-Tests: „Test gruen" abgeschlossen mit Zertifikat, ein Quiz-Versuch „Bestanden — 100%").
+4. CSV-Export aller drei Berichte herunterladen und in Excel/LibreOffice Calc öffnen — prüfen, ob Umlaute (ä/ö/ü/ß in Kurs-/Nutzernamen) korrekt dargestellt werden (BOM-Test) und ob die Datei mit korrektem Dateinamen ankommt.
+5. Git-Commit-Vorschlag: `feat: Block 6 - Reporting v1 und CSV-Export`.
+6. Übergabe an `tester`-Agent (Vitest + Playwright) gemäß CLAUDE.md §4.3.
 
 ## Phase 3 — KI ⬜
 

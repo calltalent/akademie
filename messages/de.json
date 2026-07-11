@@ -116,5 +116,41 @@
         "failed": "Fehlgeschlagen"
       }
     }
+  },
+  "reporting": {
+    "title": "Reporting",
+    "subtitle": "Fortschritt, Abschlussquoten und Quiz-Auswertung dieses Mandanten.",
+    "exportCsv": "CSV exportieren",
+    "courses": {
+      "title": "Kursberichte",
+      "empty": "Noch keine Kurse mit Einschreibungen.",
+      "columnCourse": "Kurs",
+      "columnEnrolled": "Eingeschrieben",
+      "columnActive": "Aktiv",
+      "columnCompletionRate": "Abschlussquote (%)"
+    },
+    "users": {
+      "title": "Nutzerberichte",
+      "subtitle": "Alle eingeschriebenen Lernenden über alle Kurse hinweg (eine Zeile je Kurs-Einschreibung).",
+      "empty": "Noch keine Einschreibungen.",
+      "columnName": "Name",
+      "columnEmail": "E-Mail",
+      "columnCourse": "Kurs",
+      "columnProgress": "Fortschritt (%)",
+      "columnCompletedLessons": "Abgeschlossene Lektionen",
+      "columnLastActivity": "Letzte Aktivität",
+      "noActivity": "—"
+    },
+    "quiz": {
+      "title": "Quiz-Auswertung",
+      "empty": "Noch keine Quiz-Versuche.",
+      "columnQuiz": "Quiz",
+      "columnCourse": "Kurs",
+      "columnAttempts": "Versuche",
+      "columnPassed": "Bestanden",
+      "columnFailed": "Nicht bestanden",
+      "columnAverage": "Durchschnitt (%)",
+      "noAttempts": "—"
+    }
   }
 }
