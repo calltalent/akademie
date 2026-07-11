@@ -1077,6 +1077,54 @@ Josips Entscheidung nach Cowork-Empfehlung: eigener Wert `"api"` statt der bishe
 2. `src/lib/import/video-reupload.ts` — Video-Reupload per URL: nutzt Bunnys „Fetch"-API (Bunny lädt die Datei server-seitig direkt von einer angegebenen URL, KEIN Proxy-Upload durch unseren Server — vermeidet Timeout-/Speicher-Probleme bei großen Videodateien), reuses `createBunnyVideo()` aus `src/lib/bunny/client.ts` (Phase 1 Block 4).
 3. `src/app/(admin)/admin/import/page.tsx` + Server Action — Staff-UI im bestehenden Mandanten-Admin-Bereich (NICHT im Betreiber-Portal — jeder Mandant importiert seine eigenen Altdaten), JSON-Upload + Fortschrittsanzeige.
 
+### Block 4 — Migrations-Importer (architect-Plan verfeinert, 12.07.2026)
+
+**Ziel (SPEC.md §4, „Should"-Liste):** Mandant kann eigene Altdaten (Kursstruktur + Videos) selbst importieren, ohne Calltalent-Beteiligung.
+
+**Kernentscheidung — maximale Wiederverwendung statt neuer Logik:**
+- Kursstruktur-Import validiert gegen die BEREITS EXISTIERENDEN Schemas (`courseSchema`, `moduleSchema`, `lessonSchema`, `blockSchema` aus `src/lib/courses/schema.ts`, Phase 1 Block 3) — kein neues Datenformat erfinden.
+- Video-Blöcke im Import-JSON dürfen statt einer `bunnyVideoId` (die es beim Import naturgemäß noch nicht gibt) ein `sourceUrl`-Feld haben. Der Importer löst das VOR der eigentlichen Blocks-Validierung auf: `sourceUrl` → `reuploadVideoFromUrl()` → echte `bunnyVideoId`. Erst danach wird gegen das normale `blockSchema` geprüft (das `bunnyVideoId` zwingend verlangt).
+- **Block-IDs (`id: uuid`) werden vom Importer selbst per `crypto.randomUUID()` generiert**, falls im Import-JSON nicht vorhanden — Autoren von Alt-Daten-Exporten sollen sich keine gültigen UUIDs ausdenken müssen.
+- **Sicherheitskritisch (Wiederverwendung des Phase-1-Block-7-Sicherheitsfixes „Bunny-Video-Mandantenbindung"):** JEDE neu erzeugte `bunnyVideoId` muss in `bunny_videos(tenant_id, video_id)` eingetragen werden, BEVOR die Blocks gespeichert werden — sonst weist die bereits existierende Prüfung in `saveLessonBlocks()` das Video als „gehört nicht zum Mandanten" zurück (genau die Prüfung, die der security-reviewer in Phase 1 gefordert hat). Reihenfolge zwingend: 1) Video-Blöcke auflösen (Bunny „Fetch"-API), 2) `bunny_videos`-Zeilen einfügen, 3) Lektion mit leeren Blocks anlegen, 4) `saveLessonBlocks()` (bestehende Funktion aus `courses/actions.ts`, Phase 1 Block 3) mit den fertig aufgelösten Blocks aufrufen — nutzt damit exakt denselben validierten/sanitierten Schreibpfad wie der normale Editor, keine parallele Sicherheitslogik.
+
+**Dateien:**
+1. `src/lib/import/course-import.ts` (neu, server-only) — `importCourseData(supabase, tenant, userId, data: unknown)`. Eigenes Import-Zod-Schema (Kopie/Erweiterung von `courseSchema`/`moduleSchema`/`lessonSchema`, `blockSchema` aber mit optionalem `id` und beim `video`-Typ `bunnyVideoId XOR sourceUrl`). Validiert das GESAMTE Payload zuerst vollständig (klare Fehlermeldung mit Pfad, z. B. „Modul 2, Lektion 3: …“), bevor irgendetwas geschrieben wird — kein Teil-Import bei Validierungsfehlern. Insert-Reihenfolge: `courses` (analog `createCourse()`-Insert-Logik, Slug-Unique-Verletzung `23505` freundlich abfangen: „Slug bereits vergeben.“) → `modules` (Batch-Insert mit `position` = Index) → je Modul: Video-Blöcke auflösen + `bunny_videos` befüllen → `lessons` anlegen (leere Blocks, wie `createLesson()`) → `saveLessonBlocks()` je Lektion aufrufen. Rückgabe: Zusammenfassung (`courseId`, Anzahl Module/Lektionen, Liste aufgelöster Video-IDs).
+2. `src/lib/import/video-reupload.ts` (neu, server-only) — `reuploadVideoFromUrl(sourceUrl: string, title: string): Promise<{ guid: string }>`. Nutzt Bunnys „Fetch“-API (`POST https://video.bunnycdn.com/library/{libraryId}/videos/{videoId}/fetch`, Body `{url: sourceUrl}`, gleiche `AccessKey`-Header wie in `src/lib/bunny/client.ts`) NACH `createBunnyVideo(title)` — Bunny lädt die Datei serverseitig direkt von der Quelle, unser Server sieht die Videodatei selbst nie (kein Proxy, keine Timeout-/Speicherprobleme bei großen Dateien). `sourceUrl` wird nur mit `z.string().url()` auf Wohlgeformtheit geprüft — **kein SSRF-Schutz nötig** (anders als bei den Webhook-URLs aus Phase 3 Block 7): NICHT unser Server ruft die URL auf, sondern Bunnys eigene Infrastruktur — unser Server macht selbst keinen Request an eine potenziell interne Adresse.
+3. `src/app/(admin)/admin/import/page.tsx` + Server Action (in `src/lib/import/actions.ts`) — Staff-UI im bestehenden Mandanten-Admin-Bereich (`(admin)`-Route-Gruppe hat bereits ein Staff-Gate über `admin/layout.tsx`, NICHT das Betreiber-Portal — jeder Mandant importiert seine eigenen Altdaten). Einfacher `<input type="file" accept=".json">` in einem Formular (POST an eine Server Action, die `formData.get("file")` als `File`-Objekt liest, `.text()` + `JSON.parse()` — kein Client-JS für das Datei-Lesen nötig, Browser übernimmt das über den normalen Formular-Upload). Ergebnis-Zusammenfassung nach Abschluss (Erfolg + Link zum importierten Kurs, oder vollständige Fehlerliste bei Validierungsfehler).
+
+**Bewusste Einschränkungen (Missbrauchsschutz, analog Phase 1 Block 4 „30 Video-Anlagen/Stunde“):**
+- Rate-Limit auf die Import-Action: 10 Importe/Stunde pro Mandant (`checkRateLimit("import-course", {maxRequests:10, windowSeconds:3600, extraKey: tenant.id})`) — verhindert Kostenlawinen durch wiederholte Fehlversuche, nicht die einzelnen Bunny-Aufrufe innerhalb eines Imports (die gehören zusammen).
+- Harte Obergrenzen im Import-Zod-Schema: max. 50 Module, max. 100 Lektionen je Modul (bestehendes `blocksSchema.max(200)` gilt unverändert je Lektion) — verhindert einen einzelnen Request, der hunderte Bunny-Videos anlegt.
+- JSON-Datei-Größenlimit 5 MB (reine Struktur-/Text-Daten, keine Binärdateien im Import-JSON selbst).
+
+Auftrag geht jetzt an den `builder`-Agenten.
+
+**Block 4 — Migrations-Importer: erstellt (builder, Cowork, 12.07.2026):**
+1. `src/lib/import/video-reupload.ts` (neu) — `reuploadVideoFromUrl()`, Bunny „Fetch"-API, Rollback des leeren Bunny-Video-Objekts bei Fehler.
+2. `src/lib/import/course-import.ts` (neu) — `importCourseData()`, Import-Zod-Schema baut auf den bestehenden Block-Schemas auf (`.partial({id:true})` statt Duplikat), XOR-Prüfung `bunnyVideoId`/`sourceUrl` als eigener pfadbewusster Durchgang (zod-v3-`discriminatedUnion` erlaubt kein `.refine()` auf einem Union-Mitglied). Insert-Reihenfolge exakt wie geplant, `saveLessonBlocks()` wiederverwendet statt neu implementiert.
+3. `src/lib/import/actions.ts` (neu) — `importCourseFromFile()`, Datei-Upload/-Größe/-JSON-Parsing, Rate-Limit 10/3600s pro Mandant.
+4. `src/app/(admin)/admin/import/page.tsx` (neu) + `src/components/admin/course-import-form.tsx` (neu) + `src/lib/import/state.ts` (neu, gleiche Next.js-16-Begründung wie `courses/state.ts`/`platform/schema.ts`) + Nav-Link in `admin/layout.tsx`.
+
+**Architect-Verifikation (Cowork, 12.07.2026):** alle Dateien einzeln gelesen, inkl. Gegenprüfung gegen `courses/actions.ts` (exakte Insert-Spalten, `saveLessonBlocks()`-Signatur) und die `bunny_videos`-Migration (Spalte `created_by` existiert, Insert korrekt). Sicherheitskritische Reihenfolge bestätigt: `bunny_videos`-Zeile wird VOR `saveLessonBlocks()` eingefügt, sonst würde dessen eigener Tenant-Ownership-Check (Phase-1-Sicherheitsfix) das frisch angelegte Video zurückweisen — genau richtig verdrahtet. `saveLessonBlocks()` prüft intern nochmal selbst `requireStaffTenant()` (redundant zum bereits erfolgten Check in `actions.ts`, aber harmlos — gleiche Session/Cookies, kein Sicherheitsproblem, nur eine zusätzliche Datenbankabfrage). HTML-Sanitizing läuft dadurch mehrfach (Import-Parse → finale `blocksSchema`-Validierung → `saveLessonBlocks()`-eigene Validierung), aber idempotent, kein Bug. `href="\admin\import"` im Nav-Link nutzt Backslashes statt Slashes — ist die bereits bestehende (unübliche, aber von Browsern laut URL-Standard korrekt als Slash interpretierte) Konvention aus den Nachbar-Links „Nutzer"/„Zahlungen", nicht neu eingeführt, kein Bug. Keine Bugs gefunden.
+
+**Offen für Josips manuellen Test:** `npm run test`, danach auf einem Mandanten (z. B. `demo-blau.localhost:3000/admin/import`) das Beispiel-JSON hochladen:
+```json
+{
+  "title": "Beispielkurs Import",
+  "slug": "beispielkurs-import-test1",
+  "description": "Testkurs für den Migrations-Importer.",
+  "modules": [
+    {
+      "title": "Modul 1",
+      "lessons": [
+        { "title": "Lektion 1", "blocks": [{ "type": "text", "html": "<p>Hallo Welt — importierter Text-Block.</p>" }] }
+      ]
+    }
+  ]
+}
+```
+Erwartet: Erfolgsmeldung „1 Modul(e), 1 Lektion(en), 0 Video(s)" + Link zum Kurs, der Kurs ist im normalen Editor sichtbar/bearbeitbar. Danach Fehlerfall testen (z. B. `slug` entfernen oder ein zweites Mal mit demselben Slug hochladen → „Slug bereits vergeben."). Video-Reupload optional (braucht eine echte erreichbare MP4-URL). Danach Commit.
+
 ### Block 5 — PWA
 1. `public/manifest.json` (mandantenfähig: Name/Icons/Theme-Color idealerweise aus `tenants.branding` generiert statt statisch — kleine dynamische Route `src/app/manifest.ts` statt statischer Datei, Next.js unterstützt das nativ) + Icon-Set.
 2. Service Worker (minimal: App-Shell-Caching für Kernrouten, kein aggressives Offline-Caching von Kursvideos — Bunny-Videos bleiben online-only).

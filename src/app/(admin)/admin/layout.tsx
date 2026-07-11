@@ -50,6 +50,9 @@ export default async function AdminLayout({
           <a href="/admin/nutzer" className="hover:underline">
             Nutzer
           </a>
+          <a href="/admin/import" className="hover:underline">
+            Import
+          </a>
           <a href="/admin/zahlungen" className="hover:underline">
             Zahlungen
           </a>
