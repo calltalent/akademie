@@ -24,6 +24,11 @@ const serverOnlySchema = z.object({
   BUNNY_STREAM_LIBRARY_ID: optionalString,
   BUNNY_STREAM_API_KEY: optionalString,
   BUNNY_STREAM_CDN_HOSTNAME: optionalString,
+  // Phase 3, Block 6 (Auto-Transkript): Signing-Secret für den Bunny-
+  // Stream-Webhook (src/app/api/bunny/webhook/route.ts). NICHT identisch mit
+  // BUNNY_STREAM_API_KEY — Josip muss den Wert manuell aus dem Bunny-
+  // Dashboard kopieren (Video-Library-Einstellungen -> "Read-Only API Key").
+  BUNNY_STREAM_READONLY_API_KEY: optionalString,
   STRIPE_SECRET_KEY: optionalString,
   STRIPE_WEBHOOK_SECRET: optionalString,
   RESEND_API_KEY: optionalString,
@@ -55,6 +60,7 @@ function parseServerEnv() {
     BUNNY_STREAM_LIBRARY_ID: process.env.BUNNY_STREAM_LIBRARY_ID,
     BUNNY_STREAM_API_KEY: process.env.BUNNY_STREAM_API_KEY,
     BUNNY_STREAM_CDN_HOSTNAME: process.env.BUNNY_STREAM_CDN_HOSTNAME,
+    BUNNY_STREAM_READONLY_API_KEY: process.env.BUNNY_STREAM_READONLY_API_KEY,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,

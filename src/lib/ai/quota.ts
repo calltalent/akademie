@@ -1,5 +1,7 @@
 import {
   AI_COST_RATES_USD_PER_MILLION,
+  BUNNY_TRANSCRIBE_COST_USD_PER_MINUTE,
+  BUNNY_TRANSCRIBE_MODEL,
   VOYAGE_COST_USD_PER_MILLION_TOKENS,
   VOYAGE_MODEL,
   type AiModelAlias,
@@ -36,10 +38,26 @@ function findModelAlias(model: string): AiModelAlias | null {
  * Claude-Aufruf schreibt ai_jobs ... mit Tokens und Kosten"), das laut
  * `ai_jobs.kind`-Check-Constraint (0001_init.sql) explizit auch `'embed'`
  * als Job-Art vorsieht.
+ *
+ * Erweiterung Block 6 (Auto-Transkript, ABWEICHUNG vom architect-Plan,
+ * technisch nötig — siehe PHASENSTATUS.md): der Plan verlangt für den
+ * `kind: "transcript"`-ai_jobs-Eintrag "Kosten = Videolänge in Minuten ×
+ * 0,10 $" über das bestehende, unveränderte `recordAiJob()`. Ohne diese
+ * Erweiterung würde `computeCost("bunny-transcribe-ai", …)` wie jedes
+ * unbekannte Modell `0` liefern (Bunny ist weder Claude noch Voyage) — die
+ * geforderten Kosten kämen nie in `ai_jobs.cost_usd` an. Gleiches Muster wie
+ * die Voyage-Erweiterung oben: `tokensIn` ist für dieses Pseudo-Modell keine
+ * Token-Zahl, sondern die Videolänge in SEKUNDEN (von `getBunnyVideo().length`,
+ * siehe src/lib/video/transcript.ts), `tokensOut` wird ignoriert.
  */
 export function computeCost(model: string, tokensIn: number, tokensOut: number): number {
   if (model === VOYAGE_MODEL || model.startsWith("voyage-")) {
     const cost = (tokensIn / 1_000_000) * VOYAGE_COST_USD_PER_MILLION_TOKENS;
+    return Math.round(cost * 10_000) / 10_000;
+  }
+
+  if (model === BUNNY_TRANSCRIBE_MODEL) {
+    const cost = (tokensIn / 60) * BUNNY_TRANSCRIBE_COST_USD_PER_MINUTE;
     return Math.round(cost * 10_000) / 10_000;
   }
 

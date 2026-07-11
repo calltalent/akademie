@@ -290,9 +290,45 @@ export async function saveLessonBlocks(
       }
     }
 
+    // ABWEICHUNG vom architect-Plan für Block 6 (Auto-Transkript), technisch
+    // nötig, dokumentiert in PHASENSTATUS.md: der Block-6-Plan geht davon
+    // aus, dass `lessons.video_bunny_id` bereits gepflegt wird ("findet die
+    // Lektion über lessons.video_bunny_id = bunnyVideoId") - tatsächlich gab
+    // es dafür bisher KEINEN Schreibpfad, die Video-ID lag ausschließlich im
+    // `blocks`-JSON (siehe videoBlockSchema). Ohne diese Synchronisierung
+    // hätte der Bunny-Webhook nie eine Lektion zu einem Video finden können.
+    // Nimmt den ERSTEN video-Block der Lektion (Ein-Video-pro-Lektion ist die
+    // im Editor/SPEC vorgesehene Nutzung). Bei Video-WECHSEL (nicht nur
+    // Erstzuweisung) werden alte Transkript-/Kapitel-/Zusammenfassungsdaten
+    // zurückgesetzt, damit nie das Transkript des VORHERIGEN Videos unter dem
+    // neuen Video angezeigt wird.
+    const videoBlock = parsed.data.find(
+      (b): b is Extract<typeof b, { type: "video" }> => b.type === "video",
+    );
+    const newVideoBunnyId = videoBlock?.bunnyVideoId ?? null;
+
+    const { data: currentLesson } = await supabase
+      .from("lessons")
+      .select("video_bunny_id")
+      .eq("id", lessonId)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+    const videoChanged = (currentLesson?.video_bunny_id ?? null) !== newVideoBunnyId;
+
+    const updatePayload: Record<string, unknown> = {
+      blocks: parsed.data,
+      video_bunny_id: newVideoBunnyId,
+    };
+    if (videoChanged) {
+      updatePayload.video_duration_s = null;
+      updatePayload.transcript = null;
+      updatePayload.summary = null;
+      updatePayload.chapters = [];
+    }
+
     const { error } = await supabase
       .from("lessons")
-      .update({ blocks: parsed.data })
+      .update(updatePayload)
       .eq("id", lessonId)
       .eq("tenant_id", tenant.id);
     if (error) return { error: error.message };

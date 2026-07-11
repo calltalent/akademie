@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeCost, remainingQuota } from "./quota";
+import { BUNNY_TRANSCRIBE_MODEL } from "./config";
 
 describe("computeCost", () => {
   it("berechnet Kosten für sonnet korrekt (2$/10$ pro 1M Tokens)", () => {
@@ -36,6 +37,15 @@ describe("computeCost", () => {
 
   it("erkennt auch künftige Voyage-Modellnamen über das 'voyage-'-Präfix", () => {
     expect(computeCost("voyage-4-lite", 1_000_000, 0)).toBe(0.06);
+  });
+
+  it("berechnet Bunny-Transcribe-Kosten aus Videolänge in Sekunden (Erweiterung Block 6, ABWEICHUNG siehe PHASENSTATUS.md)", () => {
+    // 600 Sekunden = 10 Minuten * 0,10 $/Minute = 1,00 $
+    expect(computeCost(BUNNY_TRANSCRIBE_MODEL, 600, 0)).toBe(1);
+  });
+
+  it("ignoriert tokensOut bei Bunny-Transcribe (reine Sekunden-basierte Abrechnung)", () => {
+    expect(computeCost(BUNNY_TRANSCRIBE_MODEL, 60, 999_999)).toBe(0.1); // 1 Minute * 0,10 $
   });
 });
 

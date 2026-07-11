@@ -7,6 +7,19 @@ import { BlockRenderer } from "@/components/learn/block-renderer";
 import { CompleteLessonButton } from "@/components/learn/complete-lesson-button";
 import { TutorPanel } from "@/components/learn/tutor-panel";
 
+type LessonChapter = { title: string; start: number; end: number };
+
+/** "MM:SS", ab 1h "H:MM:SS" — Phase 3, Block 6 (Kapitel-Anzeige). */
+function formatChapterTime(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+  const ss = String(s).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 export default async function LessonPage({
   params,
 }: {
@@ -37,7 +50,7 @@ export default async function LessonPage({
 
   const { data: lessons } = await supabase
     .from("lessons")
-    .select("id, title, module_id, blocks, status, position")
+    .select("id, title, module_id, blocks, status, position, transcript, summary, chapters")
     .in("module_id", (modules ?? []).map((m) => m.id))
     .eq("status", "published")
     .order("position", { ascending: true });
@@ -76,6 +89,45 @@ export default async function LessonPage({
       <h1 className="text-2xl font-semibold">{lesson.title}</h1>
 
       <BlockRenderer blocks={blocks} lessonId={lessonId} />
+
+      {/* Transkript/Zusammenfassung/Kapitel (Phase 3, Block 6) — nur
+          rendern, wenn tatsächlich vorhanden (kein "Kein Transkript
+          verfügbar"-Rauschen, SPEC-Zweck "Zugänglichkeit"). */}
+      {lesson.summary ? (
+        <div
+          className="rounded-md border p-4 text-base leading-relaxed"
+          style={{ borderRadius: "var(--radius)" }}
+        >
+          <p className="mb-1 text-sm font-medium text-gray-500">Zusammenfassung</p>
+          <p>{lesson.summary}</p>
+        </div>
+      ) : null}
+
+      {Array.isArray(lesson.chapters) && (lesson.chapters as LessonChapter[]).length > 0 ? (
+        <nav aria-label="Kapitel" className="flex flex-col gap-1">
+          <p className="text-sm font-medium text-gray-500">Kapitel</p>
+          <ol className="flex flex-col gap-1">
+            {(lesson.chapters as LessonChapter[]).map((chapter, index) => (
+              <li key={`${chapter.start}-${index}`} className="text-base">
+                <span className="tabular-nums text-gray-500">{formatChapterTime(chapter.start)}</span>
+                {" – "}
+                {chapter.title}
+              </li>
+            ))}
+          </ol>
+        </nav>
+      ) : null}
+
+      {lesson.transcript ? (
+        <details className="rounded-md border p-4" style={{ borderRadius: "var(--radius)" }}>
+          <summary className="cursor-pointer text-sm font-medium text-gray-500">
+            Transkript anzeigen
+          </summary>
+          <p className="mt-3 max-h-96 overflow-y-auto whitespace-pre-line text-base leading-relaxed">
+            {lesson.transcript}
+          </p>
+        </details>
+      ) : null}
 
       <div className="flex items-center justify-between border-t pt-4">
         <div>

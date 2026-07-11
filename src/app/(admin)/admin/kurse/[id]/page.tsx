@@ -4,6 +4,7 @@ import { ModuleLessonTree, DeleteLessonButton } from "@/components/admin/module-
 import { BlockEditor } from "@/components/editor/block-editor";
 import { LessonPublishToggle } from "@/components/admin/publish-toggle";
 import { ReembedCourseButton } from "@/components/admin/reembed-course-button";
+import { RefreshTranscriptButton } from "@/components/admin/refresh-transcript-button";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
 
 export default async function CourseEditorPage({
@@ -41,7 +42,7 @@ export default async function CourseEditorPage({
 
   const { data: lessons } = await supabase
     .from("lessons")
-    .select("id, title, module_id, status, blocks, position")
+    .select("id, title, module_id, status, blocks, position, video_bunny_id")
     .in("module_id", (modules ?? []).map((m) => m.id))
     .order("position", { ascending: true });
 
@@ -102,11 +103,16 @@ export default async function CourseEditorPage({
                 courseId={courseId}
                 status={activeLesson.status}
               />
-              <DeleteLessonButton
-                lessonId={activeLesson.id}
-                courseId={courseId}
-                title={activeLesson.title}
-              />
+              <div className="flex items-center gap-4">
+                {activeLesson.video_bunny_id ? (
+                  <RefreshTranscriptButton lessonId={activeLesson.id} />
+                ) : null}
+                <DeleteLessonButton
+                  lessonId={activeLesson.id}
+                  courseId={courseId}
+                  title={activeLesson.title}
+                />
+              </div>
             </div>
           </div>
         ) : (

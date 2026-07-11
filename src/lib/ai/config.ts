@@ -41,6 +41,20 @@ export const VOYAGE_EMBEDDING_DIMENSION = 1024;
 export const VOYAGE_COST_USD_PER_MILLION_TOKENS = 0.06;
 
 /**
+ * Bunny Transcribe AI (Phase 3, Block 6 — Auto-Transkript). Kein Claude-/
+ * Voyage-Modell, sondern Bunnys native Whisper-basierte STT (Preis lt.
+ * Bunny-Dashboard, siehe PHASENSTATUS.md-STT-Entscheidung: 0,10 $ pro
+ * Sprachminute). Pseudo-"Modellname" für `ai_jobs.model`/`recordAiJob()` —
+ * `computeCost()` (quota.ts) rechnet dafür `tokensIn` als Videolänge in
+ * SEKUNDEN (nicht Tokens) in Kosten um, analog zur bereits bestehenden
+ * Sonderbehandlung für Voyage-Embeddings (dort tokensIn = echte Tokens,
+ * hier tokensIn = Sekunden — beides "die vom jeweiligen Anbieter
+ * abgerechnete Einheit").
+ */
+export const BUNNY_TRANSCRIBE_MODEL = "bunny-transcribe-ai";
+export const BUNNY_TRANSCRIBE_COST_USD_PER_MINUTE = 0.1;
+
+/**
  * Monats-Kontingente je Plan (mit Josip abgestimmt, siehe PHASENSTATUS.md
  * "Phase 3 — KI", Entscheidung 4, 11.07.2026). `tutorAnswers`/`courseGens`
  * entsprechen exakt den Spalten `usage_counters.tutor_answers`/`course_gens`
