@@ -9,7 +9,7 @@ import {
   type BlockType,
 } from "@/lib/courses/schema";
 import { saveLessonBlocks, updateLessonTitle } from "@/lib/courses/actions";
-import { BlockForm } from "@/components/editor/block-form";
+import { BlockForm, type CourseQuizOption } from "@/components/editor/block-form";
 
 type SaveStatus = "idle" | "pending" | "saved" | "error";
 
@@ -24,11 +24,14 @@ export function BlockEditor({
   courseId,
   initialTitle,
   initialBlocks,
+  courseQuizzes = [],
 }: {
   lessonId: string;
   courseId: string;
   initialTitle: string;
   initialBlocks: Block[];
+  /** Für den quiz-Block-Typ (Block 2/Phase 2) — Auswahl bestehender Quizze. */
+  courseQuizzes?: CourseQuizOption[];
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
@@ -127,7 +130,12 @@ export function BlockEditor({
                 </button>
               </div>
             </div>
-            <BlockForm block={block} onChange={(next) => updateBlock(index, next)} />
+            <BlockForm
+              block={block}
+              onChange={(next) => updateBlock(index, next)}
+              courseId={courseId}
+              courseQuizzes={courseQuizzes}
+            />
           </li>
         ))}
       </ul>

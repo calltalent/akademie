@@ -41,7 +41,7 @@ export function InviteUserForm() {
       )}
       {state.success && (
         <p className="text-sm text-green-700">
-          Konto angelegt und als Mitglied aktiviert (Einladungs-Mail folgt in Phase 2).
+          Konto angelegt und als Mitglied aktiviert — Willkommensmail mit Login-Link wird verschickt.
         </p>
       )}
       <button

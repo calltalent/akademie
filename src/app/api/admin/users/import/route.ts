@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const summary = await importUsers(tenant.id, rows);
+    const summary = await importUsers(tenant, rows);
 
     return NextResponse.json({ ...summary, parseErrors });
   } catch (e) {

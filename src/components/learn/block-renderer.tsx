@@ -1,6 +1,8 @@
 import type { Block } from "@/lib/courses/schema";
 import { getPlayerConfig } from "@/lib/bunny/client";
 import { BunnyPlayer } from "@/components/player/bunny-player";
+import { loadQuizForLearner } from "@/lib/quiz/load";
+import { QuizRunner } from "@/components/learn/quiz-runner";
 
 /**
  * Read-only-Darstellung der Blöcke in der Lernansicht.
@@ -9,6 +11,12 @@ import { BunnyPlayer } from "@/components/player/bunny-player";
  * Sanitizing hier nötig (kein nutzergenerierter Fremdinhalt), aber die
  * grundsätzliche XSS-Fläche ist bewusst dokumentiert für den
  * security-reviewer.
+ *
+ * `BlockView` ist eine async Server Component (Block 2/Phase 2: der
+ * quiz-Fall lädt das verknüpfte Quiz serverseitig über loadQuizForLearner
+ * und übergibt nur die whitelisted Daten als Props an den Client-Component
+ * QuizRunner — folgt demselben "Server lädt, Client rendert"-Muster wie
+ * BunnyPlayer/getPlayerConfig weiter unten).
  */
 export function BlockRenderer({ blocks }: { blocks: Block[] }) {
   return (
@@ -23,7 +31,7 @@ export function BlockRenderer({ blocks }: { blocks: Block[] }) {
   );
 }
 
-function BlockView({ block }: { block: Block }) {
+async function BlockView({ block }: { block: Block }) {
   switch (block.type) {
     case "text":
       return (
@@ -84,12 +92,22 @@ function BlockView({ block }: { block: Block }) {
         />
       );
 
-    case "quiz":
-      return (
-        <div className="rounded-md border p-4 text-base text-gray-500">
-          Quiz „{block.title || "Ohne Titel"}" — Auswertung folgt in Phase 2.
-        </div>
-      );
+    case "quiz": {
+      if (!block.quizId) {
+        return (
+          <div className="rounded-md border p-4 text-base text-gray-500">Kein Quiz verknüpft.</div>
+        );
+      }
+      const result = await loadQuizForLearner(block.quizId);
+      if (!result.ok) {
+        return (
+          <div className="rounded-md border p-4 text-base text-gray-500">
+            Quiz aktuell nicht verfügbar.
+          </div>
+        );
+      }
+      return <QuizRunner quiz={result.quiz} />;
+    }
 
     case "submission":
       return (

@@ -1,11 +1,16 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { CsvRow } from "@/lib/users/csv";
+import { sendEmail } from "@/lib/email/client";
+import { welcomeInvite } from "@/lib/email/templates";
+import { DEFAULT_BRANDING, type PublicTenant } from "@/lib/tenant/types";
 
 export type ImportRowResult = {
   email: string;
   status: "created" | "linked" | "error";
   message?: string;
+  /** Neu (Phase 2, Block 1): ob die Willkommensmail erfolgreich verschickt wurde. */
+  emailSent: boolean;
 };
 
 export type ImportSummary = {
@@ -16,6 +21,9 @@ export type ImportSummary = {
   elapsedMs: number;
   results: ImportRowResult[];
 };
+
+/** Nur die Felder, die importUsers() für die Willkommensmail braucht — kein voller PublicTenant-Zwang an den Aufrufer. */
+type ImportTenant = Pick<PublicTenant, "id" | "name" | "slug" | "branding">;
 
 /**
  * Bulk-Import via service_role — UMGEHT RLS bewusst (siehe admin.ts).
@@ -31,11 +39,21 @@ export type ImportSummary = {
  * ("email rate limit exceeded"), das schon bei 2-3 Zeilen zuschlägt und die
  * 30-Sekunden/100-Nutzer-DoD unmöglich macht. Fix: Konto-Anlage von
  * E-Mail-Versand entkoppelt — `createUser()` legt den Auth-Nutzer OHNE Mail
- * an (kein Rate-Limit). Die eigentliche Einladungs-Mail folgt in Phase 2
- * über Resend (siehe CLAUDE.md Stack), sobald Resend-Keys hinterlegt sind.
+ * an (kein Rate-Limit).
+ *
+ * NACHGEHOLT (Phase 2, Block 1): die eigentliche Willkommensmail wird jetzt
+ * über Resend verschickt (src/lib/email/client.ts), aber bewusst NICHT im
+ * kritischen Batch-Pfad, der die 30-Sekunden-DoD erfüllen muss. Erst NACHDEM
+ * alle Konten angelegt sind, werden die Mails für alle neu angelegten
+ * ("created") Zeilen gemeinsam über Promise.allSettled verschickt — parallel
+ * statt seriell, und fail-soft (sendEmail() wirft nie), sodass ein
+ * einzelner langsamer/fehlschlagender Mailversand weder den Import verzögert
+ * (kein Warten pro Zeile) noch den Import zum Scheitern bringt. Für Zeilen
+ * mit Status "linked" (Nutzer existierte bereits) wird bewusst KEINE
+ * Willkommensmail verschickt — die Person hat vermutlich schon einen Zugang.
  */
 export async function importUsers(
-  tenantId: string,
+  tenant: ImportTenant,
   rows: CsvRow[],
 ): Promise<ImportSummary> {
   const started = Date.now();
@@ -46,10 +64,20 @@ export async function importUsers(
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.all(
-      batch.map((row) => importOneUserWithRetry(admin, tenantId, row)),
+      batch.map((row) => importOneUserWithRetry(admin, tenant.id, row)),
     );
     results.push(...batchResults);
   }
+
+  // rows[i] <-> results[i]: Reihenfolge bleibt erhalten, da jeder Batch
+  // seriell an `results` angehängt wird und Promise.all innerhalb eines
+  // Batches die Eingabereihenfolge der Ausgabe beibehält.
+  await Promise.allSettled(
+    results.map((result, i) => {
+      if (result.status !== "created") return Promise.resolve();
+      return sendWelcomeMail(tenant, result, rows[i]);
+    }),
+  );
 
   return {
     total: results.length,
@@ -59,6 +87,40 @@ export async function importUsers(
     elapsedMs: Date.now() - started,
     results,
   };
+}
+
+/** Mutiert `result.emailSent` in place — fail-soft, wirft nie (sendEmail() garantiert das bereits). */
+async function sendWelcomeMail(
+  tenant: ImportTenant,
+  result: ImportRowResult,
+  row: CsvRow,
+): Promise<void> {
+  const loginUrl = buildLoginUrl(tenant.slug);
+  const accentColor = tenant.branding?.color_primary ?? DEFAULT_BRANDING.color_primary;
+
+  const html = welcomeInvite({
+    tenantName: tenant.name,
+    recipientName: row.fullName,
+    loginUrl,
+    accentColor,
+  });
+
+  const sendResult = await sendEmail({
+    to: result.email,
+    subject: `Willkommen bei ${tenant.name}`,
+    html,
+    tenant: { name: tenant.name },
+  });
+
+  result.emailSent = sendResult.success;
+}
+
+/** Dev-/Prod-Domainschema wie in src/lib/tenant/resolve.ts dokumentiert (Entscheidung 10.07.2026). */
+function buildLoginUrl(slug: string): string {
+  if (process.env.NODE_ENV === "production") {
+    return `https://${slug}.akademie.calltalent.ai/login`;
+  }
+  return `http://${slug}.localhost:3000/login`;
 }
 
 /**
@@ -89,8 +151,8 @@ async function importOneUser(
     let status: "created" | "linked" = "created";
 
     // Kein Mail-Versand hier (siehe Kommentar oben) — nur Konto-Anlage.
-    // email_confirm: true, da wir den Login-/Aktivierungsweg noch nicht
-    // über eine eigene Einladungs-Mail steuern (kommt mit Resend, Phase 2).
+    // email_confirm: true, da wir den Login-/Aktivierungsweg über die eigene
+    // Willkommens-Mail (Resend, s. o.) steuern, nicht über Supabase-Auth-Mails.
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email: row.email,
       email_confirm: true,
@@ -104,12 +166,17 @@ async function importOneUser(
       // statt Fehler zu werfen (häufiger Fall bei Re-Imports/mehreren Mandanten).
       const existing = await findUserByEmail(admin, row.email);
       if (!existing) {
-        return { email: row.email, status: "error", message: createError.message };
+        return { email: row.email, status: "error", message: createError.message, emailSent: false };
       }
       userId = existing.id;
       status = "linked";
     } else {
-      return { email: row.email, status: "error", message: "Unbekannter Fehler bei Konto-Anlage." };
+      return {
+        email: row.email,
+        status: "error",
+        message: "Unbekannter Fehler bei Konto-Anlage.",
+        emailSent: false,
+      };
     }
 
     // profiles-Upsert (id = auth.users.id, kein RLS-Konflikt da service_role)
@@ -136,7 +203,7 @@ async function importOneUser(
       { onConflict: "tenant_id,user_id", ignoreDuplicates: false },
     );
     if (membershipError) {
-      return { email: row.email, status: "error", message: membershipError.message };
+      return { email: row.email, status: "error", message: membershipError.message, emailSent: false };
     }
 
     if (row.courseSlug) {
@@ -155,12 +222,15 @@ async function importOneUser(
       }
     }
 
-    return { email: row.email, status };
+    // emailSent wird erst nach dem Batch von sendWelcomeMail() gesetzt
+    // (nur für status === "created"); Default hier: false.
+    return { email: row.email, status, emailSent: false };
   } catch (e) {
     return {
       email: row.email,
       status: "error",
       message: e instanceof Error ? e.message : "Unbekannter Fehler.",
+      emailSent: false,
     };
   }
 }

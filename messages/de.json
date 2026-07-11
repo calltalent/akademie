@@ -9,5 +9,28 @@
     "login": "Anmelden",
     "register": "Registrieren",
     "logout": "Abmelden"
+  },
+  "quiz": {
+    "kinds": {
+      "quiz": "Quiz",
+      "exam": "Prüfung"
+    },
+    "questionKinds": {
+      "single": "Einfachauswahl (eine richtige Antwort)",
+      "multi": "Mehrfachauswahl (mehrere richtige Antworten)",
+      "gap": "Lückentext / Freitext (automatisch bewertet)",
+      "open": "Freitext (nicht automatisch bewertet)"
+    },
+    "start": "Quiz starten",
+    "submit": "Antworten abschicken",
+    "retry": "Erneut versuchen",
+    "passed": "Bestanden",
+    "failed": "Nicht bestanden",
+    "attemptsRemaining": "{count} von {total} verbleibend",
+    "attemptsUnlimited": "unbegrenzt",
+    "attemptsExhausted": "Versuchslimit erreicht — keine weiteren Versuche möglich.",
+    "noQuizLinked": "Kein Quiz verknüpft.",
+    "quizUnavailable": "Quiz aktuell nicht verfügbar.",
+    "rateLimited": "Zu viele Anfragen. Bitte kurz warten und erneut versuchen."
   }
 }

@@ -44,6 +44,14 @@ export default async function CourseEditorPage({
     .in("module_id", (modules ?? []).map((m) => m.id))
     .order("position", { ascending: true });
 
+  // Block 2/Phase 2: Quizze des Kurses für die Auswahl im quiz-Block.
+  const { data: courseQuizzesRaw } = await supabase
+    .from("quizzes")
+    .select("id, title")
+    .eq("course_id", courseId)
+    .order("title", { ascending: true });
+  const courseQuizzes = courseQuizzesRaw ?? [];
+
   const modulesWithLessons = (modules ?? []).map((m) => ({
     id: m.id,
     title: m.title,
@@ -82,6 +90,7 @@ export default async function CourseEditorPage({
               courseId={courseId}
               initialTitle={activeLesson.title}
               initialBlocks={activeLessonBlocks}
+              courseQuizzes={courseQuizzes}
             />
             <div className="flex items-center justify-between border-t pt-3">
               <LessonPublishToggle

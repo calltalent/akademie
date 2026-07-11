@@ -114,8 +114,8 @@ export function CsvImportForm() {
             {result.errors} Fehler.
           </p>
           <p className="text-xs text-gray-500">
-            Hinweis: Es wird noch keine Einladungs-Mail verschickt (folgt in Phase 2 über Resend).
-            Neue Konten sind aber sofort als Mitglied aktiv.
+            Hinweis: Neu angelegte Konten erhalten automatisch eine Willkommensmail mit Login-Link.
+            Bereits bestehenden Nutzern (zugeordnet) wird keine erneute Mail verschickt.
           </p>
           {result.parseErrors.length > 0 && (
             <details>

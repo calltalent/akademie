@@ -24,7 +24,8 @@
     "tailwind-merge": "^2",
     "lucide-react": "^0.460",
     "tus-js-client": "^4",
-    "sanitize-html": "^2"
+    "sanitize-html": "^2",
+    "resend": "^4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

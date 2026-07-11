@@ -27,7 +27,7 @@ export async function inviteSingleUser(
       return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
     }
 
-    const summary = await importUsers(tenant.id, [parsed.data]);
+    const summary = await importUsers(tenant, [parsed.data]);
     const result = summary.results[0];
     if (result?.status === "error") {
       return { error: result.message ?? "Einladung fehlgeschlagen." };

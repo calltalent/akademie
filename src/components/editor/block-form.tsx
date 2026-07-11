@@ -1,7 +1,11 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import type { Block } from "@/lib/courses/schema";
 import { VideoUpload } from "@/components/editor/video-upload";
+import { createQuiz } from "@/lib/quiz/actions";
+
+export type CourseQuizOption = { id: string; title: string };
 
 /**
  * Ein Formular je Block-Typ. Bewusst einfach gehalten (Textarea/Input statt
@@ -11,9 +15,14 @@ import { VideoUpload } from "@/components/editor/video-upload";
 export function BlockForm({
   block,
   onChange,
+  courseId,
+  courseQuizzes = [],
 }: {
   block: Block;
   onChange: (next: Block) => void;
+  /** Nur für den quiz-Block-Typ nötig (Block 2/Phase 2). */
+  courseId?: string;
+  courseQuizzes?: CourseQuizOption[];
 }) {
   switch (block.type) {
     case "text":
@@ -117,10 +126,12 @@ export function BlockForm({
 
     case "quiz":
       return (
-        <p className="text-sm text-gray-500">
-          Quiz-Erstellung folgt in Block 3b/Phase 2 (Fragen, Bestehensgrenze).
-          Platzhalter: „{block.title || "Ohne Titel"}".
-        </p>
+        <QuizBlockFields
+          block={block}
+          onChange={onChange}
+          courseId={courseId}
+          courseQuizzes={courseQuizzes}
+        />
       );
 
     case "submission":
@@ -134,4 +145,89 @@ export function BlockForm({
         />
       );
   }
+}
+
+/**
+ * Block 2/Phase 2: Auswahl/Verlinkung zu bestehenden Quizzen des Kurses +
+ * „Neues Quiz anlegen". Das eigentliche Fragen-Editing passiert auf der
+ * separaten Seite /admin/kurse/[id]/quiz/[quizId] — hier wird nur die
+ * quizId auf dem Block gesetzt (analog zu VideoUpload/bunnyVideoId oben).
+ */
+function QuizBlockFields({
+  block,
+  onChange,
+  courseId,
+  courseQuizzes,
+}: {
+  block: Extract<Block, { type: "quiz" }>;
+  onChange: (next: Block) => void;
+  courseId?: string;
+  courseQuizzes: CourseQuizOption[];
+}) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleCreateQuiz() {
+    if (!courseId) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await createQuiz(courseId, block.title || "Neues Quiz");
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onChange({ ...block, quizId: result.id });
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <input
+        value={block.title}
+        onChange={(e) => onChange({ ...block, title: e.target.value })}
+        placeholder="Block-Beschriftung (optional, z. B. „Abschlussquiz Modul 1“)"
+        className="w-full rounded-md border px-3 py-2 text-base"
+      />
+
+      <label className="flex flex-col gap-1 text-sm">
+        Verknüpftes Quiz
+        <select
+          value={block.quizId ?? ""}
+          onChange={(e) => onChange({ ...block, quizId: e.target.value || null })}
+          className="rounded-md border px-3 py-2 text-base"
+        >
+          <option value="">— kein Quiz —</option>
+          {courseQuizzes.map((q) => (
+            <option key={q.id} value={q.id}>
+              {q.title}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={pending || !courseId}
+          onClick={handleCreateQuiz}
+          className="self-start rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+        >
+          {pending ? "Wird angelegt …" : "Neues Quiz anlegen"}
+        </button>
+        {block.quizId && courseId && (
+          <a
+            href={`/admin/kurse/${courseId}/quiz/${block.quizId}`}
+            className="text-sm underline"
+          >
+            Fragen bearbeiten →
+          </a>
+        )}
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
+    </div>
+  );
 }
