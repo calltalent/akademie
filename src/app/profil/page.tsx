@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
+import { publicEnv } from "@/lib/env";
 import { DeletionRequestForm } from "./deletion-request-form";
+import { PushToggle } from "@/components/pwa/push-toggle";
 
 type CertificateRow = {
   id: string;
@@ -134,6 +136,16 @@ export default async function ProfilePage() {
             </li>
           ))}
         </ul>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-medium">Benachrichtigungen</h2>
+        <p className="mt-2 text-sm text-gray-600">
+          Erhalte eine Browser-Benachrichtigung, sobald du einen Kurs vollständig abgeschlossen hast.
+        </p>
+        <div className="mt-3">
+          <PushToggle vapidPublicKey={publicEnv.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
+        </div>
       </div>
 
       <div>

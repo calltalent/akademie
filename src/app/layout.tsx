@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { getTenant } from "@/lib/tenant/context";
 import { ThemeStyle } from "@/components/branding/theme-style";
+import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -27,6 +28,7 @@ export default async function RootLayout({
         <ThemeStyle tenant={tenant} />
       </head>
       <body className="min-h-screen antialiased" style={{ background: "var(--color-background)" }}>
+        <ServiceWorkerRegister />
         <NextIntlClientProvider messages={messages}>
           {children}
         </NextIntlClientProvider>

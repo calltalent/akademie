@@ -24,6 +24,11 @@ const publicSchema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().min(1).default("portal.localhost"),
   ),
+  // Phase 4, Block 5 (PWA/Web-Push): der öffentliche VAPID-Schlüssel darf im
+  // Client-Bundle landen (er identifiziert nur den Absender gegenüber dem
+  // Push-Dienst, ist kein Geheimnis) — das Gegenstück
+  // VAPID_PRIVATE_KEY liegt bewusst in serverOnlySchema.
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: optionalString,
 });
 
 const serverOnlySchema = z.object({
@@ -45,6 +50,13 @@ const serverOnlySchema = z.object({
   // Cron-Prozess-Endpunkt (src/app/api/admin/ki/process/route.ts) — wird
   // vom Cloudflare Cron Trigger per Header mitgeschickt, KEIN Supabase-Auth.
   CRON_PROCESS_SECRET: optionalString,
+  // Phase 4, Block 5 (PWA/Web-Push): VAPID-Schlüsselpaar (selbst generiert,
+  // kein externer Anbieter/Signup nötig — reines EC-P-256-Schlüsselpaar,
+  // siehe src/lib/push/send.ts). VAPID_SUBJECT ist die laut Web-Push-Standard
+  // vorgeschriebene Kontakt-Adresse (mailto: oder https:), falls ein
+  // Push-Dienst bei Problemen den Absender kontaktieren muss.
+  VAPID_PRIVATE_KEY: optionalString,
+  VAPID_SUBJECT: optionalString,
 });
 
 function parsePublicEnv() {
@@ -52,6 +64,7 @@ function parsePublicEnv() {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_PORTAL_HOST: process.env.NEXT_PUBLIC_PORTAL_HOST,
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
   });
   if (!result.success) {
     throw new Error(
@@ -75,6 +88,8 @@ function parseServerEnv() {
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     CRON_PROCESS_SECRET: process.env.CRON_PROCESS_SECRET,
+    VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
+    VAPID_SUBJECT: process.env.VAPID_SUBJECT,
   });
   if (!result.success) {
     throw new Error(

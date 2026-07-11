@@ -29,7 +29,8 @@
     "resend": "^4",
     "pdf-lib": "^1",
     "stripe": "^18",
-    "unpdf": "^0.12"
+    "unpdf": "^0.12",
+    "web-push": "^3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -37,6 +38,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sanitize-html": "^2",
+    "@types/web-push": "^3",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",

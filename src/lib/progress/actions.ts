@@ -6,6 +6,7 @@ import { getTenant } from "@/lib/tenant/context";
 import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/compute";
 import { issueCertificateIfEligible } from "@/lib/certificates/issue";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
+import { sendPushToUser } from "@/lib/push/send";
 
 export type ProgressActionState = { error: string | null; success?: boolean };
 
@@ -56,7 +57,7 @@ export async function completeLesson(
   try {
     const { data: course } = await supabase
       .from("courses")
-      .select("id")
+      .select("id, title")
       .eq("tenant_id", tenant.id)
       .eq("slug", courseSlug)
       .maybeSingle();
@@ -108,6 +109,30 @@ export async function completeLesson(
           course_slug: courseSlug,
           user_id: user.id,
         }).catch(() => {});
+
+        // Phase 4, Block 5 (PWA/Web-Push): EIN Trigger-Beispiel „Kurs
+        // abgeschlossen" (PHASENSTATUS.md Block-5-Plan Punkt 8) —
+        // fire-and-forget, komplett FAIL-SOFT. sendPushToUser() fängt jeden
+        // internen Fehler bereits selbst ab und wirft nie; das äußere
+        // try/catch ist zusätzliche Absicherung, damit ein unerwarteter
+        // Fehler hier (z. B. Ausnahme, die vor dem eigentlichen Push-Versand
+        // auftritt) completeLesson() niemals scheitern lassen kann — der
+        // Fortschritts-Upsert oben ist zu diesem Zeitpunkt bereits sicher
+        // gespeichert.
+        try {
+          sendPushToUser(user.id, {
+            title: "Kurs abgeschlossen",
+            body: course.title
+              ? `Du hast „${course.title}" erfolgreich abgeschlossen.`
+              : "Du hast einen Kurs erfolgreich abgeschlossen.",
+            url: `/kurs/${courseSlug}`,
+          }).catch(() => {});
+        } catch (pushError) {
+          console.error(
+            "[progress/actions] Ausnahme beim Push-Trigger (fail-soft, keine Auswirkung auf den Fortschritt):",
+            pushError instanceof Error ? pushError.message : pushError,
+          );
+        }
 
         const result = await issueCertificateIfEligible(course.id, user.id, tenant.id);
         if (!result.ok) {
