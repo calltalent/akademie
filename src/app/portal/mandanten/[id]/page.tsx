@@ -117,6 +117,12 @@ export default async function MandantDetailPage({
           </span>
           <span className="text-slate-500">Erstellt am {formatDateTime(tenant.created_at)}</span>
         </div>
+        <a
+          href={`/portal/mandanten/${tenant.id}/export`}
+          className="w-fit text-sm underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+        >
+          Mandanten-Daten exportieren (DSGVO, Art. 28)
+        </a>
       </div>
 
       <section aria-labelledby="edit-heading" className="flex flex-col gap-3">

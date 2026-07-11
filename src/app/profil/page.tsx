@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
+import { DeletionRequestForm } from "./deletion-request-form";
 
 type CertificateRow = {
   id: string;
@@ -17,14 +18,28 @@ function courseTitle(courses: CertificateRow["courses"]): string {
   return courses.title ?? "Kurs";
 }
 
+function formatDateDe(iso: string): string {
+  return new Date(iso).toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 /**
  * SPEC 4.1: `/profil` — Name, Passwort, Datenexport, Zertifikate.
  * Route existierte vor diesem Block noch nicht (kein vorheriger Phase-1/2-
  * Block hat sie angelegt) — hier neu ergänzt, Fokus liegt gemäß Auftrag auf
- * der Zertifikate-Liste. Passwort-Änderung und Datenexport sind in Phase 2
- * bewusst nur als Hinweis/Platzhalter vorhanden (kein eigenständiges
- * Formular in diesem Block) — Datenexport ist ohnehin ein DSGVO-Thema für
- * Phase 4 (siehe CLAUDE.md Phasenplan).
+ * der Zertifikate-Liste. Passwort-Änderung bleibt bewusst nur als Hinweis
+ * vorhanden (kein eigenständiges Formular in diesem Block).
+ *
+ * Datenexport + Konto löschen (Phase 4, Block 3, DSGVO Art. 15/17/20):
+ * „Meine Daten exportieren" verlinkt auf `/profil/export` (GET-Route-
+ * Handler mit Datei-Download, kein Client-JS nötig). Für „Konto löschen"
+ * wird zuerst geprüft, ob bereits ein offener Löschantrag existiert — falls
+ * ja, nur ein Hinweistext statt erneutem Formular (verhindert doppelte
+ * Anträge auch optisch, der partielle Unique-Index in der DB verhindert es
+ * zusätzlich hart).
  */
 export default async function ProfilePage() {
   const tenant = await getTenant();
@@ -47,6 +62,19 @@ export default async function ProfilePage() {
         .eq("tenant_id", tenant.id)
         .eq("user_id", user.id)
         .order("issued_at", { ascending: false })
+    : { data: null };
+
+  // Pending Löschantrag prüfen (Server-Component-Query, RLS
+  // `deletion_requests_select` erlaubt "eigene Zeilen" bereits über den
+  // normalen Session-Client — kein Admin-Client nötig).
+  const { data: pendingDeletionRequest } = tenant
+    ? await supabase
+        .from("deletion_requests")
+        .select("requested_at")
+        .eq("tenant_id", tenant.id)
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .maybeSingle()
     : { data: null };
 
   const certificates = await Promise.all(
@@ -106,6 +134,39 @@ export default async function ProfilePage() {
             </li>
           ))}
         </ul>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-medium">Meine Daten</h2>
+        <p className="mt-2 text-sm text-gray-600">
+          Lade eine strukturierte JSON-Datei mit allen zu dir gespeicherten Daten herunter (Art. 15/20 DSGVO).
+        </p>
+        <a
+          href="/profil/export"
+          className="mt-2 inline-block text-sm underline"
+          style={{ color: "var(--color-primary)" }}
+        >
+          Meine Daten exportieren
+        </a>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-medium">Konto löschen</h2>
+        {pendingDeletionRequest ? (
+          <p className="mt-2 text-sm text-gray-600">
+            Löschantrag vom {formatDateDe(pendingDeletionRequest.requested_at)} eingegangen, wird geprüft.
+          </p>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-gray-600">
+              Beantrage die Löschung deines Kontos. Die Löschung selbst erfolgt nach manueller Prüfung
+              (z. B. auf gesetzliche Aufbewahrungspflichten) und ist nicht sofort.
+            </p>
+            <div className="mt-3">
+              <DeletionRequestForm />
+            </div>
+          </>
+        )}
       </div>
     </main>
   );
