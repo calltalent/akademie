@@ -1,4 +1,5 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/compute";
 
@@ -255,9 +256,27 @@ export async function getCourseReport(tenantId: string): Promise<CourseReportRow
  * gegen `tenantId` geprüft sein (siehe Route-Handler) — hier zusätzlich
  * per `.eq("tenant_id", tenantId)` auf der enrollments-Query abgesichert,
  * sodass eine fremde courseId ohnehin nie Zeilen liefert (Defense-in-Depth).
+ *
+ * NACHTRAG (Phase 3, Block 7): optionaler dritter Parameter
+ * `supabaseOverride` — Plan-Abweichung, technisch zwingend (siehe
+ * PHASENSTATUS.md Block 7): `/api/v1/progress` und
+ * `/api/v1/reports/course/[id]` sind API-Key-authentifiziert, haben also
+ * KEINE Nutzer-Session. Der Standard-Client (`createClient()`, RLS-
+ * gebunden an `auth.uid()`) würde dort wegen `is_staff(tenant_id)` in
+ * `progress_staff_select`/`attempts_staff_select` etc. still leere
+ * Ergebnisse liefern (kein Fehler, nur RLS-gefiltert auf null Zeilen) —
+ * ein stiller Bug, kein Absturz. Ohne Override-Parameter würde der
+ * geplante Wiederverwendungspfad aus dem architect-Plan technisch falsche
+ * Daten liefern. Bestehende Aufrufer (admin/reporting/page.tsx,
+ * admin/reporting/csv/route.ts) übergeben den Parameter NICHT — Verhalten
+ * dort unverändert (weiterhin Session-Client + RLS).
  */
-export async function getUserReport(tenantId: string, courseId?: string): Promise<UserReportRow[]> {
-  const supabase = await createClient();
+export async function getUserReport(
+  tenantId: string,
+  courseId?: string,
+  supabaseOverride?: SupabaseClient,
+): Promise<UserReportRow[]> {
+  const supabase = supabaseOverride ?? (await createClient());
   const structures = await loadCourseStructures(supabase, tenantId);
   const lessonToCourse = buildLessonToCourseMap(structures);
   const progressIndex = await loadProgressIndex(supabase, tenantId, lessonToCourse);

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/compute";
 import { issueCertificateIfEligible } from "@/lib/certificates/issue";
+import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 
 export type ProgressActionState = { error: string | null; success?: boolean };
 
@@ -37,6 +38,14 @@ export async function completeLesson(
     { onConflict: "user_id,lesson_id" },
   );
   if (error) return { error: error.message };
+
+  // Block 7 (Webhooks): lesson.completed fire-and-forget direkt nach dem
+  // erfolgreichen progress-Upsert (siehe dispatch.ts).
+  dispatchWebhookEvent(tenant.id, "lesson.completed", {
+    lesson_id: lessonId,
+    user_id: user.id,
+    course_slug: courseSlug,
+  }).catch(() => {});
 
   // Zertifikats-Ausstellung (Phase 2, Block 4) — FAIL-SOFT: die Lektion ist
   // bereits korrekt als abgeschlossen gespeichert (Upsert oben erfolgreich),
@@ -91,6 +100,15 @@ export async function completeLesson(
       }));
 
       if (computeCourseProgress(moduleSummaries).isComplete) {
+        // Block 7 (Webhooks): course.completed fire-and-forget, UNABHÄNGIG
+        // vom Zertifikat-Ergebnis (Zertifikate sind abschaltbar) — siehe
+        // PHASENSTATUS.md Block 7 / dispatch.ts.
+        dispatchWebhookEvent(tenant.id, "course.completed", {
+          course_id: course.id,
+          course_slug: courseSlug,
+          user_id: user.id,
+        }).catch(() => {});
+
         const result = await issueCertificateIfEligible(course.id, user.id, tenant.id);
         if (!result.ok) {
           console.error("[progress/actions] Zertifikat-Ausstellung fehlgeschlagen (fail-soft):", result.error);

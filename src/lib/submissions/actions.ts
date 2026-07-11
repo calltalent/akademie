@@ -8,6 +8,7 @@ import { createSubmissionSchema, gradeSubmissionSchema } from "@/lib/submissions
 import { sendEmail } from "@/lib/email/client";
 import { submissionGraded } from "@/lib/email/templates";
 import type { GradeSubmissionActionState } from "@/lib/submissions/state";
+import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 
 type CreateSubmissionResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -79,6 +80,15 @@ export async function createSubmission(input: unknown): Promise<CreateSubmission
       .select("id")
       .single();
     if (error || !data) return { ok: false, error: error?.message ?? "Einreichen fehlgeschlagen." };
+
+    // Block 7 (Webhooks): submission.created fire-and-forget nach der
+    // erfolgreichen Abgabe (siehe dispatch.ts).
+    dispatchWebhookEvent(lessonRow.tenant_id, "submission.created", {
+      submission_id: data.id,
+      lesson_id: lessonRow.id,
+      user_id: user.id,
+      kind: parsed.data.kind,
+    }).catch(() => {});
 
     return { ok: true, id: data.id };
   } catch (e) {

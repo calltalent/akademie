@@ -4,6 +4,7 @@ import type { CsvRow } from "@/lib/users/csv";
 import { sendEmail } from "@/lib/email/client";
 import { welcomeInvite } from "@/lib/email/templates";
 import { DEFAULT_BRANDING, type PublicTenant } from "@/lib/tenant/types";
+import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 
 export type ImportRowResult = {
   email: string;
@@ -11,6 +12,19 @@ export type ImportRowResult = {
   message?: string;
   /** Neu (Phase 2, Block 1): ob die Willkommensmail erfolgreich verschickt wurde. */
   emailSent: boolean;
+  /**
+   * Neu (Phase 3, Block 7, Bugfix Cowork-Verifikation 11.07.2026): die
+   * `profiles.id`/`auth.users.id` des angelegten/verknüpften Nutzers.
+   * Fehlte bisher komplett im Rückgabewert, obwohl `userId` innerhalb der
+   * Funktion längst bekannt war — ohne dieses Feld hätte `POST
+   * /api/v1/users` keine ID zurückliefern können, mit der ein externer
+   * Integrator anschließend sinnvoll `POST /api/v1/enrollments` aufrufen
+   * kann (Josips Testfund: Antwort enthielt nur `email`/`status`). Optional,
+   * da bei `status: "error"` keine ID existiert. Bestehende Aufrufer
+   * (CSV-Import-UI) ignorieren das neue Feld einfach, kein Verhalten
+   * geändert.
+   */
+  userId?: string;
 };
 
 export type ImportSummary = {
@@ -141,7 +155,13 @@ async function importOneUserWithRetry(
   return importOneUser(admin, tenantId, row);
 }
 
-async function importOneUser(
+/**
+ * Phase 3, Block 7: jetzt EXPORTIERT — wird von `POST /api/v1/users`
+ * wiederverwendet (kleine, dokumentierte Abweichung vom Plan-Wortlaut
+ * "keine bestehende Logik ändern", technisch zwingend und risikoarm: nur
+ * `export` ergänzt, kein Verhalten geändert, siehe PHASENSTATUS.md Block 7).
+ */
+export async function importOneUser(
   admin: ReturnType<typeof createAdminClient>,
   tenantId: string,
   row: CsvRow,
@@ -190,6 +210,18 @@ async function importOneUser(
       { onConflict: "id" },
     );
 
+    // Block 7 (Webhooks): vor dem Upsert prüfen, ob die Mitgliedschaft
+    // bereits existierte — das user.created-Event soll NUR bei
+    // tatsächlicher Neuanlage der Mandanten-Mitgliedschaft feuern, nicht
+    // bei jedem Re-Import/Re-Invite eines bereits bestehenden Mitglieds.
+    const { data: existingMembership } = await admin
+      .from("memberships")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    const isNewMembership = !existingMembership;
+
     // memberships-Upsert — unique(tenant_id, user_id). Kein invited_by-Feld
     // im Schema (siehe 0001_init.sql); wer eingeladen hat, steht im
     // Server-Log der Server Action, nicht in dieser Tabelle.
@@ -206,6 +238,14 @@ async function importOneUser(
       return { email: row.email, status: "error", message: membershipError.message, emailSent: false };
     }
 
+    if (isNewMembership) {
+      dispatchWebhookEvent(tenantId, "user.created", {
+        user_id: userId,
+        email: row.email,
+        full_name: row.fullName ?? null,
+      }).catch(() => {});
+    }
+
     if (row.courseSlug) {
       const { data: course } = await admin
         .from("courses")
@@ -215,16 +255,24 @@ async function importOneUser(
         .maybeSingle();
 
       if (course) {
-        await admin.from("enrollments").upsert(
+        const { error: enrollError } = await admin.from("enrollments").upsert(
           { tenant_id: tenantId, course_id: course.id, user_id: userId, source: "import" },
           { onConflict: "course_id,user_id", ignoreDuplicates: true },
         );
+        if (!enrollError) {
+          dispatchWebhookEvent(tenantId, "enrollment.created", {
+            user_id: userId,
+            course_id: course.id,
+            email: row.email,
+            source: "import",
+          }).catch(() => {});
+        }
       }
     }
 
     // emailSent wird erst nach dem Batch von sendWelcomeMail() gesetzt
     // (nur für status === "created"); Default hier: false.
-    return { email: row.email, status, emailSent: false };
+    return { email: row.email, status, emailSent: false, userId };
   } catch (e) {
     return {
       email: row.email,

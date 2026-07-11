@@ -6,6 +6,7 @@ import { getServerEnv } from "@/lib/env";
 import { checkoutMetadataSchema } from "@/lib/stripe/schema";
 import { sendEmail } from "@/lib/email/client";
 import { orderPaid } from "@/lib/email/templates";
+import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 
 /**
  * Stripe-Webhook (Phase 2, Block 5). REIHENFOLGE STRENG WIE VORGEGEBEN:
@@ -121,6 +122,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return;
   }
 
+  // Block 7 (Webhooks): order.paid direkt nach dem orders-Upsert, VOR
+  // enrollFromProduct() (fire-and-forget, siehe dispatch.ts).
+  dispatchWebhookEvent(tenantId, "order.paid", {
+    order_id: order.id,
+    user_id: userId,
+    product_id: productId,
+    amount_cents: session.amount_total ?? null,
+    currency: session.currency ?? "eur",
+  }).catch(() => {});
+
   // Bei Abo zusaetzlich subscriptions-Zeile anlegen/aktualisieren.
   if (session.mode === "subscription" && typeof session.subscription === "string") {
     const { error: subError } = await admin.from("subscriptions").upsert(
@@ -179,7 +190,15 @@ async function enrollFromProduct(
     );
     if (enrollError) {
       console.error("[stripe/webhook] Einschreibung fehlgeschlagen:", courseId, enrollError.message);
+      continue;
     }
+    // Block 7 (Webhooks): enrollment.created fire-and-forget nach jeder
+    // erfolgreichen Einschreibung (siehe dispatch.ts).
+    dispatchWebhookEvent(tenantId, "enrollment.created", {
+      course_id: courseId,
+      user_id: userId,
+      source: "purchase",
+    }).catch(() => {});
   }
 }
 

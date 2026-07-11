@@ -14,6 +14,7 @@ import {
 } from "@/lib/quiz/schema";
 import { gradeAttempt } from "@/lib/quiz/grade";
 import type { QuizActionState, QuestionActionState } from "@/lib/quiz/state";
+import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 
 function errorState(e: unknown): QuizActionState {
   return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
@@ -387,6 +388,16 @@ export async function submitAttempt(quizId: string, answersInput: unknown): Prom
       passed: grading.passed,
     });
     if (insertError) return { ok: false, error: "Speichern fehlgeschlagen: " + insertError.message };
+
+    // Block 7 (Webhooks): quiz.passed fire-and-forget, NUR wenn bestanden
+    // (siehe dispatch.ts).
+    if (grading.passed) {
+      dispatchWebhookEvent(quizRow.tenant_id, "quiz.passed", {
+        quiz_id: quizId,
+        user_id: user.id,
+        score_pct: grading.scorePct,
+      }).catch(() => {});
+    }
 
     return {
       ok: true,
