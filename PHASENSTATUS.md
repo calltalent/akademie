@@ -433,14 +433,73 @@ Der reguläre Server-Client (`createClient()`, RLS aktiv, Session des angemeldet
 - **Aggregation in TypeScript, nicht per SQL-View/RPC** — wie im Auftrag als ausreichend vorgegeben (überschaubare Datenmengen pro Mandant in Phase 2).
 - **`avgScorePct` ist `null` statt `0`, wenn ein Quiz noch keine abgeschickten Versuche hat** — vermeidet eine irreführende „0 %"-Anzeige; CSV/Tabelle zeigen dafür „—".
 
-**Noch offen für Josips lokale Prüfung:**
-1. `npm install` — keine neue Dependency in diesem Block (Eigenbau-CSV wie im Auftrag bevorzugt), sollte ohne Änderungen durchlaufen.
-2. `npm run test` — neue Datei `src/lib/reporting/csv.test.ts` (5 Fälle), Regressionscheck der bestehenden Suiten.
-3. Manueller Test: `/admin/reporting` mit vorhandenen Testdaten aus den Blöcken 2/4/5 aufrufen (Test-Kurs mit Abschlüssen aus Block 4, Quiz-Versuch aus Block 2, Bestellung aus Block 5) und prüfen, ob Kursbericht/Nutzerbericht/Quiz-Auswertung die erwarteten Zahlen zeigen (bekannt aus den früheren E2E-Tests: „Test gruen" abgeschlossen mit Zertifikat, ein Quiz-Versuch „Bestanden — 100%").
-4. CSV-Export aller drei Berichte herunterladen und in Excel/LibreOffice Calc öffnen — prüfen, ob Umlaute (ä/ö/ü/ß in Kurs-/Nutzernamen) korrekt dargestellt werden (BOM-Test) und ob die Datei mit korrektem Dateinamen ankommt.
-5. Git-Commit-Vorschlag: `feat: Block 6 - Reporting v1 und CSV-Export`.
-6. Übergabe an `tester`-Agent (Vitest + Playwright) gemäß CLAUDE.md §4.3.
+**Block 6 vollständig verifiziert (Josip, 11.07.2026):**
+1. ~~`npm install`~~ — erledigt, keine neue Dependency, ohne Änderungen durchgelaufen.
+2. ~~`npm run test`~~ — erledigt, 56/56 Tests bestanden (inkl. der 5 neuen `csv.test.ts`-Fälle).
+3. ~~Manueller Test `/admin/reporting`~~ — erledigt, Zahlen gegen Testdaten (demo-blau) verifiziert und plausibel: Kursbericht Test-Kurs 2 eingeschrieben/1 aktiv/50 % Abschlussquote, deckt sich exakt mit Nutzerbericht (office@calltalent.ai 100 %/2 Lektionen, Test 2 0 %/0 Lektionen); Quiz „hh" 3 Versuche/1 bestanden/67 % Durchschnitt, Quiz „Test" ohne Versuche zeigt korrekt „—" statt 0.
+4. ~~CSV-Export~~ — erledigt, Export funktioniert.
+5. ~~Git-Commit~~ — erledigt, Commit `b79ac10` „feat: Block 6 - Reporting v1 und CSV-Export", 9 Dateien.
+6. Übergabe an `tester`-Agent (Vitest + Playwright) — optional, da manueller Test bereits erfolgreich war (gleiches Muster wie bei den vorherigen Blöcken).
 
-## Phase 3 — KI ⬜
+## Phase 2 — Geschäft: abgeschlossen (11.07.2026)
 
-## Phase 4 — Skalierung ⬜
+Alle 6 Blöcke des architect-Plans (E-Mail-Fundament, Quiz/Prüfungen, Abgaben-Inbox, Zertifikate, Stripe, Reporting) sind gebaut, lokal getestet, E2E manuell verifiziert und committet. SPEC.md DoD Phase 2 („Kauf → automatische Einschreibung → Zertifikat nach Abschluss läuft E2E mit Stripe-Testmodus; Reporting-Export stimmt gegen Testdaten") erfüllt.
+
+## Phase 3 — KI 🔶 (Planung 11.07.2026, Cowork)
+
+**architect-Plan (Opus) erstellt — 7 Blöcke in Abhängigkeitsreihenfolge:**
+1. KI-Fundament: Kontingent-Durchsetzung + Kostenprotokoll + Claude/Voyage-Clients + `/admin`-Kachel „KI-Kontingent"
+2. Embeddings/pgvector-Fundament: Chunking, Embed-Job, `match_embeddings`-RPC (Security-Definer, tenant-hart gefiltert — RLS allein verträgt sich schlecht mit pgvector-Ähnlichkeitssuche)
+3. Semantische Suche `/suche`
+4. Tutor-Chat (RAG + Eskalation) + Pflicht-Kennzeichnung „KI-Assistent" (Art. 50 KI-VO)
+5. Kurs-Generator (Upload → Entwurf → Review → Übernahme), **asynchron** über `ai_jobs`-Zustandsmaschine (Workers-CPU-Limit-Risiko bei mehrstufiger Generierung)
+6. Auto-Transkript/Kapitel/Zusammenfassung (Bunny Transcribe AI) + Auto-Embedding von Video-Lektionen
+7. REST-API v1 + Webhooks (HMAC, Retry, `webhook_deliveries`)
+
+**Kernbefund (wie Phase 2):** alle KI-Tabellen (`ai_jobs`, `embeddings` inkl. pgvector/HNSW, `tutor_conversations`/`tutor_messages`, `usage_counters`, `api_keys`, `webhooks`, `webhook_deliveries`) existieren bereits vollständig mit `tenant_id` + RLS in `0001_init.sql` — sogar die geplante `match_embeddings`-RPC ist dort vorgezeichnet (Kommentar Z. 602). Phase 3 ist überwiegend Code, keine neue Tabelle erwartet, nur Security-Definer-RPCs in neuen additiven Migrationen.
+
+**Zwei recherchierte Wissenslücken (mit Quellen):**
+- Anthropic bietet keine eigene Embeddings-API, empfiehlt **Voyage AI** (Default-Dimension 1024 = exakt unser `embedding vector(1024)`-Schema) — braucht eigenen `VOYAGE_API_KEY`.
+- **Bunny Stream hat seit 2026 native „Transcribe AI"** (Transkript + Auto-Kapitel + Auto-Titel + Zusammenfassung in einem, 0,10 $/Min/Sprache) — widerspricht der ursprünglichen Phase-0-Annahme „Bunny kann kein STT" (Transcribing war deshalb bewusst AUS geschaltet).
+
+**Offene, blockierende Fragen an Josip (architect, max. 3 wie vorgeschrieben):**
+1. Voyage-AI-Konto/`VOYAGE_API_KEY` freigeben? (blockiert Blöcke 2-5)
+2. Transkript-Weg: Bunny nativ (einfachst, 0,10 $/Min) oder externes DIY-Whisper (~15× günstiger, mehr bewegliche Teile, ursprüngliche Phase-0-Entscheidung)? (blockiert Block 6)
+3. Cloudflare Cron Trigger für asynchrone Job-Verarbeitung/Webhook-Retry erlaubt (Workers-nativ, kein neuer Dienst)? Trial-Plan-Kontingent (Komplett/Enterprise stehen in SPEC §6, trial fehlt — Vorschlag: 20 Tutor-Antworten + 1 Kursgenerierung/Monat)? (blockiert Block 1)
+
+**Entscheidungen (mit Josip abgestimmt, 11.07.2026):**
+1. Voyage AI freigegeben — `VOYAGE_API_KEY` wird von Josip besorgt (blockiert Testen ab Block 2, Block 1 selbst unabhängig baubar).
+2. Transkript-Weg: Bunny Transcribe AI nativ (0,10 $/Min/Sprache) statt DIY-Whisper.
+3. Cloudflare Cron Trigger für asynchrone Job-Verarbeitung (Kurs-Generator) und Webhook-Retry freigegeben.
+4. Trial-Plan-KI-Kontingent: 20 Tutor-Antworten + 1 Kursgenerierung/Monat (Komplett 500/5, Enterprise 2000/20 bleiben aus SPEC §6).
+
+**Start Block 1 (KI-Fundament):** Josip besorgt parallel den `VOYAGE_API_KEY` (für Block 2 nötig), Block 1 selbst (Kontingent-RPC, Kosten-Protokoll, Claude/Voyage-Clients-Gerüst, Dashboard-Kachel) wird jetzt gebaut.
+
+**Block 1 — KI-Fundament: erstellt (Cowork, lokal zu prüfen):**
+
+1. `supabase/migrations/20260711140000_ai_quota.sql` — neue Migration (0001_init.sql unverändert, wie CLAUDE.md §2.1 verlangt). RPC `increment_usage(p_tenant uuid, p_kind text, p_limit int) returns boolean`, `security definer`, `set search_path = public`, Grants ausschließlich `service_role` (kein `authenticated`, anders als `check_rate_limit` — normale Nutzer dürfen `usage_counters` nie schreiben, auch nicht Staff). Atomar über ein einziges `INSERT ... ON CONFLICT (tenant_id, month) DO UPDATE ... WHERE <spalte> < p_limit ... RETURNING true INTO v_updated` je Zweig (`tutor_answers`/`course_gens`) — kein separates SELECT davor; Postgres sperrt die Konfliktzeile beim Auswerten der WHERE-Klausel, dadurch race-condition-sicher bei parallelen Aufrufen. `v_updated` bleibt `NULL` (→ `coalesce` zu `false`), wenn das Limit bereits erreicht war und deshalb nichts aktualisiert wurde.
+2. `src/lib/ai/config.ts` — `AI_MODELS` (`sonnet: "claude-sonnet-4-5-20250929"`, `haiku: "claude-haiku-4-5-20251001"`), `AI_COST_RATES_USD_PER_MILLION` (sonnet 2$/10$ Einführungspreis bis 31.08.2026 danach 3$/15$, haiku 1$/5$ — per WebSearch 11.07.2026 recherchiert, Quelle platform.claude.com/docs/en/about-claude/pricing, als "vor Produktivbetrieb prüfen" markiert), `VOYAGE_MODEL = "voyage-3"` (Standard-Dimension 1024, per WebSearch bestätigt — passt exakt zu `embeddings.embedding vector(1024)`), `VOYAGE_COST_USD_PER_MILLION_TOKENS = 0.06`, `PLAN_AI_LIMITS` (trial 20/1, komplett 500/5, enterprise 2000/20 — exakt wie mit Josip abgestimmt).
+3. `src/lib/ai/anthropic.ts` — `createAnthropicClient()`, `server-only`, klare deutsche Fehlermeldung bei fehlendem `ANTHROPIC_API_KEY`, Workers-Kompatibilitätskommentar (fetch-basiert, analog `stripe/client.ts`).
+4. `src/lib/ai/voyage.ts` — `embedTexts(texts: string[])`, `server-only`, rohes `fetch` gegen `https://api.voyageai.com/v1/embeddings`, klare deutsche Fehlermeldung bei fehlendem `VOYAGE_API_KEY` ("Voyage-AI-Key noch nicht konfiguriert, semantische Suche/Tutor nicht verfügbar.") — Zustand aktuell erwartet, kein Absturz.
+5. `src/lib/ai/usage.ts` — `server-only`. `enforceQuota(tenantId, kind)`: lädt `tenants.plan` über Admin-Client, ruft `increment_usage` per RPC auf, lädt danach den aktuellen Zählerstand nach für ein korrektes `remaining`. Fail-CLOSED bei RPC-Fehler (bewusst Gegenteil von `rate-limit.ts`, das fail-open ist — Begründung im Dateikopf). Dateikopf dokumentiert den Vertrag: MUSS vor jedem künftigen kostenpflichtigen KI-Aufruf (Blöcke 2–7) laufen. `recordAiJob(...)` schreibt/protokolliert `ai_jobs` über Admin-Client (nötig, da `ai_jobs` keine UPDATE-Policy hat — Status-Übergänge künftiger asynchroner Jobs sonst nicht schreibbar), berechnet `cost_usd` über `computeCost()`. `recordTutorMessage()` bewusst NICHT gebaut, nur als TODO-Kommentar für Block 4 vermerkt (Formular hängt vom noch nicht existierenden RAG-/Eskalations-Entwurf ab).
+6. `src/lib/ai/quota.ts` — reine Funktionen: `computeCost(model, tokensIn, tokensOut)` (erkennt Alias UND vollen Modellnamen, 0 bei unbekanntem Modell statt Absturz), `remainingQuota(used, limit)` (`Math.max(0, ...)`).
+7. `src/lib/ai/quota.test.ts` — 9 Vitest-Fälle: Kostenberechnung sonnet/haiku, voller Modellname, unbekanntes Modell, 0 Tokens; `remainingQuota` bei Rest/genau erreicht/überschritten/voller Rest.
+8. `src/components/admin/ai-quota-card.tsx` — Server Component `AiQuotaCard()`, lädt `tenant.id` ausschließlich aus `getTenant()` (Server-Kontext), regulärer RLS-Client (`usage_staff_select` genügt, kein Admin-Client nötig) + explizites `.eq("tenant_id", ...)` als Defense-in-Depth. Barrierefreiheit: `role="progressbar"` mit aria-valuenow/-min/-max, "Kontingent aufgebraucht" als sichtbarer Text (nicht nur Farbe).
+9. `src/app/(admin)/admin/page.tsx` — **neu angelegt** (Glob vorab geprüft: existierte noch nicht). Staff-Gate kommt aus `admin/layout.tsx`, Seite enthält bewusst NUR die KI-Kontingent-Kachel (SPEC-4.2-Kacheln "aktive Lernende"/"Abschlussquote"/"offene Abgaben" bewusst nicht Teil dieses Auftrags).
+10. `src/lib/env.ts` — `VOYAGE_API_KEY: optionalString` ergänzt (gleiches Muster wie `RESEND_API_KEY`), `ANTHROPIC_API_KEY` bereits vorhanden, nicht dupliziert.
+11. `.env.example` — `VOYAGE_API_KEY=` als leere Zeile ergänzt.
+12. `package.json` — `"@anthropic-ai/sdk": "^0.110"` ergänzt (aktuelle Version, per WebSearch geprüft).
+13. `src/app/(admin)/admin/layout.tsx` — Mandantenname-Link (oben links) zeigte bisher auf `/admin/kurse`, jetzt auf `/admin`; zusätzlicher Nav-Punkt „Übersicht" ganz links in der Navigation ergänzt. Bestehende Links unverändert.
+
+**Bewusste Vereinfachungen:** `recordTutorMessage()` nur als TODO für Block 4 vorgemerkt, nicht gebaut. Claude-Kostentarife als Bestwissen-Konstanten mit explizitem "vor Produktivbetrieb prüfen"-Kommentar (Sonnet-4.5-Einführungspreis läuft am 31.08.2026 aus). `/admin`-Hauptseite enthält nur die KI-Kontingent-Kachel, keine weiteren SPEC-4.2-Kacheln. Kein neues i18n in `messages/de.json` — bewusste Konsistenz mit dem seit Phase 2 durchgehend etablierten tatsächlichen Muster im Repo (geprüft per Grep: `useTranslations`/`getTranslations` wird nirgends im Code verwendet, `messages/de.json` ist seit Block 1/Phase 1 unbenutztes Scaffolding; alle späteren Admin-/Reporting-/Zahlungen-Seiten schreiben deutsche UI-Texte direkt in JSX). Falls gewünscht, kann `messages/de.json` in einem eigenen, phasenübergreifenden Aufräum-Task nachgezogen werden.
+
+**Offen (Josip, lokal zu prüfen):**
+1. ~~`npm install` (neues Paket `@anthropic-ai/sdk`).~~ — erledigt.
+2. ~~`npm run test` (9 neue Vitest-Fälle in `quota.test.ts`).~~ — erledigt.
+3. ~~`VOYAGE_API_KEY` besorgen und in `.env` eintragen.~~ — erledigt (11.07.2026), damit Blöcke 2–5 nicht mehr blockiert.
+4. ~~Migration anwenden.~~ — erledigt.
+5. ~~Manueller Test der `increment_usage`-RPC.~~ — erledigt.
+6. Git-Commit-Vorschlag: `feat: Block 1 - KI-Fundament (Kontingente, Kosten, Claude/Voyage-Clients)`.
+7. Übergabe an `tester`-Agent (Vitest — Playwright optional, da Block 1 keine neue UI-Interaktion mit Nutzereingabe hat, nur eine lesende Kachel).
+
+**Block 1 vollständig verifiziert (Josip, 11.07.2026):** npm install, Testsuite, Migration und RPC-Test lokal bestätigt (erledigt). `VOYAGE_API_KEY` liegt vor — Block 2 (Embeddings/pgvector-Fundament) ist damit ohne Blocker startbar.

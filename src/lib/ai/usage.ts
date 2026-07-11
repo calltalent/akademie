@@ -1,0 +1,176 @@
+import "server-only";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { PLAN_AI_LIMITS } from "@/lib/ai/config";
+import { computeCost, remainingQuota } from "@/lib/ai/quota";
+
+type QuotaKind = "tutor" | "course_gen";
+
+const KIND_TO_COLUMN: Record<QuotaKind, "tutor_answers" | "course_gens"> = {
+  tutor: "tutor_answers",
+  course_gen: "course_gens",
+};
+
+const KIND_TO_LIMIT_KEY: Record<QuotaKind, "tutorAnswers" | "courseGens"> = {
+  tutor: "tutorAnswers",
+  course_gen: "courseGens",
+};
+
+/** Erster des laufenden Monats als ISO-Datum (yyyy-mm-dd) — Format der `usage_counters.month`-Spalte. */
+function currentMonthIso(): string {
+  const d = new Date();
+  d.setUTCDate(1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * VERTRAG für JEDEN künftigen KI-Aufrufpfad (Blöcke 2-7, CLAUDE.md §3.7:
+ * "KI-Verbrauch: jeder Claude-Aufruf schreibt ai_jobs/tutor_messages mit
+ * Tokens und Kosten; Monats-Kontingente über usage_counters durchsetzen.").
+ *
+ * `enforceQuota()` MUSS aufgerufen werden, BEVOR der eigentliche Claude-/
+ * Voyage-Aufruf startet — nicht danach, nicht "parallel", nicht optional.
+ * `increment_usage` (Migration `20260711140000_ai_quota.sql`) erhöht den
+ * Zähler NUR wenn noch Kontingent frei ist — das ist die einzige Stelle,
+ * an der das Limit tatsächlich hart durchgesetzt wird. Ein KI-Aufruf ohne
+ * vorheriges `enforceQuota()` umgeht das Kontingent vollständig.
+ *
+ * Verbindliches Muster für künftige Blöcke (Block 4/Tutor, Block 5/Kurs-
+ * Generator):
+ *   const quota = await enforceQuota(tenantId, "tutor");
+ *   if (!quota.allowed) {
+ *     // Nutzer freundlich informieren ("Kontingent aufgebraucht"), KEIN
+ *     // createAnthropicClient()-Aufruf.
+ *     return ...;
+ *   }
+ *   // Erst JETZT den eigentlichen Claude-/Voyage-Aufruf starten.
+ *
+ * Warum über den Admin-Client: `usage_counters` hat laut 0001_init.sql nur
+ * `usage_staff_select` (Lesen) — keine INSERT/UPDATE-Policy für irgendeine
+ * Rolle, normale Nutzer (auch Staff) dürfen NIE direkt schreiben. Die RPC
+ * `increment_usage` ist `security definer` mit Grants nur für `service_role`
+ * — über den regulären RLS-Client ist sie gar nicht aufrufbar.
+ *
+ * Fail-CLOSED bei technischem RPC-Fehler (bewusst das Gegenteil von
+ * `src/lib/security/rate-limit.ts`, das fail-open ist): ein Ausfall des
+ * Rate-Limiters darf legitime Nutzer nicht aussperren, aber ein Ausfall der
+ * Kontingent-Prüfung darf keine unbegrenzten, kostenpflichtigen KI-Aufrufe
+ * durchlassen — die Risiken sind hier gegensätzlich.
+ */
+export async function enforceQuota(
+  tenantId: string,
+  kind: QuotaKind,
+): Promise<{ allowed: boolean; remaining: number }> {
+  const admin = createAdminClient();
+
+  const { data: tenantRow, error: tenantError } = await admin
+    .from("tenants")
+    .select("plan")
+    .eq("id", tenantId)
+    .maybeSingle();
+
+  if (tenantError || !tenantRow) {
+    console.error(
+      "[ai/usage] enforceQuota: Mandant nicht gefunden",
+      tenantId,
+      tenantError?.message,
+    );
+    return { allowed: false, remaining: 0 };
+  }
+
+  const plan = tenantRow.plan as keyof typeof PLAN_AI_LIMITS;
+  // Fail-safe: unbekannter/neuer Plan-Wert -> striktestes Kontingent (trial)
+  // statt Absturz oder unbegrenztem Zugriff.
+  const limits = PLAN_AI_LIMITS[plan] ?? PLAN_AI_LIMITS.trial;
+  const limit = limits[KIND_TO_LIMIT_KEY[kind]];
+
+  const { data: allowed, error: rpcError } = await admin.rpc("increment_usage", {
+    p_tenant: tenantId,
+    p_kind: kind,
+    p_limit: limit,
+  });
+
+  if (rpcError) {
+    console.error("[ai/usage] increment_usage-RPC fehlgeschlagen:", rpcError.message);
+    return { allowed: false, remaining: 0 };
+  }
+
+  // Aktuellen Stand nachladen für eine korrekte "remaining"-Angabe (auch im
+  // Sperrfall, damit die UI z. B. "20 von 20" statt nur "gesperrt" zeigen
+  // kann). Zweite, unkritische Lese-Anfrage — die Durchsetzung selbst ist
+  // bereits mit der RPC oben abgeschlossen.
+  const column = KIND_TO_COLUMN[kind];
+  const { data: usageRow } = await admin
+    .from("usage_counters")
+    .select(column)
+    .eq("tenant_id", tenantId)
+    .eq("month", currentMonthIso())
+    .maybeSingle();
+
+  const used = (usageRow as unknown as Record<string, number> | null)?.[column] ?? 0;
+  return { allowed: allowed === true, remaining: remainingQuota(used, limit) };
+}
+
+/**
+ * Schreibt einen `ai_jobs`-Eintrag (Tokens, Kosten, Status) — Protokollpflicht
+ * aus CLAUDE.md §3.7. MUSS NACH einem abgeschlossenen (erfolgreichen oder
+ * fehlgeschlagenen) KI-Aufruf laufen, NACHDEM `enforceQuota()` bereits das
+ * Kontingent geprüft/erhöht hat (siehe Vertrag oben).
+ *
+ * Admin-Client nötig: `ai_jobs` hat laut 0001_init.sql nur
+ * `ai_jobs_staff_select`/`ai_jobs_staff_insert` (Staff darf lesen/anlegen).
+ * Für asynchrone Jobs (Block 5, Kurs-Generator: queued -> running -> done)
+ * fehlt jedoch jede UPDATE-Policy — ein Status-Übergang nach der Anlage kann
+ * über den regulären RLS-Client also nie geschrieben werden. Diese Funktion
+ * läuft deshalb durchgehend über den Admin-Client (Insert UND Update),
+ * analog `certificates/issue.ts`.
+ */
+export async function recordAiJob(params: {
+  tenantId: string;
+  kind: "course_gen" | "quiz_gen" | "transcript" | "summary" | "embed";
+  model: string;
+  tokensIn: number;
+  tokensOut: number;
+  status: "queued" | "running" | "done" | "error";
+  input?: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  error?: string;
+  createdBy?: string;
+}): Promise<void> {
+  const admin = createAdminClient();
+  const cost = computeCost(params.model, params.tokensIn, params.tokensOut);
+
+  const { error } = await admin.from("ai_jobs").insert({
+    tenant_id: params.tenantId,
+    kind: params.kind,
+    status: params.status,
+    input: params.input ?? {},
+    output: params.output ?? null,
+    model: params.model,
+    tokens_in: params.tokensIn,
+    tokens_out: params.tokensOut,
+    cost_usd: cost,
+    error: params.error ?? null,
+    created_by: params.createdBy ?? null,
+  });
+
+  if (error) {
+    // Fail-soft wie der Mailversand in certificates/issue.ts: ein
+    // Protokollierfehler darf den bereits erfolgten/abgeschlossenen
+    // KI-Aufruf nicht rückgängig machen — trotzdem laut geloggt, damit
+    // Kosten-/Protokolllücken auffallen.
+    console.error("[ai/usage] recordAiJob fehlgeschlagen:", error.message);
+  }
+}
+
+/**
+ * TODO (Block 4 — Tutor-Chat): `recordTutorMessage()` schreibt Nutzer-/
+ * Assistenten-Nachrichten in `tutor_messages` (inkl. `source_lessons`,
+ * `escalated`, Tokens/Kosten, Art.-50-KI-VO-Kennzeichnung). Bewusst NICHT
+ * in Block 1 gebaut — dieser Auftrag umfasst nur das KI-Fundament
+ * (Kontingent + Kostenprotokoll + Clients); `tutor_conversations`/
+ * `tutor_messages`-Handling gehört fachlich zu Block 4 (RAG +
+ * Eskalationslogik). Ein Grundgerüst hier vorwegzunehmen wäre Überbau
+ * außerhalb des Auftrags (CLAUDE.md §4.5: "einfachste Lösung wählen") —
+ * die Funktionsform hängt vom tatsächlichen Block-4-Entwurf (RAG-Kontext,
+ * Eskalationskriterien) ab, der noch nicht existiert.
+ */

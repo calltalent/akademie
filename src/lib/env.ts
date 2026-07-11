@@ -20,6 +20,7 @@ const publicSchema = z.object({
 const serverOnlySchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   ANTHROPIC_API_KEY: optionalString,
+  VOYAGE_API_KEY: optionalString,
   BUNNY_STREAM_LIBRARY_ID: optionalString,
   BUNNY_STREAM_API_KEY: optionalString,
   BUNNY_STREAM_CDN_HOSTNAME: optionalString,
@@ -46,6 +47,7 @@ function parseServerEnv() {
   const result = serverOnlySchema.safeParse({
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    VOYAGE_API_KEY: process.env.VOYAGE_API_KEY,
     BUNNY_STREAM_LIBRARY_ID: process.env.BUNNY_STREAM_LIBRARY_ID,
     BUNNY_STREAM_API_KEY: process.env.BUNNY_STREAM_API_KEY,
     BUNNY_STREAM_CDN_HOSTNAME: process.env.BUNNY_STREAM_CDN_HOSTNAME,
