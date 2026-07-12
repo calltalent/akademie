@@ -1,4 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "exclude": ["node_modules", ".next", ".open-next", ".wrangler", "src/lib/webhooks/dispatch.ts", "src/lib/webhooks/dispatch.test.ts", "src/middleware.ts", "e2e", "test-results"]
-}
