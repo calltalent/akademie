@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/compute";
@@ -40,21 +41,13 @@ export default async function HomePage() {
     );
   }
 
+  // Josips Fund (13.07.2026): `/` zeigte für nicht angemeldete Besucher
+  // bisher nur einen Titel + "Anmelden"-Button als Zwischenseite, statt
+  // direkt zum Login zu führen — wirkte auf `academy.calltalent.ai` wie eine
+  // kaputte/leere Seite. Direkte Weiterleitung auf `/login` statt der
+  // Zwischenseite.
   if (!user) {
-    return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-start justify-center gap-4 px-6">
-        <h1 className="text-2xl font-semibold" style={{ color: "var(--color-primary)" }}>
-          {tenant.name}
-        </h1>
-        <a
-          href="/login"
-          className="px-4 py-2 text-base text-white"
-          style={{ background: "var(--color-primary)", borderRadius: "var(--radius)" }}
-        >
-          Anmelden
-        </a>
-      </main>
-    );
+    redirect("/login");
   }
 
   const { data: courses } = await supabase

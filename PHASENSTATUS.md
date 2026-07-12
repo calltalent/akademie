@@ -2052,4 +2052,17 @@ Der Export zeigt einen kompletten Akzentfarbe-/Radius-Editor mit Live-Vorschau �
 
 **Design-Block 6 damit vollständig abgeschlossen** (beide ursprünglich offenen Punkte: Admin-Innenseiten + Mandanten-Portal).
 
-**Nachtrag (Josips Lint-Lauf, 13.07.2026):** `npm run lint` meldete einen echten Fehler in `admin/abgaben/page.tsx` Zeile 65 (`react-hooks/purity`, `Date.now()` beim Berechnen von `overdueCutoffIso`) — derselbe Fall wie bereits in `portal/mandanten/[id]/page.tsx` behandelt, dort aber vergessen nachzuziehen. Fix: identisches `eslint-disable-next-line react-hooks/purity` mit Begründung (async Server Component, einmal pro Request, kein Re-Render/Memoization-Fall) ergänzt. Danach `npm run lint` sauber (0 Fehler) und `npm run build` erfolgreich (vollständige Routen-Manifestliste ohne Fehler) — von Josip lokal bestätigt.
+**Nachtrag (Josips Lint-Lauf, 13.07.2026):** `npm run lint` meldete einen echten Fehler in `admin/abgaben/page.tsx` Zeile 65 (`react-hooks/purity`, `Date.now()` beim Berechnen von `overdueCutoffIso`) — derselbe Fall wie bereits in `portal/mandanten/[id]/page.tsx` behandelt, dort aber vergessen nachzuziehen. Fix: identisches `eslint-disable-next-line react-hooks/purity` mit Begründung (async Server Component, einmal pro Request, kein Re-Render/Memoization-Fall) ergänzt. Danach `npm run lint` sauber (0 Fehler) und `npm run build` erfolgreich (vollständige Routen-Manifestliste ohne Fehler) — von Josip lokal bestätigt. Committed + gepusht (`32aaa7d`). Anschließend `tsc-verify.json`/`tsc-verify2.json`/`tsconfig.check.json`/`tsconfig.check.tsbuildinfo` (versehentlich mitcommittete Debug-Artefakte) per `git rm --cached` entfernt + `.gitignore` um `*.tsbuildinfo`, `tsc-verify*.json`, `tsconfig.check.json` ergänzt.
+
+## Root-Redirect-Fund von Josip behoben (13.07.2026, Cowork-Sitzung)
+
+Josip meldete: `https://academy.calltalent.ai/` zeigte für nicht angemeldete Besucher nur eine leere Zwischenseite mit Titel + "Anmelden"-Button, statt direkt zum Login zu führen — wirkte defekt.
+
+**Ursache:** `src/app/page.tsx` (`HomePage`) rendert für `!user` bisher eine eigene Zwischenseite mit `<a href="/login">Anmelden</a>` statt weiterzuleiten (Rest der Datei — Tenant-Auflösung, Kursliste, Fortschrittsberechnung — unverändert und korrekt, betraf nur diesen einen Zweig).
+
+**Fix:** `redirect("/login")` (`next/navigation`) statt der Zwischenseite. Kein Datenverlust — `/login` (`src/app/(auth)/login/page.tsx`) ist die bereits bestehende, vollständige Login-Seite (Passwort + Magic Link, Design-Block 12.07.2026), nur der bisher unnötige Zwischenschritt entfällt.
+
+**Nicht selbst verifiziert** (Mount-Einschränkung). **Offen für Josip:**
+1. `npm run lint -- src/app/page.tsx`
+2. `npm run dev`, dann `/` im abgemeldeten Zustand aufrufen — sollte jetzt direkt auf `/login` weiterleiten statt die Zwischenseite zu zeigen. Angemeldeten Zustand (Dashboard „Meine Kurse") zur Sicherheit ebenfalls kurz gegenprüfen, da derselbe Datei-Bereich unverändert blieb.
+3. Bei grünem Ergebnis: `git add -A && git commit -m "fix: Root-Seite leitet abgemeldete Besucher direkt zu /login weiter"` (danach `git push` als eigener Befehl, `&&` funktioniert in Windows PowerShell nicht als Trenner).
