@@ -9,6 +9,8 @@ import { sendEmail } from "@/lib/email/client";
 import { submissionGraded } from "@/lib/email/templates";
 import type { GradeSubmissionActionState } from "@/lib/submissions/state";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
+import { translateDbError } from "@/lib/errors/db";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 type CreateSubmissionResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -79,7 +81,7 @@ export async function createSubmission(input: unknown): Promise<CreateSubmission
       })
       .select("id")
       .single();
-    if (error || !data) return { ok: false, error: error?.message ?? "Einreichen fehlgeschlagen." };
+    if (error || !data) return { ok: false, error: error ? translateDbError(error) : "Einreichen fehlgeschlagen." };
 
     // Block 7 (Webhooks): submission.created fire-and-forget nach der
     // erfolgreichen Abgabe (siehe dispatch.ts).
@@ -92,7 +94,7 @@ export async function createSubmission(input: unknown): Promise<CreateSubmission
 
     return { ok: true, id: data.id };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { ok: false, error: genericErrorMessage(e) };
   }
 }
 
@@ -142,7 +144,7 @@ export async function gradeSubmission(
       .eq("tenant_id", tenant.id)
       .select("id, lesson_id, user_id")
       .single();
-    if (error || !updated) return { error: error?.message ?? "Bewertung fehlgeschlagen." };
+    if (error || !updated) return { error: error ? translateDbError(error) : "Bewertung fehlgeschlagen." };
 
     // Mail (fail-soft) — Lernenden-Profil + Kurs-/Lektionstitel laden.
     // submissions hat keine direkte course_id — Weg über lessons.module_id
@@ -216,7 +218,7 @@ export async function gradeSubmission(
     revalidatePath("/admin/abgaben");
     return { error: null, success: true };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { error: genericErrorMessage(e) };
   }
 }
 
@@ -253,11 +255,11 @@ export async function getSubmissionDownloadUrl(submissionId: string): Promise<Do
       .from("submissions")
       .createSignedUrl(submission.file_path, 60 * 5);
     if (error || !data) {
-      return { ok: false, error: error?.message ?? "Download-URL konnte nicht erzeugt werden." };
+      return { ok: false, error: "Download-URL konnte nicht erzeugt werden." };
     }
 
     return { ok: true, url: data.signedUrl };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { ok: false, error: genericErrorMessage(e) };
   }
 }

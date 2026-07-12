@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { PublicTenant } from "@/lib/tenant/types";
 
 const TENANT_COLUMNS =
-  "id, slug, name, plan, status, branding, legal, settings";
+  "id, slug, name, custom_domain, plan, status, branding, legal, settings";
 
 /**
  * Mandanten-Auflösung für ANONYME Besucher (vor Login).
@@ -42,14 +42,40 @@ export async function resolveTenantByCustomDomain(
     .eq("status", "active")
     .maybeSingle();
 
-  if (error || !data) return null;
-  return data as unknown as PublicTenant;
+  if (!error && data) return data as unknown as PublicTenant;
+
+  // FOLGEAUFTRAG (12.07.2026, Josip: "learning soll auch bleiben" — beide
+  // Domains sollen denselben Mandanten treffen): tenants.custom_domain
+  // erlaubt nur eine Domain pro Mandant. Zusätzliche Domains ("Aliase")
+  // stehen in tenant_domains (Migration "tenant_domains", 12.07.2026).
+  // Zwei Abfragen statt Join, um TENANT_COLUMNS/resolveTenantById() (inkl.
+  // status-Filter) unverändert wiederzuverwenden statt Embed-Typisierung
+  // zu riskieren.
+  const { data: aliasRow } = await admin
+    .from("tenant_domains")
+    .select("tenant_id")
+    .eq("domain", domain)
+    .maybeSingle();
+
+  if (!aliasRow) return null;
+  return resolveTenantById(aliasRow.tenant_id);
 }
 
 /**
  * Leitet aus dem Host-Header slug ODER custom_domain ab.
  * Dev: `{slug}.localhost:3000` (Entscheidung 10.07.2026, Block 2).
- * Prod: `{slug}.akademie.calltalent.ai` ODER Kunden-eigene Domain.
+ * Prod: `{slug}.calltalent.ai` ODER Kunden-eigene Domain.
+ *
+ * UPDATE (Phase 5, Block 8, 12.07.2026): ursprünglich `{slug}.akademie.
+ * calltalent.ai` (zweite Subdomain-Ebene) — auf Josips Entscheidung hin auf
+ * die erste Ebene direkt unter `calltalent.ai` umgestellt. Grund: Cloudflares
+ * kostenloses Universal-SSL-Wildcard-Zertifikat deckt nur `calltalent.ai`
+ * und `*.calltalent.ai` (erste Ebene) ab, NICHT `*.akademie.calltalent.ai`
+ * (zweite Ebene) — jeder Mandant hätte sonst einen SSL-Zertifikatsfehler
+ * bekommen, es sei denn man kauft Cloudflare Advanced Certificate Manager.
+ * `portal.calltalent.ai` (Betreiber-Portal, siehe NEXT_PUBLIC_PORTAL_HOST)
+ * war schon vorher als erste Ebene geplant (SPEC.md §4.3/§9.1) — jetzt
+ * konsistent mit dem Mandanten-Schema.
  */
 export function extractTenantSlugFromHost(host: string): string | null {
   const hostname = host.split(":")[0]; // Port abtrennen
@@ -60,9 +86,11 @@ export function extractTenantSlugFromHost(host: string): string | null {
     return slug || null;
   }
 
-  // Prod-Schema: <slug>.akademie.calltalent.ai
+  // Prod-Schema: <slug>.calltalent.ai (genau eine Ebene — "calltalent.ai"
+  // selbst hat 2 Teile, mit slug macht das genau 3; "foo.bar.calltalent.ai"
+  // mit 4 Teilen bleibt bewusst unerkannt, s. o.)
   const parts = hostname.split(".");
-  if (parts.length >= 4 && hostname.endsWith(".akademie.calltalent.ai")) {
+  if (parts.length === 3 && hostname.endsWith(".calltalent.ai")) {
     return parts[0];
   }
 
@@ -89,7 +117,16 @@ export async function resolveTenantByHost(
 ): Promise<PublicTenant | null> {
   const slug = extractTenantSlugFromHost(host);
   if (slug) {
-    return resolveTenantBySlug(slug);
+    const bySlug = await resolveTenantBySlug(slug);
+    if (bySlug) return bySlug;
+    // FALLBACK (Block 8, 12.07.2026): seit dem Umstieg auf <slug>.calltalent.ai
+    // (erste Ebene, s. o.) matcht extractTenantSlugFromHost() JEDE erste-
+    // Ebene-Subdomain von calltalent.ai — auch eine, die eigentlich als
+    // `custom_domain` eines Mandanten eingetragen ist (z. B.
+    // "learning.calltalent.ai" für den Mandanten mit Slug "calltalent").
+    // Ohne diesen Fallback würde ein solcher Host nie bei
+    // resolveTenantByCustomDomain() ankommen, weil `slug` hier immer
+    // wahrheitswertig ist (auch wenn kein Mandant diesen Slug trägt).
   }
   const hostname = host.split(":")[0];
   return resolveTenantByCustomDomain(hostname);

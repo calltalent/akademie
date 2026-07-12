@@ -1,10 +1,12 @@
 import "server-only";
+import type Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getBunnyVideo, getCaptionVttUrl } from "@/lib/bunny/client";
 import { parseVttToPlainText } from "@/lib/video/vtt";
 import { createAnthropicClient } from "@/lib/ai/anthropic";
 import { AI_MODELS, BUNNY_TRANSCRIBE_MODEL } from "@/lib/ai/config";
 import { recordAiJob } from "@/lib/ai/usage";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 /**
  * Kernstück von Phase 3, Block 6 (Auto-Transkript + Kapitel +
@@ -121,8 +123,9 @@ export async function processVideoTranscript(bunnyVideoId: string): Promise<Proc
 
     return { ok: true, lessonId: lesson.id };
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unbekannter Fehler bei der Transkript-Verarbeitung.";
-    console.error("[video/transcript] Ausnahme:", message);
+    const rawMessage = e instanceof Error ? e.message : "Unbekannter Fehler bei der Transkript-Verarbeitung.";
+    console.error("[video/transcript] Ausnahme:", rawMessage);
+    const message = genericErrorMessage(e);
     await recordAiJob({
       tenantId: lesson.tenant_id,
       kind: "transcript",
@@ -162,7 +165,7 @@ async function summarizeTranscript(
     });
 
     const text = response.content
-      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
       .map((block) => block.text)
       .join("\n")
       .trim();
@@ -181,11 +184,12 @@ async function summarizeTranscript(
 
     return text.length > 0 ? text : null;
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unbekannter Fehler bei der Zusammenfassung.";
+    const rawMessage = e instanceof Error ? e.message : "Unbekannter Fehler bei der Zusammenfassung.";
     console.error(
       "[video/transcript] Zusammenfassung fehlgeschlagen (fail-soft, Transkript bleibt erhalten):",
-      message,
+      rawMessage,
     );
+    const message = genericErrorMessage(e);
     await recordAiJob({
       tenantId,
       kind: "summary",

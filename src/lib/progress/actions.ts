@@ -7,6 +7,7 @@ import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/comput
 import { issueCertificateIfEligible } from "@/lib/certificates/issue";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 import { sendPushToUser } from "@/lib/push/send";
+import { translateDbError } from "@/lib/errors/db";
 
 export type ProgressActionState = { error: string | null; success?: boolean };
 
@@ -38,7 +39,7 @@ export async function completeLesson(
     },
     { onConflict: "user_id,lesson_id" },
   );
-  if (error) return { error: error.message };
+  if (error) return { error: translateDbError(error) };
 
   // Block 7 (Webhooks): lesson.completed fire-and-forget direkt nach dem
   // erfolgreichen progress-Upsert (siehe dispatch.ts).

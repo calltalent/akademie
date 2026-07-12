@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { embedTexts } from "@/lib/ai/voyage";
+import { translateDbError } from "@/lib/errors/db";
 
 /**
  * Semantische Ähnlichkeitssuche über `embeddings` (Phase 3, Block 2 —
@@ -65,7 +66,13 @@ export async function retrieveChunks(params: {
   });
 
   if (error) {
-    throw new Error(`Semantische Suche fehlgeschlagen: ${error.message}`);
+    // error.message ist eine rohe Postgres-/RPC-Fehlermeldung (technisch/
+    // englisch) — Detail nur loggen, die geworfene Meldung bekommt einen
+    // klaren deutschen Satz. Aufrufer (search.ts, tutor/actions.ts) fangen
+    // diesen Fehler ohnehin ab und zeigen eine eigene generische Meldung,
+    // dieser Text ist die letzte Verteidigungslinie.
+    console.error("[ai/retrieve] match_embeddings-RPC fehlgeschlagen.", { tenantId, error: error.message });
+    throw new Error(`Semantische Suche fehlgeschlagen: ${translateDbError(error)}`);
   }
 
   return ((data ?? []) as MatchEmbeddingsRow[]).map((row) => ({

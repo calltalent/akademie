@@ -56,8 +56,18 @@ export function extractJsonPayload(raw: string): string {
   return candidate.slice(start, end + 1);
 }
 
-/** Parst + validiert eine Claude-JSON-Antwort gegen ein zod-Schema. */
-export function parseStepResponse<T>(raw: string, schema: z.ZodType<T>): T {
+/**
+ * Parst + validiert eine Claude-JSON-Antwort gegen ein zod-Schema.
+ *
+ * Schema-Typ bewusst `z.ZodType<T, z.ZodTypeDef, unknown>` statt der
+ * kurzen `z.ZodType<T>`-Schreibweise (12.07.2026, `npm run build`-Fund):
+ * Letztere setzt implizit Input=Output=T voraus und lehnt dadurch
+ * `z.preprocess(...)`-Schemas ab, deren tatsächlicher Input-Typ `unknown`
+ * ist (siehe `buildLessonContentSchema` in pipeline.ts). Da hier ohnehin
+ * `JSON.parse()`-Ergebnisse (`unknown`) validiert werden, ist Input=unknown
+ * für JEDES Schema korrekt — nicht nur für preprocess-Schemas.
+ */
+export function parseStepResponse<T>(raw: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>): T {
   const jsonText = extractJsonPayload(raw);
   let parsedJson: unknown;
   try {

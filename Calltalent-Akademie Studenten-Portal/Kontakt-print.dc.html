@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+
+  a { color: #5663AE; }
+  a:hover { color: #3E3F66; }
+  @media print {
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    @page { size: letter; margin: 0; }
+    body { padding: 0.5in 0.6in; }
+    [data-split] { min-height:0 !important; height:auto !important; display:block !important; }
+    [data-panel] { display:block !important; break-inside:avoid; border-radius:16px; }
+    [data-panel="brand"] { padding:32px !important; margin-bottom:20px; }
+    [data-panel="form"] { padding:28px 32px !important; }
+    *, *::before, *::after {
+      animation-delay:-99s !important; animation-duration:.001s !important;
+      animation-iteration-count:1 !important; animation-fill-mode:both !important;
+      animation-play-state:running !important; transition-duration:0s !important;
+    }
+  }
+</style>
+</helmet>
+<div data-split style="display:flex; min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; color:#1A1A2E; font-size:18px; line-height:1.6;">
+
+  <div data-panel="brand" style="flex:1 1 52%; position:relative; min-width:0; display:flex; flex-direction:column; justify-content:space-between; padding:48px; background-color:#3E3F66; background-image:repeating-linear-gradient(135deg,rgba(86,99,174,.55) 0 14px, rgba(62,63,102,.55) 14px 28px);">
+    <div style="display:flex; align-items:center; gap:14px;">
+      <div style="width:44px; height:44px; border-radius:11px; background:#5663AE; display:flex; align-items:center; justify-content:center; color:#F7EED4; font-weight:800; font-size:22px;">C</div>
+      <div style="line-height:1.15;">
+        <div style="font-weight:800; font-size:18px; letter-spacing:.02em; color:#FFFFFF;">CALLTALENT</div>
+        <div style="font-weight:600; font-size:12px; letter-spacing:.3em; color:#C9CBE6;">AKADEMIE</div>
+      </div>
+    </div>
+
+    <div style="max-width:460px;">
+      <div style="font-family:ui-monospace,monospace; font-size:12px; color:#C9CBE6; background:rgba(255,255,255,.12); display:inline-block; padding:5px 10px; border-radius:7px; margin-bottom:22px;">markenmotiv · gespräch, kühl-violett</div>
+      <h2 style="font-size:34px; font-weight:800; line-height:1.2; color:#FFFFFF; margin:0 0 14px;">Sprich mit uns.</h2>
+      <p style="font-size:17px; color:#DDDEEE; margin:0 0 34px;">Ob Fragen zum Zugang, zu Kursen oder zur Zusammenarbeit — wir melden uns in der Regel innerhalb eines Werktags.</p>
+
+      <div style="display:flex; flex-direction:column; gap:18px;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div style="width:42px; height:42px; border-radius:11px; background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9CBE6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+          </div>
+          <div>
+            <div style="font-size:13px; color:#B9BBDA;">E-Mail</div>
+            <div style="font-size:16px; font-weight:600; color:#FFFFFF;">support@calltalent-akademie.de</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div style="width:42px; height:42px; border-radius:11px; background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9CBE6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          </div>
+          <div>
+            <div style="font-size:13px; color:#B9BBDA;">Telefon</div>
+            <div style="font-size:16px; font-weight:600; color:#FFFFFF;">+49 30 1234 5678</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:13px; color:#B9BBDA;">© 2026 Calltalent-Akademie</div>
+  </div>
+
+  <div data-panel="form" style="flex:1 1 48%; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#F4F5FA; padding:48px 40px;">
+    <div style="width:100%; max-width:440px;">
+      <a href="Login.dc.html" style="display:inline-flex; align-items:center; gap:7px; font-size:14px; font-weight:600; text-decoration:none; margin-bottom:26px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5663AE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="m11 18-6-6 6-6"></path></svg>
+        Zurück zur Anmeldung
+      </a>
+
+      <h1 style="font-size:28px; font-weight:800; margin:0 0 6px; color:#1A1A2E;">Kontakt aufnehmen</h1>
+      <p style="font-size:16px; color:#66679B; margin:0 0 30px;">Schreib uns eine Nachricht — wir helfen dir gerne weiter.</p>
+
+      <div style="display:flex; gap:16px; margin-bottom:18px;">
+        <div style="flex:1;">
+          <label style="display:block; font-size:14px; font-weight:600; color:#3E3F66; margin-bottom:7px;">Vorname</label>
+          <input type="text" placeholder="Jonas" style="width:100%; padding:13px 15px; border:1px solid #D8DAEA; border-radius:12px; font-family:inherit; font-size:16px; color:#1A1A2E; background:#fff;" />
+        </div>
+        <div style="flex:1;">
+          <label style="display:block; font-size:14px; font-weight:600; color:#3E3F66; margin-bottom:7px;">Nachname</label>
+          <input type="text" placeholder="Weber" style="width:100%; padding:13px 15px; border:1px solid #D8DAEA; border-radius:12px; font-family:inherit; font-size:16px; color:#1A1A2E; background:#fff;" />
+        </div>
+      </div>
+
+      <label style="display:block; font-size:14px; font-weight:600; color:#3E3F66; margin-bottom:7px;">E-Mail-Adresse</label>
+      <input type="email" placeholder="name@email.de" style="width:100%; padding:13px 15px; border:1px solid #D8DAEA; border-radius:12px; font-family:inherit; font-size:16px; color:#1A1A2E; background:#fff; margin-bottom:18px;" />
+
+      <label style="display:block; font-size:14px; font-weight:600; color:#3E3F66; margin-bottom:7px;">Betreff</label>
+      <select style="width:100%; padding:13px 15px; border:1px solid #D8DAEA; border-radius:12px; font-family:inherit; font-size:16px; color:#1A1A2E; background:#fff; margin-bottom:18px;">
+        <option>Zugang / Anmeldung</option>
+        <option>Frage zu einem Kurs</option>
+        <option>Zusammenarbeit</option>
+        <option>Sonstiges</option>
+      </select>
+
+      <label style="display:block; font-size:14px; font-weight:600; color:#3E3F66; margin-bottom:7px;">Nachricht</label>
+      <textarea rows="4" placeholder="Wie können wir helfen?" style="width:100%; padding:13px 15px; border:1px solid #D8DAEA; border-radius:12px; font-family:inherit; font-size:16px; color:#1A1A2E; background:#fff; margin-bottom:24px; resize:vertical;"></textarea>
+
+      <a href="#" style="display:flex; align-items:center; justify-content:center; gap:9px; width:100%; background:#5663AE; color:#FFFFFF; font-weight:700; font-size:16px; padding:15px; border-radius:12px; text-decoration:none;">
+        Nachricht senden
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg>
+      </a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}"></script>
+<script>
+addEventListener('load', () => {
+  (async () => {
+    try { await document.fonts.ready; } catch (e) {}
+    const imgs = Array.from(document.images).filter((i) => !i.complete);
+    await Promise.race([
+      Promise.allSettled(imgs.map((i) => i.decode())),
+      new Promise((r) => setTimeout(r, 8000)),
+    ]);
+    setTimeout(() => window.print(), 500);
+  })();
+});
+</script>
+</body>
+</html>

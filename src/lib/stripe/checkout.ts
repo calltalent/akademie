@@ -7,23 +7,19 @@ import { getTenant } from "@/lib/tenant/context";
 import { createStripeClient } from "@/lib/stripe/client";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { productSlugSchema } from "@/lib/stripe/schema";
+import { buildTenantUrl } from "@/lib/tenant/url";
 
 export type CheckoutActionState = { error: string | null };
 
 /**
- * Dev-/Prod-Domainschema wie in src/lib/tenant/resolve.ts dokumentiert und
- * in src/lib/users/import.ts (buildLoginUrl) bereits genauso umgesetzt -
- * bewusst wieder eine kleine private Hilfsfunktion statt einer geteilten
- * Utility, gleiches Muster wie im restlichen Projekt (kein zusaetzliches
- * Kopplungsmodul fuer zwei Zeilen Logik).
+ * BUGFIX (Phase 5, Block 8, 12.07.2026): die private `buildTenantUrl(slug, path)`
+ * hier hing noch am alten `{slug}.akademie.calltalent.ai`-Schema UND kannte
+ * `custom_domain` nicht — für den ersten echten Mandanten (`custom_domain =
+ * learning.calltalent.ai`) wäre nach einer echten Stripe-Zahlung auf die
+ * falsche, nicht erreichbare Domain `calltalent.calltalent.ai` weitergeleitet
+ * worden. Jetzt zentral in src/lib/tenant/url.ts (kennt beide Fälle), siehe
+ * dortiger Kommentar für Details.
  */
-function buildTenantUrl(slug: string, path: string): string {
-  const base =
-    process.env.NODE_ENV === "production"
-      ? `https://${slug}.akademie.calltalent.ai`
-      : `http://${slug}.localhost:3000`;
-  return `${base}${path}`;
-}
 
 /**
  * Laedt AUSSCHLIESSLICH die fuer den Checkout-Aufbau noetigen internen Felder
@@ -132,16 +128,24 @@ export async function createCheckoutSession(productSlug: string): Promise<Checko
         user_id: user.id,
       },
       customer_email: user.email ?? undefined,
-      success_url: buildTenantUrl(tenant.slug, "/?checkout=success"),
-      cancel_url: buildTenantUrl(tenant.slug, `/kaufen/${slugCheck.data}?checkout=cancelled`),
+      success_url: buildTenantUrl(tenant, "/?checkout=success"),
+      cancel_url: buildTenantUrl(tenant, `/kaufen/${slugCheck.data}?checkout=cancelled`),
     });
     if (!session.url) {
       return { error: "Stripe hat keine Checkout-URL geliefert." };
     }
     redirectUrl = session.url;
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Checkout konnte nicht gestartet werden.";
-    return { error: "Stripe-Fehler: " + message };
+    // Stripe-SDK-Fehlermeldungen sind technisch/englisch — Detail nur
+    // loggen, Nutzer bekommt einen klaren deutschen Satz (analog
+    // translateAuthError/translateDbError-Muster).
+    console.error("[stripe/checkout] Checkout konnte nicht gestartet werden.", {
+      tenantId: tenant.id,
+      userId: user.id,
+      productSlug: slugCheck.data,
+      error: e instanceof Error ? e.message : e,
+    });
+    return { error: "Der Bezahlvorgang konnte gerade nicht gestartet werden. Bitte versuche es später erneut." };
   }
 
   // redirect() liegt bewusst AUSSERHALB des try/catch oben - Next.js

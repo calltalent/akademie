@@ -1,5 +1,4 @@
 import { createHmac } from "node:crypto";
-import { z } from "zod";
 
 /**
  * Phase 3, Block 7 — reine, testbare Bausteine der Webhook-Zustellung,
@@ -16,33 +15,18 @@ import { z } from "zod";
  * lag ursprünglich ebenfalls hier, wurde aber bei der SSRF-Schutz-Ergänzung
  * (security-reviewer-Durchgang) nach `deliver-attempt.ts` ausgelagert — sie
  * importiert `assertSafeWebhookUrl()` aus `url-safety.ts`, welches
- * `node:dns/promises` nutzt. `deliver.ts` HIER wird nicht nur von
- * `dispatch.test.ts` importiert, sondern transitiv auch von der
- * Client-Komponente `webhooks-panel.tsx` (für `WEBHOOK_EVENTS`/
- * `WebhookEvent`) — Node-Built-ins wie `node:dns` können dort nicht gebündelt
- * werden ("does not support external modules"). Diese Datei bleibt deshalb
- * STRIKT frei von jedem Node-Built-in außer `node:crypto` (das bündelt
- * Next.js/Turbopack clientseitig automatisch per Polyfill/Shim) und von
- * jedem Server-only-Import.
+ * `node:dns/promises` nutzt.
  *
- * `dispatch.ts` re-exportiert alles aus dieser Datei (WEBHOOK_EVENTS/
- * webhookEventSchema/signPayload) UND aus `deliver-attempt.ts`
- * (deliverWebhookAttempt) für bestehende Aufrufer (Settings-Actions,
- * Retry-Endpunkt, Hook-Punkte) — nur `dispatch.test.ts` importiert jetzt
- * direkt von hier.
+ * UPDATE (Block 8, 12.07.2026): `WEBHOOK_EVENTS`/`webhookEventSchema`/
+ * `WebhookEvent` sind nach `events.ts` ausgelagert (dort die Begründung) —
+ * die ursprüngliche Annahme, `node:crypto` werde clientseitig automatisch
+ * gebündelt, hielt nur für Turbopack, nicht für den Webpack-Build. Hier
+ * verbleiben nur noch `signPayload()`/`DeliveryResult`, re-exportiert werden
+ * die Events trotzdem weiter (siehe unten) — bestehende Aufrufer
+ * (`dispatch.ts`, `dispatch.test.ts`, `deliver-attempt.ts`) brauchen keine
+ * Änderung.
  */
-export const WEBHOOK_EVENTS = [
-  "user.created",
-  "enrollment.created",
-  "lesson.completed",
-  "course.completed",
-  "quiz.passed",
-  "submission.created",
-  "order.paid",
-] as const;
-
-export const webhookEventSchema = z.enum(WEBHOOK_EVENTS);
-export type WebhookEvent = z.infer<typeof webhookEventSchema>;
+export { WEBHOOK_EVENTS, webhookEventSchema, type WebhookEvent } from "@/lib/webhooks/events";
 
 /** Reine, testbare Funktion: HMAC-SHA256-Hex-Signatur über den JSON-Body. */
 export function signPayload(secret: string, body: string): string {

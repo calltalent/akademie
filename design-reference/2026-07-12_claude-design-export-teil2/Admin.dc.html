@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  a { color: #5663AE; }
+  a:hover { color: #3E3F66; }
+</style>
+</helmet>
+<div style="display:flex; min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; background:#F4F5FA; color:#1A1A2E; font-size:18px; line-height:1.6;">
+  <dc-import name="AdminSidebar" active="overview" hint-size="264px,100vh"></dc-import>
+
+  <div style="flex:1 1 auto; display:flex; flex-direction:column; min-width:0;">
+    <header style="display:flex; align-items:center; gap:18px; padding:20px 40px; background:#F4F5FA;">
+      <div style="flex:1 1 auto; min-width:0;">
+        <div style="font-size:13px; font-weight:600; color:#A9AAC4;">Verwaltung · Übersicht</div>
+        <h1 style="margin:2px 0 0; font-size:26px; font-weight:800; letter-spacing:-.01em;">Dashboard</h1>
+      </div>
+      <a href="AdminKurse.dc.html" style="display:inline-flex; align-items:center; gap:8px; background:#5663AE; color:#fff; font-weight:700; font-size:15px; padding:12px 18px; border-radius:11px; text-decoration:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+        Neuer Kurs
+      </a>
+      <span style="width:44px; height:44px; border-radius:11px; background:#3E3F66; color:#F7EED4; font-weight:700; font-size:15px; display:flex; align-items:center; justify-content:center;">AK</span>
+    </header>
+
+    <main style="flex:1 1 auto; padding:16px 40px 56px;">
+      <!-- KPI cards -->
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:22px; margin-bottom:30px;">
+        <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+          <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:22px 24px;">
+            <div style="font-size:13px; font-weight:600; color:#A9AAC4; margin-bottom:10px;">{{ k.label }}</div>
+            <div style="font-size:30px; font-weight:800; color:#1A1A2E; letter-spacing:-.01em;">{{ k.value }}</div>
+            <div style="{{ k.deltaStyle }}">{{ k.delta }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1.6fr 1fr; gap:24px;">
+        <!-- Enrollment chart -->
+        <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:26px 28px;">
+          <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:22px;">
+            <div style="font-size:17px; font-weight:700;">Einschreibungen</div>
+            <div style="font-size:13px; font-weight:600; color:#A9AAC4;">letzte 8 Wochen</div>
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:14px; height:180px;">
+            <sc-for list="{{ bars }}" as="b" hint-placeholder-count="8">
+              <div style="flex:1 1 auto; display:flex; flex-direction:column; align-items:center; gap:8px; height:100%; justify-content:flex-end;">
+                <div style="{{ b.barStyle }}"></div>
+                <div style="font-size:12px; color:#A9AAC4;">{{ b.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- Recent activity -->
+        <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:26px 28px;">
+          <div style="font-size:17px; font-weight:700; margin-bottom:18px;">Letzte Aktivität</div>
+          <sc-for list="{{ activity }}" as="a" hint-placeholder-count="4">
+            <div style="display:flex; gap:13px; padding:13px 0; border-top:1px solid #F2F3F9;">
+              <span style="flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:#EEF0FA; display:flex; align-items:center; justify-content:center;"><span style="width:13px; height:13px; border-radius:4px; background:#5663AE;"></span></span>
+              <div style="flex:1 1 auto; min-width:0;">
+                <div style="font-size:14px; font-weight:500; line-height:1.4;">{{ a.text }}</div>
+                <div style="font-size:12px; color:#A9AAC4; margin-top:2px;">{{ a.time }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- Courses table -->
+      <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; margin-top:24px; overflow:hidden;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; padding:24px 28px 16px;">
+          <div style="font-size:17px; font-weight:700;">Kurse</div>
+          <a href="AdminKurse.dc.html" style="font-size:14px; font-weight:600; text-decoration:none;">Alle verwalten</a>
+        </div>
+        <div style="display:grid; grid-template-columns:2.4fr 1fr 1fr 0.8fr; gap:0; font-size:13px; font-weight:700; color:#A9AAC4; padding:0 28px 10px; border-bottom:1px solid #EEF0F7;">
+          <div>Kurs</div><div>Teilnehmer</div><div>Ø Fortschritt</div><div>Status</div>
+        </div>
+        <sc-for list="{{ courses }}" as="c" hint-placeholder-count="4">
+          <div style="display:grid; grid-template-columns:2.4fr 1fr 1fr 0.8fr; gap:0; align-items:center; padding:16px 28px; border-bottom:1px solid #F4F5FA; font-size:15px;">
+            <div style="font-weight:600;">{{ c.title }}</div>
+            <div style="color:#3E3F66;">{{ c.members }}</div>
+            <div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="flex:1 1 auto; max-width:100px; height:7px; border-radius:5px; background:#EEF0F7; overflow:hidden;"><div style="{{ c.barStyle }}"></div></div>
+                <span style="font-size:13px; font-weight:600; color:#5663AE;">{{ c.pct }}%</span>
+              </div>
+            </div>
+            <div><span style="{{ c.statusStyle }}">{{ c.status }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  kpi(label, value, delta, up) {
+    return {
+      label, value, delta,
+      deltaStyle: 'font-size:13px; font-weight:600; margin-top:6px; color:' + (up ? '#1F8A5B' : '#B24343') + ';',
+    };
+  }
+  bar(label, pct) {
+    return { label, barStyle: 'width:100%; border-radius:7px 7px 0 0; height:' + pct + '%; background:' + (pct > 78 ? '#5663AE' : '#B7BEE0') + ';' };
+  }
+  course(o) {
+    const map = { live: ['Live','#1F8A5B','#E3F2EA'], entwurf: ['Entwurf','#1A1A2E','#F7EED4'] };
+    const [txt, col, bg] = map[o.status];
+    return {
+      title: o.title, members: o.members, pct: o.pct,
+      barStyle: 'height:100%; width:' + o.pct + '%; background:#5663AE; border-radius:5px;',
+      status: txt,
+      statusStyle: 'display:inline-flex; padding:5px 12px; border-radius:8px; font-size:13px; font-weight:700; color:' + col + '; background:' + bg + ';',
+    };
+  }
+  renderVals() {
+    return {
+      kpis: [
+        this.kpi('Teilnehmer', '1.284', '+64 diese Woche', true),
+        this.kpi('Aktive Kurse', '11', '+2 diesen Monat', true),
+        this.kpi('Ø Abschlussquote', '73%', '+4 %-Pkt.', true),
+        this.kpi('Offene Abgaben', '8', '3 überfällig', false),
+      ],
+      bars: [
+        this.bar('KW18', 42), this.bar('KW19', 55), this.bar('KW20', 48),
+        this.bar('KW21', 67), this.bar('KW22', 72), this.bar('KW23', 61),
+        this.bar('KW24', 84), this.bar('KW25', 92),
+      ],
+      activity: [
+        { text: 'Neuer Teilnehmer: Sarah Klein', time: 'vor 12 Min.' },
+        { text: 'Abgabe „Rollenspiel 3" eingereicht', time: 'vor 40 Min.' },
+        { text: 'Kurs „Bedarfsanalyse" veröffentlicht', time: 'vor 2 Std.' },
+        { text: 'Mandant „Nord GmbH" aktiviert', time: 'gestern' },
+      ],
+      courses: [
+        this.course({ title: 'Vertriebspsychologie im Erstgespräch', members: '512', pct: 68, status: 'live' }),
+        this.course({ title: 'Einwandbehandlung am Telefon', members: '388', pct: 54, status: 'live' }),
+        this.course({ title: 'Terminierung &amp; Follow-up', members: '204', pct: 31, status: 'live' }),
+        this.course({ title: 'Souverän mit Ablehnung umgehen', members: '0', pct: 0, status: 'entwurf' }),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

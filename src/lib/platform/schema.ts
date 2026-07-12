@@ -76,10 +76,26 @@ export const tenantCustomDomainSchema = z
     "Ungültiges Domain-Format (z. B. akademie.beispiel.de).",
   );
 
+/**
+ * NEU (Phase 5, Block 8, 12.07.2026 — Josips Fund: nach dem Anlegen eines
+ * Mandanten gab es keine Möglichkeit, einen Inhaber/Owner zu bekommen —
+ * bisher nur per manuellem SQL machbar, siehe PHASENSTATUS.md). Optionales
+ * Feld: leer lassen = Mandant ohne Inhaber anlegen (z. B. für interne
+ * Test-Mandanten), ausfüllen = Owner-Konto + Einladungsmail wird direkt
+ * mit angelegt (siehe createTenant() in actions.ts).
+ */
+const optionalEmailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .transform((v) => (v === "" ? null : v))
+  .refine((v) => v === null || z.string().email().safeParse(v).success, "Ungültige E-Mail-Adresse.");
+
 export const createTenantSchema = z.object({
   name: tenantNameSchema,
   slug: tenantSlugSchema,
   plan: tenantPlanSchema,
+  ownerEmail: optionalEmailSchema,
 });
 
 export const updateTenantSchema = z.object({
@@ -87,4 +103,19 @@ export const updateTenantSchema = z.object({
   plan: tenantPlanSchema,
   status: tenantStatusSchema,
   customDomain: tenantCustomDomainSchema,
+});
+
+/**
+ * NEU (Design-Block 6, 13.07.2026, Mandanten.dc.html "Branding & Theming").
+ * `tenants.branding.color_primary`/`radius` waren bisher nur lesend genutzt
+ * (Kurs-Editor-Vorschau, Zertifikate) — kein Schreibweg existierte. Farbe
+ * bewusst auf die 4 im Export vorgegebenen Marken-Akzente beschränkt (kein
+ * freier Hex-Eingeber), Radius auf den im Export nutzbaren Schieberegler-
+ * Bereich (4–24px, wie dort `<input type="range" min="4" max="24">`).
+ */
+export const TENANT_ACCENT_SWATCHES = ["#5663AE", "#2A6FDB", "#1F8A5B", "#B4682A"] as const;
+
+export const tenantBrandingSchema = z.object({
+  colorPrimary: z.enum(TENANT_ACCENT_SWATCHES),
+  radius: z.coerce.number().int().min(4).max(24),
 });

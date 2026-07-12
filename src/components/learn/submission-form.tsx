@@ -108,7 +108,11 @@ export function SubmissionForm({
       .from("submissions")
       .uploadToSignedUrl(path, token, file);
     if (uploadError) {
-      setState({ status: "error", message: uploadError.message });
+      // uploadError.message kommt von der Supabase-Storage-Bibliothek
+      // (technisch/englisch) — Detail nur in der Konsole, Nutzer bekommt
+      // einen klaren deutschen Satz.
+      console.error("[submission-form] Datei-Upload fehlgeschlagen.", uploadError);
+      setState({ status: "error", message: "Datei-Upload fehlgeschlagen. Bitte versuche es erneut." });
       return;
     }
 

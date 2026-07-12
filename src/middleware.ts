@@ -1,13 +1,28 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env";
 import { resolveTenantByHost } from "@/lib/tenant/resolve";
 
 /**
- * Next.js 16: middleware.ts wurde zu proxy.ts (Funktionsname `proxy`,
- * läuft auf Node.js-Runtime, nicht mehr Edge). Das erlaubt uns hier direkt
- * die Mandanten-Auflösung per Admin-Client (service_role) durchzuführen,
- * statt sie in jede Server Component zu duplizieren.
+ * ROLLBACK zu middleware.ts (Edge-Runtime) — Phase 5, Block 8, 12.07.2026,
+ * `npm run deploy`-Fund: `proxy.ts` (Phase 4, Block 1, Next.js 16, läuft
+ * zwingend auf Node.js-Runtime) wird von @opennextjs/cloudflare NOCH NICHT
+ * unterstützt ("Node.js middleware is not currently supported. Consider
+ * switching to Edge Middleware."), bestätigt als bekannte, noch offene
+ * Einschränkung (siehe cloudflare/workers-sdk Issue #13755 — Next.js 16s
+ * neue Proxy-Architektur vs. OpenNexts aktueller Cloudflare-Adapter).
+ * Community-Workaround bis OpenNext proxy.ts unterstützt: auf die ältere
+ * middleware.ts-Konvention (Edge-Runtime, Funktionsname `middleware` statt
+ * `proxy`) zurückwechseln.
+ *
+ * Funktional unverändert: die Mandanten-Auflösung nutzt ausschließlich
+ * fetch-basierte Supabase-Aufrufe (@supabase/supabase-js, @supabase/ssr) —
+ * keine Node-only-APIs (kein `crypto`/`fs`/Buffer o. Ä.), läuft daher
+ * unter Edge-Runtime identisch. Die ursprüngliche Phase-4-Begründung
+ * ("Node.js-Runtime erlaubt uns die Mandanten-Auflösung per Admin-Client")
+ * bezog sich auf die zum Zeitpunkt neue proxy.ts-Möglichkeit generell,
+ * nicht auf eine harte Node-API-Abhängigkeit — keine Verhaltensänderung
+ * durch diesen Rückbau.
  *
  * Block 2: Host -> Tenant (service_role, siehe lib/tenant/resolve.ts) ->
  * x-tenant-id / x-tenant-slug als REQUEST-Header (nicht nur Response!),
@@ -19,7 +34,7 @@ import { resolveTenantByHost } from "@/lib/tenant/resolve";
  * (Rewrite, keine sichtbare Weiterleitung) auf /portal/... umgeschrieben,
  * `resolveTenantByHost()` wird für diesen Host gar nicht erst aufgerufen.
  */
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
 
   const host = request.headers.get("host") ?? "";
@@ -29,7 +44,24 @@ export async function proxy(request: NextRequest) {
 
   let servedPath = request.nextUrl.pathname;
 
-  if (isPortalHost) {
+  // BUGFIX (Phase 5, Block 8, 12.07.2026, gefunden beim ersten Live-Checkout-
+  // Test): API-Routen (`/api/...`) sind bewusst host-unabhängig gebaut - der
+  // Stripe-Webhook z. B. leitet Mandant/Nutzer/Produkt AUSSCHLIESSLICH aus
+  // `session.metadata` ab (siehe stripe/checkout.ts), nicht aus dem Host.
+  // Auf `portal.calltalent.ai` registriert (empfohlen, weil stabiler als
+  // eine einzelne Mandanten-Domain), wurde JEDER `/api/...`-Aufruf trotzdem
+  // auf `/portal/api/...` umgeschrieben - eine Route, die nicht existiert ->
+  // Next.js lieferte 404, Stripe zeigte "3 von 3 Zustellungen fehlgeschlagen"
+  // im Dashboard. Fix: `/api/`-Pfade werden auf JEDEM Host (auch dem
+  // Portal-Host) unverändert durchgereicht, nie mit `/portal` vorangestellt
+  // und ohne Mandanten-Auflösungsversuch (die bestehenden `/api/...`-Routen
+  // lesen ohnehin keinen `x-tenant-id`-Header, siehe requireAdminTenant()/
+  // API-Key-Auth statt Host-basiertem Tenant).
+  const isApiPath = servedPath === "/api" || servedPath.startsWith("/api/");
+
+  if (isApiPath) {
+    // Weder Portal-Rewrite noch Mandanten-Header - Pfad bleibt unverändert.
+  } else if (isPortalHost) {
     // Betreiber-Portal-Host: KEINE Mandanten-Auflösung versuchen.
     // Doppel-Rewrite vermeiden, falls der Pfad bereits mit /portal beginnt
     // (im Normalbetrieb nie der Fall — echte Nutzer tippen nie /portal-URLs
@@ -58,7 +90,7 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-portal-pathname", servedPath);
 
   function buildResponse() {
-    if (isPortalHost) {
+    if (isPortalHost && !isApiPath) {
       const rewriteUrl = new URL(servedPath + request.nextUrl.search, request.url);
       return NextResponse.rewrite(rewriteUrl, {
         request: { headers: requestHeaders },
@@ -77,7 +109,7 @@ export async function proxy(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
           for (const { name, value } of cookiesToSet) {
             request.cookies.set(name, value);
           }

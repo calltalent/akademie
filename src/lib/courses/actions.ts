@@ -9,9 +9,11 @@ import {
   moduleSchema,
 } from "@/lib/courses/schema";
 import type { CourseActionState } from "@/lib/courses/state";
+import { translateDbError } from "@/lib/errors/db";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 function errorState(e: unknown): CourseActionState {
-  return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+  return { error: genericErrorMessage(e) };
 }
 
 // --- Kurse ---
@@ -39,7 +41,7 @@ export async function createCourse(
       created_by: user.id,
     });
     if (error) {
-      return { error: "Anlegen fehlgeschlagen: " + error.message };
+      return { error: "Anlegen fehlgeschlagen: " + translateDbError(error) };
     }
 
     revalidatePath("/admin/kurse");
@@ -60,7 +62,7 @@ export async function updateCourseStatus(
       .update({ status })
       .eq("id", courseId)
       .eq("tenant_id", tenant.id);
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
     revalidatePath("/admin/kurse");
     return { error: null, success: true };
   } catch (e) {
@@ -76,7 +78,7 @@ export async function deleteCourse(courseId: string): Promise<CourseActionState>
       .delete()
       .eq("id", courseId)
       .eq("tenant_id", tenant.id);
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
     revalidatePath("/admin/kurse");
     return { error: null, success: true };
   } catch (e) {
@@ -109,7 +111,7 @@ export async function createModule(
       title: parsed.data.title,
       position: count ?? 0,
     });
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
 
     revalidatePath(`/admin/kurse/${courseId}`);
     return { error: null, success: true };
@@ -129,7 +131,7 @@ export async function deleteModule(
       .delete()
       .eq("id", moduleId)
       .eq("tenant_id", tenant.id);
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
     revalidatePath(`/admin/kurse/${courseId}`);
     return { error: null, success: true };
   } catch (e) {
@@ -150,7 +152,7 @@ export async function moveModule(
       .eq("course_id", courseId)
       .eq("tenant_id", tenant.id)
       .order("position", { ascending: true });
-    if (listError || !modules) return { error: listError?.message ?? "Fehler." };
+    if (listError || !modules) return { error: listError ? translateDbError(listError) : "Fehler." };
 
     const idx = modules.findIndex((m) => m.id === moduleId);
     const swapIdx = direction === "up" ? idx - 1 : idx + 1;
@@ -205,7 +207,7 @@ export async function createLesson(
       position: count ?? 0,
       blocks: [],
     });
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
 
     revalidatePath(`/admin/kurse/${courseId}`);
     return { error: null, success: true };
@@ -225,7 +227,7 @@ export async function deleteLesson(
       .delete()
       .eq("id", lessonId)
       .eq("tenant_id", tenant.id);
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
     revalidatePath(`/admin/kurse/${courseId}`);
     return { error: null, success: true };
   } catch (e) {
@@ -245,7 +247,7 @@ export async function updateLessonStatus(
       .update({ status })
       .eq("id", lessonId)
       .eq("tenant_id", tenant.id);
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
     revalidatePath(`/admin/kurse/${courseId}`);
     return { error: null, success: true };
   } catch (e) {
@@ -281,7 +283,7 @@ export async function saveLessonBlocks(
         .select("video_id")
         .in("video_id", videoIds);
       if (videoLookupError) {
-        return { error: "Video-Prüfung fehlgeschlagen: " + videoLookupError.message };
+        return { error: "Video-Prüfung fehlgeschlagen: " + translateDbError(videoLookupError) };
       }
       const ownedIds = new Set((ownedVideos ?? []).map((v) => v.video_id));
       const foreignId = videoIds.find((id) => !ownedIds.has(id));
@@ -331,7 +333,7 @@ export async function saveLessonBlocks(
       .update(updatePayload)
       .eq("id", lessonId)
       .eq("tenant_id", tenant.id);
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
 
     revalidatePath(`/admin/kurse/${courseId}`);
     return { error: null, success: true };
@@ -356,7 +358,7 @@ export async function updateLessonTitle(
       .update({ title: parsed.data.title })
       .eq("id", lessonId)
       .eq("tenant_id", tenant.id);
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
     revalidatePath(`/admin/kurse/${courseId}`);
     return { error: null, success: true };
   } catch (e) {

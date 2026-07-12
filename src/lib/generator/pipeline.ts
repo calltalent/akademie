@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import type Anthropic from "@anthropic-ai/sdk";
 import { createAnthropicClient } from "@/lib/ai/anthropic";
 import { AI_MODELS } from "@/lib/ai/config";
 import { parseStepResponse } from "@/lib/generator/parse";
@@ -55,7 +56,9 @@ function wrapUntrustedSourceText(sourceText: string): string {
 async function callClaudeJsonStep<T>(params: {
   system: string;
   user: string;
-  schema: z.ZodType<T>;
+  // z.ZodType<T, z.ZodTypeDef, unknown> statt z.ZodType<T> — siehe
+  // Kommentar an parseStepResponse() in parse.ts (12.07.2026, build-Fund).
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>;
   maxTokens: number;
 }): Promise<StepResult<T>> {
   const anthropic = createAnthropicClient();
@@ -73,7 +76,7 @@ async function callClaudeJsonStep<T>(params: {
       ],
     });
     const rawText = response.content
-      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
       .map((block) => block.text)
       .join("\n");
     try {
@@ -135,7 +138,7 @@ Format: {"title": string, "description": string, "modules": [{"title": string, "
  * (process.ts, "PER CODE statt per KI-Abtippen"): der KI so wenig wie
  * möglich abverlangen, was der Code zuverlässiger selbst beisteuern kann.
  */
-function buildLessonContentSchema(outline: CourseOutline) {
+function buildLessonContentSchema(outline: CourseOutline): z.ZodType<CourseContent, z.ZodTypeDef, unknown> {
   return z.preprocess((data) => {
     if (Array.isArray(data)) {
       return { title: outline.title, description: outline.description, modules: data };

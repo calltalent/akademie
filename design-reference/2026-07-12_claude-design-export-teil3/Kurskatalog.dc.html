@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  a { color: #5663AE; }
+  a:hover { color: #3E3F66; }
+</style>
+</helmet>
+<div style="display:flex; min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; background:#F4F5FA; color:#1A1A2E; font-size:18px; line-height:1.6;">
+  <dc-import name="Sidebar" active="catalog" hint-size="264px,100vh"></dc-import>
+
+  <div style="flex:1 1 auto; display:flex; flex-direction:column; min-width:0;">
+    <dc-import name="TopBar" breadcrumb="Lernen · Kurskatalog" title="Kurskatalog" hint-size="100%,90px"></dc-import>
+
+    <main style="flex:1 1 auto; padding:16px 40px 56px;">
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:28px;">
+        <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+          <span style="{{ f.style }}">{{ f.label }}</span>
+        </sc-for>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:24px;">
+        <sc-for list="{{ courses }}" as="c" hint-placeholder-count="6">
+          <a href="{{ c.href }}" style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; overflow:hidden; display:flex; flex-direction:column; text-decoration:none; color:inherit;">
+            <div style="{{ c.thumbStyle }}">
+              <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:#66679B; background:rgba(255,255,255,.75); padding:4px 8px; border-radius:6px;">{{ c.thumbLabel }}</span>
+            </div>
+            <div style="padding:20px 20px 22px; display:flex; flex-direction:column; flex:1 1 auto;">
+              <div style="font-size:12px; font-weight:600; letter-spacing:.03em; color:#A9AAC4; margin-bottom:6px;">{{ c.module }}</div>
+              <div style="font-size:17px; font-weight:700; line-height:1.35; color:#1A1A2E; margin-bottom:10px; text-wrap:pretty;">{{ c.title }}</div>
+              <div style="font-size:14px; color:#66679B; margin-bottom:18px;">{{ c.meta }}</div>
+              <span style="{{ c.ctaStyle }}">{{ c.cta }}</span>
+            </div>
+          </a>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:940}}">
+class Component extends DCLogic {
+  chip(label, active) {
+    return {
+      label,
+      style: [
+        'display:inline-flex','align-items:center','padding:9px 16px','border-radius:10px',
+        'font-size:14px','font-weight:600','cursor:pointer',
+        active ? 'background:#5663AE;color:#fff;border:1px solid #5663AE'
+               : 'background:#fff;color:#3E3F66;border:1px solid #E7E8F2',
+      ].join(';'),
+    };
+  }
+  card(o) {
+    const enrolled = o.enrolled;
+    return {
+      module: o.module, title: o.title, meta: o.meta,
+      thumbStyle: [
+        'height:132px','display:flex','align-items:center','justify-content:center',
+        'background-image:repeating-linear-gradient(45deg,' + o.tint + ' 0 10px, rgba(255,255,255,.55) 10px 20px)',
+        'background-color:' + o.tint,
+      ].join(';'),
+      thumbLabel: 'kursbild 16:9',
+      cta: enrolled ? 'Weiterlernen' : 'Zum Kurs',
+      href: 'Kurs.dc.html',
+      ctaStyle: [
+        'margin-top:auto','display:inline-flex','align-items:center','justify-content:center',
+        'padding:11px 16px','border-radius:10px','font-size:14px','font-weight:700','text-decoration:none',
+        enrolled ? 'background:#5663AE;color:#fff' : 'background:#F7EED4;color:#1A1A2E',
+      ].join(';'),
+    };
+  }
+  renderVals() {
+    return {
+      filters: [this.chip('Alle Kurse', true), this.chip('Vertrieb'), this.chip('Telefonie'), this.chip('Abschluss'), this.chip('Mindset')],
+      courses: [
+        this.card({ module: 'VERTRIEB', title: 'Vertriebspsychologie im Erstgespräch', meta: '12 Lektionen · 3,5 Std', tint: '#DFE2F4', enrolled: true }),
+        this.card({ module: 'TELEFONIE', title: 'Einwandbehandlung am Telefon', meta: '9 Lektionen · 2,1 Std', tint: '#E7E9F6', enrolled: true }),
+        this.card({ module: 'ABSCHLUSS', title: 'Terminierung &amp; Follow-up', meta: '7 Lektionen · 1,8 Std', tint: '#EDE7F5', enrolled: false }),
+        this.card({ module: 'MINDSET', title: 'Souverän mit Ablehnung umgehen', meta: '6 Lektionen · 1,4 Std', tint: '#E4E6F5', enrolled: false }),
+        this.card({ module: 'VERTRIEB', title: 'Bedarfsanalyse mit Struktur', meta: '10 Lektionen · 2,7 Std', tint: '#E9E6F3', enrolled: false }),
+        this.card({ module: 'TELEFONIE', title: 'Die perfekte Gesprächseröffnung', meta: '8 Lektionen · 1,9 Std', tint: '#DDE0F2', enrolled: false }),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

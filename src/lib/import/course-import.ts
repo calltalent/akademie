@@ -20,6 +20,7 @@ import {
 import { saveLessonBlocks } from "@/lib/courses/actions";
 import { reuploadVideoFromUrl } from "@/lib/import/video-reupload";
 import { deleteBunnyVideo } from "@/lib/bunny/client";
+import { translateDbError } from "@/lib/errors/db";
 
 /**
  * Migrations-Importer (Phase 4, Block 4): Kursstruktur-Import aus JSON.
@@ -185,11 +186,20 @@ async function resolveLessonBlocks(
         );
         bunnyVideoId = uploaded.guid;
       } catch (e) {
+        // e.message kann eine rohe Bunny-API-Antwort enthalten (siehe
+        // bunny/client.ts bzw. video-reupload.ts, technisch/englisch) —
+        // Detail nur loggen, die Import-Fehlerliste bekommt einen klaren
+        // deutschen Satz.
+        console.error("[import/course-import] Video-Reupload fehlgeschlagen.", {
+          moduleIndex,
+          lessonIndex,
+          block: b,
+          sourceUrl: block.sourceUrl,
+          error: e instanceof Error ? e.message : e,
+        });
         return {
           ok: false,
-          error: `Modul ${moduleIndex + 1}, Lektion ${lessonIndex + 1}, Block ${b + 1}: Video-Reupload fehlgeschlagen — ${
-            e instanceof Error ? e.message : "unbekannter Fehler"
-          }`,
+          error: `Modul ${moduleIndex + 1}, Lektion ${lessonIndex + 1}, Block ${b + 1}: Video-Reupload fehlgeschlagen.`,
         };
       }
 
@@ -205,7 +215,7 @@ async function resolveLessonBlocks(
         await deleteBunnyVideo(bunnyVideoId).catch(() => {});
         return {
           ok: false,
-          error: `Modul ${moduleIndex + 1}, Lektion ${lessonIndex + 1}, Block ${b + 1}: Video konnte nicht zugeordnet werden — ${bindError.message}`,
+          error: `Modul ${moduleIndex + 1}, Lektion ${lessonIndex + 1}, Block ${b + 1}: Video konnte nicht zugeordnet werden — ${translateDbError(bindError)}`,
         };
       }
       videoIds.push(bunnyVideoId);
@@ -266,7 +276,7 @@ export async function importCourseData(
     const message =
       courseError?.code === "23505"
         ? "Slug bereits vergeben."
-        : `Kurs-Anlage fehlgeschlagen: ${courseError?.message ?? "unbekannter Fehler"}`;
+        : `Kurs-Anlage fehlgeschlagen: ${courseError ? translateDbError(courseError) : "unbekannter Fehler"}`;
     return { ok: false, errors: [message] };
   }
   const courseId = courseRow.id as string;
@@ -307,7 +317,7 @@ export async function importCourseData(
       await rollback();
       return {
         ok: false,
-        errors: [`Modul ${m + 1}: Anlage fehlgeschlagen — ${moduleError?.message ?? "unbekannter Fehler"}`],
+        errors: [`Modul ${m + 1}: Anlage fehlgeschlagen — ${moduleError ? translateDbError(moduleError) : "unbekannter Fehler"}`],
       };
     }
     const moduleId = moduleRow.id as string;
@@ -363,7 +373,7 @@ export async function importCourseData(
         return {
           ok: false,
           errors: [
-            `Modul ${m + 1}, Lektion ${l + 1}: Anlage fehlgeschlagen — ${lessonError?.message ?? "unbekannter Fehler"}`,
+            `Modul ${m + 1}, Lektion ${l + 1}: Anlage fehlgeschlagen — ${lessonError ? translateDbError(lessonError) : "unbekannter Fehler"}`,
           ],
         };
       }

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<aside style="width:{{ sidebarWidth }}; flex:0 0 auto; background:#FFFFFF; border-right:1px solid #E7E8F2; display:flex; flex-direction:column; padding:26px 0; transition:width .18s ease; position:sticky; top:0; height:100vh; font-family:'Montserrat',system-ui,sans-serif;">
+
+  <a href="Dashboard.dc.html" style="padding:0 22px; display:flex; align-items:center; gap:12px; margin-bottom:30px; min-height:34px; text-decoration:none;">
+    <div style="width:34px; height:34px; border-radius:9px; background:#5663AE; flex:0 0 auto; display:flex; align-items:center; justify-content:center; color:#F7EED4; font-weight:800; font-size:18px;">C</div>
+    <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}">
+      <div style="line-height:1.15;">
+        <div style="font-weight:800; font-size:15px; letter-spacing:.02em; color:#1A1A2E;">CALLTALENT</div>
+        <div style="font-weight:600; font-size:11px; letter-spacing:.28em; color:#66679B;">AKADEMIE</div>
+      </div>
+    </sc-if>
+  </a>
+
+  <div style="padding:0 16px; margin-bottom:26px;">
+    <button onClick="{{ toggleSidebar }}" style="width:100%; display:flex; align-items:center; gap:12px; background:#F4F5FA; border:1px solid #E7E8F2; border-radius:11px; padding:11px 13px; cursor:pointer; color:#66679B; font-family:inherit; font-size:15px;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#5663AE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.2-3.2"></path></svg>
+      <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span>Suchen …</span></sc-if>
+    </button>
+  </div>
+
+  <nav style="flex:1 1 auto; padding:0 16px; overflow:hidden;">
+    <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}">
+      <div style="font-size:11px; font-weight:700; letter-spacing:.18em; color:#A9AAC4; padding:0 12px; margin-bottom:9px;">LERNEN</div>
+    </sc-if>
+    <sc-for list="{{ lernen }}" as="item" hint-placeholder-count="3">
+      <a href="{{ item.href }}" style="{{ item.style }}">
+        <span style="{{ item.iconStyle }}"><span style="{{ item.dot }}"></span></span>
+        <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span style="flex:1 1 auto;">{{ item.label }}</span></sc-if>
+      </a>
+    </sc-for>
+
+    <div style="height:20px;"></div>
+
+    <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}">
+      <div style="font-size:11px; font-weight:700; letter-spacing:.18em; color:#A9AAC4; padding:0 12px; margin-bottom:9px;">KONTO</div>
+    </sc-if>
+    <sc-for list="{{ konto }}" as="item" hint-placeholder-count="2">
+      <a href="{{ item.href }}" style="{{ item.style }}">
+        <span style="{{ item.iconStyle }}"><span style="{{ item.dot }}"></span></span>
+        <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span style="flex:1 1 auto;">{{ item.label }}</span></sc-if>
+        <sc-if value="{{ item.badge }}" hint-placeholder-val=""><span style="flex:0 0 auto; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:#5663AE; color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">{{ item.badge }}</span></sc-if>
+      </a>
+    </sc-for>
+  </nav>
+
+  <div style="padding:16px 16px 0; border-top:1px solid #E7E8F2; margin-top:16px;">
+    <a href="#" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:11px; color:#66679B; font-size:15px; font-weight:500; text-decoration:none;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#66679B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .8-1 1.7"></path><path d="M12 17h.01"></path></svg>
+      <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span>Hilfe &amp; Kontakt</span></sc-if>
+    </a>
+  </div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;active&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;,&quot;default&quot;:&quot;dashboard&quot;}}">
+class Component extends DCLogic {
+  state = { expanded: true };
+  toggleSidebar = () => this.setState(s => ({ expanded: !s.expanded }));
+
+  item(id, label, href, badge) {
+    const isActive = (this.props.active ?? 'dashboard') === id;
+    const style = [
+      'display:flex','align-items:center','gap:12px','padding:11px 12px',
+      'border-radius:11px','margin-bottom:3px','font-size:15px',
+      'font-weight:' + (isActive ? '700' : '500'),'text-decoration:none',
+      'color:' + (isActive ? '#FFFFFF' : '#3E3F66'),
+      'background:' + (isActive ? '#5663AE' : 'transparent'),
+    ].join(';');
+    return {
+      label, href,
+      style,
+      iconStyle: 'flex:0 0 auto; width:20px; height:20px; display:flex; align-items:center; justify-content:center;',
+      dot: 'width:14px; height:14px; border-radius:4px; border:2px solid ' + (isActive ? '#F7EED4' : '#5663AE') + ';',
+      badge: badge || '',
+    };
+  }
+
+  renderVals() {
+    const expanded = this.state.expanded;
+    return {
+      expanded,
+      sidebarWidth: expanded ? '264px' : '84px',
+      toggleSidebar: this.toggleSidebar,
+      lernen: [
+        this.item('dashboard', 'Meine Kurse', 'Dashboard.dc.html'),
+        this.item('catalog', 'Kurskatalog', 'Kurskatalog.dc.html'),
+        this.item('bookmarks', 'Lesezeichen', '#'),
+      ],
+      konto: [
+        this.item('settings', 'Einstellungen', 'Einstellungen.dc.html'),
+        this.item('notif', 'Benachrichtigungen', 'Einstellungen.dc.html', '3'),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

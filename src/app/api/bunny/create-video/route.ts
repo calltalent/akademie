@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireStaffTenant } from "@/lib/auth/staff";
 import { createBunnyVideo, generateTusCredentials } from "@/lib/bunny/client";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
+import { translateDbError } from "@/lib/errors/db";
 
 const bodySchema = z.object({
   title: z.string().min(1).max(300),
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
       // hart fehlschlagen als eine unverknüpfte Video-ID ausliefern.
       await import("@/lib/bunny/client").then((m) => m.deleteBunnyVideo(video.guid));
       return NextResponse.json(
-        { error: "Video konnte nicht zugeordnet werden: " + bindError.message },
+        { error: "Video konnte nicht zugeordnet werden: " + translateDbError(bindError) },
         { status: 500 },
       );
     }
@@ -75,7 +76,13 @@ export async function POST(request: Request) {
       signature,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unbekannter Fehler.";
-    return NextResponse.json({ error: message }, { status: 502 });
+    // e.message kann eine rohe Bunny-API-Antwort enthalten (siehe
+    // bunny/client.ts, technisch/englisch) — Detail nur loggen, Nutzer
+    // bekommt einen klaren deutschen Satz.
+    console.error("[bunny/create-video] Video konnte nicht angelegt werden.", {
+      tenantId: ctx.tenant.id,
+      error: e instanceof Error ? e.message : e,
+    });
+    return NextResponse.json({ error: "Video konnte nicht angelegt werden. Bitte versuche es erneut." }, { status: 502 });
   }
 }

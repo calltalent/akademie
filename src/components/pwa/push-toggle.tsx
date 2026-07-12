@@ -28,7 +28,11 @@ export function PushToggle({ vapidPublicKey }: Props) {
     if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
       return;
     }
-    setSupported(true);
+    // Korrektur (Josips Lint-Lauf, 12.07.2026): setSupported(true) lief
+    // vorher synchron im Effect-Body (react-hooks/set-state-in-effect).
+    // Über queueMicrotask in einen eigenen Callback verschoben, Verhalten
+    // unverändert (Ausführung noch vor dem nächsten Paint).
+    queueMicrotask(() => setSupported(true));
 
     navigator.serviceWorker.ready
       .then((registration) => registration.pushManager.getSubscription())
@@ -122,7 +126,7 @@ export function PushToggle({ vapidPublicKey }: Props) {
 }
 
 /** Standard-Konvertierung für `PushManager.subscribe({ applicationServerKey })" — der Browser erwartet ein Uint8Array, VAPID-Keys liegen als URL-safe Base64 vor. */
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = atob(base64);

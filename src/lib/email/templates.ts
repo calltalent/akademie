@@ -92,6 +92,17 @@ function actionButton(url: string, label: string, accentColor?: string): string 
   </p>`;
 }
 
+/**
+ * UPDATE (Phase 5, Block 8, 12.07.2026 — Josips Fund): `loginUrl` zeigte
+ * bisher auf die reine Login-Seite, obwohl das Konto ohne Passwort angelegt
+ * wird — der Button führte damit ins Leere. Seit diesem Block liefert
+ * `users/import.ts` (`buildSetPasswordLink()`) hier einen echten, einmaligen
+ * Passwort-setzen-Link (Supabase `generateLink({type:"recovery"})`), der
+ * direkt auf /passwort-setzen führt. Parametername `loginUrl` bewusst
+ * beibehalten (auch vom Mandanten-Besitzer-Einladungsflow wiederverwendet,
+ * siehe platform/actions.ts) — Button-Text/Beschreibung unten an die neue
+ * Realität angepasst.
+ */
 export function welcomeInvite({
   tenantName,
   recipientName,
@@ -105,9 +116,9 @@ export function welcomeInvite({
 }): string {
   const bodyHtml = `
     <p style="margin:0 0 16px 0;">${greeting(recipientName)}</p>
-    <p style="margin:0 0 16px 0;">für dich wurde ein Konto bei <strong>${escapeHtml(tenantName)}</strong> angelegt. Du kannst dich ab sofort anmelden.</p>
-    ${actionButton(loginUrl, "Jetzt anmelden", accentColor)}
-    <p style="margin:0;font-size:13px;color:#6b7280;">Falls du noch kein Passwort gesetzt hast, nutze auf der Login-Seite „Passwort vergessen" oder melde dich per Magic-Link mit deiner E-Mail-Adresse an.</p>
+    <p style="margin:0 0 16px 0;">für dich wurde ein Konto bei <strong>${escapeHtml(tenantName)}</strong> angelegt. Lege jetzt dein Passwort fest, um dich anzumelden.</p>
+    ${actionButton(loginUrl, "Passwort festlegen", accentColor)}
+    <p style="margin:0;font-size:13px;color:#6b7280;">Dieser Link ist nur einmal gültig und läuft nach einiger Zeit ab. Falls er nicht mehr funktioniert, kannst du auf der Login-Seite jederzeit „Passwort vergessen" nutzen.</p>
   `;
   return renderLayout({ tenantName, accentColor, heading: "Willkommen", bodyHtml });
 }

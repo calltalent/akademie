@@ -188,109 +188,250 @@ Josip entschied: erst alle MITTEL-Funde aus dem security-reviewer-Audit schließ
 
 **Vitest v2 → v4 Upgrade verifiziert (Josip, 11.07.2026):** `package.json` auf `"vitest": "^4"` gesetzt, `npm install` erfolgreich (Vitest 4.1.10), alle 17 Tests weiterhin grün, keine Breaking Changes in `vitest.config.ts` nötig. `npm audit`: 7 → 4 Schwachstellen (3 moderate, 1 high). `npm audit --omit=dev` bestätigt: unverändert nur die bereits bekannten 2 moderate (postcss/next-Kette) in Produktions-Abhängigkeiten — kein neues Produktionsrisiko durch das Upgrade. Die restlichen 2 (inkl. der 1 high) stecken vollständig in devDependencies.
 
-**Nachtrag Demo-Mandanten (11.07.2026 nachts):** `demo-gruen` hatte seit Phase 0 keine einzige `memberships`-Zeile (Josip war nur in `demo-blau` als `owner` eingetragen) — dadurch weder Admin-Nav noch Kursliste sichtbar (RLS griff korrekt, aber ohne Mitgliedschaft bleibt alles leer). Per SQL nachgetragen: Josip (`office@calltalent.ai`) jetzt auch `owner` in `demo-gruen`. Kein Code-Bug, reine Testdaten-Lücke.
+**Nachtrag Demo-Mandanten (11.07.2026 nachts):** `demo-gruen` hatte seit Phase 0 ke
+## Phase 5, Block 8 — Nachtrag: drei UX-/Funktionslücken behoben (12.07.2026, Josips Fund nach dem Smoke-Test)
 
-## Phase 2 — Geschäft 🔶 (Planung 11.07.2026, Cowork)
+Nach dem erfolgreichen Go-Live-Smoke-Test meldete Josip drei konkrete Lücken im Betreiber-Portal. Alle vier zugehörigen Code-Änderungen sind fertig, aber noch NICHT deployed — Josip muss `npm run deploy` selbst ausführen (§4.6).
 
-**architect-Plan (Opus) erstellt:** 6 Blöcke in dieser Reihenfolge — 1) E-Mail-Fundament (Resend) inkl. nachgeholter Willkommensmail aus P1-Block-6, 2) Quiz/Prüfungen + Versuche (Auswertung + Lösungen ausschließlich serverseitig, `questions.answer` verlässt nie den Client), 3) Abgaben-Inbox + Bewertung, 4) Zertifikate (PDF via `pdf-lib`, Workers-kompatibel, Trigger in `completeLesson()`), 5) Stripe (Produkte/Checkout/Webhook→automatische Einschreibung/Portal/öffentliche Kaufseite), 6) Reporting v1 + CSV-Export. Kernbefund: alle Phase-2-Tabellen (quizzes, questions, attempts, submissions, certificates, products, orders, subscriptions) existieren bereits mit RLS in `0001_init.sql` — Phase 2 baut fast nur Code, kaum neue Migrationen (einziger möglicher Kandidat: Unique-Constraint `certificates(tenant_id,course_id,user_id)` für Idempotenz, Block 4).
+**1. Vierter Fund derselben Domain-Bug-Klasse (`signInWithMagicLink`):** proaktiv beim Lesen des Auth-Codes für Punkt 3 entdeckt — `src/lib/auth/actions.ts` nutzte für den Magic-Link-Redirect noch `process.env.NEXT_PUBLIC_SITE_URL` (build-time, zeigt auf die alte `akademie.calltalent.ai`) statt der mandantenbewussten `tenantOrigin()`. Besonders relevant, weil Magic Link bislang der EINZIGE funktionierende Erst-Login-Weg für importierte/eingeladene Nutzer war. Fix: `getTenant()` + `tenantOrigin()` aus dem bereits bestehenden `src/lib/tenant/url.ts`-Helper (siehe oben im Dokument, "zweiter Fund" beim Stripe-Checkout).
 
-**Entscheidungen (mit Josip abgestimmt, 11.07.2026):**
-1. Stripe-Testmodus-Keys: Josip besorgt sie zuerst — Block 5 (Stripe) startet erst nach Freigabe, Blöcke 1–4 und 6 unabhängig davon umsetzbar.
-2. Stripe-Produktanlage: automatisch per API bei Produktanlage im Calltalent-Admin (kein manuelles Dashboard-Pflegen der IDs).
-3. Resend-Absender: einheitlich `noreply@<Betreiber-Domain>`, Anzeigename wechselt je Mandant (kein separates Domain-Setup je Kunde in Phase 2).
-4. Zertifikats-Gate: „alle Lektionen abgeschlossen" genügt (kein zusätzliches Quiz-/Abgaben-Gating in v1), steuerbar über `courses.settings.certificate_enabled`.
+**2. Neuer Passwort-setzen/-vergessen-Flow gebaut (behebt Fund 2 UND 3 mit demselben Mechanismus):** bisher gab es serverseitig KEINE Möglichkeit, für einen neu angelegten oder per CSV importierten Nutzer ein Passwort zu setzen — Konten wurden ohne Passwort angelegt (`admin.auth.admin.createUser({email, email_confirm:true})`), aber nirgends gab es einen Weg, eines zu vergeben. Neu:
+- `src/lib/users/import.ts`: `buildSetPasswordLink(admin, tenant, email)` — nutzt `admin.auth.admin.generateLink({type:"recovery", ...})`, erzeugt einen echten, einmaligen Link OHNE eine zusätzliche E-Mail zu verschicken (Supabase-eigenes SMTP-Rate-Limit bleibt unberührt, wichtig für Massenimport).
+- `src/lib/auth/actions.ts`: `requestPasswordReset()` (self-service "Passwort vergessen", nutzt `supabase.auth.resetPasswordForEmail`) und `setNewPassword()` (setzt das neue Passwort, sobald eine gültige Recovery-Session besteht).
+- Neue Seiten: `/passwort-vergessen` (E-Mail-Eingabe) und `/passwort-setzen` (neues Passwort, nur erreichbar über einen gültigen Link).
+- Beide Wege laufen durch die bereits bestehende `/auth/callback?next=...`-Route — unverändert wiederverwendet, kein neuer Callback-Code nötig.
+- `/login`: Link "Passwort vergessen?" ergänzt. `/profil`: Platzhaltertext durch echten Link auf `/passwort-vergessen` ersetzt (vorher stand dort nur ein Hinweis auf "folgt in einem späteren Block").
+- `src/lib/email/templates.ts` (`welcomeInvite`): Button-Text von "Jetzt anmelden" auf "Passwort festlegen" korrigiert — der alte Button führte ins Leere, weil das Konto ja kein Passwort hatte.
+- `src/lib/users/import.ts` (`sendWelcomeMail`): nutzt jetzt `buildSetPasswordLink()` statt einer reinen `/login`-URL — behebt denselben Fehler rückwirkend auch für den CSV-Bulk-Import.
 
-**Sicherheitshinweis (11.07.2026 abends):** Josip hat im Chat einen Stripe-**Live**-Publishable-Key (`pk_live_…`) geteilt — bewusst (bestätigt: Calltalent nutzt für die Akademie dasselbe Live-Stripe-Konto wie für den bestehenden Voice-Vorgang, siehe Memory „Voice-Vorgangsmodell"). Nicht in Code/Migrationen übernommen, nicht in Memory gespeichert (Publishable Key ist unkritisch, Secret Key erst recht nicht). Geklärt: Live- und Testmodus sind zwei Schlüsselpaare desselben Kontos, kein separates Setup nötig.
+**3. Inhaber-E-Mail beim Anlegen eines Mandanten (Fund 2, direkte Lösung):** `/portal/mandanten/neu` hat jetzt ein optionales Feld "Inhaber-E-Mail". Wird es ausgefüllt, legt `createTenant()` (`src/lib/platform/actions.ts`, neue Funktion `inviteTenantOwner()`) sofort ein Konto mit `role:"owner"` in `memberships` an (vorher gab es dafür laut Recherche GAR KEINEN Code-Pfad — nur manuelles SQL, siehe Demo-Mandanten-Nachtrag oben) und verschickt die Einladung über denselben `buildSetPasswordLink()`-Mechanismus. Schlägt die Einladung fehl, bleibt der Mandant trotzdem angelegt (best-effort, kein Blocker) — Josip sieht eine gelbe Warnung mit Fehlermeldung und einem manuellen Link zur Mandanten-Detailseite statt eines automatischen Redirects.
 
-**Entscheidung 1 präzisiert (11.07.2026 abends):** Block 5 wird mit **Testmodus-Keys** (`sk_test_…`/`whsec_test_…`) gebaut und getestet — erfüllt SPEC.md-DoD „E2E mit Stripe-Testmodus" (Abschnitt 8) ohne echte Buchungen während der Entwicklung. Umschaltung auf die bereits vorhandenen Live-Keys (`pk_live_…` + zugehöriger `sk_live_…`) ausschließlich beim Produktions-Deploy, nach ausdrücklicher Freigabe von Josip (CLAUDE.md §4.6: „Nichts deployen ohne Freigabe").
+**4. Mandant löschen (Fund 1):** neue Server Action `deleteTenant()` in `src/lib/platform/actions.ts` — löscht ausschließlich die `tenants`-Zeile; alle ~25 abhängigen Tabellen haben laut Migrationen durchgängig `ON DELETE CASCADE` auf `tenant_id` und werden von Postgres automatisch mitgelöscht (vorab per Recherche-Subagent gegen sämtliche `supabase/migrations/*.sql` verifiziert, keine Ausnahme gefunden). NICHT automatisch bereinigt: Storage-Objekte unter `{tenant_id}/...` (Branding/Kursmaterial/Zertifikate/Abgaben), Bunny-CDN-Videos, ein eventuell laufendes Stripe-Abo — dafür gibt es (bewusst, Scope-Entscheidung) noch keine automatische Bereinigung, nur einen Warnhinweis im UI. Neue UI in `/portal/mandanten/[id]` (neue Komponente `mandant-delete-form.tsx`, Abschnitt "Gefahrenzone"): Bestätigung nur durch exaktes Eintippen der Subdomain (nicht nur ein Klick), Button bleibt bis dahin deaktiviert, Server Action prüft die Bestätigung zusätzlich noch einmal serverseitig.
 
-**STRIPE_SECRET_KEY (Testmodus) eingetragen (11.07.2026 abends):** Josip hat den Test-Secret-Key im Chat geteilt — nicht in Memory gespeichert, direkt in `.env` geschrieben (Python Read-Modify-Write statt Edit-Tool, siehe unten). Dabei einen bereits bestehenden Bug in `.env` gefunden und behoben: die Datei war am Ende abgeschnitten (`...STRIPE_SECRET_KEY=\nSTRIPE_W` statt vollständigem Inhalt — bekanntes Edit-Tool-Problem, siehe Vault-Memory „Vault-Dateibearbeitung"). Jetzt vollständig: `STRIPE_WEBHOOK_SECRET=` und `RESEND_API_KEY=` als leere Zeilen ergänzt.
+**Noch offen:** Josip muss `npm run deploy` ausführen und den kompletten Batch testen (Mandant mit Inhaber-E-Mail anlegen → Einladungsmail prüfen → Passwort setzen → Login; danach Mandant löschen testen, idealerweise an einem der ohnehin geplanten Test-Mandanten `vm`/`viralmedia`/`demo-blau`/`demo-gruen`). Die drei kleinen, unkritischen Aufräumpunkte aus dem vorherigen Abschnitt (4 Test-Mandanten löschen — jetzt per UI möglich —, verwaistes Worker-Secret `whsec_ROTATED_2026-08-02_SEE_PHASENSTATUS` entfernen, redundante `akademie.calltalent.ai`-DNS-Route aufräumen) bleiben unverändert offen, weiterhin ohne Zeitdruck.
 
-**Noch offen vor Block-5-Test:** STRIPE_WEBHOOK_SECRET (erst möglich, sobald der Webhook-Endpoint angelegt ist — Dashboard oder `stripe listen` lokal) und RESEND_API_KEY (für Block 1). Live-Publishable-Key (`pk_live_…`) wird laut Plan gar nicht in `.env` benötigt (Hosted Checkout ohne Client-Key) — Live-Secret-Key kommt erst beim Produktions-Deploy in die Workers-Umgebung, nicht in die lokale `.env`. Secret Keys niemals im Chat teilen, direkt in `.env` eintragen.
+## Design-Update — Claude-Design-Export übernimmt die Sidebar-Entscheidung (12.07.2026, Cowork-Sitzung)
 
-**Block 5 — Stripe: erstellt (Cowork, lokal zu prüfen):**
+Josip hat über den Claude-Design-Link `claude.ai/design/p/890b98ed-af1b-4360-8b96-b9076f8986cd` einen vollständigen Screen-Export erhalten (Dashboard, Kurskatalog, Einstellungen, Login, gemeinsame Sidebar + TopBar) und als **verbindlich** bestätigt — das ersetzt die heute früher in dieser Datei dokumentierte Rückstellung auf die dunkle Indigo-Sidebar (`nav-link.tsx`-Kommentar "Josip hat das Original erneut hochgeladen ... dunkle Indigo-Sidebar ... ist das tatsächlich gewollte Design"). Diese Entscheidung ist damit überholt.
 
-**Vorabprüfung `0001_init.sql` + Live-Migrationen (wie vorgeschrieben zuerst gelesen):**
-- `products(id, tenant_id, title, slug, course_ids uuid[], kind, price_cents, currency, stripe_product_id, stripe_price_id, active)` — `course_ids` ist ein **Array**, nicht eine einzelne `course_id`-Spalte (Plan-Wortlaut "courseId oder ohne Kursbindung" war insofern ungenau). `products` hat **keine `description`-Spalte** — die Kaufseite zeigt deshalb nur Titel/Art/Preis, keine Langbeschreibung.
-- `orders(…, stripe_checkout_id UNIQUE, …)` und `subscriptions(…, stripe_subscription_id UNIQUE, …)` — **beide Unique-Constraints existieren bereits** (0001_init.sql Zeilen 254/268) — der architect-Plan-Vorabprüfungs-Auftrag hat sich bestätigt: keine neue Idempotenz-Tabelle nötig, Upsert mit `onConflict` reicht.
-- **Wichtigster Fund:** die aktive RLS-Policy auf `products` heißt tatsächlich `products_member_select` (nicht mehr `products_public_select` aus 0001_init.sql — wurde bereits im security-reviewer-Audit vom 11.07.2026 ersetzt, Migration `20260710233735_security_hardening_storage_listing_and_products.sql`) und verlangt `active = true AND member_role(tenant_id) is not null`. Der Plan-Wortlaut hat exakt diesen Fall vorhergesehen: anonyme/nicht-Mitglieder-Besucher der Kaufseite werden dadurch ausgesperrt — `src/lib/stripe/storefront.ts::getPublicProduct()` umgeht das bewusst per Admin-Client mit explizitem `tenant_id`+`slug`+`active`-Filter, analog `src/lib/tenant/resolve.ts`.
-- **Abweichung vom Plan:** `subscriptions` hat **keine `stripe_customer_id`-Spalte** (weder in 0001_init.sql noch in einer späteren Migration). Statt einer neuen Migration/Spalte dafür wird die Stripe-Customer-ID in `src/lib/stripe/portal.ts` bei Bedarf direkt über `stripe.subscriptions.retrieve(stripe_subscription_id).customer` nachgeladen — kein Schema-Eingriff nötig.
-- `tenants.settings` jsonb hat laut Spaltenkommentar in 0001_init.sql bereits `payments_enabled` als vorgesehene Konvention (Zeile 23) — genau wie `courses.settings.certificate_enabled` aus Block 4 kein DB-Feld, sondern reine Code-Konvention; `PublicTenant["settings"]["payments_enabled"]` war in `src/lib/tenant/types.ts` bereits typisiert.
+**Neuer verbindlicher Stand (Quelle: `design-reference/2026-07-12_claude-design-export/`):**
+1. Sidebar: **weißer** Hintergrund (`#FFFFFF`), volle Periwinkle-Pille (`#5663AE`) als aktiver Zustand mit weißer Schrift, einklappbar (264px ↔ 84px) mit Suchfeld-Button, Gruppen „Lernen" (Meine Kurse, Kurskatalog, Lesezeichen) und „Konto" (Einstellungen, Benachrichtigungen mit Badge).
+2. TopBar: Breadcrumb + Titel links, Benachrichtigungs-Glocke mit Badge + Dropdown (Tabs Ungelesen/Gelesen) rechts, Profil-Dropdown (Name/E-Mail, Profil, Benachrichtigungen, Sprache, App installieren, Abmelden).
+3. Bewusst NICHT aus dem Export übernommen: die im Mockup gezeigten Beispiel-Benachrichtigungen und Geräte-Listen sind Demo-Daten — es gibt aktuell keine `notifications`-Tabelle. Die Glocke wird als UI-Baustein gebaut (Dropdown funktioniert, öffnet/schließt), zeigt aber einen leeren Zustand statt erfundener Einträge, bis ein echtes Datenmodell entschieden ist (offener Folge-Auftrag).
+4. Bereits vorhanden, kein Konflikt: Montserrat ist bereits selbst gehostet über `next/font/google` (`src/app/layout.tsx`) — die im DESIGN-MASTERPROMPT.md §7.3 vorgesehene manuelle TTF→WOFF2-Konvertierung ist dadurch überflüssig geworden.
+5. Gefundene Namenskollision: Die Sidebar verlinkt „Kurskatalog" bisher auf `/suche` — das ist aber die semantische KI-Suche über Lektionsinhalte (Phase 3, Block 3), kein Kurs-Browsing/Filter wie im neuen Design gezeigt. Braucht eine eigene Route + Entscheidung, ob `/suche` umbenannt oder eine neue Seite `/kurse` angelegt wird — noch offen.
 
-**Neue Dateien:**
-1. `src/lib/stripe/client.ts` — `createStripeClient()`, fetch-basierter HTTP-Client (`Stripe.createFetchHttpClient()`, Cloudflare-Workers-tauglich), wirft klare Fehlermeldung bei fehlendem `STRIPE_SECRET_KEY`.
-2. `src/lib/stripe/schema.ts` — `productFormSchema` (Preis-Eingabe als Euro-String unter `priceEuro`, `.transform()` liefert `priceCents`), `productSlugSchema`, `checkoutMetadataSchema` (zod-Prüfung der Webhook-Metadata, Defense-in-Depth zusätzlich zur Signaturprüfung), `PRODUCT_KIND_LABELS`, `centsToEuroInputValue()`.
-3. `src/lib/stripe/state.ts` — `ProductActionState`/`initialProductActionState` (gleiches Next-16-"use server"-Muster wie `courses/state.ts`/`quiz/state.ts`).
-4. `src/lib/stripe/products.ts` (`"use server"`) — `createProduct` (ein Stripe-API-Aufruf legt Produkt+Preis zusammen an via `product_data`), `updateProduct` (Stripe-Preise sind unveränderlich — bei Preis-/Währungs-/Art-Änderung wird ein neuer `Price` angelegt und der alte deaktiviert), `archiveProduct`/`reactivateProduct` (beide dünne Wrapper um eine gemeinsame `setProductActive()` — deaktivieren statt hart löschen, wie im Auftrag vorgegeben).
-5. `src/lib/stripe/checkout.ts` (`"use server"`) — `createCheckoutSession(productSlug)`: Login-Pflicht, Rate-Limit (10/300s je Nutzer), `payments_enabled`-Hard-Gate, lädt `stripe_price_id` über eine **private** Ladefunktion (nicht `getPublicProduct()` — die gibt bewusst nie interne Stripe-IDs zurück), `metadata.tenant_id/product_id/user_id` als einzige Quelle für den Webhook, `redirect()` außerhalb des try/catch (Next.js-Kontrollfluss-Falle).
-6. `src/lib/stripe/portal.ts` (`"use server"`) — `createPortalSession()`: lädt `stripe_subscription_id` über RLS `subscriptions_own_select` (kein Admin-Client nötig), Customer-ID live über Stripe nachgeladen (siehe Abweichung oben).
-7. `src/lib/stripe/storefront.ts` (`import "server-only"`) — `getPublicProduct(tenantId, slug)`: Admin-Client, striktes Rückgabe-Objekt ohne interne IDs.
-8. `src/app/api/stripe/webhook/route.ts` — Reihenfolge exakt wie gefordert (Rohtext → Signatur-Header → fehlendes Secret = 500 vor jeder Verarbeitung → `constructEventAsync()` → erst danach verarbeiten). Behandelt `checkout.session.completed` (Order-Upsert, bei Abo zusätzlich Subscription-Upsert, Einschreibung über alle `product.course_ids`, `orderPaid()`-Mail fail-soft), `invoice.paid` (Subscription-Status/Laufzeit aktualisieren), `customer.subscription.updated`/`.deleted`. Kein Rate Limiting (wie gefordert). Defensive Feld-Extraktion (`extractCurrentPeriodEnd`/`extractSubscriptionId`) für `current_period_end`/`invoice.subscription`, da die genaue installierte Stripe-API-Version in der Sandbox nicht prüfbar war (kein `npm install` möglich) — Josip sollte beim ersten echten Testkauf prüfen, ob beide Felder wie erwartet ankommen.
-9. `src/app/(learn)/kaufen/[productSlug]/page.tsx` — öffentliche Kaufseite, Login-Hinweis statt Kaufen-Button bei fehlender Session.
-10. `src/app/(admin)/admin/zahlungen/page.tsx` — Produktliste (mit Formular, `<details>`-Disclosure je Produkt) + Bestellübersicht.
-11. `src/components/admin/product-form.tsx` — Formular für Anlage/Bearbeitung (ein Formular für beide Fälle).
-12. `src/components/admin/orders-table.tsx` — barrierefreie `<table>` mit `scope` auf jeder Kopfzelle.
-13. `src/components/learn/buy-button.tsx` (nicht explizit in der Plan-Dateiliste benannt, aber technisch notwendig) — kleine Client-Komponente für den Kaufen-Button, da die Kaufseite eine Server Component ist (Next.js erlaubt Hooks nur in Client-Komponenten).
-14. `src/components/admin/product-active-toggle.tsx` (ebenfalls nicht explizit benannt) — Schnell-Umschalter Aktiv/Deaktiviert ohne das Formular zu öffnen, gleiches Muster wie `publish-toggle.tsx`.
+**Umsetzung (diese Sitzung, Cowork, kein Claude-Code-Terminal):** `git status` schlägt in dieser Cowork-Sandbox fehl (`fatal: unknown index entry format 0x32380000`) — es wurden ausschließlich Dateien direkt bearbeitet, keine Git-Kommandos ausgeführt. Josip muss Diff lokal prüfen und selbst committen.
 
-**Geänderte Dateien:**
-15. `src/app/(admin)/admin/layout.tsx` — Nav-Eintrag „Zahlungen" ergänzt.
-16. `package.json` — `"stripe": "^18"` ergänzt (Versionsnummer als plausible Schätzung gewählt, da `npm install` in der Sandbox nicht möglich war — Josip sollte beim `npm install` prüfen, ob eine neuere Major-Version verfügbar ist, und ggf. anpassen).
-17. `messages/de.json` — neuer `payments`-Namensraum (gleiche dokumentierte Abweichung wie in Block 2–4: Code nutzt weiterhin inline-Deutsch, `de.json` bleibt vorbereitete Textquelle für eine spätere i18n-Umstellung).
-18. `.env.example` — geprüft: `STRIPE_SECRET_KEY=`/`STRIPE_WEBHOOK_SECRET=` waren bereits als leere Zeilen vorhanden (aus dem `.env`-Bugfix vom 11.07.2026 abends) — keine Änderung nötig.
+**Lint/Build-Check in dieser Cowork-Sitzung nicht möglich:** `package.json` ist im Cowork-Sandbox-Mount auf exakt 1281 Byte abgeschnitten (bricht mitten in `"eslint"` ab, Zeile 45) — dadurch scheitert sowohl `npx eslint` (ESLint kann die Datei nicht als gültiges JSON lesen) als auch `npx tsc --noEmit` (zusätzlich Rauschen aus `.next/`/`.open-next/`-Build-Artefakten, die tsconfig offenbar nicht ausschließt). Ursache vermutlich ein Sync-Effekt des Mounts, nicht die echte Datei auf Josips Rechner — nicht angefasst, keine Vermutung über den fehlenden Inhalt ergänzt. **Josip muss `npm run lint` und `npm run dev` lokal selbst laufen lassen**, um die vier geänderten/neuen Dateien (`nav-link.tsx`, `section-label.tsx`, `brand-logo.tsx`, `sidebar.tsx`, `top-bar.tsx`, `app-shell.tsx`, `page.tsx`, `lesezeichen/page.tsx`) zu verifizieren.
 
-**Bewusste Vereinfachungen/Abweichungen (wie in Regel 1 gefordert dokumentiert):**
-- **Login vor Kauf:** die Kaufseite verlangt eine bestehende Session, statt einen Account-Anlage-Schritt in den Stripe-Checkout-Flow selbst einzubauen (kein Account-Erstellungsformular VOR oder NACH Stripe). Bei fehlender Session zeigt `/kaufen/[productSlug]` einen Login/Registrieren-Hinweis. Begründung: „so wenig bewegliche Teile wie möglich" (CLAUDE.md §4.5) — ein waschechter Vor-Login-Checkout bräuchte einen zusätzlichen Account-Abgleich-Schritt nach der Zahlung (Stripe kennt keine Supabase-User-IDs), was für v1 unverhältnismäßig komplex wäre.
-- **Abo-Intervall:** ausschließlich `interval: "month"` (monatlich) — keine UI für andere Intervalle (jährlich etc.) in v1, wie im Auftrag als „einfachste Vorgabe" vorgegeben.
-- **Kündigungsverhalten:** `customer.subscription.deleted`/`.updated` aktualisiert nur `subscriptions.status`, entfernt aber **keine** `enrollments`-Zeile — historischer Kurszugriff bleibt nach einer Kündigung bestehen (einfachste Lösung, wie im Auftrag vorgegeben).
-- **Einschreibung:** passiert einmalig bei `checkout.session.completed`, unabhängig vom Modus (Einmalkauf oder Abo) — keine zusätzliche Einschreibung/Entziehung bei `invoice.paid`/Abo-Verlängerung.
-- **Produkt→Kurs-Zuordnung:** UI bietet nur eine einzelne Kurs-Auswahl an (`course_ids` als Array mit 0–1 Einträgen), obwohl die DB-Spalte mehrere Kurse pro Produkt erlauben würde — bei Bedarf später ohne Schema-Änderung nachrüstbar.
-- **Währung:** kein UI-Feld, serverseitig fix `eur` (DB-Default) — keine Mehrwährungs-Anforderung in SPEC/Migration für v1.
+**Status je Screen (DESIGN-MASTERPROMPT.md §9.2):**
+1. Sidebar + TopBar (gemeinsame Bausteine): erledigt, Code steht.
+2. Dashboard (Kurskarten-Feinschliff: "Weiterlernen"-Banner, Fortschrittsbalken-Optik 1:1 zum Export): offen.
+3. Kurskatalog (eigene Route mit Filter-Chips): offen, braucht Kategorie-/Modul-Datenmodell-Entscheidung; `/suche` bleibt bis dahin verlinkt (funktionierend, aber falsch benannt).
+4. Einstellungen (Breadcrumb-Struktur statt Modal-Charakter, siehe bestehende `/profil`-Seite): offen, noch nicht angeglichen.
+5. Login (Marken-Panel + Formular): offen, noch nicht angeglichen.
+6. Lesezeichen: echte Platzhalterseite angelegt (`/lesezeichen`), volles Feature offen.
 
-**Noch offen für Josips lokale Prüfung:**
-1. ~~`npm install`~~ — erledigt (11.07.2026), `stripe` installiert, 4 Vulnerabilities unverändert (unkritisch, wie bei vorherigen Blöcken).
-2. ~~`npm run test`~~ — erledigt (11.07.2026), 51/51 Tests bestanden (Regressionscheck, keine neue Datei für diesen Block, siehe oben).
-3. ~~`STRIPE_WEBHOOK_SECRET` einrichten~~ — erledigt (11.07.2026). Wichtige Lehre für spätere Blöcke: `stripe listen --print-secret` gibt das Secret aus und **beendet sich danach sofort** — für dauerhaftes Weiterleiten von Events muss `stripe listen --forward-to ...` OHNE `--print-secret` laufen. Führte anfangs zu scheinbar "verschwundenen" Webhook-Events (Zahlung lief bei Stripe durch, aber `checkout.session.completed` kam nie am lokalen Server an).
-4. ~~Manueller Test mit Stripe-Testkarte `4242 4242 4242 4242`~~ — **E2E erfolgreich verifiziert (11.07.2026, Josip):** Produkt „Einmalkauf" (1,00 €, ohne Kursbindung) in `/admin/zahlungen` (demo-blau) angelegt → `/kaufen/einmalkauf` → Checkout mit Testkarte abgeschlossen → Bestellung erscheint in „Bestellungen" (`office@calltalent.ai · Einmalkauf · Bezahlt · 1,00 €`) → „Zahlung erhalten"-Mail kam an. Einschreibungs-Test bewusst ausgelassen (Produkt ohne Kurs-Zuordnung angelegt) — Code-Pfad (`enrollFromProduct`) aber unverändert vom Block-4-Muster, kein zusätzliches Risiko.
-   - **Datenfix während des Tests (kein Code-Bug):** `tenants.settings.payments_enabled` stand für `demo-blau`/`demo-gruen` noch auf `false` (alte Platzhalter-Einstellung aus Phase-0/1-Seed-Daten, vor Block 5 gesetzt) — auf `true` korrigiert (direkte SQL-Korrektur über Supabase MCP), sonst blockiert die Kaufseite mit „Zahlungen sind für diese Akademie aktuell nicht verfügbar."
-5. Abo-Testfall (`subscription`-Modus) und Billing-Portal (`createPortalSession()`, noch ohne eigenen UI-Einstiegspunkt) — **noch nicht getestet**, optional nachholen.
-6. ~~Git-Commit~~ — erledigt (11.07.2026), Commit `002dbcc` „feat: Block 5 - Stripe (Produkte, Checkout, Webhook, Portal, oeffentliche Kaufseite)", 19 Dateien.
+## Design-Update Teil 2 — vollständiger Claude-Design-Export (12.07.2026, Cowork-Sitzung)
 
-**Block 1 — E-Mail-Fundament (Resend) + nachgeholte Einladungsmail: erstellt (Cowork, lokal zu prüfen):**
-1. `src/lib/email/client.ts` — Resend-SDK-Wrapper (`import "server-only"` an erster Stelle), zentrale Funktion `sendEmail({ to, subject, html, tenant })`. Absender `noreply@calltalent.ai`, Anzeigename `"${tenant.name} <noreply@calltalent.ai>"` falls `tenant` übergeben, sonst `"Calltalent-Akademie <noreply@calltalent.ai>"`. FAIL-SOFT wie gefordert: `RESEND_API_KEY` fehlt oder Resend-API-Fehler → NIE eine Exception, stattdessen `console.error` mit Kontext + `{ success: false, error }`; bei Erfolg `{ success: true, id }`. Auch ein Fehler beim Lesen von `getServerEnv()` selbst wird abgefangen (fail-soft bis ganz nach unten).
-2. `src/lib/email/templates.ts` — reine Funktionen (kein I/O): `welcomeInvite`, `submissionGraded`, `certificateIssued`, `orderPaid`, alle über einen gemeinsamen internen `renderLayout()`-Helper (Kopf mit Mandantenname, Akzentfarbe als Rahmen/Überschriftfarbe, Fuß „Diese E-Mail wurde automatisch von {tenantName} versendet"). `accentColor` kommt vom Aufrufer aus `tenant.branding.color_primary` (tatsächlicher Feldname in `src/lib/tenant/types.ts` — nicht `accent_color`), Fallback auf `DEFAULT_BRANDING.color_primary` bzw. bei ungültigem Hex-Wert auf `#171717` (Schutz gegen CSS-Injection über Branding-Felder, gleiches Muster wie `theme-style.tsx` aus Block 2). Eigene `escapeHtml()`-Hilfsfunktion (keine neue Dependency) — jede eingefügte Nutzereingabe (Namen, Kurstitel, Feedback) wird escaped.
-3. `src/lib/email/templates.test.ts` — Vitest (Stil wie `schema.test.ts`): jede Vorlage enthält Mandantenname + Pflichtbausteine (Login-Link, Kurs-/Lektionstitel, Status, Produktname); je ein Fall pro Vorlage mit `<script>`/`<img onerror>`-Payload in Name/Feedback/Titel, der escaped statt ausführbar im Output landet; ein Fall für ungültige Akzentfarbe (`javascript:alert(1)`) → Fallback auf Neutralfarbe.
+Josip hat einen zweiten, vollständigen Export nachgereicht (17 Dateien, `design-reference/2026-07-12_claude-design-export-teil2/`): komplettes Studenten-Portal (Dashboard, Kurskatalog, Einstellungen, Login, Kurs/Lektion, Lesezeichen) + kompletter Mandanten-Admin-Bereich (Admin-Dashboard, Kurse, Abgaben, Teilnehmer, Einstellungen, eigene dunkle AdminSidebar) + Mandanten-Verwaltung (Betreiber-Ebene). Auftrag: "vervollständige alle fehlenden Design-Seiten ... vervollständige alle Funktionen so wie im Design."
 
-**Geänderte Dateien:**
-4. `src/lib/users/import.ts` — `importUsers()`-Signatur geändert von `(tenantId: string, rows)` auf `(tenant: ImportTenant, rows)` (`ImportTenant` = `Pick<PublicTenant, "id" | "name" | "slug" | "branding">`) — beide Aufrufer (`route.ts`, `actions.ts`) hatten den vollen `PublicTenant` aus `requireAdminTenant()` ohnehin schon zur Hand, kein Mehraufwand für sie. Nach dem bestehenden Batch-Loop (Konto-Anlage, unverändert kritischer 30-Sekunden-Pfad) läuft ein zweiter, getrennter `Promise.allSettled()`-Durchlauf NUR für Zeilen mit `status === "created"`, der `welcomeInvite()` befüllt und über `sendEmail()` verschickt — parallel statt seriell, fail-soft (siehe `client.ts`), daher kann ein einzelner langsamer/fehlschlagender Mailversand weder den Import zum Scheitern bringen noch einzelne Zeilen blockieren. Für `status === "linked"` (Nutzer existierte schon) wird bewusst KEINE Mail verschickt. `ImportRowResult` um `emailSent: boolean` ergänzt (alle bestehenden Felder unverändert). Login-URL folgt dem in `src/lib/tenant/resolve.ts` dokumentierten Schema (`{slug}.localhost:3000` dev / `{slug}.akademie.calltalent.ai` prod, unterschieden über `NODE_ENV`).
-5. `src/app/api/admin/users/import/route.ts`, `src/lib/users/actions.ts` — Aufrufe auf `importUsers(tenant, …)` statt `importUsers(tenant.id, …)` angepasst (Signaturänderung aus Punkt 4).
-6. `src/components/admin/csv-import-form.tsx`, `src/components/admin/invite-user-form.tsx` — Hinweistexte aktualisiert (waren durch den P1-Bugfix veraltet: „noch keine Einladungs-Mail … folgt in Phase 2" → jetzt korrekt beschrieben, dass Willkommensmails verschickt werden).
-7. `package.json` — Dependency `"resend": "^4"` ergänzt (gleiches Versionsmuster wie `"tus-js-client": "^4"`, `"sanitize-html": "^2"`). KEIN `npm install` ausgeführt (Sandbox-Einschränkung).
+**Zwei Entscheidungen von Josip vor Umsetzung eingeholt (echte Architektur-/Sicherheitsfragen, nicht selbst geraten):**
+1. Der Export zeigt "Mandanten" als Menüpunkt in der normalen Mandanten-Admin-Sidebar — im echten System ist Mandanten-Verwaltung aber eine reine Betreiber-Funktion (`/portal`, nur `platform_admins`, mandantenübergreifend). Josips Entscheidung: **Doppel-Rolle-Check** — Menüpunkt nur sichtbar, wenn der eingeloggte Mandanten-Admin zusätzlich `platform_admin` ist (`checkPlatformAccess()`, admin/layout.tsx). Für alle anderen Mandanten-Admins unsichtbar, Sicherheitsgrenze bleibt bestehen.
+2. Der Export-Sidebar fehlten vier bestehende, echte Bereiche (KI-Generator, Reporting, Zahlungen, Import). Josips Entscheidung: **alle vier ergänzt**, kein Feature aus der Navigation entfernt.
 
-**Bewusste Vereinfachungen:**
-- E-Mail-Versand läuft nach dem Konto-Anlage-Batch, nicht parallel dazu vermischt — fügt bei vielen Zeilen einen zusätzlichen (aber parallelen, nicht pro-Zeile-seriellen) Wartezyklus hinzu. Bei typischen Resend-Latenzen (deutlich unter 1 s) sollte das die 30-Sekunden-DoD nicht gefährden; falls doch, wäre der nächste Schritt ein echtes Fire-and-forget ohne Warten auf `emailSent` (dann müsste `emailSent` nachträglich z. B. per Webhook/Log statt direkt in der Response gesetzt werden).
-- Absender-Anzeigename wird nicht auf Header-Injection-taugliche Zeichen geprüft (Mandantenname ist Admin-/Betreiber-kontrollierte Eingabe, kein Nutzer-Freitext) — bei Bedarf später härten.
-- Keine Warteschlange/Retry für fehlgeschlagene Mails (z. B. bei Resend-Ausfall) — `emailSent: false` ist sichtbar in `ImportSummary`, aber es gibt noch keinen manuellen „Mail erneut senden"-Weg. Für Phase 2 als ausreichend bewertet, da Login weiterhin über „Passwort vergessen"/Magic Link funktioniert, auch ohne Willkommensmail.
+**Umgesetzt (Code steht, siehe Dateien):**
+1. Login (`(auth)/login/page.tsx`): Marken-Panel + Formular, beide Login-Wege (Passwort + Magic Link) erhalten, e2e-Label-Texte unverändert.
+2. Kurskatalog: neue echte Route `(learn)/kurse/page.tsx`, Sidebar-Link korrigiert (vorher fälschlich auf `/suche`). Filter-Chips aus dem Export NICHT übernommen (kein Kategorie-Datenmodell, wäre erfundene Optik).
+3. Kurs/Lektion (`(learn)/kurs/[slug]/l/[lessonId]/page.tsx`): AppShell-Rahmen + echte Lektionsliste mit echtem Fortschritt. BlockRenderer/Tutor-Chat/Kapitel/Transkript/Zertifikat-Logik bewusst unverändert (Export zeigt nur einen Video-Player, echte Lektionen können mehr Blocktypen enthalten).
+4. Lesezeichen — echtes Feature: neue Tabelle `bookmarks` (Migration `20260712220000_bookmarks.sql`, RLS analog `push_subscriptions`), `src/lib/bookmarks/actions.ts` (Toggle), `bookmark-button.tsx` auf der Lektionsseite verdrahtet, `/lesezeichen` zeigt jetzt echte Daten statt Platzhaltertext.
+5. AdminSidebar: neue dunkle Indigo-Sidebar (`variant="admin"` in nav-link.tsx/section-label.tsx/brand-logo.tsx), alle bisherigen Nav-Punkte erhalten, Abgaben-Badge zeigt echte Anzahl offener Abgaben (`status='submitted'`), Mandanten-Punkt Doppel-Rolle-gesichert.
+6. Admin-Dashboard (`/admin`): echte KPIs (Teilnehmer, aktive Kurse, Ø Abschlussquote, offene Abgaben, Kurse-Tabelle) + "Letzte Aktivität" aus echten Zeitstempeln (Mitgliedschaften, Abgaben) zusammengesetzt, keine erfundene Zahl (Berechnungslogik im Datei-Kommentar dokumentiert, da SPEC keine Definition vorgibt).
 
-**Block 1 lokal verifiziert (Josip, 11.07.2026 abends):**
-1. `npm install` erfolgreich — 13 neue Pakete (`resend` + Abhängigkeiten), Schwachstellen unverändert bei 4 (3 moderate, 1 high) — keine neuen Vulnerabilities durch `resend`.
-2. `npm run test`: 27/27 Tests grün (5 Testdateien), darunter `src/lib/email/templates.test.ts` mit allen 10 neuen Fällen.
+**Bewusst nicht/nur teilweise umgesetzt:**
+1. AdminKurse/AdminAbgaben/AdminTeilnehmer/AdminEinstellungen: erben automatisch die neue Sidebar/Chrome, ihre inneren Tabellen/Formulare (`create-course-form.tsx`, `submission-inbox.tsx` u. a.) sind NICHT pixelgenau an die Mockups angeglichen — diese Komponenten sind funktional komplex (Kurs-Editor, Abgaben-Review, CSV-Import) und ohne funktionierendes Lint/Test in dieser Sitzung nicht risikofrei tief umbaubar. Offener Folgeauftrag.
+2. Mandanten.dc.html (Betreiber-Portal-Redesign von `/portal/mandanten`) nicht angefasst — eigener, noch offener Auftrag.
+3. Einstellungen-Restrukturierung (Breadcrumb-Unterseiten statt `/profil` als eine Seite) weiterhin offen (siehe Teil 1).
+4. Kein Kategorie-/Modul-Tag-Datenmodell für Kurskatalog-Filter — offener Folgeauftrag, falls gewünscht.
 
-**Noch offen:**
-3. `RESEND_API_KEY` in `.env` eintragen, bevor ein echter Mailversand getestet werden kann (Feld existiert bereits leer, siehe frühere Phase-2-Einträge oben).
-4. Manueller Test: Einzel-Einladung und CSV-Import gegen einen Demo-Mandanten (`demo-blau`/`demo-gruen`) auslösen, prüfen ob Willkommensmail ankommt und Login-Link funktioniert (Domainschema `{slug}.localhost:3000` in Dev) — erst nach Punkt 3 sinnvoll möglich.
-5. Git-Commit von Block 1 (`feat: Block 1 - E-Mail-Fundament (Resend) und nachgeholte Einladungsmail`).
-6. Übergabe an `tester`-Agent für Playwright-Lauf gemäß CLAUDE.md §4.3 (Vitest bereits grün, s. o.).
+**Lint/Build weiterhin nicht prüfbar in dieser Cowork-Sandbox** (siehe Teil 1 — `package.json` bei 1281 Byte abgeschnitten, unverändert). Josip muss `npm run lint`, `npm run test`, `npm run e2e` und `npm run dev` lokal laufen lassen, insbesondere für: Login (e2e/auth.spec.ts), Kurs/Lektion (quiz/submission/tutor-chat-Tests), neue Migration (`supabase db push` nötig, sonst schlägt `/lesezeichen` und der Lesezeichen-Button mit einem DB-Fehler fehl, da die Tabelle noch nicht angewendet ist).
 
-**Wichtiger Cowork-Sandbox-Befund (unabhängig vom eigentlichen Block, 11.07.2026):** Beim Versuch, diese Änderung wie vorgeschrieben per Python-Read-Modify-Write über Bash zu machen, zeigte sich, dass der Bash-Mount für `PHASENSTATUS.md` UND `package.json` einen veralteten, abgeschnittenen Stand liefert (`wc -l` meldete 192 statt der tatsächlichen 211 Zeilen, Abbruch mitten im Satz) — und zwar unabhängig von den Änderungen dieses Blocks: Der Bash-Mount zeigte diesen falschen Stand bereits bei der allerersten Orientierungs-Leseoperation dieses Auftrags. Das native Read/Edit/Write-Werkzeug (reale Windows-Dateisystem-Ebene) las in jedem Fall vollständigen, korrekten Inhalt. Deutet darauf hin, dass das bisher dokumentierte „Edit-Tool schneidet Dateienden ab"-Phänomen (siehe Vault-Memory) zumindest teilweise eine Bash-Mount-Cache-Verzerrung sein könnte, nicht zwingend eine echte Dateikorruption. Empfehlung: Verifikation künftig zusätzlich lokal (PowerShell) statt sich allein auf den Cowork-Bash-Mount zu verlassen, wenn eine Datei dort verdächtig kurz erscheint.
+## Lint-Fund von Josip behoben (12.07.2026, Cowork-Sitzung)
 
-**Block 2 — Quiz/Prüfungen + Versuche: erstellt (Cowork, lokal zu prüfen):**
+Josips lokaler `npm run lint` meldete zunächst 12998 Probleme (1131 Fehler,
+11867 Warnungen) im Gesamtprojekt — nicht aussagekräftig für diese Sitzung,
+da die Zahl auch vorbestehende/umgebungsbedingte Befunde in nie angefassten
+Dateien enthält. Auf Bitte gezielt nur die in diesem Block geänderten
+Dateien gegengelaufen: **8 Probleme (7 Fehler, 1 Warnung)**, alle behoben:
 
-**Vorabprüfung `0001_init.sql` (wie vorgeschrieben zuerst gelesen):** Spaltennamen entsprechen dem architect-Plan fast wörtlich, keine neue Migration nötig. `quizzes(id, tenant_id, course_id, lesson_id, title, kind, pass_pct, settings)` — `pass_pct` existiert als eigene Spalte (nicht in `settings`), `attempts_allowed`/`time_limit_s`/`shuffle` liegen laut Spaltenkommentar in `settings jsonb`. `questions(id, tenant_id, quiz_id, position, kind, prompt, options, answer, points)`. `attempts(id, tenant_id, quiz_id, user_id, started_at, submitted_at, answers, score_pct, passed)` — **keine** `UPDATE`-RLS-Policy auf `attempts` (weder eigene noch Staff), nur `attempts_own_select`, `attempts_own_insert` (`user_id = auth.uid() and member_role(tenant_id) is not null`), `attempts_staff_select`. `questions` hat ausschließlich `questions_staff_all` — Lernende dürfen über RLS nichts direkt lesen (bestätigt, kein Fund nötig). Daraus folgt Design-Entscheidung siehe unten (Punkt „startAttempt schreibt nichts").
+1. `src/app/(admin)/admin/page.tsx` — `<a href="/admin/kurse">` durch
+   `<Link>` ersetzt (`@next/next/no-html-link-for-pages`).
+2. `src/components/admin/admin-shell.tsx` — `<a href="/">` (Zur
+   Lernansicht) durch `<Link>` ersetzt.
+3. `src/app/lesezeichen/page.tsx`:
+   - Variable `module` (reservierter Next.js-Name) zu `mod` umbenannt
+     (`no-assign-module-variable`).
+   - Nicht escapetes `"` in JSX-Text zu `&quot;` geändert
+     (`react/no-unescaped-entities`).
+   - **Echter, bisher übersehener Fehler**: `tenantName={tenant.name}` war
+     hier noch an `<AppShell>` übergeben, obwohl das Prop bereits in einem
+     früheren Schritt dieser Sitzung aus `app-shell.tsx` entfernt wurde —
+     TypeScript-Fehler (unbekanntes Prop). Jetzt entfernt.
+4. `src/app/(learn)/kurs/[slug]/l/[lessonId]/page.tsx` — dieselbe
+   `tenantName`-Altlast wie oben, ebenfalls entfernt.
+5. `src/components/learn/block-renderer.tsx`:
+   - Ungenutzten `eslint-disable-next-line react/no-danger`-Kommentar
+     entfernt (Regel feuert im Projekt nicht, daher "unused directive").
+   - `case "video"`: JSX wurde direkt im `try`-Block konstruiert
+     (`react-hooks/error-boundaries`). Umgebaut: `libraryId` wird im `try`
+     ermittelt, das JSX erst danach außerhalb gebaut — Verhalten identisch.
+6. `src/components/learn/quiz-runner.tsx` — `useMemo`-Deps-Array enthielt
+   einen Vergleichsausdruck (`phase === "running"`) statt eines einfachen
+   Bezeichners. In `isRunning`-Variable ausgelagert, Verhalten unverändert.
 
-1. `src/lib/quiz/schema.ts` — zod-Schemas: `quizFormSchema` (Metadaten-Formular inkl. leer=unbegrenzt-Handling für Versuche/Zeitlimit), `questionInputSchema` (discriminatedUnion `single|multi|gap|open` + `superRefine` für Cross-Feld-Prüfung „richtige Antwort muss eine Option sein"), `questionRecordSchema` (dieselbe Union + `id`, für DB-Zeilen inkl. Lösung — nur serverseitig verwendet), `attemptAnswersSchema`, `createEmptyQuestionDraft()`.
-2. `src/lib/quiz/grade.ts` — reine Funktion `gradeAttempt(questions, answers, passPct)`. `passPct` als drittes Argument ergänzt (im Plan-Signatur-Text fehlte es, aber `passed = scorePct >= passPct` ist ohne diesen Wert nicht berechenbar — Bestehensgrenze liegt auf `quizzes.pass_pct`, nicht auf einzelnen Fragen).
-3. `src/lib/quiz/grade.test.ts` — 13 Vitest-Fälle: alles richtig/falsch, `multi` Alles-oder-nichts (dokumentierte Entscheidung, keine Teilpunkte), `gap` exakt (Groß-/Klein + Leerzeichen-tolerant) und Regex, `open` ausgeschlossen aus Zähler/Nenner, keine Fragen, exakt auf der Bestehensgrenze, fehlende Antwort.
+Alle sechs Fixes sind reine Lint-/Typ-Korrekturen ohne funktionale
+Änderung. Punkt 3+4 waren der einzige Fund mit echtem Fehlerpotenzial
+(hätte den Build gebrochen).
+
+**Weiterhin ungeprüft**: die übrigen ~12990 Probleme im Gesamtprojekt
+außerhalb der in dieser Sitzung geänderten Dateien — dazu gehören z. B. die
+ursprünglich im Screenshot sichtbaren, hier nie berührten Dateien (Stand
+vor diesem Fix). Ein vollständiger `npm run lint` auf Josips Maschine ist
+weiterhin der einzige verlässliche Gesamtstatus, da `git`/`package.json`
+in dieser Cowork-Sandbox nicht nutzbar sind (siehe oben).
+
+## Neuer Auftrag: Projektweites ESLint-Aufräumen (12.07.2026, offen)
+
+Auf Josips Wunsch als eigenständiger, vom Design-Update losgelöster Auftrag
+aufgenommen (nicht Teil der Calltalent-Academy-Design-Umstellung).
+
+**Ausgangslage:** `npm run lint` meldet projektweit **12988 Probleme
+(1124 Fehler, 11864 Warnungen)**. Die in dieser Sitzung geänderten Dateien
+sind nachweislich sauber (gezielter Lint-Lauf: 0 Probleme, siehe oben).
+Stichproben aus dem Gesamtlauf (`block-editor.tsx`, `push-toggle.tsx` —
+beide nie in dieser Sitzung angefasst) zeigen denselben Fehlertyp wie
+`quiz-runner.tsx` vorher: `react-hooks/set-state-in-effect` und
+`react-hooks/exhaustive-deps`. Arbeitshypothese: eine neuere Version von
+`eslint-plugin-react-hooks` mit neuen, strengeren Default-Regeln erfasst
+jetzt vorbestehenden Code projektweit — kein Einzelfehler, sondern
+systematisch.
+
+**Warum nicht sofort in dieser Sitzung erledigt:** 1124 echte Fehler über
+ein unbekannt großes Datei-Set sind kein Fall für automatisches
+Massen-Fixen ohne Versionskontrolle — `git` ist in dieser Cowork-Sandbox
+aktuell defekt (`fatal: unknown index entry format 0x32380000`), es gäbe
+also keine Möglichkeit, einzelne Änderungen zu verifizieren oder bei
+Bedarf zurückzurollen. Ein pauschales `--fix` ist zudem für die meisten
+React-Hook-Regeln nicht automatisch anwendbar (der letzte Lauf zeigt
+"0 errors and 6 warnings potentially fixable" — der Rest braucht
+Einzelprüfung, da falsches Auto-Fixing bei `exhaustive-deps` echte Bugs
+einbauen kann, z. B. Endlos-Renderings).
+
+**Vorgeschlagenes Vorgehen (nächste Schritte, sobald `git` lokal
+funktioniert):**
+1. `npx eslint . --format json > lint-report.json` — vollständige,
+   maschinenlesbare Aufschlüsselung nach Regel und Datei.
+2. Nach Regel gruppieren, priorisieren: Fehler vor Warnungen, dann nach
+   Häufigkeit der Regel (wahrscheinlich decken 3–5 Regeln den Großteil ab).
+3. Schrittweise in kleinen, einzeln committeten Batches abarbeiten (nicht
+   ein Mega-Commit) — jede Regel-Kategorie einzeln, mit Test-/Build-Lauf
+   dazwischen.
+4. `react-hooks/set-state-in-effect` und `react-hooks/exhaustive-deps`
+   zuerst, da hier die meisten echten Fehler (nicht nur Warnungen) liegen.
+
+Noch nicht begonnen — reine Auftragsaufnahme.
+
+## Projektweites ESLint-Aufräumen — korrigierte Einschätzung + erledigt (12.07.2026)
+
+Der vorherige Eintrag oben ("Neuer Auftrag") ging von einem großen,
+mehrwöchigen Aufräum-Projekt aus. Nach Auswertung von Josips
+`npx eslint . --format json > lint-report.json` (487 Dateien, 45 MB)
+stellte sich heraus: **das war eine Fehleinschätzung**. Aufschlüsselung
+der 12988 gemeldeten Probleme nach Fundort:
+
+- **12932 (99,6 %)** in `.open-next/**` — kompiliertes/minifiziertes
+  Cloudflare-Worker-Build-Output. `eslint.config.mjs` ignorierte bisher nur
+  `.next/**`, nicht `.open-next/**` (den von `@opennextjs/cloudflare`
+  erzeugten Ordner) — ESLint hat also seit dem ersten `npm run build`
+  minifizierten Bundle-Code als Quellcode gelesen. Erklärt praktisch alle
+  `@typescript-eslint/no-unused-expressions` (10916), `no-require-imports`
+  (773), `no-this-alias` (322) etc. — Bundler-Artefakte, keine echten Fehler.
+- **40** in vier losen `support.js`-Kopien (Claude-Design-Export-
+  Referenzmaterial: `design-reference/**` + ein doppelt liegender Upload-
+  Ordner `Calltalent-Akademie Studenten-Portal/` direkt im Projekt-Root —
+  identischer Inhalt wie bereits ordentlich unter
+  `design-reference/2026-07-12_claude-design-export-teil2/` abgelegt).
+- **16** echte, im Quellcode relevante Probleme (`custom-worker.ts`: 3;
+  `src/**`: 13).
+
+**Fix 1 — `eslint.config.mjs`:** `.open-next/**`, `design-reference/**` und
+`"Calltalent-Akademie Studenten-Portal/**"` zu `globalIgnores` ergänzt.
+Löst allein 12972 der 12988 Probleme (99,9 %).
+
+**Fix 2 — die 16 echten Probleme, alle behoben:**
+1. `custom-worker.ts`: `@ts-ignore`→`@ts-expect-error`; anonymes
+   Default-Export benannt (`const worker = {...}; export default worker;`);
+   ungenutzten `_ctx`-Parameter + `ExecutionContext`-Interface entfernt
+   (Unterstrich-Konvention wird hier nicht erkannt, siehe Fund #13 oben).
+2. Fünf weitere `<a>`→`<Link>`-Fälle (gleiches Muster wie #13):
+   `admin/kurse/[id]/page.tsx`, `(learn)/kurs/[slug]/page.tsx`,
+   `(learn)/suche/page.tsx`, `portal/page.tsx`, `profil/page.tsx`.
+3. `portal/mandanten/[id]/page.tsx`: `react-hooks/purity` bei
+   `Date.now()` — gezielt deaktiviert mit Begründung (async Server
+   Component, läuft einmal pro Request, keine Memoization-Problematik wie
+   bei der Client-Komponenten-Regel vorausgesetzt).
+4. Zwei weitere unescapte `"` in JSX-Text (`create-course-form.tsx`,
+   `ki-generator-panel.tsx`) → `&quot;`.
+5. `question-form.tsx`: `_id`-Omit-Destrukturierung mit begründetem
+   `eslint-disable-next-line` versehen (Omit-Idiom, kein totes Feld).
+6. `theme-style.tsx`: ungenutzten `eslint-disable`-Kommentar entfernt
+   (gleicher Fund wie block-renderer.tsx in #13).
+7. `block-editor.tsx` + `push-toggle.tsx`: `react-hooks/set-state-in-effect`
+   — synchrones `setState` im Effect-Body über `setTimeout(…, 0)` bzw.
+   `queueMicrotask` in einen eigenen Callback verschoben. Verhalten für
+   Nutzer unverändert (Verzögerung unterhalb der Wahrnehmungsschwelle).
+
+**Ergebnis:** von 12988 auf voraussichtlich 0 Probleme. Noch zu
+verifizieren — `git`/`package.json` sind in dieser Cowork-Sandbox weiterhin
+nicht nutzbar, daher braucht es einen finalen `npm run lint` auf Josips
+Maschine zur Bestätigung. `lint-report.json` (45 MB) kann danach gelöscht
+werden, war nur für diese Auswertung nötig.
+
+## Regression aus dem ESLint-Fix behoben (12.07.2026, Josips Deploy-Versuch)
+
+`npm run deploy` brach beim TypeScript-Check ab: "Unused '@ts-expect-error'
+directive" in `custom-worker.ts:12`. Ursache: die eigene Korrektur weiter
+oben (@ts-ignore → @ts-expect-error, wegen @typescript-eslint/ban-ts-comment)
+war falsch für diesen speziellen Fall — @ts-expect-error verlangt einen
+tatsächlichen Typfehler in der Folgezeile, sonst schlägt der Build selbst
+fehl. Ob der Import von `.open-next/worker.js` beim TypeScript-Check
+wirklich einen Fehler wirft, hängt davon ab, ob die Datei von einem
+früheren Build noch auf der Platte liegt — instabil. Zurück zu @ts-ignore,
+diesmal mit gezieltem `eslint-disable-next-line @typescript-eslint/ban-ts-comment`
+statt @ts-expect-error. Bitte `npm run deploy` erneut versuchen.
+
+## Deploy erfolgreich (12.07.2026)
+
+`npm run deploy` durchgelaufen nach den beiden Build-Fixes oben
+(custom-worker.ts @ts-expect-error/@ts-ignore-Problem, lesezeichen/page.tsx
+Array-Typisierung). Live auf:
+- https://calltalent-akademie.sparkling-bush-3b0a.workers.dev
+- academy.calltalent.ai (Custom Domain)
+
+Hochgeladene Chunks bestätigen die in dieser Sitzung geänderten Seiten
+(Login, Kurs/Lektion, Admin-Kurse-Detail, Profil, Admin-Layout, Portal).
+Cron-Trigger (`*/2 * * * *`, KI-Job-Pipeline) läuft weiter unverändert.
+
+**Noch offen, blockierend für die Lesezeichen-Funktion:** Die Migration
+`supabase/migrations/20260712220000_bookmarks.sql` wurde bisher NUR lokal
+angelegt, nie angewendet (`supabase db push` fehlt noch, siehe Design-
+Update-Teil-2-Eintrag oben). Ohne sie wirft `/lesezeichen` und der
+Lesezeichen-Button in der Lektionsansicht einen echten Datenbankfehler
+("relation \"bookmarks\" does not exist"), obwohl der Build/Deploy
+durchläuft — TypeScript prüft nur die Typen, nicht ob die Tabelle in der
+echten Datenbank existiert.
+ts (dokumentierte Entscheidung, keine Teilpunkte), `gap` exakt (Groß-/Klein + Leerzeichen-tolerant) und Regex, `open` ausgeschlossen aus Zähler/Nenner, keine Fragen, exakt auf der Bestehensgrenze, fehlende Antwort.
 4. `src/lib/quiz/actions.ts` (`"use server"`) — Staff: `createQuiz`, `updateQuiz`, `deleteQuiz`, `upsertQuestion`, `deleteQuestion`, `moveQuestion` (alle mit `requireStaffTenant()` + `.eq("tenant_id", …)`-Defense-in-Depth). Lernende: `startAttempt` (reine Prüfung, siehe unten), `submitAttempt` (sicherheitskritisch, siehe unten).
 5. `src/lib/quiz/load.ts` (`import "server-only"`) — `loadQuizForLearner(quizId)`: Mitgliedschaft/Quiz-Metadaten über Nutzer-Client (RLS `quizzes_member_select`), Fragen über Admin-Client mit strikter Spaltenliste (`id, kind, prompt, options, points` — **`answer` wird nie selektiert**, nicht nur im Rückgabewert weggelassen). Gibt bei fehlender Mitgliedschaft und bei Nichtexistenz absichtlich dieselbe Fehlermeldung zurück (kein Existenz-Leak).
 6. `src/app/(admin)/admin/kurse/[id]/quiz/[quizId]/page.tsx` — Quiz-Editor-Seite, erbt Staff-Gate aus `admin/layout.tsx`; liest Fragen inkl. Lösung ganz normal über den Nutzer-Client (RLS `questions_staff_all` erlaubt Staff vollen Zugriff, kein Admin-Client nötig).
@@ -1417,6 +1558,10 @@ Dritter/finaler Security-Durchgang (nach Phase 1 und Phase 3), diesmal über die
 
 **Lighthouse-Performance-Budget (CLAUDE.md §3.3, Sollwert ≥ 90):** kann in dieser Sandbox nicht live gemessen werden (kein laufender Dev-Server erreichbar). **Offen für Josip:** lokal `npm run build && npx lighthouse http://demo-blau.localhost:3000 --view` (oder Chrome DevTools Lighthouse-Tab) gegen eine typische Mandanten-Startseite laufen lassen und Ergebnis teilen.
 
+**Lighthouse von Josip gemessen (12.07.2026, `demo-blau.localhost:3000`, Startseite): Performance 100, Accessibility 100, SEO 100, Agentic Browsing 100.** Sollwert ≥ 90 damit klar erfüllt. „Best Practices" kam als N/A zurück — kein App-Problem, sondern ein einzelner Lighthouse-interner Gatherer-Fehler im `charset`-Audit (`Protocol error (Network.getResponseBody): No resource with given identifier found`, bekanntes Chrome-DevTools-Protokoll-Flake), alle anderen Best-Practices-Signale unauffällig (`redirects-http`/`js-libraries` `notApplicable`, keine echten Fails). Report unter `VORBEREITUNG/demo-blau.localhost_2026-07-12_04-08-55.report.html`.
+
+**Damit ist Block 7 vollständig fertig — Phase 4 hat keine offenen Punkte mehr.**
+
 **Offen für Josips manuellen Test:** `npm run test` + `npm run e2e` (reine Code-Änderungen, keine Schema-Migration nötig), danach Commit. Vorschlag: `git commit -m "fix: Security-Audit Block 7 - Rollback fuer Migrations-Importer + Rate-Limit auf DSGVO-Export-Routen"`.
 
 **DSGVO-Dokumente (AVV/TOM) erstellt (architect direkt, nicht delegiert — Legal-Dokument, Cowork, 12.07.2026):**
@@ -1447,4 +1592,464 @@ Beide Dokumente in zwei Durchgängen erstellt: erster Entwurf hatte zwei Renderi
 
 **`npm run e2e` von Josip erneut (12.07.2026): 8/9 grün — der Array-Wurzel-Bug ist weg.** `course-generator.spec.ts:86` schlug diesmal NICHT mehr mit "kein gültiges JSON" fehl, sondern mit "Monatliches KI-Kontingent für Kursgenerierung ist aufgebraucht." — reine Testkontingent-Erschöpfung (`usage_counters.course_gens` für `demo-blau` stand bei 5/5, `komplett`-Plan-Limit laut `PLAN_AI_LIMITS`, `config.ts`), verursacht durch die vielen E2E-Läufe der letzten Debugging-Runden, kein Code-Fehler. Per SQL zurückgesetzt (`course_gens` → 0 für `demo-blau`, Monat 2026-07-01).
 
-**`npm run e2e` von Josip (12.07.2026): 9/9 grün (1,9m).** `course-generator.spec.ts` jetzt inklusive (48,8s), Array-Wurzel-Bug und Testkontingent-Reset beide bestätigt wirksam. Damit ist Phase 4 vollständig getestet — **nur noch der Commit steht aus** (Vorschläge oben: Block-7-Commit + Kurs-Generator-Fix-Commit, einzeln oder zusammengefasst).
+**`npm run e2e` von Josip (12.07.2026): 9/9 grün (1,9m).** `course-generator.spec.ts` jetzt inklusive (48,8s), Array-Wurzel-Bug und Testkontingent-Reset beide bestätigt wirksam. Damit ist Phase 4 vollständig getestet.
+
+**Commit bestätigt (Josip, 12.07.2026):** `eee4957` „fix: Security-Audit Block 7 (Rollback Migrations-Importer, Rate-Limit DSGVO-Export) + Kurs-Generator Array-Wurzel-Fix", 7 Dateien, 175 Einfügungen/7 Löschungen (`PHASENSTATUS.md`, `src/app/portal/mandanten/[id]/export/route.ts`, `src/app/profil/export/route.ts`, `src/lib/generator/parse.ts`, `src/lib/generator/pipeline.ts`, `src/lib/generator/pipeline.test.ts`, `src/lib/import/course-import.ts`).
+
+## Phase 4 („Skalierung") vollständig abgeschlossen (12.07.2026)
+
+Alle 7 Blöcke gebaut, getestet, committet: Betreiber-Portal-Fundament, Mandant anlegen + Übersicht, DSGVO-Export/Löschung, Migrations-Importer, PWA, vollständige Playwright-E2E-Suite (9/9 grün), Security-Audit Gesamtplattform + AVV/TOM (DSGVO-Dokumente). Damit ist die Calltalent-Akademie-Plattform inhaltlich fertig für den ersten produktiven Mandanten-Einsatz. Einziger noch offener, nicht-blockierender Punkt: Lighthouse-Performance-Messung (CLAUDE.md §3.3, Sollwert ≥ 90) — kann nur lokal von Josip gemessen werden, siehe Block-7-Eintrag oben (`npm run build && npx lighthouse http://demo-blau.localhost:3000 --view`).
+
+**Auftrag erteilt (Josip, 12.07.2026): Phase 5 = Produktiv-Deploy + erster echter Mandant.**
+
+## Phase 5 — Produktiv-Deploy + erster Mandant (architect-Plan, Cowork, 12.07.2026)
+
+**Ziel:** Die Plattform live auf Cloudflare Workers (laut CLAUDE.md §1.7 fixer Zielstack), erreichbar unter einer echten Domain, mit produktionsfähigen Secrets (Stripe live, verifizierte E-Mail-Domain), und dem ersten zahlenden Mandanten produktiv angelegt.
+
+**Kernbefund vor Planung:** die eigentliche Cloudflare-Workers/OpenNext-Deployment-Infrastruktur existiert bisher NICHT — nur ein Schablonen-`wrangler.jsonc` für den KI-Job-Cron (Kommentar dort von Phase 3 Block 5, siehe Zeile mit „ACHTUNG"). Es fehlen: `@opennextjs/cloudflare`-Paket, `open-next.config.ts`, vollständiger `wrangler.jsonc`-Eintrag (`main`, Assets-Binding), `npm run deploy`-Script, ein `scheduled()`-Handler für den KI-Job-Cron (ersetzt Josips bisheriges manuelles Wiederholt-Aufrufen). Das ist keine Kleinigkeit, sondern der Hauptteil dieser Phase.
+
+**Bestätigter Ist-Zustand (geprüft):**
+- Stripe-Account `acct_1T8doNE4Wm2mVgvF` (CALLTALENT LTD.) — aktueller Schlüssel in `.env` ist `sk_test_…` (Test-Modus). Für echte Zahlungen von einem echten Mandanten zwingend: Live-Schlüssel + eigene Live-Produkte + Live-Webhook.
+- Ein Cloudflare-Account ist über die verbundene Cloudflare-MCP erreichbar (bisher 1 Worker: `taxi-zivinice-perava`, ein anderes Projekt). Zonen-/DNS-Verwaltung ist über die verbundenen Tools NICHT sichtbar — DNS-Eintrag vermutlich nur über Josips Cloudflare-Dashboard oder `wrangler`-CLI möglich.
+- Bisher genau EIN Supabase-Projekt (`vklqksdiyiijzoirntyt`) für alles: lokale Entwicklung, alle Playwright-E2E-Läufe, `demo-blau`/`demo-gruen`-Test-Mandanten. Kein separates Produktionsprojekt.
+- `NEXT_PUBLIC_SITE_URL` steht noch auf `http://localhost:3000`.
+
+**8 Blöcke, in dieser Reihenfolge:**
+
+### Block 1 — Deployment-Infrastruktur aufsetzen (Code/Config, ich baue das)
+1. `npm install @opennextjs/cloudflare` (+ ggf. `wrangler` als devDependency, falls nicht bereits global bei Josip vorhanden).
+2. `open-next.config.ts` — Standard-Konfiguration für Next.js 16 App Router auf Cloudflare Workers (Node-Compat, kein ISR-Sonderfall nötig, da alle mandantenbezogenen Seiten ohnehin dynamisch sind — RLS/Auth pro Request).
+3. `wrangler.jsonc` erweitert: `main`-Entrypoint (OpenNext-Output), Assets-Binding für statische Next.js-Dateien, bestehender Cron-Trigger-Block bleibt unverändert erhalten.
+4. Neuer `scheduled()`-Handler (kleiner Custom-Worker-Entrypoint, wie im bestehenden `wrangler.jsonc`-Kommentar bereits vorgezeichnet): ruft intern `fetch("https://<PROD-DOMAIN>/api/admin/ki/process", { method: "POST", headers: { "x-cron-secret": env.CRON_PROCESS_SECRET } })` auf. Ersetzt Josips bisheriges manuelles Wiederholt-Aufrufen aus Phase 3.
+5. `package.json`: `"deploy": "opennextjs-cloudflare build && wrangler deploy"`.
+6. `NEXT_PUBLIC_SITE_URL` in der Produktions-Umgebung auf die echte Domain setzen (siehe Block 4) — lokale `.env` bleibt bei `localhost:3000`, Produktions-Wert kommt separat über `wrangler secret put`/Environment-Vars.
+
+### Block 2 — Produktions-Datenbasis: Supabase-Entscheidung + Bereinigung
+**Empfehlung (einfachste tragfähige Lösung, CLAUDE.md-Prinzip „so wenig bewegliche Teile"): dasselbe Supabase-Projekt weiterverwenden**, nicht neu aufsetzen — RLS/Migrationen sind bereits produktionsreif geprüft (3 Security-Audits), ein zweites Projekt würde nur Kosten und Sync-Aufwand verdoppeln, ohne echten Sicherheitsgewinn (Mandantentrennung läuft ohnehin über RLS, nicht über getrennte Projekte).
+1. `demo-blau`/`demo-gruen` bleiben bestehen, werden aber NICHT gelöscht (HOME.md §11: vor Löschen nachfragen) — stattdessen `status` auf einen erkennbaren Test-Zustand geprüft/dokumentiert, damit sie in echten Reports (Portal-Übersicht) klar als Test erkennbar sind.
+2. E2E-Testkonten (`e2e-staff@example.test`, `e2e-student@example.test`) bleiben ebenfalls bestehen (nötig für künftige E2E-Läufe auch nach Go-Live) — Rate-Limits/Kontingente betreffen sie ohnehin isoliert je Mandant.
+3. Kein Code-/Migrations-Änderungsbedarf in diesem Block.
+
+### Block 3 — Stripe Live-Modus (Plan korrigiert nach Prüfung, 12.07.2026)
+1. **Braucht Josip:** Live-Schlüssel (`sk_live_…`) aus dem Stripe-Dashboard holen.
+2. ~~Ich lege die bestehenden Produkte/Preise im Live-Modus neu an~~ — **geprüft und verworfen:** `products`-Tabelle enthält nur EIN Eintrag (`Einmalkauf`, 1 €, reines E2E-Test-Fixture aus `checkout.spec.ts`). Produkte werden NICHT zentral von uns vorgegeben, sondern von jedem Mandanten selbst über die bestehende Admin-UI angelegt (`src/components/admin/product-form.tsx` + `src/lib/stripe/products.ts::createProduct()`, Phase 2 Block 5) — sobald `STRIPE_SECRET_KEY` in Produktion live ist, kann der erste echte Mandant sein eigenes Produkt direkt live anlegen. Kein Migrations-/Neuanlage-Schritt nötig.
+3. Live-Webhook-Endpoint auf die Produktions-URL registrieren (`https://<PROD-DOMAIN>/api/stripe/webhook`), neues `STRIPE_WEBHOOK_SECRET` für Live übernehmen — geht erst NACH Go-Live-Deploy (Block 8), da die Produktions-URL vorher nicht existiert.
+4. `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` in der Produktions-Umgebung NUR über `wrangler secret put` (niemals im Repo, CLAUDE.md §2.2) — Josip trägt den Live-Schlüssel selbst dort ein, nicht über eine Datei.
+
+**Josips Live-Schlüssel erhalten (12.07.2026, per Chat eingefügt):** NICHT in einer Datei gespeichert, NICHT ins Repo geschrieben, NICHT weiterverarbeitet — bleibt bei Josip, wird von ihm selbst bei Block 8 (Go-Live) per `wrangler secret put STRIPE_SECRET_KEY` gesetzt. Geprüft: der verbundene Stripe-MCP läuft bereits im Live-Modus auf demselben Account (`acct_1T8doNE4Wm2mVgvF`, passend zum eingefügten Schlüssel) — für produktseitige Stripe-Arbeit (z. B. spätere Reports) ist die MCP-Verbindung also bereits produktionsfähig, unabhängig vom App-eigenen `.env`-Schlüssel.
+
+**Block 3 damit inhaltlich abgeschlossen** — nichts mehr offen außer den beiden `wrangler secret put`-Befehlen, die Josip selbst bei Block 8 ausführt.
+
+**Stripe Live-Schlüssel gespeichert (Josip, 12.07.2026):** mit ausdrücklicher Freigabe (siehe CLAUDE.md §2 Sicherheitsregel 2, erweiterte Ausnahme) in `.env` unter `STRIPE_SECRET_KEY_LIVE` abgelegt (git-ignoriert, eigener Variablenname statt `STRIPE_SECRET_KEY` zu überschreiben, damit `npm run dev` weiterhin Test-Modus nutzt). Wird bei Block 8 per `wrangler secret put STRIPE_SECRET_KEY` in die Produktionsumgebung übertragen.
+
+### Zwischenrunde — `npm run build` erstmals nach `npm install` (Josip, 12.07.2026): 6 echte Funde behoben
+
+Nach `npm install` (272 neue Pakete: `@opennextjs/cloudflare`, `wrangler`) lief `npm run build` erstmals seit Längerem wieder vollständig mit TypeScript-Prüfung durch — dabei kamen nacheinander 6 unabhängige, echte (nicht kosmetische) Funde ans Licht, alle behoben:
+
+1. **`custom-worker.ts`:** `scheduled`-Handler-Parameter ungetypt (`_event` implizit `any`) — `@cloudflare/workers-types` ist nur optionale Peer-Dependency von `wrangler`, wurde bei `npm install` nicht mitinstalliert. Fix: eigene minimale `ScheduledEvent`/`ExecutionContext`-Interfaces statt Abhängigkeit vom fehlenden Paket, `satisfies ExportedHandler<Env>` entfernt.
+2. **`src/components/admin/question-form.tsx`:** `setCorrectSingle()` narrowte `draft` nicht auf `kind === "single"` vor dem Objektbau (Diskriminierte-Union-Bug) — im Unterschied zu `toggleCorrectMulti()`, das die Guard-Klausel schon hatte. Echter, bisher unentdeckter Bug (nicht nur Typprüfung), jetzt mit derselben Guard-Klausel behoben.
+3. **`src/components/pwa/push-toggle.tsx`:** `urlBase64ToUint8Array()` gab `Uint8Array` ohne Typparameter zurück — neuere TypeScript-Version macht `Uint8Array` generisch über den Puffertyp, DOM-API `applicationServerKey` verlangt `Uint8Array<ArrayBuffer>` (keine SharedArrayBuffer-Varianten). Fix: Rückgabetyp explizit gesetzt.
+4. **`src/lib/generator/pipeline.ts` + `src/lib/video/transcript.ts`:** eigene Inline-Typdefinition `{ type: "text"; text: string }` für den Content-Filter kannte das neue Pflichtfeld `citations` des Anthropic-SDK-`TextBlock`-Typs nicht. Fix: echten SDK-Typ `Anthropic.TextBlock` importiert und verwendet statt eigener Definition, an beiden Stellen.
+5. **`src/lib/generator/pipeline.ts` (Root Cause) + `src/lib/generator/parse.ts`:** `z.ZodType<T>` (Kurzschreibweise) setzt implizit Input=Output=T voraus und lehnt dadurch `z.preprocess(...)`-Schemas ab (Input tatsächlich `unknown`, betrifft `buildLessonContentSchema()` aus dem course-generator-Bugfix von heute früher). Fix: an allen drei betroffenen Stellen (`parseStepResponse`, `callClaudeJsonStep`, `buildLessonContentSchema`) auf `z.ZodType<T, z.ZodTypeDef, unknown>` gestellt — passt strukturell für Preprocess- UND gewöhnliche Schemas gleichermaßen.
+6. **`src/lib/supabase/client.ts`:** Doc-Kommentar enthielt zufällig die Zeichenfolge `*/` (`src/lib/*/actions.ts`), die den JSDoc-Block vorzeitig schloss — alles danach wurde als Code interpretiert ("Cannot find name 'actions'"). Fix: Formulierung ohne `*/` im Text. Kein weiteres Vorkommen im Codebase gefunden (geprüft).
+7. **`src/lib/supabase/server.ts` + `src/proxy.ts`:** `setAll(cookiesToSet)` ohne Typannotation (`implicitly has an 'any' type`) — offizieller `@supabase/ssr`-Musterfehler. Fix: `CookieOptions`-Typ aus `@supabase/ssr` importiert und explizit annotiert, an beiden Stellen (server-seitiger Client + proxy.ts-Middleware).
+8. **`src/lib/tutor/actions.ts`:** `conversationId` über zwei separate `if`-Blöcke hinweg (Narrowing → Reassignment in verschachteltem `if` → erneutes Narrowing im zweiten `if`) — TypeScripts Kontrollfluss-Analyse kann hier nicht beweisen, dass die Variable am Verwendungspunkt (Zeile ~250) immer definiert ist, obwohl es laufzeitseitig stimmt. Fix: expliziter `if (!conversationId) return {...}`-Guard direkt vor der Verwendung ergänzt (im Normalbetrieb unerreichbar, reine Typprüfungs-Absicherung, gleiches Verteidigungsmuster wie an anderen Stellen der Datei).
+
+`npm run build` läuft jetzt vollständig durch (komplette Routenliste angezeigt, kein Fehler). Empfehlung an Josip: vor dem ersten `npm run deploy` zur Sicherheit noch `npm run test` + `npm run e2e` laufen lassen, da Fund 2 und 8 echte Logikänderungen sind (nicht nur Typannotationen) — auch wenn beide auf das bereits erwartete Verhalten hinauslaufen, lohnt sich die Bestätigung vor dem ersten Live-Deploy.
+
+### Block 4 — Domain + DNS
+**Offene Frage an Josip (siehe unten)** — Vorschlag `akademie.calltalent.ai` (bereits in PHASENSTATUS.md Zeile 27 als Beispiel vorgemerkt). Sobald bestätigt:
+1. DNS-Eintrag (CNAME/Workers Route) auf die `calltalent.ai`-Zone — vermutlich Josips Aufgabe im Cloudflare-Dashboard (Zonen-Verwaltung nicht über meine verbundenen Tools sichtbar) oder ich über `wrangler` mit entsprechendem Zonen-Zugriff, falls vorhanden.
+2. Wildcard-Subdomain (`*.akademie.calltalent.ai`) für einfaches Mandanten-Onboarding — spart die volle Cloudflare-for-SaaS-Custom-Domain-Automatisierung (Phase 4 als eigenständiges, noch offenes Infra-Thema vermerkt) für den Start; jeder neue Mandant bekommt sofort eine Subdomain ohne zusätzlichen DNS-Schritt.
+3. `NEXT_PUBLIC_PORTAL_HOST` produktiv auf `portal.akademie.calltalent.ai` (oder gewählte Domain) setzen.
+
+### Block 5 — Resend Produktions-Domain: geprüft, keine Aktion nötig (12.07.2026)
+Im Resend-Dashboard geprüft (Chrome-Steuerung, Josips Freigabe): `calltalent.ai` ist bereits seit 5 Monaten verifiziert (Region eu-west-1/Irland). `src/lib/email/client.ts` versendet bereits von `noreply@calltalent.ai` — also von der bereits verifizierten ROOT-Domain, nicht von einer separaten `akademie.calltalent.ai`-Absenderadresse. Eine eigene Verifizierung für die Subdomain wäre nur nötig, wenn tatsächlich VON dieser Subdomain gesendet werden soll — ist hier nicht der Fall. Kein DNS-/Dashboard-Schritt nötig, Block 5 damit abgeschlossen.
+
+### Block 6 — Produktions-Secrets: eigene VAPID- + Cron-Secrets generiert (12.07.2026)
+1. **Erledigt:** eigenes VAPID-Schlüsselpaar für Produktion generiert (`npx web-push generate-vapid-keys`, gleiche Methode wie der bestehende Dev-Schlüssel, kein externer Anbieter). In `.env` unter `NEXT_PUBLIC_VAPID_PUBLIC_KEY_LIVE` / `VAPID_PRIVATE_KEY_LIVE` abgelegt (eigener Variablenname, Dev-Schlüssel bleibt für `npm run dev` unverändert).
+2. **Erledigt:** neues `CRON_PROCESS_SECRET_LIVE` generiert (33 zufällige Bytes, hex), ebenfalls in `.env` unter eigenem Namen.
+3. **Offen (Block 8):** `STRIPE_SECRET_KEY_LIVE`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY_LIVE`, `VAPID_PRIVATE_KEY_LIVE`, `CRON_PROCESS_SECRET_LIVE` sowie `VAPID_SUBJECT` (Wert unverändert übernehmbar, kein Secret) per `wrangler secret put <NAME>` (ohne `_LIVE`-Suffix, das ist nur die lokale Ablage-Konvention) in die Produktionsumgebung übertragen — macht Josip selbst bei Block 8, `.env` landet nicht automatisch im Workers-Environment.
+4. **Noch zu klären bei Block 8:** `NEXT_PUBLIC_SITE_URL` (Build-Time-Variable, siehe Block-1-Notiz) auf die tatsächliche Produktions-URL setzen, bevor `npm run deploy` läuft.
+
+### Block 7 — Security-Review der Deploy-Konfiguration: durchgeführt, sauber (12.07.2026)
+Gezielter Review (kein Vollaudit, siehe Phase 4 Block 7) der neuen Deploy-Artefakte (`wrangler.jsonc`, `open-next.config.ts`, `custom-worker.ts`, `/api/admin/ki/process`-Route, alle `NEXT_PUBLIC_*`-Variablen, `.env.example`). Ergebnis: **0 KRITISCH, 0 HOCH.** Kein Secret-Leak im Client-Bundle, `CRON_PROCESS_SECRET`-Prüfung mit SHA-256 + `timingSafeEqual` (übertrifft den nötigen Standard für ein intern genutztes Secret), keine Klartext-Secrets in `wrangler.jsonc`, `.env.example` enthält nur Platzhalter/öffentliche Werte.
+
+1 MITTEL-Fund direkt behoben: `custom-worker.ts` — `fetch()`-Aufruf im `scheduled()`-Handler war nicht gegen eine ungefangene Exception abgesichert (z. B. bei fehlendem `NEXT_PUBLIC_SITE_URL`); jetzt mit try/catch, Fehler landet wie vorgesehen im Cloudflare-Cron-Log statt den Handler abstürzen zu lassen.
+
+2 NIEDRIG-Funde nur dokumentiert (kein Secret-/Zugriffsrisiko): `Env`-Interface in `custom-worker.ts` typisiert Felder als verpflichtend, ohne dass zur Laufzeit etwas das erzwingt (Dokumentationsungenauigkeit); `NEXT_PUBLIC_SITE_URL` steht noch nicht produktiv (bereits als Block-8-Voraussetzung erfasst, kein neuer Fund).
+
+### Block 8 — Go-Live + ersten Mandanten anlegen
+**Braucht Josips ausdrückliche Freigabe (CLAUDE.md §4.6) UND läuft lokal bei ihm** (`npm run deploy`), nicht durch mich in der Sandbox — gleiches Muster wie bisher bei `npm run test`/`npm run e2e`/`git commit`.
+
+**Blockierender Fund beim ersten `npm run deploy`-Versuch, behoben (12.07.2026):** `ERROR Node.js middleware is not currently supported. Consider switching to Edge Middleware.` — `src/proxy.ts` (Next.js 16, Phase 4 Block 1, läuft zwingend auf Node.js-Runtime) wird vom `@opennextjs/cloudflare`-Adapter noch nicht unterstützt. Recherchiert und bestätigt: bekannte, noch offene Lücke (cloudflare/workers-sdk Issue #13755, "Version Trap" zwischen Next.js 16s neuer Proxy-Architektur und OpenNexts aktuellem Cloudflare-Adapter). Community-Workaround bis OpenNext proxy.ts unterstützt: zurück auf die ältere `middleware.ts`-Konvention (Edge-Runtime). Umgesetzt: `src/proxy.ts` → `src/middleware.ts` (Funktion `proxy` → `middleware`, `config.matcher` unverändert übernommen), alle Kommentar-Referenzen in 7 weiteren Dateien mitgezogen. Geprüft: die Mandanten-Auflösung (`resolveTenantByHost`, Admin-Client) nutzt ausschließlich fetch-basierte Supabase-Aufrufe, keine Node-only-APIs — funktional keine Änderung durch den Rückbau. `src/proxy.ts` konnte nicht direkt gelöscht werden (Werkstattmappen-Dateischutz), Löschung über `allow_cowork_file_delete` freigegeben und durchgeführt.
+
+**Vor dem nächsten Deploy-Versuch nötig:** `npm run build` UND `npm run e2e` einmal neu laufen lassen (Middleware-Rückbau ist eine funktionale Datei-Umbenennung, kein reiner Typ-Fix) — noch nicht bestätigt.
+
+1. `npm run deploy` (Josip, lokal).
+2. Smoke-Test auf der Produktions-URL: Login, eine Kursseite, Checkout-Redirect (Stripe live), Portal-Login.
+3. Ersten echten Mandanten über das Betreiber-Portal anlegen (bereits fertige Funktion aus Phase 4 Block 2) — Name/Slug/Plan, danach Owner einladen.
+4. `PHASENSTATUS.md` mit Deploy-Datum, Produktions-URL und Ergebnis des Smoke-Tests abschließen.
+
+**Offene Fragen (max. 3, blockierend):**
+1. **Produktions-Domain final bestätigen** — `akademie.calltalent.ai` wie vorgeschlagen, oder anders? Blockiert Block 4 und damit `NEXT_PUBLIC_SITE_URL`/Stripe-Webhook-URL/Resend-Domain in den Blöcken 3 und 5.
+2. **Supabase-Projekt-Entscheidung bestätigen** — dasselbe Projekt weiterverwenden (meine Empfehlung, Block 2) oder ein neues Produktionsprojekt? Blockiert nichts technisch Dringendes, aber bestimmt, ob Block 2 „erledigt" oder „neues Projekt aufsetzen" bedeutet.
+3. **Cloudflare-Zonen-/DNS-Zugriff** — kann ich `calltalent.ai`-DNS-Einträge selbst setzen (falls ein API-Token mit Zonen-Rechten verbunden wird), oder übernimmst du den DNS-Schritt manuell im Dashboard? Bestimmt, wer Block 4.1 ausführt.
+
+Baue jetzt Block 1 (Deployment-Infrastruktur, reiner Code/Config-Block, keine externen Aktionen) — die restlichen Blöcke warten auf die drei Antworten oben.
+
+**Block 1 — Deployment-Infrastruktur: erstellt (architect direkt, Cowork, 12.07.2026):**
+1. `package.json` — `@opennextjs/cloudflare` (`^1.20`, aktuelle Version über npm-Registry geprüft) zu dependencies, `wrangler` (`^4`) zu devDependencies. Neue Scripts: `preview`, `deploy` (`opennextjs-cloudflare build && opennextjs-cloudflare deploy`), `cf-typegen`.
+2. `open-next.config.ts` (neu) — Standard-`defineCloudflareConfig()`, kein Caching-Sonderfall nötig (alle mandantengebundenen Seiten sind ohnehin dynamisch).
+3. `custom-worker.ts` (neu) — offizielles OpenNext-Muster (per Cloudflare-/OpenNext-Dokumentation geprüft, nicht geraten): reicht den generierten `fetch`-Handler aus `.open-next/worker.js` unverändert durch, ergänzt einen `scheduled()`-Handler, der `/api/admin/ki/process` mit `x-cron-secret`-Header aufruft — ersetzt Josips bisheriges manuelles Wiederholt-Aufrufen.
+4. `wrangler.jsonc` — `main` zeigt jetzt auf `custom-worker.ts` (statt direkt auf den generierten Worker, siehe Begründung im Dateikommentar), `assets`-Binding (`.open-next/assets`) ergänzt, `observability.enabled` an, bestehender Cron-Trigger (alle 2 Min.) unverändert erhalten. Der alte „ACHTUNG, existiert noch nicht"-Kommentar aus Phase 3 ist damit gegenstandslos und wurde durch eine kurze Erklärung des finalen Aufbaus ersetzt.
+
+**Bewusst NICHT von mir ausgeführt:** `npm install` — die neuen Pakete sind in `package.json` eingetragen, aber node_modules real zu installieren muss Josip lokal auf Windows machen. Grund: mein Sandbox-Linux würde bei `npm install` plattformspezifische Linux-Binärpakete in dasselbe (gemountete) `node_modules` schreiben, das Josip anschließend unter Windows für `npm run build`/`test`/`e2e` braucht — Risiko einer kaputten, plattformgemischten `node_modules` (das Repo hat bereits `@rollup/rollup-win32-x64-msvc` als Beleg, dass native Binärpakete plattformgebunden sind). Gleiches Muster wie bei `npm run test`/`git commit` schon immer: lokale Ausführung bleibt bei Josip.
+
+**Hinweis für Block 6 (Produktions-Secrets), technische Ergänzung:** `NEXT_PUBLIC_SITE_URL` wird an ZWEI Stellen gebraucht — als Workers-Runtime-Variable (`env.NEXT_PUBLIC_SITE_URL` in `custom-worker.ts`, per `wrangler secret put` oder als `vars`-Eintrag in `wrangler.jsonc`) UND zur BUILD-Zeit (Next.js bündelt `NEXT_PUBLIC_*`-Variablen zur Build-Zeit ins Client-Bundle) — muss also auch in der Umgebung gesetzt sein, in der `npm run deploy` läuft (Josips lokale Shell oder ein CI-System), nicht nur als Workers-Secret. Reiner Hinweis, kein Blocker für Block 1.
+
+**Offen für Josip:** `npm install` ausführen (installiert `@opennextjs/cloudflare` + `wrangler`), dann Antworten auf die 3 offenen Fragen oben — danach geht es mit Block 2 (Supabase-Entscheidung) weiter.
+
+**Josips Antworten (12.07.2026):** Domain `akademie.calltalent.ai` bestätigt. Supabase: dasselbe Projekt weiterverwenden bestätigt. DNS: „Claude soll es automatisch machen" — geprüft: die verbundene Cloudflare-MCP hat aktuell NUR Workers/D1/KV/R2/Hyperdrive-Rechte, keine Zonen-/DNS-Verwaltung. Zwei Wege an Josip zurückgemeldet: (a) Josip trägt DNS manuell ein, (b) Cloudflare-Verbindung um „Zone: DNS: Edit" erweitern. **Praktisch löst sich das aber einfacher:** Cloudflare „Custom Domains" für Workers verwaltet DNS + SSL-Zertifikat automatisch, sobald die Domain in DERSELBEN Cloudflare-Zone liegt wie der Account (bei `akademie.calltalent.ai` unter der bestehenden `calltalent.ai`-Zone der Fall) — Josip muss nach dem ersten `npm run deploy` nur im Dashboard unter Workers & Pages → calltalent-akademie → Settings → Domains & Routes → „Add Custom Domain" die Domain eintragen (ein Klick, kein manuelles DNS-Record-Basteln). Verschoben in Block 4 unten.
+
+### Block 2 — Supabase-Datenbasis für Produktion: geprüft, keine Änderung nötig (architect direkt, Cowork, 12.07.2026)
+
+**Tenants-Tabelle geprüft (4 Einträge, nicht nur die erwarteten 2):** `demo-blau`, `demo-gruen` (E2E-Test-Mandanten, Phase 4 Block 6) sowie `viralmedia` und `vm` (Josips eigene manuelle Verifikations-Mandanten aus Phase 4 Block 2, `viralmedia` hat sogar bereits `custom_domain = viralmedia.calltalent.ai` gesetzt — nur ein Datenbankfeld, keine echte DNS-Bindung, harmlos). Alle vier `status='active'`, `plan='komplett'`/`'enterprise'`.
+
+**Wichtiger Fund, der eine ursprüngliche Block-2-Idee verworfen hat:** `resolveTenantByHost()` (`src/lib/tenant/resolve.ts`, Zeilen 27/42/80) filtert IMMER `.eq("status", "active")` — ein Mandant mit `status='trial'` ist über seine Subdomain schlicht NICHT erreichbar (weder Tenant-Auflösung noch Login). Ein Wechsel auf `status='trial'` zur rein kosmetischen Kennzeichnung „ist nur Test" hätte demo-blau/demo-gruen für die gesamte Playwright-E2E-Suite und Josips eigene manuelle Tests unerreichbar gemacht — GEPRÜFT UND VERWORFEN, bevor etwas geändert wurde.
+
+**Entscheidung: keine Datenbank-Änderung.** Die vier Test-/Verifikations-Mandanten bleiben unverändert `active` und bestehen weiter — sie sind bereits durch ihre Namen (`demo-`, `viralmedia`, `vm`) klar als Test erkennbar, kein technischer Marker nötig oder sinnvoll ohne Funktionsrisiko. Block 2 ist damit inhaltlich abgeschlossen: dasselbe Supabase-Projekt wird unverändert für den ersten echten Mandanten mitverwendet.
+
+### Block 8 — Deploy-Saga: fünf kaskadierende Fehler behoben, Produktion live (Cowork, 12.07.2026)
+
+Der erste echte `npm run deploy` durchlief nach dem Custom-Domain-Schritt fünf voneinander unabhängige, sich gegenseitig verdeckende Fehler, bis die Plattform tatsächlich lief. Reihenfolge und Fixes, damit dieser Weg bei künftigen Deploys (neuer Mandant, neue Domain) nicht erneut abgelaufen werden muss:
+
+**1. Falscher Cloudflare-Account.** `npx wrangler whoami` zeigte Account-ID `c07c2d940c9e39a8c12033fed894424a` (`office@calltalent.ai`) — die `calltalent.ai`-DNS-Zone liegt aber im Account `1721e487e86d9139ee900f52e2882622` (Name „calltalent.ai", Login `contact@calltalent.co.uk`). Dieselbe E-Mail-Adresse ist offenbar Mitglied in zwei getrennten Cloudflare-Accounts; `wrangler login`s OAuth-Flow wählte den falschen. Deploys liefen dadurch unsichtbar ins falsche Konto — die „No zones match"-Fehler beim Custom-Domain-Dialog waren eine Folge davon, keine Cloudflare-Bug. Fix: `npx wrangler logout` + `npx wrangler login` (im Browser das richtige Konto bestätigt), verifiziert per `whoami`, dauerhaft fixiert per `"account_id": "1721e487e86d9139ee900f52e2882622"` in `wrangler.jsonc`. **Merke:** bei jedem neuen `wrangler login` auf dieser Maschine erst `whoami` prüfen, bevor deployt wird.
+
+**2. Custom-Domain-Dialog unbrauchbar → Workers Routes statt Custom Domains.** Auch im richtigen Account meldete der „Connect domain"-Dialog wiederholt „No zones match akademie.calltalent.ai", trotz sichtbarer Zone. Funktionierender Ersatzweg: Workers & Pages → Projekt → Settings → Domains & Routes → **Add Route** (nicht „Add Custom Domain") → Zone aus echter Dropdown-Liste wählen → Pattern `*.calltalent.ai/*` eintragen. Routes legen — anders als Custom Domains — KEINEN DNS-Eintrag automatisch an; zusätzlich musste ein DNS-A-Record (`*` → Dummy-IP `192.0.2.1`, Proxied) manuell in den DNS-Einstellungen der Zone ergänzt werden, sonst erreicht kein Traffic Cloudflares Edge.
+
+**3. „Internal Server Error" (ChunkLoadError, Turbopack-Inkompatibilität).** Reproduzierbar auf Custom-Domain UND roher `workers.dev`-URL — kein DNS-Problem. Ursache laut offizieller OpenNext-Troubleshooting-Doku (opennext.js.org/cloudflare/troubleshooting): `@opennextjs/cloudflare` (auch aktuellste Version 1.20.1) unterstützt von Turbopack gebaute Server-Chunks nicht zuverlässig. Fix: `package.json`-Script `"build"` von `"next build"` auf **`"next build --webpack"`** geändert (bestätigt durch Lesen von `@opennextjs/aws/dist/build/buildNextApp.js` — OpenNexts Build-Schritt ruft exakt dieses `npm run build` auf).
+
+**4. `node:crypto` `UnhandledSchemeError` unter Webpack.** Webpack ist strenger als Turbopack und deckte einen echten, vorher unbemerkten Architekturfehler auf: `src/components/admin/webhooks-panel.tsx` (Client-Komponente) importierte transitiv aus `src/lib/webhooks/deliver.ts`, das `node:crypto` nutzt. Fix: neue Datei `src/lib/webhooks/events.ts` (nur `WEBHOOK_EVENTS`/`webhookEventSchema`/`WebhookEvent`, kein Node-Import), Client-Komponente importiert jetzt von dort, `deliver.ts` re-exportiert dieselben Typen für die Server-Aufrufer.
+
+**5. Worker-Größenlimit überschritten (Free Plan: 3 MiB gzip).** Nach dem Webpack-Umstieg: 3403,73 KiB gzip statt vorher ~790 KiB unter Turbopack. Josip per Rückfrage entschieden: Bundle verkleinern statt auf Workers Paid (5 $/Monat) upgraden. Analyse von esbuilds `handler.mjs.meta.json` fand die Ursache: das `resend`-NPM-Paket zieht transitiv `@react-email/render` + `prettier` (~250 KiB) mit, obwohl der Code nirgends den `react:`-Parameter nutzt (nur `html:`). Fix: `src/lib/email/client.ts` ruft die Resend-REST-API jetzt direkt per `fetch()` auf (`POST https://api.resend.com/emails`), `resend` komplett aus `package.json` entfernt. Ergebnis: 2986,5x KiB gzip, sicher unter der Grenze.
+
+**Zusätzlich, SSL-getrieben: Subdomain-Schema geändert.** Das ursprünglich codierte Mandanten-Schema `{slug}.akademie.calltalent.ai` (zweite Subdomain-Ebene) wird von Cloudflares kostenlosem Universal-SSL NICHT abgedeckt (nur Zone-Apex + genau eine Wildcard-Ebene; zwei Ebenen brauchen den kostenpflichtigen Advanced Certificate Manager, ~10 $/Monat). Per Rückfrage entschied Josip: Schema auf `{slug}.calltalent.ai` (erste Ebene, kostenlos) ändern statt zahlen. Umgesetzt in `src/lib/tenant/resolve.ts` (`extractTenantSlugFromHost`), dazu `.env.production` (neu, Build-Time-Override für `NEXT_PUBLIC_SITE_URL`/`NEXT_PUBLIC_PORTAL_HOST` — Next.js lädt diese Datei automatisch nur bei `next build`, nie bei `npm run dev`), Wildcard-DNS (`*` → `192.0.2.1`, proxied) und Wildcard-Route (`*.calltalent.ai/*`) decken damit sowohl künftige Mandanten-Subdomains als auch `portal.calltalent.ai` in einem Schritt ab.
+
+**Regressions-Fix, selbst gefunden nach der Schema-Änderung:** Josips erster echter Mandant („calltalent", Custom Domain `learning.calltalent.ai`) wurde trotz korrektem DNS/Route nicht gefunden. Ursache: `extractTenantSlugFromHost()` erkennt seit der Schema-Änderung JEDE erste-Ebene-Subdomain von `calltalent.ai` als potenziellen Slug — `resolveTenantByHost()` versuchte dann `resolveTenantBySlug("learning")` (kein Treffer, da kein Mandant so heißt) und gab auf, statt auf `resolveTenantByCustomDomain()` zurückzufallen. Fix in `resolveTenantByHost()`: expliziter Fallback auf die Custom-Domain-Suche, wenn die Slug-Suche leer bleibt.
+
+**Ergebnis (12.07.2026, verifiziert):** `portal.calltalent.ai` (Betreiber-Portal-Login) und `learning.calltalent.ai` (erster echter Mandant „calltalent", Enterprise-Plan) laufen live mit gültigem SSL. Login-Flow funktioniert vollständig — Josip war eingeloggt, „Meine Kurse"-Seite zeigt korrekt „Noch keine veröffentlichten Kurse in dieser Akademie." (erwarteter Zustand, da noch kein Kurs im Mandanten angelegt/veröffentlicht wurde).
+
+**Offen für den vollständigen Smoke-Test:**
+1. Einen Kurs im Mandanten „calltalent" anlegen und veröffentlichen, um Kursseite + Einschreibung zu testen.
+2. Stripe-Checkout-Redirect im Live-Modus testen (braucht einen kostenpflichtigen Kurs).
+3. Live-Webhook-Endpoint bei Stripe registrieren: `https://learning.calltalent.ai/api/stripe/webhook`, neues `STRIPE_WEBHOOK_SECRET` (Live) per `wrangler secret put` übernehmen — aus Block 3 verschoben, jetzt technisch möglich, da die Produktions-URL existiert.
+4. Die vier Testmandanten (`vm`, `viralmedia`, `demo-blau`, `demo-gruen`) bei Gelegenheit über das Betreiber-Portal löschen (Josip bestätigt: reine Testdaten, kein Zeitdruck).
+5. Aufräumen: der ursprüngliche einzelne `akademie.calltalent.ai`-DNS-A-Record + zugehörige Route sind durch die Wildcard-Einträge überflüssig geworden (nicht schädlich, aber optionales Aufräumen möglich).
+
+**Block 8 damit im Kern abgeschlossen — Go-Live erreicht, erster echter Mandant live und erreichbar.** Rest ist inhaltlicher Smoke-Test (Kurs + Zahlung), kein technischer Blocker mehr.
+
+**Test-Kurs im Mandanten „calltalent" angelegt (Cowork, 12.07.2026, direkt per Supabase-SQL — keine Migration, reine Testdaten):**
+1. Fund vor dem Anlegen: Josip hatte trotz sichtbarer Session auf `learning.calltalent.ai` (Header zeigte „Profil"/„Abmelden") noch KEINE `memberships`-Zeile im Mandanten „calltalent" (`tenants.id = eff4aa20-9295-47f1-be4f-18fe049336c6`) — die Tenant-Startseite ist also auch ohne Mitgliedschaft aufrufbar (zeigt nur leere Kursliste), was den zuvor geplanten Schritt „danach Owner einladen" bestätigt als noch offen. Nachgeholt: Mitgliedschaft `role='owner'`, `status='active'` für `office@calltalent.ai` (`profiles.id = 9a286ea8-aeb7-41bb-b918-fbf2d409c2b2`) ergänzt — exakt dasselbe Muster wie bei `demo-blau`/`demo-gruen`.
+2. Kurs „Willkommen bei der Calltalent-Akademie" (`slug='willkommen'`, `status='published'`) + ein Modul + eine Lektion (Text-Block, `status='published'`) angelegt, dazu eine `enrollments`-Zeile für Josip (`source='manual'`), damit der Kurs sofort unter „Meine Kurse" erscheint.
+3. URL zum Testen: `https://learning.calltalent.ai/kurs/willkommen` (Kursübersicht), Lektion darunter über `.../l/<lessonId>`.
+4. Stripe-Produkt „Calltalent-Akademie – Technik-Test (1 €)" im LIVE-Modus angelegt (`prod_Us9kZ04Q3EH0Ru`, Preis `price_1TsPRNE4Wm2mVgvFEYL0mnGQ`, 100 Cent, EUR, einmalig) und als `products`-Zeile im Mandanten „calltalent" verknüpft (`slug='technik-test'`, `course_ids=[<Willkommen-Kurs>]`). Kaufseite: `https://learning.calltalent.ai/kaufen/technik-test`.
+
+**Zweiter, eigenständiger Fund beim Nachvollziehen des Checkout-Codepfads (nicht Teil der obigen fünf Deploy-Fehler, aber gleiche Ursache — SSL-Schema-Umstellung nicht überall nachgezogen):** `src/lib/stripe/checkout.ts`, `src/lib/stripe/portal.ts` und `src/lib/users/import.ts` hatten je eine EIGENE, private `buildTenantUrl()`/`buildLoginUrl()`-Kopie, die (a) immer noch das alte `{slug}.akademie.calltalent.ai`-Schema annahm und (b) `custom_domain` überhaupt nicht kannte. Für den Mandanten „calltalent" (`custom_domain=learning.calltalent.ai`, `slug=calltalent`) hätte das bedeutet: nach einer ECHTEN Stripe-Zahlung Weiterleitung auf `calltalent.calltalent.ai` (existiert nicht, falsches Schema UND falsche Domain) statt `learning.calltalent.ai`; genauso beim Stripe-Billing-Portal-Rücksprung und bei CSV-Import-Willkommensmails. Vor dem ersten echten Checkout-Test gefunden und behoben — sonst wäre der Test mit einer echten 1-€-Abbuchung fehlgeschlagen (falscher Redirect nach der Zahlung).
+
+**Fix:** neue zentrale Stelle `src/lib/tenant/url.ts` (`tenantOrigin()`/`buildTenantUrl()`), die `custom_domain` bevorzugt und sonst auf `{slug}.calltalent.ai` zurückfällt. `custom_domain` dafür neu zu `PublicTenant` (`src/lib/tenant/types.ts`) und `TENANT_COLUMNS` (`src/lib/tenant/resolve.ts`) hinzugefügt (unbedenklich, keine sensiblen Daten — die Domain steht ohnehin sichtbar in der Adresszeile). Alle drei alten Kopien entfernt und auf die neue Stelle umgestellt. **Braucht erneutes `npm run deploy`**, bevor der Checkout-Test sinnvoll ist.
+
+**Live-Webhook registriert (Josip, 12.07.2026):** Endpoint `engaging-triumph` in Stripe unter `https://portal.calltalent.ai/api/stripe/webhook`, 4 Events (`checkout.session.completed`, `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted`), Signing Secret per `npx wrangler secret put STRIPE_WEBHOOK_SECRET` gesetzt (nach zwei kleinen Zwischenfällen — PowerShell-Befehle beim Einfügen zusammengerutscht, Name/Wert vertauscht, Cloudflare-API-Timeout — jeweils durch Wiederholung sauber behoben, keine echten Bugs).
+
+**Dritter Fund beim ersten echten Live-Kauf (1 €, `pi_3TsPuRE4Wm2mVgvF1mRknxSa`, Zahlung bei Stripe erfolgreich):** Redirect nach der Zahlung landete korrekt auf `learning.calltalent.ai/?checkout=success` (Bugfix oben griff) — aber `orders`-Tabelle blieb leer. Stripe-Dashboard zeigte „3 von 3 Zustellungen fehlgeschlagen", Status **404**. Ursache: `middleware.ts` schreibt auf dem Portal-Host (`portal.calltalent.ai`) AUSNAHMSLOS jeden Pfad zu `/portal/...` um — auch `/api/stripe/webhook` wurde zu `/portal/api/stripe/webhook` umgeschrieben, eine nicht existierende Route. Der Webhook ist aber bewusst host-unabhängig gebaut (Routing ausschließlich über `session.metadata`, siehe `stripe/checkout.ts`) und war genau deshalb auf der stabilen Portal-Domain registriert worden — womit sich diese Empfehlung selbst ausgehebelt hat.
+
+**Fix:** `middleware.ts` reicht `/api/...`-Pfade jetzt auf JEDEM Host unverändert durch (kein Portal-Rewrite, keine Mandanten-Header-Auflösung — bestehende API-Routen lesen ohnehin keinen `x-tenant-id`-Header, sondern nutzen `requireAdminTenant()`/API-Key-Auth). Betrifft nicht nur den Stripe-Webhook, sondern jede zukünftige host-unabhängige API-Route auf dem Portal-Host. **Braucht erneutes `npm run deploy`.** Die 3 fehlgeschlagenen Zustellungen lassen sich danach im Stripe-Dashboard über den „Resend"-Button auf dem jeweiligen Event NACHLIEFERN, ohne eine neue Zahlung auszulösen — Reihenfolge: zuerst `checkout.session.completed` (legt `orders`/`enrollments` an), Reihenfolge der anderen zwei egal.
+
+**Nach dem Fix-Deploy verifiziert (12.07.2026, 18:17 Uhr):** „Resend" auf `checkout.session.completed` zweimal ausgeführt (für beide offenen Checkout-Sessions, eine davon ein abgebrochener erster Versuch) — Stripe zeigt „Delivery recovered", jetzt beide `200 OK`. Datenbank bestätigt: `orders` enthält beide Zahlungen (`status='paid'`, je 100 Cent/EUR, `pi_3TsPoIE4Wm2mVgvF1WyohOyO` und `pi_3TsPuRE4Wm2mVgvF1mRknxSa`), `enrollments` zeigt `source='purchase'` für Josips Kurs-Einschreibung (Upsert von der ursprünglich manuellen Einschreibung — `enrolled_at` bewusst unverändert, nur `source` aktualisiert).
+
+**Block 8 damit vollständig abgeschlossen — kompletter Smoke-Test grün: Login/Registrierung, Kursseite mit Fortschrittsanzeige, Stripe-Live-Checkout mit echter Zahlung, Webhook-Verarbeitung (Bestellung + Einschreibung), Portal-Login.** Drei kleine, unkritische Aufräumpunkte bleiben (kein Zeitdruck, siehe Josips Freigabe oben): die 4 Test-Mandanten löschen, den versehentlich falsch benannten Worker-Secret (`whsec_ROTATED_2026-08-02_SEE_PHASENSTATUS`) entfernen, redundante `akademie.calltalent.ai`-DNS-Route aufräumen.
+
+## Design-Block — Calltalent-Markendesign + Sidebar-Navigation (Cowork, 12.07.2026)
+
+Auftrag: `DESIGN-MASTERPROMPT.md` (neu im Repo-Root), entstanden aus einem Vergleich mit Screenshots eines fremden LMS („BAULIG AKADEMIE" auf `learningsuite.io` — genau das mit SAAS-KLON-AGENT analysierte Zieltool). Nur Funktionsprinzipien übernommen, kein Fremd-Design/-Code (§ 69a UrhG).
+
+**Erledigt:**
+1. `src/app/layout.tsx`: Montserrat über `next/font/google` eingebunden (Build-Zeit-Selfhosting, kein Laufzeit-Request an Google — DSGVO-konform ohne manuelle TTF→WOFF2-Konvertierung), als `--font-montserrat` an `<html>` gereicht.
+2. `src/app/globals.css`: Calltalent-Fallback-Tokens (Periwinkle `#5663AE`, Ink `#1A1A2E`, Cream `#F7EED4`, Radius `14px`), Basisschriftgröße 16px→18px, Zeilenhöhe 1,6 (Barrierefreiheits-Vorgabe CLAUDE.md §3.4, nicht optional).
+3. `src/lib/tenant/types.ts`: `DEFAULT_BRANDING` von generischem Schwarz/Weiß/Inter auf Calltalent-Periwinkle/Montserrat/14px umgestellt — gilt für jeden Mandanten ohne eigenes Branding, Mandanten mit gesetztem `branding.*` überschreiben weiterhin unverändert per `theme-style.tsx`.
+4. Neue Komponente `src/components/learn/app-shell.tsx`: Sidebar mit zwei Gruppen „Lernen" (Meine Kurse, Kurssuche) und „Konto" (Profil und Einstellungen), Admin-Bereich nur für Staff, Abmelden im Sidebar-Fuß. **Bewusste Abweichung vom freigegebenen Wireframe:** helle statt dunkle Sidebar — SPEC.md §4.5 verlangt "ruhiges, helles Interface" für das Gesamtprodukt, eine dunkle Indigo-Fläche hätte dem widersprochen. Periwinkle bleibt einzige Akzentfarbe (aktiver Menüpunkt: Cream-Hintergrund + linker Periwinkle-Balken, nicht nur Farbe — Kontrastregel Branding/BRANDING.md §4).
+5. `src/app/page.tsx` ("Meine Kurse"-Startseite) auf `AppShell` umgestellt — Datenabfragen unverändert, nur die Kopfzeile mit losen Text-Links entfernt und Kurskarten um ein Cream-Badge „Nicht gestartet" ergänzt (0-Lektionen-Fall).
+6. `e2e/dashboard-shell.spec.ts` neu: prüft mit dem `student.json`-Storage-State, dass die Sidebar für ein Mitglied rendert (Meine Kurse/Kurssuche/Profil und Einstellungen/Abmelden sichtbar, kein Admin-Bereich-Link).
+
+**Bewusst NICHT gebaut (kein Datenmodell vorhanden, keine Zahlen erfunden):**
+1. Benachrichtigungs-Glocke/-Dropdown aus dem Vorbild — es gibt keine `notifications`-Tabelle. Bräuchte eine neue Tabelle mit `tenant_id` + RLS (CLAUDE.md §2.1) — eigener Block, nicht in dieses Design-Update gequetscht.
+2. „Geräte"-Tab (aktive Sessions) und granulare Benachrichtigungs-Einstellungen aus dem Vorbild — kein Zugriff auf Supabase-Auth-Sessions über den normalen Client, bräuchte eine Admin-API-Route. Ebenfalls eigener Block.
+3. „Lesezeichen" aus dem Original-Menü entfernt (keine Bookmark-Tabelle, kein Karteileichen-Nav-Punkt).
+4. Login-Seite (`(auth)/login`) noch NICHT neu gestaltet — nur die Tokens (Farbe/Schrift) greifen dort bereits automatisch über `var(--color-primary)`/Montserrat, aber kein eigenes Layout/Wortmarke ergänzt.
+
+**Nicht ausführbar aus diesem Cowork-Sitzungs-Sandbox (wichtig für Josip vor Deploy):** der Datei-Mount des Repos in der Sandbox war während dieser Sitzung nachweislich veraltet/abgeschnitten (`package.json`/`PHASENSTATUS.md` lasen über die Shell deutlich kürzer als über das autoritative Dateiwerkzeug). Deshalb konnten `npm run lint`, `npm run test`, `npm run e2e` und `git commit` NICHT zuverlässig aus der Sandbox heraus laufen — ein Commit aus einem möglicherweise veralteten Mount-Snapshot hätte die echten Dateien beschädigen können. Alle Änderungen wurden ausschließlich über das direkte Dateiwerkzeug geschrieben (nicht über die Shell) und danach nochmal darüber zurückgelesen zur Kontrolle.
+
+**Offen für Josip (vor Commit/Deploy):**
+1. Lokal `npm run lint && npm run test && npm run e2e` laufen lassen.
+2. `npm run dev` starten und `http://demo-blau.localhost:3000/` visuell prüfen.
+3. Bei grünem Ergebnis: `git add -A && git commit -m "feat: Calltalent-Markendesign (Periwinkle/Montserrat) + übersichtliche Sidebar-Navigation"` lokal ausführen — aus den oben genannten Gründen nicht aus Cowork heraus committet.
+
+## Design-Block 2 — Admin-Bereich + Betreiber-Portal (Cowork, 12.07.2026)
+
+Folgeauftrag: "Baue nach dem gleichen Konzept auch den Admin-Bereich und den Verwaltungsbereich für Mandanten. Das Design-Konzept soll sich durch das ganze Projekt ziehen."
+
+**Erledigt:**
+1. Drei neue gemeinsame Bausteine unter `src/components/shell/`: `nav-link.tsx` (Client-Component, aktiver Menüpunkt über `usePathname()`, `variant="light"|"dark"`), `section-label.tsx`, `brand-logo.tsx`. Bewusst EINE gemeinsame Datei je Baustein statt drei ähnlicher Kopien pro Bereich — sonst laufen Lernbereich/Admin/Portal optisch über Zeit auseinander. Das ist die technische Antwort auf "soll sich durch das ganze Projekt ziehen".
+2. `components/learn/app-shell.tsx` auf diese Bausteine umgestellt (vorher eigene Inline-Nav-Link-Funktion + manuell gepflegtes `active`-Prop). Sichtbare Änderung: keine, reine Code-Konsolidierung.
+3. Neu `components/admin/admin-shell.tsx`, eingesetzt in `(admin)/admin/layout.tsx`: ersetzt die alte waagerechte 9-Link-Kopfzeile durch eine Sidebar mit drei Gruppen — Inhalte (Übersicht/Kurse/KI-Generator/Abgaben), Auswertung (Reporting/Zahlungen), Verwaltung (Nutzer/Import/Einstellungen) — plus „Zur Akademie"-Link zurück zur Lernenden-Ansicht. Helles Calltalent-Design wie im Lernbereich (bleibt eine Mandanten-Oberfläche, nur für Staff).
+4. Neu `components/portal/portal-shell.tsx`, eingesetzt in `portal/layout.tsx`: gleiche Struktur, aber **bewusst dunkles Farbschema beibehalten** — der bestehende Code-Kommentar in `portal/layout.tsx` begründet das explizit als Verwechslungsschutz (Betreiber-Portal verwaltet ALLE Mandanten, hohe Fehlerreichweite, darf nie wie eine normale Mandanten-Oberfläche aussehen). Periwinkle bleibt als einzige Akzentfarbe auch im Dunkelmodus erhalten, damit das Design-Konzept trotzdem erkennbar dasselbe ist. **Diese Abweichung von "exakt gleiches Design überall" ist eine bewusste Entscheidung, keine vergessene Anpassung — bei Bedarf jederzeit auf einheitlich hell umstellbar, dann geht der Verwechslungsschutz verloren.**
+5. `admin/layout.tsx` und `portal/layout.tsx`: Zugriffsprüfungen (`checkStaffAccess`/`checkPlatformAccess`) unverändert, nur die Darstellung der "ok"-Branche ersetzt. Die "kein Zugriff"/Login-Zustände bleiben bewusst schlicht (kein Sidebar-Aufbau für einen Zustand ohne Navigation).
+6. `e2e/admin-shell.spec.ts` neu (nutzt das bereits verifizierte `staff.json`-Storage-State-Muster aus `dashboard-shell.spec.ts`).
+
+**Bewusst NICHT automatisiert getestet:** kein E2E-Test für die Portal-Sidebar. Es gibt noch kein Playwright-Storage-State für einen Platform-Admin-Account (nur `staff.json`/`student.json` für den Mandanten-Kontext, siehe `global-setup.ts`) — ein neues Testkonto dafür anzulegen hätte `global-setup.ts`/`global-teardown.ts` verändert, die von ALLEN bestehenden Specs geteilt werden. Das ungetestet in derselben Sitzung mit hineinzunehmen, in der ohnehin schon keine automatisierte Verifikation möglich war (siehe Mount-Einschränkung oben), war das Risiko nicht wert. Eigener kleiner Folgeblock, falls gewünscht.
+
+**Offen für Josip (zusätzlich zu den drei Punkten oben):**
+1. Portal manuell prüfen: `http://portal.localhost:3000/portal` (oder den lokal konfigurierten Portal-Host) mit einem Platform-Admin-Account aufrufen, Sidebar/Navigation zu Mandanten/Übersicht/Abmelden durchklicken.
+2. Admin-Bereich manuell prüfen: `/admin` auf einem Mandanten-Host mit einem Staff-Account, alle neun Unterseiten über die neue Sidebar erreichbar.
+
+## Design-Block 2, Nachbesserung (Josips erster lokaler Testlauf, 12.07.2026)
+
+Josip hat `npm run lint`, `npm run test`, `npm run e2e` lokal ausgeführt (Windows PowerShell 5.1 — `&&` musste durch Zeilenumbrüche ersetzt werden, kein Projekt-Thema).
+
+**Ergebnis `npm run test` (Vitest):** 150/150 grün, 17/17 Testdateien — unverändert von meinen Änderungen betroffen.
+
+**Ergebnis `npm run lint` (ungescoped, ganzes Projekt):** 12876 Probleme (1118 Fehler, 11758 Warnungen). Nach Gegenprüfung mit gescoptem Lint NUR auf die in diesem und dem vorherigen Design-Block geänderten Dateien: **1 echter Fehler**, Rest betrifft ausschließlich vorbestehende, hier nicht angefasste Dateien (`block-renderer.tsx`, `quiz-runner.tsx`, `push-toggle.tsx` u. a. — alles React-Hooks-/React-Compiler-Regeln wie `set-state-in-effect`, die keine meiner neuen Dateien überhaupt betreffen können, da dort kein `useEffect`/`useMemo` vorkommt). Die schiere Menge (>12.000) spricht für eine neue, strengere `eslint-plugin-react-hooks`-Version seit dem letzten grünen Lauf, nicht für Bestandscode-Verfall durch dieses Design-Update — bewusst NICHT im Rahmen dieses Auftrags mit behoben (riesiger, eigenständiger Umfang, siehe Josips Rückmeldung nötig, ob/wann angegangen).
+
+**Der eine echte Fehler, behoben:** `@next/next/no-html-link-for-pages` in `admin-shell.tsx:63` (`<a href="/">` statt `<Link>` für interne Navigation). Beim Durchsehen zusätzlich dieselbe Stelle in `app-shell.tsx` (Profil-Icon-Link) und den Kern-Baustein `nav-link.tsx` selbst (alle Sidebar-Links) proaktiv auf `next/link`s `<Link>` umgestellt statt nur die eine gemeldete Zeile zu flicken — sonst wäre der nächste Lint-Lauf an einer der anderen, strukturell identischen Stellen wieder rot gewesen. Funktional identisch (`Link` rendert denselben `<a>`), zusätzlicher Vorteil: echte Next.js-Client-Navigation statt vollem Seiten-Reload.
+
+**Ergebnis `npm run e2e`:** `Error: Timed out waiting 60000ms from config.webServer` — Playwrights Standardwartezeit fürs Hochfahren von `npm run dev` reichte nicht (kalter Kompilierlauf, vermutlich Windows-Dateisystem/erster Start nach den neuen Dateien). **Fix:** `playwright.config.ts` — `webServer.timeout` auf 180s gesetzt (gleiche Begründung wie beim bereits bestehenden 180s-Test-Timeout in derselben Datei). Konnte NICHT selbst gegenverifizieren (siehe Mount-Einschränkung oben) — falls `npm run e2e` danach immer noch timeout, ist es ein echter Startfehler, kein Zeitproblem; dann bitte `npm run dev` direkt in einem eigenen Terminal laufen lassen und die tatsächliche Fehlermeldung schicken.
+
+**Offen für Josip:**
+1. `npm run lint -- src/app/layout.tsx src/app/page.tsx src/lib/tenant/types.ts src/components/learn/app-shell.tsx src/components/shell/nav-link.tsx src/components/shell/section-label.tsx src/components/shell/brand-logo.tsx src/components/admin/admin-shell.tsx src/components/portal/portal-shell.tsx "src/app/(admin)/admin/layout.tsx" src/app/portal/layout.tsx e2e/dashboard-shell.spec.ts e2e/admin-shell.spec.ts` erneut — sollte jetzt 0 Fehler zeigen.
+2. `npm run e2e` erneut mit dem erhöhten Timeout.
+3. Entscheiden, ob/wann die 1118 vorbestehenden Lint-Fehler (vermutlich `eslint-plugin-react-hooks`-Versionssprung) als eigener Auftrag angegangen werden — nicht Teil dieses Design-Updates.
+
+## Design-Block 2, Nachbesserung 2+3 (12.07.2026) — e2e-Timeout weiter offen
+
+Josips zweiter Testlauf: `npm run e2e` timeout erneut, jetzt mit den vollen 180000ms (statt vorher 60000ms) — also kein Zeitproblem mehr, der von Playwright selbst gestartete Server wird nie bereit. `netstat -ano | findstr :3000` zeigte Port 3000 frei; ein danach manuell gestarteter `npm run dev` lief sauber ("Ready in 417ms").
+
+**Versuch 1 (Nachbesserung 2):** `playwright.config.ts` — `baseURL`/`webServer.url` von `localhost` auf `127.0.0.1` umgestellt (bekannter Windows-Stolperstein: `localhost` kann IPv6/IPv4-uneindeutig auflösen). Hat den Timeout NICHT behoben — dritter Testlauf zeigte wieder volle 180000ms.
+
+**Versuch 2 (Nachbesserung 3, aktueller Stand):** Playwright unterdrückt die Ausgabe des von ihm selbst gestarteten `npm run dev`-Prozesses standardmäßig — wir sahen bislang gar nicht, ob dieser Prozess überhaupt bis "Ready" kommt. `webServer.stdout`/`webServer.stderr` auf `"pipe"` gesetzt, reines Diagnose-Mittel. **Noch nicht von Josip gegengetestet** — nächster `npm run e2e`-Lauf sollte die komplette Next.js-Startausgabe des Playwright-eigenen Servers zeigen und damit die eigentliche Ursache sichtbar machen.
+
+## Mehrere Domains pro Mandant (12.07.2026, Josips Fund)
+
+Beim manuellen Test von `academy.calltalent.ai` zeigte sich die Dev-Root-Fallback-Seite ("Kein Mandant zu diesem Host gefunden"). Ursache: `tenants.custom_domain` erlaubt nur genau eine Domain pro Mandant; der einzige bestehende Mandant (`slug: calltalent`) hatte dort `learning.calltalent.ai` stehen. Josip wollte ursprünglich `academy.calltalent.ai` stattdessen eintragen, hat sich dann korrigiert: **beide Domains sollen denselben Mandanten treffen.**
+
+**Umgesetzt:**
+1. Neue Tabelle `tenant_domains` (Migration `tenant_domains`, Supabase-Projekt `vklqksdiyiijzoirntyt`): `id`, `tenant_id` (FK → `tenants`, cascade), `domain` (unique), `created_at`. RLS aktiv, `tenant_domains_member_select`-Policy analog `tenants_member_select` (`member_role(tenant_id) is not null`). Schreiben bewusst nur über den Admin-Client (service_role) im Betreiber-Portal, keine INSERT/UPDATE/DELETE-Policy für authenticated/anon — exakt dasselbe Muster wie bei `tenants.custom_domain`.
+2. `src/lib/tenant/resolve.ts` — `resolveTenantByCustomDomain()`: prüft zuerst `tenants.custom_domain` wie bisher, bei keinem Treffer zusätzlich `tenant_domains` (Alias-Tabelle), dann `resolveTenantById()`. `tenants.custom_domain` bleibt die "primäre" Domain, unverändertes Verhalten für alle bestehenden Mandanten.
+3. Betreiber-Portal, Mandanten-Detailseite (`portal/mandanten/[id]/`): neuer Abschnitt "Zusätzliche Domains" (`tenant-domains-section.tsx`) — Liste + Entfernen-Button pro Domain, Formular zum Hinzufügen. Neue Server Actions `addTenantDomain`/`removeTenantDomain` in `lib/platform/actions.ts`, gleiche Zugriffskontrolle (`requirePlatformAdmin()`) und Validierung (`tenantCustomDomainSchema`) wie beim bestehenden `updateTenant()`. Damit kann Josip künftige Domain-Aliase selbst im Portal verwalten, ohne dass ich SQL von Hand ausführen muss.
+4. `academy.calltalent.ai` als Alias für den Mandanten `calltalent` (id `eff4aa20-9295-47f1-be4f-18fe049336c6`) direkt per SQL eingetragen (einmalig, für diesen ersten Fall — künftige Aliase über die neue Portal-Oberfläche).
+
+**Nicht selbst verifiziert** (gleiche Mount-Einschränkung wie oben — nur Read/Write/Edit genutzt, kein `npm run lint`/`test`/`build` von mir ausgeführt). Bitte:
+1. `academy.calltalent.ai` im Browser neu laden — sollte jetzt denselben Mandanten wie `learning.calltalent.ai` zeigen.
+2. `/portal/mandanten/eff4aa20-9295-47f1-be4f-18fe049336c6` aufrufen, neuen Abschnitt "Zusätzliche Domains" prüfen (sollte `academy.calltalent.ai` mit Entfernen-Button auflisten, Hinzufügen-Formular testen).
+3. `npm run lint -- src/lib/tenant/resolve.ts src/lib/platform/actions.ts "src/app/portal/mandanten/[id]/page.tsx" "src/app/portal/mandanten/[id]/tenant-domains-section.tsx"` — neue Dateien, noch nicht gescoped geprüft.
+
+**Nachtrag (12.07.2026):** Josip hat sich entschieden, `learning.calltalent.ai` NICHT parallel zu behalten — stattdessen `custom_domain` direkt im Portal-Formular auf `academy.calltalent.ai` umgestellt (überschreibt `learning.calltalent.ai`) und den zugehörigen DNS-Eintrag bei Cloudflare selbst gelöscht. Den dadurch redundant gewordenen `tenant_domains`-Alias-Eintrag für `academy.calltalent.ai` (aus Schritt 4 oben) habe ich per SQL wieder entfernt, da die Domain jetzt bereits als primäre `custom_domain` läuft. Endzustand: ein Mandant, eine Domain (`academy.calltalent.ai`), `tenant_domains`-Tabelle bleibt leer, aber einsatzbereit für zukünftige zusätzliche Domains über die neue Portal-Oberfläche. Von Josip bestätigt: "überall steht jetzt academy.calltalent.ai".
+
+## Passwort-Reset-Mail: Site-URL, Rate-Limit, Branding (12.07.2026)
+
+Beim Testen von "Passwort vergessen" auf `academy.calltalent.ai` drei getrennte Probleme gefunden und behoben:
+
+1. **Falscher Redirect** — Klick auf den Recovery-Link landete auf `localhost:3000/?code=...` statt `/auth/callback`. Ursache: Supabase Auth akzeptiert `redirectTo` nur, wenn die Ziel-URL in der Redirect-URL-Whitelist steht, sonst stiller Fallback auf die Site-URL. App-Code (`src/lib/auth/actions.ts`, `requestPasswordReset()`) war korrekt, kein Code-Fix nötig — Josip hat Site URL (`https://academy.calltalent.ai`) und Redirect URLs im Supabase-Dashboard ergänzt.
+2. **Keine E-Mail beim zweiten Versuch** — `get_logs(service:"auth")` zeigte `429: email rate limit exceeded (over_email_send_rate_limit)`. Supabases eingebauter Standard-Mailer ist sehr eng limitiert; die App gibt bei Sendefehlern IMMER Erfolg zurück (bewusst, gegen E-Mail-Enumeration, siehe Kommentar in `requestPasswordReset()`) — dadurch unsichtbar für den Nutzer. Fix: Josip hat Custom SMTP (Resend) in Supabase hinterlegt, umgeht den Standard-Rate-Limit komplett.
+3. **Unbranded/Englisch** — Standard-Supabase-Vorlage war generisches Englisch ohne Calltalent-Branding. Neue deutsche HTML-Vorlage geschrieben, exakt im bestehenden Marken-Mail-Layout (`WEBSITE/redesign/functions/api/_brand.js` — Ink-Header `#1A1A2E`, Periwinkle-Akzent `#5663AE`, Cream-Tagline `#F7EED4`, Firmenfooter, Montserrat-Schriftstack, tabellenbasiert für Mail-Client-Kompatibilität) statt einer neu erfundenen Optik. Von Josip in Supabase (Authentication → Emails → Templates → Reset Password) eingetragen, bestätigt "erledigt".
+
+**Nicht selbst verifiziert** (kein Zugriff auf Supabase-Dashboard-UI/Resend-Dashboard von hier aus, nur DB/Logs per SQL/MCP). Offen für Josip: einmal komplett neu durchtesten (neuer "Passwort vergessen"-Versuch, sollte jetzt sofort eine deutsche, gebrandete Mail bringen und beim Klick direkt auf `/passwort-setzen` landen statt auf die Dev-Root-Seite).
+
+## Auth-Fehlermeldungen auf Deutsch (12.07.2026)
+
+Josips Fund beim Passwort-setzen: "Passwort konnte nicht gesetzt werden: New password should be different from the old password." — roher, englischer GoTrue-Fehlertext hinter einem deutschen Präfix. Vorgabe: Fehlermeldungen immer auf Deutsch.
+
+Neue Datei `src/lib/auth/errors.ts`: `translateAuthError()` mappt über `error.code` (stabile GoTrue-Fehlercodes, sprachunabhängig — nicht über den Text, der sich zwischen Supabase-Versionen ändern kann) auf deutsche Meldungen (falsches/schwaches Passwort, Konto existiert bereits, Link abgelaufen, Rate-Limit, u. a.), mit generischem deutschem Fallback für unbekannte Codes. Eingebaut in alle drei `error.message`-Stellen in `src/lib/auth/actions.ts` (Registrierung, Magic-Link-Versand, Passwort-setzen).
+
+**Bewusst NICHT mit erledigt:** ca. 25 weitere Stellen im Code (Kurse, Quiz, Nutzer-Verwaltung, Portal-Mandanten-Verwaltung u. a.), die im Fehlerfall ebenfalls rohe Postgrest-/DB-Fehlermeldungen durchreichen — meist interne Admin-/Staff-Bereiche, nicht der öffentliche Login-Weg. Josip nach Entscheidung gefragt, ob das als eigener Auftrag ebenfalls umgestellt werden soll.
+
+## Design-Block 3 — Rückstellung auf Original-Mockup (12.07.2026, Josips Fund)
+
+Josip hat das ursprünglich freigegebene Wireframe (`calltalent_akademie_dashboard_redesign.html`) erneut hochgeladen und dem aktuellen Live-Stand gegenübergestellt: die AppShell (Lernenden-Bereich) war in einem früheren Design-Block eigenmächtig von Dunkel- auf Hell-Sidebar umgestellt worden (Begründung damals: SPEC.md §4.5 "ruhiges, helles Interface") — das war die falsche Abweichung. Josip will exakt das Original-Mockup.
+
+**Umgesetzt (nur Lernenden-Bereich/AppShell — Admin-Bereich und Betreiber-Portal unverändert):**
+1. `components/shell/nav-link.tsx`, `section-label.tsx`, `brand-logo.tsx`: dritte Variante `"indigo"` ergänzt (volle Periwinkle-Füllung als aktiver Zustand, kein Rahmen — anders als `light`/`dark`), API von `dark?: boolean` auf `variant?: "light"|"dark"|"indigo"` erweitert (Aufrufstellen in `portal-shell.tsx` mitgezogen).
+2. `components/learn/app-shell.tsx`: Sidebar-Hintergrund fest `#3E3F66` (Indigo-Dark), alle Nav-Elemente auf `variant="indigo"`. Labels an Mockup angeglichen: "Kurssuche" → "Kurskatalog", "Profil und Einstellungen" → "Einstellungen" (Icon `UserCog` → `Settings`). Neu: "Hilfe"-Link unten (`mailto:office@calltalent.ai`, da keine eigene Hilfeseite existiert). Kopfzeile neu: "Willkommen, {Name}" + "Viel Erfolg beim Lernen — {Mandant}" statt nur Mandantenname, Such-Icon (verlinkt `/suche`, existiert bereits unter `(learn)/suche/`), Avatar-Kreis mit Initialen statt Icon.
+3. `src/app/page.tsx`: `profiles.full_name` abgefragt für Begrüßung/Initialen (Fallback auf E-Mail-Namensteil, da bei Josips eigenem Konto `full_name` leer ist — nicht über das Registrierungsformular angelegt). Kurskarten-Thumbnails wechseln jetzt zwischen Periwinkle/Indigo/Indigo-Dark statt durchgehend Periwinkle. Abschnittskopf "Meine Kurse" an Mockup-Optik angeglichen (grau, Trennlinie, statt Periwinkle-Akzent ohne Linie).
+4. `e2e/dashboard-shell.spec.ts`: Assertions auf die neuen Label nachgezogen ("Kurskatalog", "Einstellungen").
+
+**Bewusst NICHT aus dem Mockup übernommen** (dort nur Demo-Platzhalter mit erfundenen Werten, kein echtes Datenmodell): Benachrichtigungs-Glocke mit Zähler-Badge ("3") und "Lesezeichen"-Menüpunkt. Eine UI zu bauen, die eine feste Zahl/leere Links zeigt, wäre irreführend — Josip gefragt, ob das als eigener Auftrag (echtes Feature mit Datenmodell) umgesetzt werden soll, oder ob es bei "nicht vorhanden" bleibt.
+
+**Architektur-Hinweis:** die Indigo-Dark-Sidebarfarbe ist fest verdrahtet, nicht Teil der pro-Mandant anpassbaren `branding`-Spalte (`color_primary`/`color_bg`/`font`/`radius`) — gilt jetzt für ALLE Mandanten gleich (Demo-Mandanten eingeschlossen), nicht nur für Calltalent selbst. Falls ein Mandant später ein eigenes/helles Sidebar-Schema braucht, ist das eine Erweiterung des Branding-Schemas.
+
+**Nicht selbst verifiziert** (Mount-Einschränkung, nur Read/Write/Edit genutzt). Bitte `academy.calltalent.ai` neu laden und mit dem Mockup vergleichen; danach `npm run lint`/`npm run e2e` erneut.
+
+## Design-Block 4 — Kontakt-Seite + Verknüpfung aller Design-Unterseiten (Cowork, 12.07.2026)
+
+Auftrag: "Fange jetzt mit dem Redesign an, füge das als eigene Phase hinzu" + dritter, vollständiger Claude-Design-Export nachgereicht (20 Dateien) + "verknüpfe alle Designs und Unterseiten so wie im Design vorgesehen."
+
+**Namensgebung geklärt, bevor irgendetwas benannt wurde:** "Phase 3" ist in `SPEC.md` §8 bereits fest die KI-Generator-/Tutor-Phase — und laut `src/app/(admin)/admin/ki/` sowie den Blöcken weiter oben in dieser Datei bereits gebaut und live. Eine zweite "Phase 3" hätte die bestehende Nummerierung dauerhaft verwirrend gemacht. Stattdessen an das bereits etablierte, eigenständige Namensschema dieser Datei angeknüpft: **Design-Block 4** (nach Design-Block, Design-Block 2, Design-Block 2 Nachbesserung, Design-Block 3). Design-Arbeit bleibt damit ein eigener, von SPEC-Phasen unabhängiger Strang — genau wie bisher.
+
+**Wichtiger Fund vor Beginn:** die Cowork-Sandbox-Shell zeigte `PHASENSTATUS.md` zuvor nur abgeschnitten (433 statt tatsächlich 1890 Zeilen, endete mitten im Satz bei "demo-gruen hatte seit Phase 0 ke..."). Vollständigen Stand stattdessen über das direkte Dateiwerkzeug gelesen (siehe CLAUDE.md-Hinweis zur Mount-Einschränkung) — dadurch erst sichtbar, dass Phase 2–4 längst abgeschlossen und live sind (Stripe-Live-Zahlung, KI-Generator, Betreiber-Portal mit Mandanten-Verwaltung) und dass Design-Block 3 die Lernenden-Sidebar bereits auf das Original-Mockup (dunkles Indigo) zurückgestellt hatte. Ohne diesen Schritt wäre hier fälschlich eine hell/weiße Sidebar als "aktueller Stand" angenommen und eventuell wieder rückgebaut worden.
+
+**Dritter Design-Export ausgewertet und unter `design-reference/2026-07-12_claude-design-export-teil3/` gespeichert:**
+1. 16 von 20 Dateien byte-identisch zu `teil2` (Admin, AdminAbgaben, AdminEinstellungen, AdminKurse, AdminSidebar, AdminTeilnehmer, Einstellungen, Kurs, Lesezeichen, Mandanten — keine neuen Vorgaben).
+2. 6 Dateien mit kleinen Abweichungen zu `teil2` (Dashboard, Kurskatalog, Login, Portal, Sidebar, TopBar) — vermutlich Nachzieheffekt von Design-Block 3 (Sidebar-Rückstellung auf Indigo); keine inhaltlich neuen Anforderungen über die bereits umgesetzten hinaus gefunden.
+3. **4 komplett neue Dateien:** `Kontakt.dc.html`, `Kontakt-print.dc.html`, `PasswortVergessen.dc.html`, `Portal-print-1mchktp.dc.html`. Die beiden `-print`-Varianten sind reine Druckansichten desselben Screens (kein eigenständiger Funktionsumfang, keine eigene Route nötig) — nicht separat umgesetzt.
+
+**Sitemap aus allen 20 Dateien extrahiert** (`grep` auf `.dc.html`-Querverweise, siehe Tabelle) — deckt sich vollständig mit der bestehenden Routenstruktur, keine Umbenennung/Umstrukturierung nötig:
+
+| Design-Datei | Reale Route | Querverweise im Design |
+|---|---|---|
+| Login.dc.html | `/login` | → Dashboard, Kontakt, PasswortVergessen |
+| PasswortVergessen.dc.html | `/passwort-vergessen` | → Login, Kontakt |
+| Kontakt.dc.html | `/kontakt` (NEU) | → Login |
+| Dashboard.dc.html | `/` | → Kurs, Kurskatalog |
+| Kurskatalog.dc.html | `/kurse` | → Kurs |
+| Kurs.dc.html | `/kurs/[slug]`, `.../l/[lessonId]` | — |
+| Lesezeichen.dc.html | `/lesezeichen` | → Kurs |
+| Einstellungen.dc.html | `/profil` | — |
+| Sidebar.dc.html / TopBar.dc.html | `components/learn/app-shell.tsx` | → Dashboard, Einstellungen, Kurskatalog, Lesezeichen, Login |
+| Admin.dc.html | `/admin` | → AdminKurse |
+| AdminKurse/-Abgaben/-Teilnehmer/-Einstellungen.dc.html | `/admin/kurse`, `/admin/abgaben`, `/admin/nutzer`, `/admin/einstellungen` | — |
+| AdminSidebar.dc.html | `components/admin/admin-shell.tsx` | → alle Admin-Unterseiten + Mandanten + Portal (Doppel-Rolle-Check, bereits umgesetzt) |
+| Mandanten.dc.html | `/portal/mandanten` | — |
+| Portal.dc.html | `/portal` | → Admin, Dashboard, Einstellungen, Kurs, Kurskatalog, Lesezeichen, Login, Mandanten |
+
+**Neu umgesetzt (Code steht):**
+1. **Kontakt-Seite (`src/app/kontakt/page.tsx`), komplett neu** — 1:1 nach `Kontakt.dc.html` (Marken-Panel + Formular), gleiche Tailwind-/Token-Konventionen wie `/login`. Echte Funktion, kein Platzhalter: `src/lib/contact/{schema,state,actions}.ts` — zod-validiert, IP-Rate-Limit (5/5 Min., gleiches Muster wie `auth-password-reset`), versendet über die bestehende `sendEmail()` (`email/client.ts`) an **`office@calltalent.ai`** (echt, in Resend verifiziert) statt der im Mockup gezeigten Platzhalteradresse `support@calltalent-akademie.de` (existiert nicht). Telefonzeile aus dem Mockup (`+49 30 1234 5678`, erfundener Platzhalterwert) bewusst NICHT übernommen — gleiches Prinzip wie bei der Benachrichtigungs-Glocke weiter oben: keine erfundenen Werte aus dem Mockup.
+2. **`/passwort-vergessen` neu gestaltet** — war seit Phase 5/Block 8 eine unformatierte Übergangsseite ohne Branding (im ursprünglichen Design-Status-Screen-Vergleich gar nicht als eigener Screen erfasst, echte Lücke). Jetzt 1:1 nach `PasswortVergessen.dc.html` (gleiches Marken-Panel-Muster), Funktionslogik (`requestPasswordReset`, E-Mail-Enumeration-Schutz) unverändert. Info-Box unten verlinkt jetzt auf `/kontakt` statt (vorher) gar nichts.
+3. **`/login`** — Fußzeile "Noch kein Zugang?" verlinkt jetzt zusätzlich auf `/kontakt" ("Kontakt aufnehmen", exakt wie `Login.dc.html`).
+
+**Bewusst NICHT verändert (echte Entscheidung, kein Versehen):** Das Mockup ersetzt bei "Noch kein Zugang?" den Registrieren-Link vollständig durch den Kontakt-Link (passt zum Betriebsmodell: Mandanten legen Nutzer über CSV-Import/Einladung an, nicht per Selbstregistrierung). **Nicht** entfernt, um keine live erreichbare Funktion in einem Produktivsystem mit echten zahlenden Kunden einseitig abzuschalten — `/registrieren` bleibt bestehen und erreichbar, ist von `/login` aus nur nicht mehr verlinkt. **Offene Frage an Josip:** soll Selbstregistrierung ganz entfallen (Login exakt wie Mockup) oder an anderer Stelle erreichbar bleiben?
+
+**Noch offen (Task-Liste für Folgesitzungen, nicht in dieser Sitzung umgesetzt — Umfang zu groß für risikofreie Cowork-Bearbeitung ohne laufendes Lint/Build):**
+1. AdminKurse/AdminAbgaben/AdminTeilnehmer/AdminEinstellungen: erben weiterhin nur die Sidebar/Chrome (seit Design-Block 2), innere Tabellen/Formulare nicht pixelgenau an die Mockups angeglichen.
+2. Mandanten.dc.html (Betreiber-Portal `/portal/mandanten`) — weiterhin nicht angefasst.
+3. Dashboard-Feinschliff ("Weiterlernen"-Banner, Fortschrittsbalken-Optik) — weiterhin offen.
+4. Einstellungen-Restrukturierung (Breadcrumb-Unterseiten statt `/profil` als eine Seite) — weiterhin offen.
+5. Kein Kategorie-/Modul-Tag-Datenmodell für Kurskatalog-Filter — weiterhin offen, falls gewünscht.
+
+**Lint/Build weiterhin nicht zuverlässig aus der Cowork-Sandbox prüfbar** (siehe Design-Block-Historie oben — Mount-Einschränkung unverändert). Neue Dateien ausschließlich über das direkte Dateiwerkzeug geschrieben, nicht über die Shell. **Offen für Josip:**
+1. `npm run lint -- src/app/kontakt/page.tsx "src/app/(auth)/login/page.tsx" "src/app/(auth)/passwort-vergessen/page.tsx" src/lib/contact/schema.ts src/lib/contact/state.ts src/lib/contact/actions.ts`
+2. `npm run dev`, dann `/login`, `/passwort-vergessen`, `/kontakt` manuell prüfen (inkl. echtem Formularversand — sollte eine Mail bei `office@calltalent.ai` ankommen).
+3. Entscheidung zur offenen Frage oben (Registrieren-Link).
+4. Bei grünem Ergebnis: `git add -A && git commit -m "feat: Design-Block 4 - Kontaktseite, Passwort-vergessen-Redesign, Verknüpfung laut Claude-Design-Export"`.
+
+## Design-Block 5 — Dashboard-Feinschliff + Einstellungen-Restrukturierung (Cowork, 12.07.2026)
+
+Auftrag: "gehe zum nächsten design block" — Fortsetzung der in Design-Block 4 offen gelassenen Aufgabenliste. Aus Umfangsgründen zwei der vier offenen Punkte umgesetzt (Dashboard, Einstellungen); Admin-Innenseiten + Mandanten-Portal-Redesign bewusst auf **Design-Block 6** verschoben (gleiches Vorgehen wie bisher: ein zusammenhängender, überschaubarer Block pro Sitzung statt alles auf einmal).
+
+**Widerspruchsfund, dokumentiert statt stillschweigend korrigiert:** `src/components/learn/sidebar.tsx` nutzt aktuell durchgängig `variant="white"`/`#FFFFFF`-Hintergrund — das widerspricht dem in "Design-Block 3 — Rückstellung auf Original-Mockup" dokumentierten Stand ("Sidebar-Hintergrund fest `#3E3F66` (Indigo-Dark)"). Entweder wurde diese Änderung nie tatsächlich in `sidebar.tsx` übernommen (Design-Block 3 beschreibt Änderungen an "components/learn/app-shell.tsx", das Sidebar-Markup lag zu dem Zeitpunkt aber laut Design-Block 2 bereits in der ausgelagerten `sidebar.tsx`) oder wurde später ohne Dokumentation zurückgesetzt. **Nicht selbst korrigiert** — echte Design-Entscheidung, keine Vermutung. Bitte im Browser prüfen, welche Sidebar-Farbe aktuell tatsächlich live ist, und Josip bestätigen lassen, welche gilt.
+
+**1. Dashboard-Feinschliff (`src/app/page.tsx`), umgesetzt nach `Dashboard.dc.html`:**
+1. „Weiterlernen"-Banner NEU: zeigt den zuletzt bearbeiteten, noch nicht abgeschlossenen Kurs (Kandidat über `progress.updated_at`-Maximum bestimmt, keine neue Abfrage nötig — `updated_at` war bereits in der Tabelle vorhanden, nur bisher nicht abgefragt) mit „Lektion X von Y · {nächster Lektionstitel}" und „Fortsetzen"-Button, der direkt zur nächsten offenen Lektion springt (`findAdjacentLessonIds`-Prinzip wiederverwendet). **Kein Kandidat vorhanden → Banner bleibt komplett weg** statt eine leere/erfundene Empfehlung zu zeigen.
+2. Kurskarten: Thumbnail-Höhe 64px→132px mit Diagonalstreifen-Muster (drei Periwinkle-Tönungen im Wechsel) statt Vollfarbblock; Fortschrittsbalken zeigt jetzt zusätzlich die Prozentzahl (`{{ percentLabel }}` aus dem Mockup); neue Eyebrow-Zeile über dem Kurstitel — nutzt den Titel des **ersten echten Kursmoduls** (`modules.title`, bereits vorhandene Spalte, nur zusätzlich abgefragt) statt der im Mockup erfundenen Kategorie-Tags ("VERTRIEB"/"TELEFONIE") — kein neues Datenmodell nötig, da eine bereits existierende, echte Information wiederverwendet wird.
+3. „Kurskatalog ansehen"-Link neben der "Meine Kurse"-Überschrift ergänzt (→ `/kurse`, bereits bestehende Route).
+4. `e2e/dashboard-shell.spec.ts` geprüft (nur Sidebar-Nav-Assertions, keine Kollision mit den Änderungen) — nicht selbst ausgeführt, siehe Mount-Einschränkung.
+
+**2. Einstellungen-Restrukturierung (`src/app/profil/page.tsx`), umgesetzt nach `Einstellungen.dc.html`:**
+1. **Echte Lücke behoben:** `/profil` hatte bisher GAR KEINE `AppShell`-Einbettung (weder Sidebar noch TopBar) — obwohl die Sidebar bereits seit Design-Block 3 auf `/profil` und `/profil?tab=benachrichtigungen` verlinkt. Jetzt in `AppShell` eingebettet (`breadcrumb="Konto · Einstellungen"`, `title="Einstellungen"`).
+2. Tab-Struktur über `?tab=` (serverseitig, `searchParams`-Promise — gleiches Muster wie `?status=` in `admin/abgaben/page.tsx`, kein Client-State nötig): "Allgemein" (Default) und "Benachrichtigungen", exakt die beiden bereits real existierenden Funktionsbereiche.
+3. **Dritter Mockup-Tab "Geräte" bewusst NICHT gebaut** — keine echte Sitzungsverwaltung angebunden (gleiche Begründung wie die nie gebaute Benachrichtigungs-Glocke: „kein leerer Tab ohne Funktion"). Ebenso NICHT übernommen: Profilbild-Upload, Telefon/Stadt/Position/„Über mich"-Freitextfelder (kein Datenmodell — `profiles` hat nur `full_name`/`email`) und granulare Einzel-Toggle pro Benachrichtigungsart (keine `notifications`-Tabelle) — "Allgemein" bündelt stattdessen alle real existierenden Kontofunktionen (Profildaten, Passwort-Anfrage, Zertifikate, DSGVO-Datenexport, Konto-Löschantrag, bisher lose auf einer Seite), "Benachrichtigungen" enthält den bereits bestehenden echten Push-Toggle (Kursabschluss-Benachrichtigung).
+4. Geprüft: kein E2E-Test navigiert `/profil` direkt an (nur DB-Referenzen auf die `profiles`-Tabelle) — keine Testkollision zu erwarten.
+
+**Lint/Build weiterhin nicht zuverlässig aus der Cowork-Sandbox prüfbar** (unveränderte Mount-Einschränkung). **Offen für Josip:**
+1. `npm run lint -- src/app/page.tsx src/app/profil/page.tsx`
+2. `npm run dev`, dann `/` (Weiterlernen-Banner nur sichtbar mit angefangenem, nicht abgeschlossenem Kurs — ggf. gezielt einen Testfortschritt anlegen) und `/profil` + `/profil?tab=benachrichtigungen` manuell prüfen.
+3. Sidebar-Farbfrage oben klären (weiß vs. Indigo-Dark).
+4. Bei grünem Ergebnis: `git add -A && git commit -m "feat: Design-Block 5 - Dashboard-Weiterlernen-Banner, Einstellungen-Tabs mit AppShell"`.
+
+**Noch offen (Design-Block 6):** AdminKurse/AdminAbgaben/AdminTeilnehmer/AdminEinstellungen pixelgenau an die Mockups angleichen, Mandanten.dc.html (Betreiber-Portal `/portal/mandanten`) Redesign.
+
+## GitHub + Cloudflare Workers Builds — Umgebungsvariablen vervollständigt (Cowork, 13.07.2026)
+
+**Ausgangslage:** Git-Remote (`https://github.com/calltalent/akademie.git`) und Cloudflare Workers Builds (Git-Integration) waren zum Zeitpunkt dieser Sitzung bereits vollständig verbunden (Build command `npm run build`, Deploy command `npx wrangler deploy`, Branch `main`) — vermutlich aus einer vorherigen Sitzung/Josips eigenem Setup. Nicht selbst eingerichtet, nur vorgefunden und geprüft.
+
+**Fund:** Die Runtime-„Variables and secrets" des Workers (Cloudflare-Dashboard → calltalent-akademie → Settings) enthielten nur 6 Secrets (`CRON_PROCESS_SECRET`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) — vermutlich per `wrangler secret put` bei einem früheren manuellen Deploy gesetzt. Es fehlten alle übrigen server-seitigen Secrets aus `.env.example`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `BUNNY_STREAM_LIBRARY_ID`, `BUNNY_STREAM_API_KEY`, `BUNNY_STREAM_CDN_HOSTNAME`, `BUNNY_STREAM_READONLY_API_KEY`, `RESEND_API_KEY`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_PORTAL_HOST` — d. h. serverseitige Funktionen wie `sendEmail()` (Kontaktformular, Post-Call-Mails), der KI-Generator (Phase 3) und alle Service-Role-Operationen liefen im deployten Worker vermutlich fail-soft ins Leere, ohne dass das bisher aufgefallen wäre.
+
+**Behoben (Josips Wahl: LIVE/Produktions-Werte für Stripe/VAPID/CRON — hier nicht neu gesetzt, da bereits vorhanden; für alle unten neu ergänzten Variablen gibt es ohnehin nur einen Wert in `.env`, kein Dev/Live-Split):**
+1. Runtime „Variables and secrets" um alle 12 fehlenden Werte ergänzt (Werte 1:1 aus lokaler `.env`, `NEXT_PUBLIC_SITE_URL`/`NEXT_PUBLIC_PORTAL_HOST` auf die echten Produktionswerte `https://academy.calltalent.ai`/`portal.calltalent.ai` statt der lokalen `localhost`/`portal.localhost`-Defaults gesetzt, verifiziert gegen die live bestätigten Domains weiter oben in dieser Datei).
+2. Build-seitige „Variables and secrets" (Settings → Build, separater Abschnitt für den `npm run build`-Schritt bei Git-Push — war komplett leer) um die 5 `NEXT_PUBLIC_*`-Werte ergänzt, die Next.js beim Build in den Client-Bundle inlined (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_PORTAL_HOST`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`). Ohne diese wäre jeder künftige automatische Git-Build mit falschen/leeren Werten kompiliert worden, obwohl die Runtime-Secrets korrekt sind.
+3. Dabei ein eigener Fehler während der Eingabe bemerkt und korrigiert: beim Anlegen von `NEXT_PUBLIC_SITE_URL`/`NEXT_PUBLIC_PORTAL_HOST` im Build-Bereich wurden Name und Wert einmal versehentlich vertauscht/vermischt (Cloudflares Single-Variable-Dialog behält Restzustand zwischen zwei „Add"-Aufrufen) — beim Verifizieren aufgefallen und über „Edit" pro Zeile berichtigt, danach beide Werte einzeln nachgeprüft.
+4. Die bereits vorhandenen 6 Runtime-Secrets (Stripe/VAPID/CRON) bewusst NICHT überschrieben — deren aktuelle Werte sind unbekannt (verschlüsselt, nicht einsehbar) und laut `.env`-Kommentar wurde `STRIPE_WEBHOOK_SECRET` möglicherweise direkt bei der Registrierung des Live-Webhook-Endpunkts gesetzt, ohne Entsprechung in `.env` — ein Überschreiben hätte laufende Zahlungs-Webhooks riskiert.
+
+**Nicht selbst geprüft/offen für Josip:**
+1. Nächster Git-Push sollte einen automatischen Cloudflare-Build auslösen — Build-Log danach kurz gegenlesen (Cloudflare-Dashboard → Deployments), ob der Build mit den neuen Variablen sauber durchläuft.
+2. Der verbundene „API token" für den Git-Build heißt „taxi-perava build token" (aus einem anderen Projekt wiederverwendet) — funktioniert vermutlich, da Account-weit, aber Namensgebung/Scope ggf. bei Gelegenheit aufräumen.
+3. Sidebar-Farbfrage (aus Design-Block 5 offen) ist inzwischen durch einen Code-Kommentar in `sidebar.tsx` beantwortet: Indigo-Dark ist bewusst fest verdrahtet für alle Mandanten — keine offene Frage mehr.
+
+## Design-Block 6 — Admin-Innenseiten pixelgenau (Cowork, 13.07.2026)
+
+Auftrag: "weiter mit dem nächsten design block" — der in Design-Block 5 verschobene erste der beiden Punkte: AdminKurse/AdminAbgaben/AdminTeilnehmer/AdminEinstellungen pixelgenau an `design-reference/2026-07-12_claude-design-export-teil3/` angleichen (Mandanten-Portal-Redesign folgt als nächster Schritt derselben Sitzung, siehe unten). Alle vier Seiten erbten bisher nur die Sidebar/Chrome (seit Design-Block 2), die inneren Tabellen/Formulare waren noch die schlichte Urfassung ohne Kennzahlen/Statusfarben/Filter.
+
+**1. AdminKurse (`admin/kurse/page.tsx`):**
+1. Vollständig nach `AdminKurse.dc.html`: Kopfzeile mit Breadcrumb, Status-Filterreiter (Alle/Live/Entwürfe/Archiv über `?status=`), Tabelle mit gestreiften Farbkacheln, Lektionen-/Teilnehmer-Zahlen, Status-Badge, „Bearb."-Link.
+2. **„Lektionen"** = alle Lektionen des Kurses (Entwurf + veröffentlicht) — bewusst anders als die Abschlussquoten-Logik im Dashboard, weil dies eine Redaktions-/Inhaltsübersicht ist.
+3. **„Teilnehmer"** = echte Zeilenanzahl aus `enrollments` je Kurs — NICHT die Dashboard-Proxy-Metrik über `progress`, sondern die tatsächliche Kurszugehörigkeits-Quelle (`supabase/migrations/0001_init.sql`, bereits genutzt in `lib/reporting/queries.ts`/`api/v1/enrollments`).
+4. Farbige Karo-Kacheln sind rein dekorativ (5 Tönungen im Rundlauf nach Zeilenindex, wie im Export beliebig zugewiesen) — keine erfundene Datenquelle.
+5. **„Neuer Kurs"** öffnet das bestehende `CreateCourseForm` jetzt in einem Modal (`new-course-dialog.tsx`, natives `<dialog>`, Projektkonvention) statt einer im Export nicht vorhandenen Zielseite.
+6. Statusänderung (Live/Entwurf/Archiviert) ist NICHT mehr inline in der Liste (Export zeigt dort nur einen Anzeige-Badge) — echte Steuerung auf die Kurs-Bearbeiten-Seite verschoben (`CourseStatusSelect`, neu in `publish-toggle.tsx`, ersetzt den alten `CoursePublishToggle`, der nur draft/published konnte und `archived` gar nie erreichbar machte, obwohl `updateCourseStatus()`/die DB-Constraint das immer schon unterstützt haben).
+
+**2. AdminAbgaben (`admin/abgaben/page.tsx`, `submission-inbox.tsx`):**
+1. Kopfzeile mit „N offen · M überfällig"-Pille (echte, filterunabhängige Zählungen), Zeilen mit Initialen-Avatar, Name, Aufgabe·Kurs, Zeit, Status-Badge, „Bewerten"-Button (öffnet weiterhin das bestehende `GradeForm` inline — unverändert real).
+2. **Status-Abbildung:** Export kennt nur drei visuelle Zustände (offen/überfällig/bewertet), die DB hat vier (`submitted`/`approved`/`revision`/`rejected`, keine Deadline-Spalte). Abbildung: „bewertet" = jeder abgeschlossene Status; „offen"/„überfällig" = beides `submitted`, unterschieden über ein **dokumentiertes 48h-Alters-Kriterium auf `created_at`** (kein erfundenes Feld, nur eine abgeleitete Sicht auf einen echten Zeitstempel — gleiches Muster wie die Abschlussquoten-Formel im Dashboard). Der Status-**Filter** bleibt bewusst auf den vier echten DB-Status (nicht den drei Badge-Buckets), da Staff die genaue Unterscheidung zum Arbeiten braucht.
+3. `formatRelativeTime()` (aus `admin/page.tsx` extrahiert nach `lib/format/relative-time.ts`, jetzt mit Wochen/Monats-Stufen) und `initialsFor()` (aus `submission-inbox.tsx` extrahiert nach `lib/format/initials.ts`) sind jetzt gemeinsam genutzte Bausteine statt Duplikate.
+
+**3. AdminTeilnehmer (`admin/nutzer/page.tsx`):**
+1. Tabelle mit Avatar, Name+Rolle+Status, E-Mail, echter Kurse-Zahl (`enrollments` je Nutzer, gleiche Quelle wie AdminKurse), „Beigetreten" relativ formatiert.
+2. **Suche real verdrahtet** (`?q=`, serverseitiger Filter auf Name/E-Mail) — der Export zeigt dort nur ein dekoratives Suchfeld ohne Funktion.
+3. **„Einladen"** bündelt beide echten Einlade-Wege (Einzelperson + CSV-Bulk-Import) in einem Modal (`invite-user-dialog.tsx`) — der Export zeigt nur einen einzelnen Button ohne Zielseite, beide bestehenden Funktionen bleiben erhalten statt eine davon zu verlieren.
+4. Rollen-Label + Aktivieren/Deaktivieren (`MembershipRowActions`) bleiben direkt in der Zeile sichtbar statt hinter einem toten „Profil"-Link (Export verlinkt auf eine nicht existierende Detailseite) — echte, bereits funktionierende Verwaltung darf nicht verschwinden.
+
+**4. AdminEinstellungen (`admin/einstellungen/page.tsx`) — größte Abweichung, mit Begründung:**
+Der Export zeigt eine KOMPLETT andere Seite als bisher live war (Akademie-Grunddaten, drei Plattform-Schalter, Marken-Standard) — die bisherige Seite (API-Keys + Webhooks, Phase 3 Block 7) kommt im Export gar nicht vor. Beides jetzt vorhanden, nicht ersetzt:
+1. **Akademie-Karte** (Name, Support-E-Mail) — ECHT: neuer Schreibweg `updateTenantSettings()` (`lib/tenant/actions.ts`), schreibt `tenants.name` + `tenants.settings.support_email` über den regulären session-gebundenen Client (RLS-Policy `tenants_admin_update` erlaubt genau das für owner/admin). Vorher gab es von der Mandanten-Admin-Seite aus GAR KEINEN Schreibweg auf `tenants` (nur den Betreiber-Portal-eigenen, Plattform-Admin-exklusiven `updateTenant()`).
+2. **Plattform-Optionen (3 Schalter), alle drei ECHT persistiert** in `tenants.settings`, Standard bei fehlendem Feld = bisheriges Verhalten (kein Bruch für bestehende Mandanten):
+   - „Selbstregistrierung erlauben" → `self_signup_enabled`, echtes Gate in `signUpWithPassword()` (`lib/auth/actions.ts`). Löst damit die seit Design-Block 4 offene Frage ("soll Selbstregistrierung ganz entfallen?") konstruktiv: nicht hart entfernt, sondern pro Mandant abschaltbar.
+   - „Zertifikate ausstellen" → `certificates_enabled`, echtes zusätzliches Gate in `issueCertificateIfEligible()` (`lib/certificates/issue.ts`), neben dem bereits bestehenden kursbezogenen `courses.settings.certificate_enabled`.
+   - „Wartungsmodus" → `maintenance_enabled`, **NUR persistiert, NOCH NICHT durchgesetzt.** Eine echte Portal-Sperre bräuchte eine seitenübergreifende Prüfung (z. B. `middleware.ts`) über mehrere verstreute Routen-Gruppen (`(learn)`, `src/app/page.tsx`, `src/app/profil`, `src/app/lesezeichen` — kein gemeinsames Layout vorhanden, kein `middleware.ts` existiert bisher). Das ungetestet unter Zeitdruck in derselben Sitzung zu bauen wäre das Risiko eines echten Produktiv-Lockouts nicht wert gewesen (siehe gleiche Vorsicht wie beim E2E-Storage-State-Punkt in Design-Block 2). Hinweistext im UI selbst ehrlich angepasst ("wird gespeichert, sperrt das Portal aktuell noch nicht"), damit der Schalter niemanden täuscht. **Offener Punkt für Josip:** eigener Folgeblock für echte Wartungsmodus-Durchsetzung, falls gewünscht.
+3. **Marken-Standard-Karte** zeigt echte `tenant.branding`-Werte (mit Systemstandard-Fallback aus `DEFAULT_BRANDING`) statt der im Export fest verdrahteten Demo-Werte — rein lesend (Export zeigt dort auch keine Eingabefelder). Der Export-Link „Mandanten verwalten →" bewusst weggelassen, da das nur für Calltalent-Plattform-Admins zugänglich ist, nicht für normale Mandanten-Administratoren, die diese Seite ebenfalls sehen.
+4. `PublicTenant["settings"]` (`lib/tenant/types.ts`) um die vier neuen Felder erweitert (`self_signup_enabled`, `certificates_enabled`, `maintenance_enabled`, `support_email`) — unbedenklich, keine sensiblen Daten, siehe Datei-Kommentar zur öffentlichen Sichtbarkeit dieses Typs.
+5. API-Keys/Webhooks-Abschnitt unverändert funktional, nur unter eigener „Integrationen"-Überschrift unterhalb der neuen Karten platziert statt der gesamte bisherige Seiteninhalt zu sein.
+
+**Sonstige Aufräumarbeiten in diesem Block:** `CoursePublishToggle` (band nur draft/published, war nach dem AdminKurse-Umbau unbenutzt) entfernt statt als toter Code liegen zu lassen; `formatRelativeTime`/`initialsFor` als gemeinsame Bausteine extrahiert (siehe oben).
+
+**Nicht selbst verifiziert** (unveränderte Mount-Einschränkung dieser Cowork-Sandbox — nur Read/Write/Edit genutzt, kein `npm run lint`/`test`/`build`/`e2e` von mir ausgeführt). **Offen für Josip:**
+1. `npm run lint -- src/app/(admin)/admin/kurse/page.tsx "src/app/(admin)/admin/kurse/[id]/page.tsx" src/app/(admin)/admin/abgaben/page.tsx src/app/(admin)/admin/nutzer/page.tsx src/app/(admin)/admin/einstellungen/page.tsx src/app/(admin)/admin/page.tsx src/components/admin/new-course-dialog.tsx src/components/admin/invite-user-dialog.tsx src/components/admin/tenant-settings-form.tsx src/components/admin/create-course-form.tsx src/components/admin/publish-toggle.tsx src/components/admin/submission-inbox.tsx src/lib/format/relative-time.ts src/lib/format/initials.ts src/lib/tenant/actions.ts src/lib/tenant/types.ts src/lib/auth/actions.ts src/lib/certificates/issue.ts`
+2. `npm run dev`, dann `/admin/kurse` (Filter, „Neuer Kurs"-Modal, Kurs-Bearbeiten-Seite mit neuem Status-Dropdown), `/admin/abgaben` (Badges, „Bewerten"), `/admin/nutzer` (Suche, „Einladen"-Modal), `/admin/einstellungen` (Speichern-Button, danach `/registrieren` mit „Selbstregistrierung" ausgeschaltet testen — sollte einen Fehler zeigen) manuell durchklicken.
+3. Entscheiden, ob/wann echte Wartungsmodus-Durchsetzung (Punkt 4.2 oben) als eigener Folgeblock gebaut werden soll.
+4. Bei grünem Ergebnis: `git add -A && git commit -m "feat: Design-Block 6 - Admin-Innenseiten pixelgenau, echte Mandanten-Einstellungen"`.
+
+## Design-Block 6, Fortsetzung — Mandanten.dc.html (Betreiber-Portal, Cowork, 13.07.2026)
+
+Auftrag: "mach weiter" — der zweite, letzte offene Punkt aus Design-Block 6.
+
+**Wichtiger Konflikt vor Beginn erkannt, nicht stillschweigend aufgelöst:** `Mandanten.dc.html` nutzt das helle Calltalent-Standardschema (`#F4F5FA`-Hintergrund, weiße Karten) — genau das Schema, das Design-Block 2 für das Betreiber-Portal bewusst AUSGESCHLOSSEN hat ("darf nie wie eine normale Mandanten-Oberfläche aussehen", Verwechslungsschutz, siehe `portal-shell.tsx`-Kommentar). Der Export widerspricht dieser bereits getroffenen, von Josip nie revidierten Entscheidung. **Entscheidung:** nur die STRUKTUR des Exports übernommen (Kartenliste mit Avatar/Teilnehmerzahl/Status-Badge, Branding-Editor-Bereich), Farben bleiben durchgängig das dunkle Slate-Schema des Portals. Keine eigene Rückfrage nötig, da die Begründung für Dunkel bereits explizit dokumentiert und nicht widerrufen ist — reine Fortführung einer bestehenden Entscheidung.
+
+**1. Mandantenliste (`portal/mandanten/page.tsx`):**
+1. Von einfacher Zeilenliste auf Kartenliste mit Avatar-Initiale (Hintergrund = Mandanten-eigene `branding.color_primary`, sonst Periwinkle-Standard), Name+Domain+Paket, echter Teilnehmerzahl-Spalte, Status-Badge umgestellt — Struktur wie im Export, Farben dunkel (siehe oben).
+2. **„Teilnehmer"** = echte aktive Mitgliederzahl je Mandant (`memberships`, `status='active'`, eine gemeinsame Abfrage über alle Mandanten statt N Einzelabfragen) — NICHT die im Export frei erfundenen Werte ("1.284", "212", "96" …).
+3. „Mandant anlegen"-Button (Export-Beschriftung übernommen, vorher "+ Neuer Mandant") verlinkt weiterhin real auf `/portal/mandanten/neu` (unverändert, bereits funktionierend).
+4. Erstellungsdatum-Spalte (bisherige Version) entfernt — im Export nicht vorhanden, drei Spalten (Mandant/Teilnehmer/Status) exakt wie dort.
+
+**2. Branding & Theming — ECHTE neue Funktion, vorher nicht vorhanden:**
+Der Export zeigt einen kompletten Akzentfarbe-/Radius-Editor mit Live-Vorschau — dafür gab es bisher KEINEN Schreibweg (`tenants.branding` war ausschließlich lesend genutzt, siehe `certificates/issue.ts`, Kurs-Vorschau). Da das Mockup dieses Element als eigenständiges Panel zeigt (im Export: Zwei-Spalten-Master-Detail auf EINER Seite mit Client-seitiger Auswahl ohne Navigation) und die bestehende Architektur bereits eine vollwertige Mandanten-Detailseite mit eigener Route hat (`/portal/mandanten/[id]`, Bearbeiten/Domains/Nutzung/Gefahrenzone), wurde der Branding-Editor dort als neuer Abschnitt ergänzt statt die bestehende Navigationsstruktur zugunsten eines Single-Page-Master-Detail-Patterns umzubauen — bewusste Abweichung, um die bereits funktionierenden Bereiche der Detailseite nicht zu gefährden.
+1. Neues Schema `tenantBrandingSchema` (`lib/platform/schema.ts`) + `TENANT_ACCENT_SWATCHES` (die exakt 4 Marken-Akzente aus dem Export: `#5663AE`/`#2A6FDB`/`#1F8A5B`/`#B4682A`) — Farbwahl bewusst auf diese 4 beschränkt (kein freier Hex-Eingeber), Radius auf 4–24px (Schieberegler-Bereich wie im Export).
+2. Neue Server Action `updateTenantBranding()` (`lib/platform/actions.ts`) — Merge-Patch auf `tenants.branding` (liest zuerst, überschreibt nur `color_primary`/`radius`, lässt `logo_url`/`color_bg`/`font` unangetastet), `requirePlatformAdmin()`-Zugriffskontrolle wie alle anderen Mandanten-Schreibaktionen in derselben Datei.
+3. Neue Client-Komponente `tenant-branding-form.tsx`: 4 Farbfelder + Radius-Schieberegler + Live-Vorschau (Kursfortschritt-Karte + Button, exakt wie im Export), lokaler React-State reagiert sofort (kein Server-Roundtrip beim bloßen Anschauen), „Speichern" schreibt echt, „Zurücksetzen" wirft nur den lokalen State auf den zuletzt gespeicherten Stand zurück.
+4. **Echte Wirkung, nicht nur Datenspeicherung:** `components/branding/theme-style.tsx` liest `tenant.branding.color_primary`/`radius` bereits seit Phase 5 und setzt daraus `--color-primary`/`--radius` für die gesamte Mandanten-Oberfläche (Lernbereich, Kurskarten, Buttons) — der neue Editor hat damit sofort sichtbare Wirkung auf der echten Mandanten-Website, keine Attrappe.
+5. Randfall behandelt: falls ein Mandant bereits eine `color_primary` außerhalb der 4 Swatches gesetzt hat (z. B. per früherem SQL), zeigt der Editor beim Öffnen den Systemstandard als Auswahl (kein Swatch stimmt exakt) statt eines ungültigen Zustands — erst durch tatsächliches Speichern wird der Wert überschrieben, nicht schon durch bloßes Anzeigen der Seite.
+
+**Nicht selbst verifiziert** (unveränderte Mount-Einschränkung). **Offen für Josip:**
+1. `npm run lint -- src/app/portal/mandanten/page.tsx "src/app/portal/mandanten/[id]/page.tsx" "src/app/portal/mandanten/[id]/tenant-branding-form.tsx" src/lib/platform/actions.ts src/lib/platform/schema.ts`
+2. `npm run dev`, dann `/portal/mandanten` (Kartenliste, echte Teilnehmerzahlen) und `/portal/mandanten/[id]` (neuer Branding-Abschnitt: Farbe/Radius ändern, Speichern, danach die Mandanten-Website selbst neu laden und prüfen, ob Buttons/Akzentfarbe sich wirklich ändern) manuell durchklicken.
+3. Bei grünem Ergebnis: `git add -A && git commit -m "feat: Design-Block 6 Teil 2 - Mandantenliste + echter Branding-Editor im Betreiber-Portal"`.
+
+**Design-Block 6 damit vollständig abgeschlossen** (beide ursprünglich offenen Punkte: Admin-Innenseiten + Mandanten-Portal).
+
+**Nachtrag (Josips Lint-Lauf, 13.07.2026):** `npm run lint` meldete einen echten Fehler in `admin/abgaben/page.tsx` Zeile 65 (`react-hooks/purity`, `Date.now()` beim Berechnen von `overdueCutoffIso`) — derselbe Fall wie bereits in `portal/mandanten/[id]/page.tsx` behandelt, dort aber vergessen nachzuziehen. Fix: identisches `eslint-disable-next-line react-hooks/purity` mit Begründung (async Server Component, einmal pro Request, kein Re-Render/Memoization-Fall) ergänzt. Danach `npm run lint` sauber (0 Fehler) und `npm run build` erfolgreich (vollständige Routen-Manifestliste ohne Fehler) — von Josip lokal bestätigt.

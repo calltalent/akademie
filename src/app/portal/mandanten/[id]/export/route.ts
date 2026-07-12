@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePlatformAdmin } from "@/lib/platform/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 /**
  * GET /portal/mandanten/[id]/export — Mandanten-Gesamtexport für den
@@ -184,9 +185,12 @@ export async function GET(
       },
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    // Status-Ermittlung braucht die ROHE Meldung von requirePlatformAdmin()
+    // (feste Strings "Nicht angemeldet."/"...nur für..." aus platform/auth.ts)
+    // — die an die UI zurückgegebene Meldung bleibt trotzdem generisch.
+    const rawMessage = e instanceof Error ? e.message : "";
     const status =
-      message.includes("Nicht angemeldet") || message.includes("nur für") ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+      rawMessage.includes("Nicht angemeldet") || rawMessage.includes("nur für") ? 403 : 500;
+    return NextResponse.json({ error: genericErrorMessage(e) }, { status });
   }
 }

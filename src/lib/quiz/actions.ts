@@ -15,9 +15,11 @@ import {
 import { gradeAttempt } from "@/lib/quiz/grade";
 import type { QuizActionState, QuestionActionState } from "@/lib/quiz/state";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
+import { translateDbError } from "@/lib/errors/db";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 function errorState(e: unknown): QuizActionState {
-  return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+  return { error: genericErrorMessage(e) };
 }
 
 // -------------------------------------------------------------
@@ -59,12 +61,12 @@ export async function createQuiz(
       })
       .select("id")
       .single();
-    if (error || !data) return { ok: false, error: error?.message ?? "Anlegen fehlgeschlagen." };
+    if (error || !data) return { ok: false, error: error ? translateDbError(error) : "Anlegen fehlgeschlagen." };
 
     revalidatePath(`/admin/kurse/${courseId}`);
     return { ok: true, id: data.id };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { ok: false, error: genericErrorMessage(e) };
   }
 }
 
@@ -103,7 +105,7 @@ export async function updateQuiz(
       })
       .eq("id", quizId)
       .eq("tenant_id", tenant.id);
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
 
     revalidatePath(`/admin/kurse/${courseId}/quiz/${quizId}`);
     return { error: null, success: true };
@@ -121,12 +123,12 @@ export async function deleteQuiz(
     // questions/attempts hängen per "on delete cascade" an quizzes (0001_init.sql)
     // — werden automatisch mit entfernt.
     const { error } = await supabase.from("quizzes").delete().eq("id", quizId).eq("tenant_id", tenant.id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: translateDbError(error) };
 
     revalidatePath(`/admin/kurse/${courseId}`);
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { ok: false, error: genericErrorMessage(e) };
   }
 }
 
@@ -171,7 +173,7 @@ export async function upsertQuestion(
         .eq("id", questionId)
         .eq("tenant_id", tenant.id)
         .eq("quiz_id", quizId);
-      if (error) return { error: error.message };
+      if (error) return { error: translateDbError(error) };
     } else {
       const { count } = await supabase
         .from("questions")
@@ -183,13 +185,13 @@ export async function upsertQuestion(
         position: count ?? 0,
         ...row,
       });
-      if (error) return { error: error.message };
+      if (error) return { error: translateDbError(error) };
     }
 
     revalidatePath(`/admin/kurse/${courseId}/quiz/${quizId}`);
     return { error: null, success: true };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { error: genericErrorMessage(e) };
   }
 }
 
@@ -206,11 +208,11 @@ export async function deleteQuestion(
       .eq("id", questionId)
       .eq("tenant_id", tenant.id)
       .eq("quiz_id", quizId);
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
     revalidatePath(`/admin/kurse/${courseId}/quiz/${quizId}`);
     return { error: null, success: true };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { error: genericErrorMessage(e) };
   }
 }
 
@@ -229,7 +231,7 @@ export async function moveQuestion(
       .eq("quiz_id", quizId)
       .eq("tenant_id", tenant.id)
       .order("position", { ascending: true });
-    if (listError || !questions) return { error: listError?.message ?? "Fehler." };
+    if (listError || !questions) return { error: listError ? translateDbError(listError) : "Fehler." };
 
     const idx = questions.findIndex((q) => q.id === questionId);
     const swapIdx = direction === "up" ? idx - 1 : idx + 1;
@@ -245,7 +247,7 @@ export async function moveQuestion(
     revalidatePath(`/admin/kurse/${courseId}/quiz/${quizId}`);
     return { error: null, success: true };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { error: genericErrorMessage(e) };
   }
 }
 
@@ -387,7 +389,7 @@ export async function submitAttempt(quizId: string, answersInput: unknown): Prom
       score_pct: grading.scorePct,
       passed: grading.passed,
     });
-    if (insertError) return { ok: false, error: "Speichern fehlgeschlagen: " + insertError.message };
+    if (insertError) return { ok: false, error: "Speichern fehlgeschlagen: " + translateDbError(insertError) };
 
     // Block 7 (Webhooks): quiz.passed fire-and-forget, NUR wenn bestanden
     // (siehe dispatch.ts).
@@ -409,6 +411,6 @@ export async function submitAttempt(quizId: string, answersInput: unknown): Prom
       },
     };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { ok: false, error: genericErrorMessage(e) };
   }
 }

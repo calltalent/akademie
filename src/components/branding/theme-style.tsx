@@ -14,7 +14,10 @@ export function ThemeStyle({ tenant }: { tenant: PublicTenant | null }) {
 
   return (
     <style
-      // eslint-disable-next-line react/no-danger -- reine CSS-Variablen, keine Nutzereingabe direkt im DOM
+      // Reine CSS-Variablen, keine Nutzereingabe direkt im DOM (cssColor/
+      // cssLength whitelisten unten streng). Kein eslint-disable nötig —
+      // react/no-danger feuert in diesem Projekt nicht (Josips Lint-Lauf
+      // 12.07.2026 meldete den Disable-Kommentar als "unused directive").
       dangerouslySetInnerHTML={{
         __html: `:root {
   --color-primary: ${cssColor(branding.color_primary)};

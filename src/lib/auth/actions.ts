@@ -6,8 +6,13 @@ import {
   magicLinkSchema,
   passwordSignInSchema,
   passwordSignUpSchema,
+  passwordResetRequestSchema,
+  newPasswordSchema,
 } from "@/lib/auth/schema";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
+import { getTenant } from "@/lib/tenant/context";
+import { tenantOrigin } from "@/lib/tenant/url";
+import { translateAuthError } from "@/lib/auth/errors";
 
 export type AuthActionState = { error: string | null; success?: boolean };
 
@@ -66,6 +71,19 @@ export async function signUpWithPassword(
     return { error: RATE_LIMIT_MESSAGE };
   }
 
+  // Design-Block 6 (13.07.2026, AdminEinstellungen.dc.html "Selbstregistrierung
+  // erlauben"): löst die bisher offene Frage in (auth)/login/page.tsx ("soll
+  // Selbstregistrierung ganz entfallen oder abschaltbar bleiben?") — statt
+  // hart zu entfernen, ist sie jetzt pro Mandant abschaltbar (Default weiterhin
+  // an, unverändertes Verhalten für alle bisherigen Mandanten ohne das Feld).
+  const tenant = await getTenant();
+  if (!tenant) {
+    return { error: "Kein Mandant zu diesem Host gefunden." };
+  }
+  if (tenant.settings.self_signup_enabled === false) {
+    return { error: "Die Registrierung ist für diesen Mandanten deaktiviert." };
+  }
+
   const parsed = passwordSignUpSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -82,7 +100,7 @@ export async function signUpWithPassword(
     options: { data: { full_name: parsed.data.fullName } },
   });
   if (error) {
-    return { error: "Registrierung fehlgeschlagen: " + error.message };
+    return { error: "Registrierung fehlgeschlagen: " + translateAuthError(error) };
   }
   if (data.user) {
     await ensureProfile(supabase, data.user.id, parsed.data.email, parsed.data.fullName);
@@ -109,16 +127,100 @@ export async function signInWithMagicLink(
     return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
   }
 
+  // BUGFIX (Phase 5, Block 8, 12.07.2026): hing vorher an der globalen
+  // Build-Time-Variable NEXT_PUBLIC_SITE_URL (fest auf die alte Domain
+  // akademie.calltalent.ai eingebacken, siehe .env.production) statt am
+  // tatsächlichen Mandanten-Host - vierter Fund derselben Fehlerklasse wie
+  // in stripe/checkout.ts, stripe/portal.ts und users/import.ts (siehe
+  // src/lib/tenant/url.ts). Für den Mandanten "calltalent" wäre der Magic-
+  // Link-Rücksprung auf einer falschen/nicht mehr existierenden Domain
+  // gelandet - der bislang EINZIGE funktionierende Erstanmeldeweg für
+  // importierte Nutzer (siehe Josips Fund zum fehlenden Passwort-Setzen-
+  // Screen) wäre damit ebenfalls kaputt gewesen.
+  const tenant = await getTenant();
+  const redirectBase = tenant ? tenantOrigin(tenant) : (process.env.NEXT_PUBLIC_SITE_URL ?? "");
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: parsed.data.email,
-    options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/callback` },
+    options: { emailRedirectTo: `${redirectBase}/auth/callback` },
   });
   if (error) {
-    return { error: "Versand fehlgeschlagen: " + error.message };
+    return { error: "Versand fehlgeschlagen: " + translateAuthError(error) };
   }
 
   return { error: null, success: true };
+}
+
+/**
+ * NEU (Phase 5, Block 8, 12.07.2026 — Josips Fund: es gab überhaupt keine
+ * Möglichkeit, ein erstes Passwort zu setzen, weder für eingeladene/
+ * importierte Nutzer noch als "Passwort vergessen"-Weg, obwohl `/login` und
+ * `/profil` bereits beide darauf verwiesen). `resetPasswordForEmail()`
+ * verschickt Supabase's eingebaute Recovery-Mail mit Link auf
+ * `/auth/callback?next=/passwort-setzen` (bestehende Route, tauscht den Code
+ * gegen eine Session und leitet dann weiter, siehe auth/callback/route.ts).
+ * Bewusst KEIN Hinweis, ob die E-Mail existiert (verhindert E-Mail-
+ * Enumeration) - Supabase gibt hier ohnehin keinen Fehler bei unbekannter
+ * Adresse zurück, die Erfolgsmeldung ist also in beiden Fällen identisch.
+ */
+export async function requestPasswordReset(
+  _prevState: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  if (!(await checkRateLimit("auth-password-reset", { maxRequests: 5, windowSeconds: 300 }))) {
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
+  const parsed = passwordResetRequestSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+  }
+
+  const tenant = await getTenant();
+  const redirectBase = tenant ? tenantOrigin(tenant) : (process.env.NEXT_PUBLIC_SITE_URL ?? "");
+
+  const supabase = await createClient();
+  await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: `${redirectBase}/auth/callback?next=/passwort-setzen`,
+  });
+  // Absichtlich IMMER Erfolg zurückgeben (siehe Kommentar oben) - ein
+  // tatsächlicher Versandfehler (SMTP down o. Ä.) ist hier kein Nutzer-
+  // Problem, das eine andere Rückmeldung rechtfertigen würde.
+  return { error: null, success: true };
+}
+
+/**
+ * Setzt ein neues Passwort - braucht eine bereits aktive Session aus dem
+ * Recovery-Link (via /auth/callback hergestellt). `updateUser()` arbeitet
+ * auf der aktuellen Session, kein separates Token/Code nötig.
+ */
+export async function setNewPassword(
+  _prevState: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const parsed = newPasswordSchema.safeParse({ password: formData.get("password") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      error: "Sitzung abgelaufen oder ungültig. Bitte fordere einen neuen Link über „Passwort vergessen“ an.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+  if (error) {
+    return { error: "Passwort konnte nicht gesetzt werden: " + translateAuthError(error) };
+  }
+
+  await ensureProfile(supabase, user.id, user.email ?? "");
+  redirect("/");
 }
 
 export async function signOut() {

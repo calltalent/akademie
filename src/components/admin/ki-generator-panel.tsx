@@ -177,7 +177,7 @@ export function KiGeneratorPanel() {
             <p className="text-base text-red-700">Fehler: {jobStatus.error ?? "Unbekannter Fehler."}</p>
           ) : jobStatus.status === "done" ? (
             <p className="text-base">
-              Entwurf „{jobStatus.draft?.title ?? jobStatus.outlineTitle ?? "Kurs"}" ist fertig.
+              Entwurf „{jobStatus.draft?.title ?? jobStatus.outlineTitle ?? "Kurs"}&quot; ist fertig.
             </p>
           ) : (
             <p className="text-base">{STEP_LABELS[jobStatus.step] ?? "Wird verarbeitet …"}</p>

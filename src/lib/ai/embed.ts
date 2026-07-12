@@ -5,6 +5,7 @@ import { recordAiJob } from "@/lib/ai/usage";
 import { VOYAGE_MODEL } from "@/lib/ai/config";
 import { chunkText, extractLessonText } from "@/lib/ai/chunk";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
+import { translateDbError } from "@/lib/errors/db";
 
 /**
  * Embed-Job für Lektionen (Phase 3, Block 2 — Embeddings/pgvector-
@@ -106,7 +107,7 @@ export async function embedLesson(
     .eq("lesson_id", lessonId)
     .eq("tenant_id", tenantId);
   if (deleteError) {
-    throw new Error(`Alte Embeddings konnten nicht gelöscht werden: ${deleteError.message}`);
+    throw new Error(`Alte Embeddings konnten nicht gelöscht werden: ${translateDbError(deleteError)}`);
   }
 
   if (chunks.length === 0) {
@@ -122,6 +123,10 @@ export async function embedLesson(
   try {
     vectors = await embedTexts(chunks);
   } catch (e) {
+    // e.message ist eine rohe Voyage-API-Fehlermeldung (technisch/englisch)
+    // — volles Detail nur im ai_jobs-Protokoll (internes Log, nicht direkt
+    // im Staff-UI), reembedCourse() (ai/actions.ts) bekommt stattdessen
+    // einen klaren deutschen Fehler geworfen.
     const message = e instanceof Error ? e.message : "Unbekannter Voyage-Fehler.";
     await recordAiJob({
       tenantId,
@@ -133,7 +138,7 @@ export async function embedLesson(
       input: { lessonId, courseId, chunkCount: chunks.length },
       error: message,
     });
-    throw e;
+    throw new Error("Embeddings konnten nicht erzeugt werden (Voyage-API-Fehler).");
   }
 
   const rows = chunks.map((content, index) => ({
@@ -157,7 +162,7 @@ export async function embedLesson(
       input: { lessonId, courseId, chunkCount: chunks.length },
       error: insertError.message,
     });
-    throw new Error(`Embeddings konnten nicht gespeichert werden: ${insertError.message}`);
+    throw new Error(`Embeddings konnten nicht gespeichert werden: ${translateDbError(insertError)}`);
   }
 
   // (f) Kostenprotokoll bei Erfolg (CLAUDE.md §3.7).
@@ -197,7 +202,7 @@ export async function embedCourse(
     .eq("course_id", courseId)
     .eq("tenant_id", tenantId);
   if (modulesError) {
-    throw new Error(`Module konnten nicht geladen werden: ${modulesError.message}`);
+    throw new Error(`Module konnten nicht geladen werden: ${translateDbError(modulesError)}`);
   }
   const moduleIds = (modules ?? []).map((m) => m.id);
 
@@ -211,7 +216,7 @@ export async function embedCourse(
     .in("module_id", moduleIds.length > 0 ? moduleIds : [DUMMY_UUID])
     .eq("tenant_id", tenantId);
   if (lessonsError) {
-    throw new Error(`Lektionen konnten nicht geladen werden: ${lessonsError.message}`);
+    throw new Error(`Lektionen konnten nicht geladen werden: ${translateDbError(lessonsError)}`);
   }
 
   let lessonsEmbedded = 0;

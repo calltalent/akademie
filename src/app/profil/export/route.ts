@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { exportUserData } from "@/lib/gdpr/export";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 /**
  * GET /profil/export — Selbst-Service-Datenexport (Art. 15/20 DSGVO),
@@ -57,7 +58,6 @@ export async function GET() {
       },
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unbekannter Fehler.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: genericErrorMessage(e) }, { status: 500 });
   }
 }

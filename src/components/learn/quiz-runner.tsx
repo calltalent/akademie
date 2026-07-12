@@ -42,10 +42,16 @@ export function QuizRunner({ quiz }: { quiz: LearnerQuiz }) {
   // Fragenreihenfolge einmal pro Versuch mischen, wenn settings.shuffle
   // gesetzt ist — rein clientseitig/kosmetisch, ändert nichts an der
   // serverseitigen Bewertung (die arbeitet über questionId, nicht Position).
+  //
+  // Korrektur (Josips Lint-Lauf, 12.07.2026): eslint verlangt ein Array aus
+  // "einfachen Ausdrücken" (Identifier), kein Vergleichsausdruck direkt im
+  // Deps-Array — deshalb vorher in eine benannte Variable ausgelagert,
+  // Verhalten unverändert.
+  const isRunning = phase === "running";
   const questions = useMemo<LearnerQuestion[]>(
     () => (quiz.shuffle ? shuffle(quiz.questions) : quiz.questions),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [phase === "running"],
+    [isRunning],
   );
 
   useEffect(() => {

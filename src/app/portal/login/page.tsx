@@ -10,7 +10,7 @@ const initialState: AuthActionState = { error: null };
  * Vereinfachte Portal-Variante von src/app/(auth)/login/page.tsx — nutzt
  * dieselben Server Actions (kein neues Auth-System, keine neuen Actions).
  * signInWithPassword redirect("/") funktioniert hier korrekt: der Browser
- * bleibt auf dem Portal-Host, src/proxy.ts schreibt "/" dort intern auf
+ * bleibt auf dem Portal-Host, src/middleware.ts schreibt "/" dort intern auf
  * /portal um (siehe checkPlatformAccess()-Gate in portal/layout.tsx).
  */
 export default function PortalLoginPage() {

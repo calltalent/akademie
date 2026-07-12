@@ -24,7 +24,12 @@ export default function NeuerMandantPage() {
   const [slug, setSlug] = useState("");
 
   useEffect(() => {
-    if (state.success && state.id) {
+    // NEU (Phase 5, Block 8, 12.07.2026): bei einer fehlgeschlagenen
+    // Inhaber-Einladung NICHT sofort wegnavigieren — Josip soll den Hinweis
+    // tatsächlich lesen können, bevor die Seite wechselt. Der Mandant ist in
+    // beiden Fällen bereits angelegt (siehe actions.ts-Kommentar); ohne
+    // Fehler bleibt der bisherige sofortige Redirect unverändert.
+    if (state.success && state.id && !state.ownerInviteError) {
       router.push(`/portal/mandanten/${state.id}`);
     }
   }, [state, router]);
@@ -93,10 +98,39 @@ export default function NeuerMandantPage() {
           ))}
         </fieldset>
 
+        <label className="flex flex-col gap-1 text-sm" htmlFor="ownerEmail">
+          Inhaber-E-Mail (optional)
+          <input
+            id="ownerEmail"
+            name="ownerEmail"
+            type="email"
+            autoComplete="off"
+            aria-describedby="owner-hint"
+            className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-base text-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+          />
+          <span id="owner-hint" className="text-xs text-slate-500">
+            Falls ausgefüllt: Konto wird als Inhaber (Owner) angelegt und bekommt sofort eine
+            Einladungsmail mit Link zum Passwort-Setzen. Leer lassen, um den Mandanten ohne
+            Inhaber anzulegen (Einladung kann später über den Mandanten selbst nachgeholt werden).
+          </span>
+        </label>
+
         {state.error && (
           <p role="alert" className="text-sm text-red-400">
             {state.error}
           </p>
+        )}
+
+        {state.success && state.ownerInviteError && (
+          <div className="rounded-md border border-amber-700 bg-amber-950/40 p-3 text-sm text-amber-200">
+            <p>
+              Mandant wurde angelegt, die Inhaber-Einladung ist aber fehlgeschlagen:{" "}
+              {state.ownerInviteError}
+            </p>
+            <a href={`/portal/mandanten/${state.id}`} className="mt-2 inline-block underline">
+              Trotzdem zum Mandanten →
+            </a>
+          </div>
         )}
 
         <button

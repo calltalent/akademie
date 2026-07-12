@@ -4,6 +4,7 @@ import { requireAdminTenant } from "@/lib/auth/staff";
 import { parseCsv } from "@/lib/users/csv";
 import { importUsers } from "@/lib/users/import";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 const bodySchema = z.object({
   csv: z.string().min(1).max(2_000_000), // ~2 MB Textlimit, reicht weit über 100 Zeilen hinaus
@@ -58,10 +59,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ...summary, parseErrors });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unbekannter Fehler.";
-    const status = message.includes("Nicht angemeldet") || message.includes("Inhaber")
+    const rawMessage = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    const status = rawMessage.includes("Nicht angemeldet") || rawMessage.includes("Inhaber")
       ? 403
       : 500;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: genericErrorMessage(e) }, { status });
   }
 }

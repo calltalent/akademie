@@ -13,7 +13,15 @@ import { SubmissionInbox, type InboxSubmission } from "@/components/admin/submis
  * der Kurstitel wird über `lessons.module_id -> modules.course_id ->
  * courses.title` nachgeladen (drei einfache Zusatzabfragen statt eines
  * tief verschachtelten PostgREST-Selects, für Lesbarkeit/Testbarkeit).
+ *
+ * Design-Block 6 (13.07.2026, AdminAbgaben.dc.html): Kopfzeile mit
+ * Breadcrumb + "N offen · M überfällig"-Pille ergänzt. Beide Zahlen sind
+ * echte, vom Filter unabhängige Zählungen (nicht die evtl. gefilterte Liste
+ * unten) — "überfällig" = `status='submitted'` UND älter als 48h (siehe
+ * Begründung in submission-inbox.tsx, dort dieselbe Schwelle für die
+ * Zeilen-Badges verwendet).
  */
+const OVERDUE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
 export default async function AdminAbgabenPage({
   searchParams,
 }: {
@@ -53,6 +61,26 @@ export default async function AdminAbgabenPage({
   if (submissionsError) {
     console.error("[admin/abgaben] Abgaben konnten nicht geladen werden:", submissionsError.message);
   }
+
+  // react-hooks/purity: Date.now() gilt fuer Client-Komponenten mit
+  // React-Compiler-Memoization als "unrein" (siehe identische Begruendung in
+  // portal/mandanten/[id]/page.tsx, Josips Lint-Lauf 12.07.2026). Diese
+  // Funktion ist eine async Server Component (einmal pro Request, kein
+  // Re-Render), daher hier bewusst deaktiviert statt kuenstlich umgebaut.
+  // eslint-disable-next-line react-hooks/purity
+  const overdueCutoffIso = new Date(Date.now() - OVERDUE_THRESHOLD_MS).toISOString();
+  const { count: openCount } = await supabase
+    .from("submissions")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenant!.id)
+    .eq("status", "submitted")
+    .gte("created_at", overdueCutoffIso);
+  const { count: overdueCount } = await supabase
+    .from("submissions")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenant!.id)
+    .eq("status", "submitted")
+    .lt("created_at", overdueCutoffIso);
 
   const moduleIds = Array.from(
     new Set(
@@ -100,8 +128,23 @@ export default async function AdminAbgabenPage({
   });
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Abgaben</h1>
+    <div className="flex flex-col gap-4">
+      <header className="flex items-center gap-[18px]">
+        <div className="flex-1">
+          <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
+            Inhalte · Abgaben
+          </div>
+          <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
+            Abgaben
+          </h1>
+        </div>
+        <span
+          className="inline-flex flex-none items-center gap-2 rounded-[10px] px-[15px] py-[9px] text-sm font-bold"
+          style={{ background: "#F7EED4", color: "#1A1A2E" }}
+        >
+          {openCount ?? 0} offen · {overdueCount ?? 0} überfällig
+        </span>
+      </header>
       <SubmissionInbox submissions={submissions} activeStatus={filterStatus} />
     </div>
   );

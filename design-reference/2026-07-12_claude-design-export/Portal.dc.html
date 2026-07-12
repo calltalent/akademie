@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  a { color: #5663AE; }
+  a:hover { color: #3E3F66; }
+</style>
+</helmet>
+<div style="min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; background:#F4F5FA; color:#1A1A2E; font-size:18px; line-height:1.6; padding:64px 48px;">
+  <div style="max-width:1080px; margin:0 auto;">
+    <div style="display:flex; align-items:center; gap:14px; margin-bottom:12px;">
+      <div style="width:44px; height:44px; border-radius:11px; background:#5663AE; display:flex; align-items:center; justify-content:center; color:#F7EED4; font-weight:800; font-size:22px;">C</div>
+      <div style="line-height:1.15;">
+        <div style="font-weight:800; font-size:18px; letter-spacing:.02em; color:#1A1A2E;">CALLTALENT</div>
+        <div style="font-weight:600; font-size:12px; letter-spacing:.3em; color:#66679B;">AKADEMIE</div>
+      </div>
+    </div>
+    <h1 style="font-size:32px; font-weight:800; margin:0 0 6px;">Studenten-Portal — Design</h1>
+    <p style="font-size:17px; color:#66679B; margin:0 0 40px; max-width:640px;">Alle Screens im Calltalent-Design. Wähle einen Screen zur Ansicht.</p>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:22px;">
+      <sc-for list="{{ screens }}" as="s" hint-placeholder-count="5">
+        <a href="{{ s.href }}" style="display:block; text-decoration:none; background:#fff; border:1px solid #E7E8F2; border-radius:14px; overflow:hidden;">
+          <div style="{{ s.thumbStyle }}"></div>
+          <div style="padding:18px 20px 20px;">
+            <div style="font-size:12px; font-weight:600; letter-spacing:.04em; color:#A9AAC4;">{{ s.tag }}</div>
+            <div style="font-size:18px; font-weight:700; color:#1A1A2E; margin:3px 0 3px;">{{ s.title }}</div>
+            <div style="font-size:14px; color:#66679B;">{{ s.desc }}</div>
+          </div>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1080,&quot;height&quot;:720}}">
+class Component extends DCLogic {
+  screen(o) {
+    return {
+      ...o,
+      thumbStyle: 'height:150px; background-color:' + o.tint + '; background-image:repeating-linear-gradient(45deg,' + o.tint + ' 0 12px, rgba(255,255,255,.5) 12px 24px);',
+    };
+  }
+  renderVals() {
+    return {
+      screens: [
+        this.screen({ tag: 'LERNEN', title: 'Dashboard', desc: 'Meine Kurse & Fortschritt', href: 'Dashboard.dc.html', tint: '#DFE2F4' }),
+        this.screen({ tag: 'LERNEN', title: 'Kurskatalog', desc: 'Alle Kurse durchsuchen', href: 'Kurskatalog.dc.html', tint: '#E7E9F6' }),
+        this.screen({ tag: 'KONTO', title: 'Einstellungen', desc: 'Allgemein · Benachrichtigungen · Geräte', href: 'Einstellungen.dc.html', tint: '#EDE7F5' }),
+        this.screen({ tag: 'AUTH', title: 'Login', desc: 'Anmeldung mit Markenpanel', href: 'Login.dc.html', tint: '#E4E6F5' }),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

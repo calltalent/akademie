@@ -4,6 +4,7 @@ import { requireStaffTenant } from "@/lib/auth/staff";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { importCourseData } from "@/lib/import/course-import";
 import type { ImportActionState } from "@/lib/import/state";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB — reine Struktur-/Text-Daten, keine Binärdateien.
 
@@ -68,6 +69,6 @@ export async function importCourseFromFile(
       videoCount: result.videoIds.length,
     };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { error: genericErrorMessage(e) };
   }
 }

@@ -3,7 +3,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createWebhook, deleteWebhook } from "@/lib/settings/actions";
-import { WEBHOOK_EVENTS, type WebhookEvent } from "@/lib/webhooks/deliver";
+import { WEBHOOK_EVENTS, type WebhookEvent } from "@/lib/webhooks/events";
 import { WebhookSecretCreatedDialog } from "@/components/admin/webhook-secret-created-dialog";
 
 const EVENT_LABELS: Record<WebhookEvent, string> = {

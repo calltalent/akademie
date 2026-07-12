@@ -13,6 +13,7 @@ import {
 
 function toDraft(initial: Question | null): QuestionInput {
   if (!initial) return createEmptyQuestionDraft("single");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- absichtliches Omit-Idiom: "id" aus dem Objekt herausdestrukturieren, um es aus "rest" auszuschließen
   const { id: _id, ...rest } = initial;
   return rest;
 }
@@ -179,6 +180,7 @@ function OptionsFields({
   }
 
   function setCorrectSingle(optionId: string) {
+    if (draft.kind !== "single") return;
     onChange({ ...draft, answer: { correctOptionId: optionId } });
   }
 

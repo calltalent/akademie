@@ -7,6 +7,10 @@ import {
   type TenantStatus,
 } from "@/lib/platform/schema";
 import { MandantEditForm } from "./mandant-edit-form";
+import { MandantDeleteForm } from "./mandant-delete-form";
+import { TenantDomainsSection } from "./tenant-domains-section";
+import { TenantBrandingForm } from "./tenant-branding-form";
+import { TENANT_ACCENT_SWATCHES } from "@/lib/platform/schema";
 
 /**
  * Mandanten-Detailseite (Betreiber-Portal, Phase 4 Block 2): Kopfbereich +
@@ -54,7 +58,7 @@ export default async function MandantDetailPage({
 
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, slug, name, plan, status, custom_domain, created_at")
+    .select("id, slug, name, plan, status, custom_domain, created_at, branding")
     .eq("id", id)
     .maybeSingle();
 
@@ -62,6 +66,25 @@ export default async function MandantDetailPage({
     notFound();
   }
 
+  const branding = (tenant.branding ?? {}) as { color_primary?: string; radius?: string };
+  const brandingInitial = {
+    // Editor bietet bewusst nur die 4 Marken-Akzente aus dem Export an
+    // (siehe TENANT_ACCENT_SWATCHES) — ein bereits gesetzter, davon
+    // abweichender Wert fällt hier auf den Standard zurück (Anzeige only,
+    // nicht automatisch überschrieben, solange nicht gespeichert wird).
+    colorPrimary: (TENANT_ACCENT_SWATCHES as readonly string[]).includes(branding.color_primary ?? "")
+      ? (branding.color_primary as string)
+      : "#5663AE",
+    radius: Number.parseInt(branding.radius ?? "14", 10) || 14,
+  };
+
+  // Korrektur (Josips Lint-Lauf, 12.07.2026): react-hooks/purity moniert
+  // Date.now() als "unreinen Aufruf während des Renderns" — diese Regel ist
+  // für Client-Komponenten mit React-Compiler-Memoization gedacht. Diese
+  // Funktion ist eine async Server Component (führt pro Request genau
+  // einmal aus, kein Re-Render/Memoization-Fall), daher hier bewusst
+  // deaktiviert statt künstlich umgebaut.
+  // eslint-disable-next-line react-hooks/purity
   const ninetyDaysAgoIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
 
   const [
@@ -69,6 +92,7 @@ export default async function MandantDetailPage({
     { count: courseCount },
     { data: usageRow },
     { data: aiJobs },
+    { data: tenantDomains },
   ] = await Promise.all([
     admin
       .from("memberships")
@@ -87,6 +111,13 @@ export default async function MandantDetailPage({
       .select("kind, cost_usd")
       .eq("tenant_id", id)
       .gte("created_at", ninetyDaysAgoIso),
+    // FOLGEAUFTRAG (12.07.2026): zusätzliche Domains, siehe
+    // tenant-domains-section.tsx / tenant_domains-Migration.
+    admin
+      .from("tenant_domains")
+      .select("id, domain")
+      .eq("tenant_id", id)
+      .order("created_at"),
   ]);
 
   const jobs = aiJobs ?? [];
@@ -138,6 +169,14 @@ export default async function MandantDetailPage({
             customDomain: tenant.custom_domain,
           }}
         />
+        <TenantDomainsSection tenantId={tenant.id} domains={tenantDomains ?? []} />
+      </section>
+
+      <section aria-labelledby="branding-heading" className="flex flex-col gap-3">
+        <h2 id="branding-heading" className="text-lg font-medium">
+          Branding &amp; Theming
+        </h2>
+        <TenantBrandingForm tenantId={tenant.id} tenantName={tenant.name} initial={brandingInitial} />
       </section>
 
       <section aria-labelledby="usage-heading" className="flex flex-col gap-4">
@@ -183,6 +222,13 @@ export default async function MandantDetailPage({
             </ul>
           )}
         </div>
+      </section>
+
+      <section aria-labelledby="delete-heading" className="flex flex-col gap-3">
+        <h2 id="delete-heading" className="text-lg font-medium text-red-300">
+          Gefahrenzone
+        </h2>
+        <MandantDeleteForm tenantId={tenant.id} slug={tenant.slug} />
       </section>
     </main>
   );

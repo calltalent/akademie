@@ -7,6 +7,7 @@ import { checkoutMetadataSchema } from "@/lib/stripe/schema";
 import { sendEmail } from "@/lib/email/client";
 import { orderPaid } from "@/lib/email/templates";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 /**
  * Stripe-Webhook (Phase 2, Block 5). REIHENFOLGE STRENG WIE VORGEGEBEN:
@@ -74,9 +75,9 @@ export async function POST(request: Request) {
         break;
     }
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unbekannter Fehler bei der Webhook-Verarbeitung.";
-    console.error(`[stripe/webhook] Fehler bei Event ${event.type}:`, message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const rawMessage = e instanceof Error ? e.message : "Unbekannter Fehler bei der Webhook-Verarbeitung.";
+    console.error(`[stripe/webhook] Fehler bei Event ${event.type}:`, rawMessage);
+    return NextResponse.json({ error: genericErrorMessage(e) }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; } a { color:#5663AE; } a:hover { color:#3E3F66; }</style>
+</helmet>
+<div style="display:flex; min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; background:#F4F5FA; color:#1A1A2E; font-size:18px; line-height:1.6;">
+  <dc-import name="AdminSidebar" active="members" hint-size="264px,100vh"></dc-import>
+  <div style="flex:1 1 auto; display:flex; flex-direction:column; min-width:0;">
+    <header style="display:flex; align-items:center; gap:18px; padding:20px 40px;">
+      <div style="flex:1 1 auto;">
+        <div style="font-size:13px; font-weight:600; color:#A9AAC4;">Nutzer · Teilnehmer</div>
+        <h1 style="margin:2px 0 0; font-size:26px; font-weight:800; letter-spacing:-.01em;">Teilnehmer</h1>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E8F2; border-radius:11px; padding:10px 14px; width:280px;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#66679B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.2-3.2"></path></svg>
+        <span style="font-size:14px; color:#A9AAC4;">Teilnehmer suchen …</span>
+      </div>
+      <a href="#" style="display:inline-flex; align-items:center; gap:8px; background:#5663AE; color:#fff; font-weight:700; font-size:15px; padding:12px 18px; border-radius:11px; text-decoration:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>Einladen
+      </a>
+    </header>
+    <main style="flex:1 1 auto; padding:16px 40px 56px;">
+      <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; overflow:hidden;">
+        <div style="display:grid; grid-template-columns:2fr 1.4fr 1fr 1fr 0.6fr; font-size:13px; font-weight:700; color:#A9AAC4; padding:18px 26px 12px; border-bottom:1px solid #EEF0F7;">
+          <div>Name</div><div>E-Mail</div><div>Kurse</div><div>Beigetreten</div><div></div>
+        </div>
+        <sc-for list="{{ rows }}" as="m" hint-placeholder-count="6">
+          <div style="display:grid; grid-template-columns:2fr 1.4fr 1fr 1fr 0.6fr; align-items:center; padding:15px 26px; border-bottom:1px solid #F4F5FA; font-size:15px;">
+            <div style="display:flex; align-items:center; gap:13px;">
+              <span style="flex:0 0 auto; width:38px; height:38px; border-radius:10px; background:#3E3F66; color:#F7EED4; font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center;">{{ m.initials }}</span>
+              <span style="font-weight:600;">{{ m.name }}</span>
+            </div>
+            <div style="color:#66679B; font-size:14px;">{{ m.email }}</div>
+            <div style="color:#3E3F66;">{{ m.courses }}</div>
+            <div style="color:#66679B; font-size:14px;">{{ m.joined }}</div>
+            <div><a href="#" style="font-size:14px; font-weight:600; text-decoration:none;">Profil</a></div>
+          </div>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:760}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      rows: [
+        { initials:'SK', name:'Sarah Klein', email:'s.klein@email.de', courses:3, joined:'Heute' },
+        { initials:'MB', name:'Max Böhm', email:'max.boehm@email.de', courses:2, joined:'vor 3 Tagen' },
+        { initials:'LN', name:'Lena Nowak', email:'l.nowak@email.de', courses:4, joined:'vor 1 Woche' },
+        { initials:'TF', name:'Tim Fuchs', email:'tim.f@email.de', courses:1, joined:'vor 2 Wochen' },
+        { initials:'AH', name:'Anna Herz', email:'anna.herz@email.de', courses:3, joined:'vor 3 Wochen' },
+        { initials:'JW', name:'Jonas Weber', email:'jonas.weber@email.de', courses:3, joined:'vor 1 Monat' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

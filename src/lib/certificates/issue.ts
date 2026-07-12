@@ -5,6 +5,7 @@ import { generateCertificateSerial } from "@/lib/certificates/serial";
 import { generateCertificatePdf } from "@/lib/certificates/pdf";
 import { sendEmail } from "@/lib/email/client";
 import { certificateIssued } from "@/lib/email/templates";
+import { translateDbError } from "@/lib/errors/db";
 
 /**
  * Zertifikats-Ausstellung nach Kursabschluss (Phase 2, Block 4).
@@ -45,6 +46,7 @@ export type IssueCertificateResult =
 
 type CourseSettings = { certificate_enabled?: boolean };
 type TenantBranding = { color_primary?: string };
+type TenantSettings = { certificates_enabled?: boolean };
 
 export async function issueCertificateIfEligible(
   courseId: string,
@@ -99,6 +101,23 @@ export async function issueCertificateIfEligible(
       return { ok: true, alreadyExisted: false };
     }
 
+    // (c) Mandanten-Branding + Zertifikats-Schalter laden — vorgezogen
+    // (Design-Block 6, 13.07.2026, AdminEinstellungen.dc.html "Zertifikate
+    // ausstellen"): war vorher erst NACH der Idempotenz-Prüfung geladen,
+    // jetzt hier gebraucht für das mandantenweite Gate NEBEN dem
+    // bestehenden kursbezogenen `certificate_enabled`-Feld. Standard bei
+    // fehlendem Feld weiterhin "aktiviert" (unverändertes Verhalten für
+    // alle Mandanten ohne das Feld).
+    const { data: tenantRow } = await admin
+      .from("tenants")
+      .select("name, branding, settings")
+      .eq("id", tenantId)
+      .maybeSingle();
+    const tenantSettings = (tenantRow?.settings ?? {}) as TenantSettings;
+    if (tenantSettings.certificates_enabled === false) {
+      return { ok: true, alreadyExisted: false };
+    }
+
     // (b) Idempotenz: existiert bereits ein Zertifikat? Kein Duplikat, keine zweite Mail.
     const { data: existing } = await admin
       .from("certificates")
@@ -111,12 +130,6 @@ export async function issueCertificateIfEligible(
       return { ok: true, alreadyExisted: true, certificateId: existing.id };
     }
 
-    // (c) Mandanten-Branding + Lernenden-Profil laden.
-    const { data: tenantRow } = await admin
-      .from("tenants")
-      .select("name, branding")
-      .eq("id", tenantId)
-      .maybeSingle();
     const tenantName = tenantRow?.name ?? "Calltalent-Akademie";
     const accentColor = (tenantRow?.branding as TenantBranding | null)?.color_primary;
 
@@ -147,7 +160,8 @@ export async function issueCertificateIfEligible(
       .from("certificates")
       .upload(storagePath, pdfBytes, { contentType: "application/pdf", upsert: false });
     if (uploadError) {
-      return { ok: false, error: `Zertifikat-Upload fehlgeschlagen: ${uploadError.message}` };
+      console.error("[certificates/issue] Zertifikat-Upload fehlgeschlagen.", uploadError.message);
+      return { ok: false, error: "Zertifikat-Upload fehlgeschlagen." };
     }
 
     // (f) certificates-Zeile schreiben — letzte Verteidigungslinie: der
@@ -180,7 +194,7 @@ export async function issueCertificateIfEligible(
           .maybeSingle();
         return { ok: true, alreadyExisted: true, certificateId: raceExisting?.id };
       }
-      return { ok: false, error: `Zertifikat-Zeile konnte nicht angelegt werden: ${insertError.message}` };
+      return { ok: false, error: `Zertifikat-Zeile konnte nicht angelegt werden: ${translateDbError(insertError)}` };
     }
 
     // (g) Mail — FAIL-SOFT (Vertrag aus src/lib/email/client.ts): ein
@@ -209,8 +223,9 @@ export async function issueCertificateIfEligible(
 
     return { ok: true, alreadyExisted: false, certificateId: inserted.id };
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unbekannter Fehler bei der Zertifikat-Ausstellung.";
-    console.error("[certificates/issue] Ausnahme:", message);
-    return { ok: false, error: message };
+    // e.message kann eine rohe/technische Meldung sein — Detail nur loggen,
+    // der Rückgabewert bekommt einen klaren deutschen Satz.
+    console.error("[certificates/issue] Ausnahme:", e instanceof Error ? e.message : e);
+    return { ok: false, error: "Unbekannter Fehler bei der Zertifikat-Ausstellung." };
   }
 }

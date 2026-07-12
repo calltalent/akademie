@@ -21,7 +21,7 @@ function currentMonthIso(): string {
  * Component, keine Interaktivität nötig — lädt die Daten selbst.
  *
  * Liest NUR den eigenen Mandanten: `tenant.id` kommt ausschließlich aus
- * `getTenant()` (Server-Kontext, proxy.ts -> x-tenant-id-Header), niemals
+ * `getTenant()` (Server-Kontext, middleware.ts -> x-tenant-id-Header), niemals
  * aus Client-Eingabe. Regulärer RLS-Client genügt — `usage_staff_select`
  * (0001_init.sql, Zeilen 577-578) erlaubt Staff das Lesen der
  * usage_counters-Zeilen des eigenen Mandanten; zusätzlich explizites

@@ -1,14 +1,25 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { createCourse } from "@/lib/courses/actions";
 import { initialCourseActionState } from "@/lib/courses/state";
 
-export function CreateCourseForm() {
+/**
+ * Design-Block 6 (13.07.2026): optionales `onSuccess` ergänzt, damit dieses
+ * Formular jetzt auch in einem <dialog>-Modal (new-course-dialog.tsx)
+ * verwendet werden kann und sich nach erfolgreichem Anlegen selbst schließt.
+ * Ohne Prop unverändertes Verhalten (rein optional, kein Breaking Change).
+ */
+export function CreateCourseForm({ onSuccess }: { onSuccess?: () => void } = {}) {
   const [state, action, pending] = useActionState(
     createCourse,
     initialCourseActionState,
   );
+
+  useEffect(() => {
+    if (state.success) onSuccess?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.success]);
 
   return (
     <form
@@ -27,7 +38,7 @@ export function CreateCourseForm() {
         />
       </label>
       <label className="flex flex-col gap-1 text-sm">
-        Slug (URL, z. B. „einfuehrung-produkt")
+        Slug (URL, z. B. „einfuehrung-produkt&quot;)
         <input
           name="slug"
           type="text"

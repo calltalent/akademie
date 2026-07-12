@@ -5,6 +5,9 @@ import { sendEmail } from "@/lib/email/client";
 import { welcomeInvite } from "@/lib/email/templates";
 import { DEFAULT_BRANDING, type PublicTenant } from "@/lib/tenant/types";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
+import { tenantOrigin } from "@/lib/tenant/url";
+import { translateAuthError } from "@/lib/auth/errors";
+import { translateDbError } from "@/lib/errors/db";
 
 export type ImportRowResult = {
   email: string;
@@ -37,7 +40,7 @@ export type ImportSummary = {
 };
 
 /** Nur die Felder, die importUsers() für die Willkommensmail braucht — kein voller PublicTenant-Zwang an den Aufrufer. */
-type ImportTenant = Pick<PublicTenant, "id" | "name" | "slug" | "branding">;
+export type ImportTenant = Pick<PublicTenant, "id" | "name" | "slug" | "custom_domain" | "branding">;
 
 /**
  * Bulk-Import via service_role — UMGEHT RLS bewusst (siehe admin.ts).
@@ -89,7 +92,7 @@ export async function importUsers(
   await Promise.allSettled(
     results.map((result, i) => {
       if (result.status !== "created") return Promise.resolve();
-      return sendWelcomeMail(tenant, result, rows[i]);
+      return sendWelcomeMail(admin, tenant, result, rows[i]);
     }),
   );
 
@@ -103,13 +106,32 @@ export async function importUsers(
   };
 }
 
-/** Mutiert `result.emailSent` in place — fail-soft, wirft nie (sendEmail() garantiert das bereits). */
+/**
+ * Mutiert `result.emailSent` in place — fail-soft, wirft nie (sendEmail()
+ * garantiert das bereits).
+ *
+ * BUGFIX (Phase 5, Block 8, 12.07.2026 — Josips Fund): der "Anmelden"-Button
+ * zeigte bisher auf die reine `/login`-URL. Das Konto wird aber bewusst OHNE
+ * Passwort angelegt (siehe importOneUser() oben, `createUser()` ohne
+ * `password`-Feld) — ein neu importierter Nutzer hatte also gar keine
+ * Möglichkeit, sich anzumelden, außer den (im E-Mail-Text nur beiläufig
+ * erwähnten) Magic-Link-Weg zu erraten. Fix: `generateLink({type:
+ * "recovery"})` erzeugt denselben Link-Typ, den auch die neue "Passwort
+ * vergessen"-Seite verschickt (siehe auth/actions.ts requestPasswordReset())
+ * - führt beim Klick über /auth/callback direkt zu /passwort-setzen. WICHTIG:
+ * das ist ein reiner API-Aufruf, der KEINE E-Mail verschickt (anders als
+ * `inviteUserByEmail`, das am Anfang dieser Datei wegen Supabase's SMTP-
+ * Rate-Limit bewusst verworfen wurde) - der Link wird stattdessen in UNSERE
+ * eigene Resend-Mail eingebettet, das Rate-Limit-Problem bleibt also
+ * vermieden, auch bei 100 Zeilen im selben Batch.
+ */
 async function sendWelcomeMail(
+  admin: ReturnType<typeof createAdminClient>,
   tenant: ImportTenant,
   result: ImportRowResult,
   row: CsvRow,
 ): Promise<void> {
-  const loginUrl = buildLoginUrl(tenant.slug);
+  const loginUrl = await buildSetPasswordLink(admin, tenant, result.email);
   const accentColor = tenant.branding?.color_primary ?? DEFAULT_BRANDING.color_primary;
 
   const html = welcomeInvite({
@@ -129,12 +151,37 @@ async function sendWelcomeMail(
   result.emailSent = sendResult.success;
 }
 
-/** Dev-/Prod-Domainschema wie in src/lib/tenant/resolve.ts dokumentiert (Entscheidung 10.07.2026). */
-function buildLoginUrl(slug: string): string {
-  if (process.env.NODE_ENV === "production") {
-    return `https://${slug}.akademie.calltalent.ai/login`;
+/**
+ * Erzeugt einen funktionierenden Erstanmelde-Link (Passwort setzen) für
+ * einen frisch angelegten, passwortlosen Nutzer. Fail-soft: schlägt
+ * `generateLink()` fehl (z. B. transienter Auth-API-Fehler), fällt die
+ * Funktion auf die reine Login-URL zurück, statt die gesamte Willkommensmail
+ * scheitern zu lassen - dann landet der Nutzer eben auf /login und muss
+ * dort selbst "Passwort vergessen" nutzen (funktioniert seit demselben
+ * Block, s. o.), statt gar keine Mail zu bekommen.
+ *
+ * EXPORTIERT (Phase 5, Block 8, 12.07.2026): wird jetzt auch von
+ * `platform/actions.ts` (Mandanten-Inhaber-Einladung beim Anlegen eines
+ * neuen Mandanten) wiederverwendet — derselbe Bedarf (passwortloses Konto,
+ * echter Erstanmelde-Link), kein Grund für eine zweite Implementierung.
+ */
+export async function buildSetPasswordLink(
+  admin: ReturnType<typeof createAdminClient>,
+  tenant: ImportTenant,
+  email: string,
+): Promise<string> {
+  const fallback = `${tenantOrigin(tenant)}/login`;
+  try {
+    const { data, error } = await admin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo: `${tenantOrigin(tenant)}/auth/callback?next=/passwort-setzen` },
+    });
+    if (error || !data?.properties?.action_link) return fallback;
+    return data.properties.action_link;
+  } catch {
+    return fallback;
   }
-  return `http://${slug}.localhost:3000/login`;
 }
 
 /**
@@ -186,7 +233,7 @@ export async function importOneUser(
       // statt Fehler zu werfen (häufiger Fall bei Re-Imports/mehreren Mandanten).
       const existing = await findUserByEmail(admin, row.email);
       if (!existing) {
-        return { email: row.email, status: "error", message: createError.message, emailSent: false };
+        return { email: row.email, status: "error", message: translateAuthError(createError), emailSent: false };
       }
       userId = existing.id;
       status = "linked";
@@ -235,7 +282,7 @@ export async function importOneUser(
       { onConflict: "tenant_id,user_id", ignoreDuplicates: false },
     );
     if (membershipError) {
-      return { email: row.email, status: "error", message: membershipError.message, emailSent: false };
+      return { email: row.email, status: "error", message: translateDbError(membershipError), emailSent: false };
     }
 
     if (isNewMembership) {
@@ -274,16 +321,24 @@ export async function importOneUser(
     // (nur für status === "created"); Default hier: false.
     return { email: row.email, status, emailSent: false, userId };
   } catch (e) {
+    // e.message kann eine rohe/technische Meldung sein (unerwarteter Fehler
+    // irgendwo im Import-Ablauf) — Detail nur loggen, Nutzer/CSV-Bericht
+    // bekommt einen klaren deutschen Satz.
+    console.error("[users/import] Unerwarteter Fehler beim Import einer Zeile.", {
+      email: row.email,
+      error: e instanceof Error ? e.message : e,
+    });
     return {
       email: row.email,
       status: "error",
-      message: e instanceof Error ? e.message : "Unbekannter Fehler.",
+      message: "Unbekannter Fehler beim Import.",
       emailSent: false,
     };
   }
 }
 
-async function findUserByEmail(admin: ReturnType<typeof createAdminClient>, email: string) {
+/** EXPORTIERT (Phase 5, Block 8, 12.07.2026) — Wiederverwendung in platform/actions.ts, s. o. */
+export async function findUserByEmail(admin: ReturnType<typeof createAdminClient>, email: string) {
   // Supabase Admin API bietet keine direkte "get by email" Suche über alle
   // Seiten hinweg; bei üblichen Nutzerzahlen (<1000/Mandant) reicht eine
   // Einzelseiten-Abfrage mit hohem perPage-Wert für Phase 1.

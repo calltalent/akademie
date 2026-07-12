@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; } a { color:#5663AE; } a:hover { color:#3E3F66; }</style>
+</helmet>
+<div style="display:flex; min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; background:#F4F5FA; color:#1A1A2E; font-size:18px; line-height:1.6;">
+  <dc-import name="AdminSidebar" active="courses" hint-size="264px,100vh"></dc-import>
+  <div style="flex:1 1 auto; display:flex; flex-direction:column; min-width:0;">
+    <header style="display:flex; align-items:center; gap:18px; padding:20px 40px;">
+      <div style="flex:1 1 auto;">
+        <div style="font-size:13px; font-weight:600; color:#A9AAC4;">Inhalte · Kurse</div>
+        <h1 style="margin:2px 0 0; font-size:26px; font-weight:800; letter-spacing:-.01em;">Kurse</h1>
+      </div>
+      <a href="#" style="display:inline-flex; align-items:center; gap:8px; background:#5663AE; color:#fff; font-weight:700; font-size:15px; padding:12px 18px; border-radius:11px; text-decoration:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>Neuer Kurs
+      </a>
+    </header>
+    <main style="flex:1 1 auto; padding:16px 40px 56px;">
+      <div style="display:flex; gap:10px; margin-bottom:24px;">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3"><span style="{{ t.style }}">{{ t.label }}</span></sc-for>
+      </div>
+      <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; overflow:hidden;">
+        <div style="display:grid; grid-template-columns:2.6fr 1fr 1fr 1fr 0.6fr; font-size:13px; font-weight:700; color:#A9AAC4; padding:18px 26px 12px; border-bottom:1px solid #EEF0F7;">
+          <div>Kurs</div><div>Lektionen</div><div>Teilnehmer</div><div>Status</div><div></div>
+        </div>
+        <sc-for list="{{ rows }}" as="c" hint-placeholder-count="5">
+          <div style="display:grid; grid-template-columns:2.6fr 1fr 1fr 1fr 0.6fr; align-items:center; padding:16px 26px; border-bottom:1px solid #F4F5FA; font-size:15px;">
+            <div style="display:flex; align-items:center; gap:14px;">
+              <span style="flex:0 0 auto; width:44px; height:32px; border-radius:8px; background-color:{{ c.tint }}; background-image:repeating-linear-gradient(45deg,{{ c.tint }} 0 6px, rgba(255,255,255,.5) 6px 12px);"></span>
+              <span style="font-weight:600;">{{ c.title }}</span>
+            </div>
+            <div style="color:#3E3F66;">{{ c.lessons }}</div>
+            <div style="color:#3E3F66;">{{ c.members }}</div>
+            <div><span style="{{ c.statusStyle }}">{{ c.status }}</span></div>
+            <div><a href="#" style="font-size:14px; font-weight:600; text-decoration:none;">Bearb.</a></div>
+          </div>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:760}}">
+class Component extends DCLogic {
+  chip(l, a) { return { label: l, style: ['display:inline-flex','padding:9px 15px','border-radius:10px','font-size:14px','font-weight:600', a?'background:#5663AE;color:#fff':'background:#fff;color:#3E3F66;border:1px solid #E7E8F2'].join(';') }; }
+  row(o) {
+    const m = { live:['Live','#1F8A5B','#E3F2EA'], entwurf:['Entwurf','#1A1A2E','#F7EED4'], archiv:['Archiviert','#66679B','#EEF0F7'] };
+    const [t,c,b] = m[o.status];
+    return { ...o, status:t, statusStyle:'display:inline-flex; padding:5px 12px; border-radius:8px; font-size:13px; font-weight:700; color:'+c+'; background:'+b+';' };
+  }
+  renderVals() {
+    return {
+      tabs: [this.chip('Alle', true), this.chip('Live'), this.chip('Entwürfe'), this.chip('Archiv')],
+      rows: [
+        this.row({ title:'Vertriebspsychologie im Erstgespräch', lessons:12, members:512, status:'live', tint:'#DFE2F4' }),
+        this.row({ title:'Einwandbehandlung am Telefon', lessons:9, members:388, status:'live', tint:'#E7E9F6' }),
+        this.row({ title:'Terminierung &amp; Follow-up', lessons:7, members:204, status:'live', tint:'#EDE7F5' }),
+        this.row({ title:'Souverän mit Ablehnung umgehen', lessons:6, members:0, status:'entwurf', tint:'#E4E6F5' }),
+        this.row({ title:'Kaltakquise-Grundlagen (2024)', lessons:8, members:140, status:'archiv', tint:'#E9E6F3' }),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

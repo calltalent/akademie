@@ -3,6 +3,8 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
+import { translateDbError } from "@/lib/errors/db";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 /**
  * Server Actions für das Web-Push-Fundament (Phase 4, Block 5).
@@ -60,11 +62,11 @@ export async function subscribeToPush(subscriptionJson: unknown): Promise<PushAc
       },
       { onConflict: "endpoint" },
     );
-    if (error) return { error: "Speichern fehlgeschlagen: " + error.message };
+    if (error) return { error: "Speichern fehlgeschlagen: " + translateDbError(error) };
 
     return { error: null, success: true };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { error: genericErrorMessage(e) };
   }
 }
 
@@ -84,10 +86,10 @@ export async function unsubscribeFromPush(endpoint: string): Promise<PushActionS
       .delete()
       .eq("endpoint", parsedEndpoint.data)
       .eq("user_id", user.id);
-    if (error) return { error: "Abmelden fehlgeschlagen: " + error.message };
+    if (error) return { error: "Abmelden fehlgeschlagen: " + translateDbError(error) };
 
     return { error: null, success: true };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { error: genericErrorMessage(e) };
   }
 }

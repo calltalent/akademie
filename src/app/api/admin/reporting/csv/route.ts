@@ -4,6 +4,7 @@ import { requireStaffTenant } from "@/lib/auth/staff";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { getCourseReport, getUserReport, getQuizReport } from "@/lib/reporting/queries";
 import { toCsv } from "@/lib/reporting/csv";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 const querySchema = z.object({
   type: z.enum(["courses", "users", "quiz"]),
@@ -124,9 +125,9 @@ export async function GET(request: Request) {
       },
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    const rawMessage = e instanceof Error ? e.message : "Unbekannter Fehler.";
     const status =
-      message.includes("Nicht angemeldet") || message.includes("nur für Team-Mitglieder") ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+      rawMessage.includes("Nicht angemeldet") || rawMessage.includes("nur für Team-Mitglieder") ? 403 : 500;
+    return NextResponse.json({ error: genericErrorMessage(e) }, { status });
   }
 }

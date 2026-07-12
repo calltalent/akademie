@@ -5,16 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { createStripeClient } from "@/lib/stripe/client";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
+import { buildTenantUrl } from "@/lib/tenant/url";
 
 export type PortalActionState = { error: string | null };
 
-function buildTenantUrl(slug: string, path: string): string {
-  const base =
-    process.env.NODE_ENV === "production"
-      ? `https://${slug}.akademie.calltalent.ai`
-      : `http://${slug}.localhost:3000`;
-  return `${base}${path}`;
-}
+/** BUGFIX (Phase 5, Block 8, 12.07.2026) — siehe gleichlautende Notiz in stripe/checkout.ts. */
 
 /**
  * Self-Service-Billing-Portal fuer Abo-Kunden.
@@ -78,12 +73,19 @@ export async function createPortalSession(): Promise<PortalActionState> {
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: buildTenantUrl(tenant.slug, "/profil"),
+      return_url: buildTenantUrl(tenant, "/profil"),
     });
     redirectUrl = portalSession.url;
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Portal-Sitzung konnte nicht erzeugt werden.";
-    return { error: "Stripe-Fehler: " + message };
+    // Stripe-SDK-Fehlermeldungen sind technisch/englisch — Detail nur
+    // loggen, Nutzer bekommt einen klaren deutschen Satz (analog
+    // translateAuthError/translateDbError-Muster).
+    console.error("[stripe/portal] Portal-Sitzung konnte nicht erzeugt werden.", {
+      tenantId: tenant.id,
+      userId: user.id,
+      error: e instanceof Error ? e.message : e,
+    });
+    return { error: "Das Kunden-Portal konnte gerade nicht geöffnet werden. Bitte versuche es später erneut." };
   }
 
   redirect(redirectUrl);

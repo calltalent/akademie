@@ -38,10 +38,12 @@ export function BlockRenderer({ blocks, lessonId }: { blocks: Block[]; lessonId:
 async function BlockView({ block, lessonId }: { block: Block; lessonId: string }) {
   switch (block.type) {
     case "text":
-      return (
-        // eslint-disable-next-line react/no-danger -- Inhalt stammt nur von Staff (RLS lessons_staff_write)
-        <div className="text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: block.html }} />
-      );
+      // Inhalt stammt nur von Staff (RLS lessons_staff_write), kein
+      // nutzergenerierter Fremdinhalt — dangerouslySetInnerHTML ist hier
+      // bewusst und sicher (react/no-danger feuert in diesem Projekt nicht,
+      // eslint-disable-Kommentar entfernt: Josips Lint-Lauf 12.07.2026
+      // meldete ihn als "unused eslint-disable directive").
+      return <div className="text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: block.html }} />;
 
     case "callout": {
       const bg =
@@ -65,16 +67,23 @@ async function BlockView({ block, lessonId }: { block: Block; lessonId: string }
           </div>
         );
       }
+      // Korrektur (Josips Lint-Lauf, 12.07.2026): "Avoid constructing JSX
+      // within try/catch" (react-hooks/error-boundaries) — libraryId wird
+      // jetzt im try ermittelt, das JSX erst danach außerhalb gebaut.
+      let libraryId: string | null = null;
       try {
-        const { libraryId } = getPlayerConfig();
-        return <BunnyPlayer libraryId={libraryId} videoId={block.bunnyVideoId} />;
+        libraryId = getPlayerConfig().libraryId;
       } catch {
+        libraryId = null;
+      }
+      if (!libraryId) {
         return (
           <div className="rounded-md border p-6 text-center text-base text-gray-500">
             Video-Player nicht verfügbar (Bunny Stream nicht konfiguriert).
           </div>
         );
       }
+      return <BunnyPlayer libraryId={libraryId} videoId={block.bunnyVideoId} />;
     }
 
     case "audio":

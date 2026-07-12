@@ -65,7 +65,11 @@ export function VideoUpload({
       },
       metadata: { filetype: file.type, title: file.name },
       onError(error) {
-        setState({ status: "error", message: error.message });
+        // error.message kommt vom tus-js-client (Netzwerk-/Protokollfehler,
+        // technisch/englisch) — Detail nur in der Konsole, Nutzer bekommt
+        // einen klaren deutschen Satz.
+        console.error("[video-upload] Upload fehlgeschlagen.", error);
+        setState({ status: "error", message: "Der Video-Upload ist fehlgeschlagen. Bitte versuche es erneut." });
       },
       onProgress(bytesUploaded, bytesTotal) {
         setState({ status: "uploading", percent: Math.round((bytesUploaded / bytesTotal) * 100) });

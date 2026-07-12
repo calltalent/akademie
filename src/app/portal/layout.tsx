@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { checkPlatformAccess } from "@/lib/platform/auth";
+import { PortalShell } from "@/components/portal/portal-shell";
 
 const LOGIN_PATH = "/portal/login";
 
@@ -9,7 +10,7 @@ const LOGIN_PATH = "/portal/login";
  * Mandanten-Branding: kein getTenant()/ThemeStyle-Einbindung wie im
  * Mandanten-Layout (src/app/layout.tsx bindet ThemeStyle bereits global ein,
  * aber getTenant() liefert auf dem Portal-Host ohnehin null, siehe
- * src/proxy.ts). Eigenständiges, dunkles Farbschema statt der hellen
+ * src/middleware.ts). Eigenständiges, dunkles Farbschema statt der hellen
  * Mandanten-Optik der Akademie — bewusst unterscheidbar, damit im
  * Betreiber-Portal nie mit einer Mandanten-Oberfläche verwechselt wird.
  */
@@ -22,7 +23,7 @@ export default async function PortalLayout({
 
   // Auf der Login-Seite selbst nie gaten — sonst Redirect-Schleife
   // (nicht angemeldet -> Redirect zu /portal/login -> wieder nicht
-  // angemeldet -> ...). Der Header kommt aus src/proxy.ts.
+  // angemeldet -> ...). Der Header kommt aus src/middleware.ts.
   if (isLoginPage) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50">{children}</div>
@@ -58,20 +59,7 @@ export default async function PortalLayout({
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-        <a href="/portal" className="text-lg font-semibold">
-          Calltalent — Betreiber-Portal
-        </a>
-        <form action="/auth/signout" method="post">
-          <button
-            type="submit"
-            className="rounded-md border border-slate-600 px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
-          >
-            Abmelden
-          </button>
-        </form>
-      </header>
-      <div className="px-6 py-6">{children}</div>
+      <PortalShell>{children}</PortalShell>
     </div>
   );
 }

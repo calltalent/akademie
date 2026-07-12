@@ -2,19 +2,26 @@ import { checkAdminAccess } from "@/lib/auth/staff";
 import { createClient } from "@/lib/supabase/server";
 import { ApiKeysPanel } from "@/components/admin/api-keys-panel";
 import { WebhooksPanel } from "@/components/admin/webhooks-panel";
+import { TenantSettingsForm } from "@/components/admin/tenant-settings-form";
 
 /**
- * Phase 3, Block 7 — `/admin/einstellungen` (SPEC.md
- * Navigationskarte: "Domain, Sprachen, Tutor an/aus, Webhooks, API-Keys").
- * Diese Iteration deckt API-Keys + Webhooks ab; Domain/Sprachen/Tutor-
- * Umschalter sind nicht Teil von Block 7 (kein Bezug zu REST-API/
- * Webhooks) und bleiben ein späteres Thema.
+ * Design-Block 6 (13.07.2026, Claude-Design-Export Teil 3,
+ * AdminEinstellungen.dc.html). Der Export zeigt Akademie-Grunddaten,
+ * Plattform-Optionen (3 Schalter) und Marken-Standard — GAR KEINE
+ * API-Keys/Webhooks (das war bislang der komplette Seiteninhalt, Phase 3
+ * Block 7). Beides bleibt erhalten: neue Karten oben (echte, gespeicherte
+ * Werte, siehe tenant-settings-form.tsx + lib/tenant/actions.ts), API-Keys/
+ * Webhooks als eigener Abschnitt darunter (reale, funktionierende
+ * Integrationsverwaltung, im Export schlicht nicht vorgesehen — nicht
+ * entfernt, nur nicht Teil dieses Exports).
  *
- * Eigenes Admin-Gate (`checkAdminAccess`, strenger als das layout-weite
- * Staff-Gate) — gleiches Muster wie `/admin/nutzer` (Block 6): RLS
- * `api_keys_admin_all`/`webhooks_admin_all` erlaubt nur owner/admin, ein
- * Trainer bekäme über das allgemeine Staff-Gate sonst eine irreführend
- * leere Seite statt einer klaren Meldung.
+ * "Marken-Standard" zeigt echte `tenant.branding`-Werte (mit Systemstandard
+ * als Fallback, siehe DEFAULT_BRANDING in lib/tenant/types.ts) statt der im
+ * Export fest verdrahteten Demo-Werte — rein lesend, keine Eingabefelder
+ * (Export zeigt dort auch keine). Der Export verlinkt zusätzlich auf
+ * "Mandanten verwalten" (Betreiber-Portal) — bewusst weggelassen, weil das
+ * nur für Calltalent-Plattform-Admins zugänglich ist, nicht für normale
+ * Mandanten-Administratoren, die diese Seite genauso sehen.
  */
 export default async function AdminEinstellungenPage() {
   const access = await checkAdminAccess();
@@ -33,31 +40,81 @@ export default async function AdminEinstellungenPage() {
     );
   }
 
+  const { tenant } = access;
   const supabase = await createClient();
   const [{ data: apiKeys }, { data: webhooks }] = await Promise.all([
     supabase
       .from("api_keys")
       .select("id, name, last_used, active, created_at")
-      .eq("tenant_id", access.tenant.id)
+      .eq("tenant_id", tenant.id)
       .order("created_at", { ascending: false }),
     supabase
       .from("webhooks")
       .select("id, url, events, active, created_at")
-      .eq("tenant_id", access.tenant.id)
+      .eq("tenant_id", tenant.id)
       .order("created_at", { ascending: false }),
   ]);
 
+  const branding = tenant.branding;
+
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Einstellungen</h1>
-        <p className="text-base text-gray-500">
-          API-Keys und Webhooks für externe Integrationen (z. B. Zapier, Make) dieses Mandanten.
-        </p>
+    <div className="flex flex-col gap-4">
+      <header>
+        <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
+          Plattform · Einstellungen
+        </div>
+        <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
+          Einstellungen
+        </h1>
+      </header>
+
+      <div className="flex max-w-[820px] flex-col gap-[22px]">
+        <TenantSettingsForm
+          name={tenant.name}
+          supportEmail={tenant.settings.support_email ?? ""}
+          selfSignupEnabled={tenant.settings.self_signup_enabled !== false}
+          certificatesEnabled={tenant.settings.certificates_enabled !== false}
+          maintenanceEnabled={tenant.settings.maintenance_enabled === true}
+        />
+
+        <div className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
+          <div className="mb-1.5 text-[17px] font-bold">Marken-Standard</div>
+          <div className="mb-4 text-sm" style={{ color: "#66679B" }}>
+            Aktuelle Markenwerte dieses Mandanten.
+          </div>
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="flex items-center gap-2.5">
+              <span
+                aria-hidden="true"
+                className="h-[34px] w-[34px] flex-none rounded-[9px]"
+                style={{ background: branding.color_primary ?? "#5663AE" }}
+              />
+              <span className="text-sm" style={{ color: "#3E3F66" }}>
+                {branding.color_primary ?? "#5663AE"}
+              </span>
+            </div>
+            <div className="text-sm" style={{ color: "#3E3F66" }}>
+              Radius {branding.radius ?? "14px"}
+            </div>
+            <div className="text-sm" style={{ color: "#3E3F66" }}>
+              Schrift: {branding.font ?? "Montserrat"}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <ApiKeysPanel apiKeys={apiKeys ?? []} />
-      <WebhooksPanel webhooks={(webhooks ?? []) as { id: string; url: string; events: string[]; active: boolean; created_at: string }[]} />
+      <div className="mt-6 flex max-w-[820px] flex-col gap-8">
+        <div>
+          <h2 className="text-lg font-semibold">Integrationen</h2>
+          <p className="text-sm text-gray-500">
+            API-Keys und Webhooks für externe Integrationen (z. B. Zapier, Make) dieses Mandanten.
+          </p>
+        </div>
+        <ApiKeysPanel apiKeys={apiKeys ?? []} />
+        <WebhooksPanel
+          webhooks={(webhooks ?? []) as { id: string; url: string; events: string[]; active: boolean; created_at: string }[]}
+        />
+      </div>
     </div>
   );
 }

@@ -7,6 +7,8 @@ import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { generateApiKey, generateWebhookSecret } from "@/lib/webhooks/keys";
 import { webhookEventSchema } from "@/lib/webhooks/dispatch";
 import { assertSafeWebhookUrl } from "@/lib/webhooks/url-safety";
+import { translateDbError } from "@/lib/errors/db";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 /**
  * Phase 3, Block 7 — Server Actions für `/admin/einstellungen`
@@ -49,12 +51,12 @@ export async function createApiKey(name: string): Promise<ApiKeyCreateResult> {
       .insert({ tenant_id: tenant.id, name: parsedName.data, key_hash: hash, active: true })
       .select("id, name")
       .single();
-    if (error || !data) return { ok: false, error: error?.message ?? "Anlegen fehlgeschlagen." };
+    if (error || !data) return { ok: false, error: error ? translateDbError(error) : "Anlegen fehlgeschlagen." };
 
     revalidatePath("/admin/einstellungen");
     return { ok: true, id: data.id, name: data.name, plaintext };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { ok: false, error: genericErrorMessage(e) };
   }
 }
 
@@ -66,12 +68,12 @@ export async function revokeApiKey(id: string): Promise<{ ok: true } | { ok: fal
       .update({ active: false })
       .eq("id", id)
       .eq("tenant_id", tenant.id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: translateDbError(error) };
 
     revalidatePath("/admin/einstellungen");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { ok: false, error: genericErrorMessage(e) };
   }
 }
 
@@ -123,12 +125,12 @@ export async function createWebhook(url: string, events: string[]): Promise<Webh
       })
       .select("id, url, events")
       .single();
-    if (error || !data) return { ok: false, error: error?.message ?? "Anlegen fehlgeschlagen." };
+    if (error || !data) return { ok: false, error: error ? translateDbError(error) : "Anlegen fehlgeschlagen." };
 
     revalidatePath("/admin/einstellungen");
     return { ok: true, id: data.id, url: data.url, events: data.events, secret };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { ok: false, error: genericErrorMessage(e) };
   }
 }
 
@@ -136,11 +138,11 @@ export async function deleteWebhook(id: string): Promise<{ ok: true } | { ok: fa
   try {
     const { tenant, supabase } = await requireAdminTenant();
     const { error } = await supabase.from("webhooks").delete().eq("id", id).eq("tenant_id", tenant.id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: translateDbError(error) };
 
     revalidatePath("/admin/einstellungen");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { ok: false, error: genericErrorMessage(e) };
   }
 }

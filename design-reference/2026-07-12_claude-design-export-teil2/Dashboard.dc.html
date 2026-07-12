@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  a { color: #5663AE; }
+  a:hover { color: #3E3F66; }
+</style>
+</helmet>
+<div style="display:flex; min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; background:#F4F5FA; color:#1A1A2E; font-size:18px; line-height:1.6;">
+
+  <dc-import name="Sidebar" active="dashboard" hint-size="264px,100vh"></dc-import>
+
+  <div style="flex:1 1 auto; display:flex; flex-direction:column; min-width:0;">
+    <dc-import name="TopBar" breadcrumb="Lernen · Meine Kurse" title="Willkommen zurück, Jonas" hint-size="100%,90px"></dc-import>
+
+    <main style="flex:1 1 auto; padding:16px 40px 56px;">
+      <div style="display:flex; align-items:center; gap:26px; background:#3E3F66; border-radius:16px; padding:26px 30px; margin-bottom:34px; color:#F7EED4;">
+        <div style="flex:1 1 auto; min-width:0;">
+          <div style="font-size:13px; font-weight:600; letter-spacing:.04em; color:#B9BBDA;">WEITERLERNEN</div>
+          <div style="font-size:22px; font-weight:700; margin:4px 0 3px; color:#FFFFFF;">Vertriebspsychologie im Erstgespräch</div>
+          <div style="font-size:15px; color:#D6D7EC;">Lektion 7 von 12 · Einwände als Kaufsignal lesen</div>
+        </div>
+        <a href="#" style="flex:0 0 auto; display:inline-flex; align-items:center; gap:9px; background:#F7EED4; color:#1A1A2E; font-weight:700; font-size:15px; padding:13px 22px; border-radius:11px; text-decoration:none;">
+          Fortsetzen
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1A1A2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg>
+        </a>
+      </div>
+
+      <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:18px;">
+        <h2 style="margin:0; font-size:20px; font-weight:700; color:#1A1A2E;">Meine Kurse</h2>
+        <a href="Kurskatalog.dc.html" style="font-size:14px; font-weight:600; text-decoration:none;">Kurskatalog ansehen</a>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:24px;">
+        <sc-for list="{{ courses }}" as="c" hint-placeholder-count="3">
+          <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; overflow:hidden; display:flex; flex-direction:column;">
+            <div style="{{ c.thumbStyle }}">
+              <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:#66679B; background:rgba(255,255,255,.75); padding:4px 8px; border-radius:6px;">{{ c.thumbLabel }}</span>
+            </div>
+            <div style="padding:20px 20px 22px; display:flex; flex-direction:column; flex:1 1 auto;">
+              <div style="font-size:12px; font-weight:600; letter-spacing:.03em; color:#A9AAC4; margin-bottom:6px;">{{ c.module }}</div>
+              <div style="font-size:17px; font-weight:700; line-height:1.35; color:#1A1A2E; margin-bottom:16px; text-wrap:pretty;">{{ c.title }}</div>
+              <div style="margin-top:auto;">
+                <sc-if value="{{ c.started }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600; margin-bottom:8px;">
+                    <span style="color:#66679B;">{{ c.progressLabel }}</span>
+                    <span style="color:#5663AE;">{{ c.percentLabel }}</span>
+                  </div>
+                  <div style="height:8px; border-radius:6px; background:#EEF0F7; overflow:hidden;">
+                    <div style="{{ c.barStyle }}"></div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ c.notStarted }}" hint-placeholder-val="">
+                  <span style="display:inline-flex; align-items:center; gap:8px; background:#F7EED4; color:#1A1A2E; font-size:13px; font-weight:700; padding:8px 14px; border-radius:9px;">
+                    <span style="width:7px; height:7px; border-radius:50%; background:#3E3F66;"></span>Nicht gestartet
+                  </span>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:940},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#5663AE&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#5663AE&quot;,&quot;#66679B&quot;,&quot;#3E3F66&quot;]}}">
+class Component extends DCLogic {
+  courseCard(o) {
+    const accent = this.props.accent ?? '#5663AE';
+    const thumbStyle = [
+      'height:132px','display:flex','align-items:center','justify-content:center',
+      'background-image:repeating-linear-gradient(45deg,' + o.tint + ' 0 10px, rgba(255,255,255,.55) 10px 20px)',
+      'background-color:' + o.tint,
+    ].join(';');
+    const pct = o.percent || 0;
+    return {
+      module: o.module, title: o.title, thumbStyle, thumbLabel: o.thumbLabel,
+      started: pct > 0, notStarted: pct === 0,
+      progressLabel: 'Fortschritt', percentLabel: pct + '%',
+      barStyle: 'height:100%; width:' + pct + '%; background:' + accent + '; border-radius:6px;',
+    };
+  }
+  renderVals() {
+    return {
+      courses: [
+        this.courseCard({ module: 'VERTRIEB', title: 'Vertriebspsychologie im Erstgespräch', percent: 64, tint: '#DFE2F4', thumbLabel: 'kursbild 16:9' }),
+        this.courseCard({ module: 'TELEFONIE', title: 'Einwandbehandlung am Telefon', percent: 22, tint: '#E7E9F6', thumbLabel: 'kursbild 16:9' }),
+        this.courseCard({ module: 'ABSCHLUSS', title: 'Terminierung &amp; Follow-up', percent: 0, tint: '#EDE7F5', thumbLabel: 'kursbild 16:9' }),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

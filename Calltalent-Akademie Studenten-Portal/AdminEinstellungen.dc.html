@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; } a { color:#5663AE; } a:hover { color:#3E3F66; }</style>
+</helmet>
+<div style="display:flex; min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; background:#F4F5FA; color:#1A1A2E; font-size:18px; line-height:1.6;">
+  <dc-import name="AdminSidebar" active="settings" hint-size="264px,100vh"></dc-import>
+  <div style="flex:1 1 auto; display:flex; flex-direction:column; min-width:0;">
+    <header style="display:flex; align-items:center; gap:18px; padding:20px 40px;">
+      <div style="flex:1 1 auto;">
+        <div style="font-size:13px; font-weight:600; color:#A9AAC4;">Plattform · Einstellungen</div>
+        <h1 style="margin:2px 0 0; font-size:26px; font-weight:800; letter-spacing:-.01em;">Einstellungen</h1>
+      </div>
+    </header>
+    <main style="flex:1 1 auto; padding:16px 40px 56px; max-width:820px; display:flex; flex-direction:column; gap:22px;">
+
+      <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:26px 28px;">
+        <div style="font-size:17px; font-weight:700; margin-bottom:4px;">Akademie</div>
+        <div style="font-size:14px; color:#A9AAC4; margin-bottom:20px;">Grunddaten der Plattform.</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+          <div><label style="display:block; font-size:14px; font-weight:600; color:#3E3F66; margin-bottom:7px;">Name</label><input value="Calltalent-Akademie" style="width:100%; padding:13px 15px; border:1px solid #D8DAEA; border-radius:11px; font-family:inherit; font-size:16px; background:#fff;" /></div>
+          <div><label style="display:block; font-size:14px; font-weight:600; color:#3E3F66; margin-bottom:7px;">Support-E-Mail</label><input value="support@calltalent.ai" style="width:100%; padding:13px 15px; border:1px solid #D8DAEA; border-radius:11px; font-family:inherit; font-size:16px; background:#fff;" /></div>
+        </div>
+      </div>
+
+      <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:24px 28px;">
+        <div style="font-size:17px; font-weight:700; margin-bottom:16px;">Plattform-Optionen</div>
+        <sc-for list="{{ toggles }}" as="t" hint-placeholder-count="3">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-top:1px solid #F2F3F9;">
+            <div><div style="font-size:15px; font-weight:600;">{{ t.label }}</div><div style="font-size:13px; color:#A9AAC4;">{{ t.desc }}</div></div>
+            <button onClick="{{ t.toggle }}" style="{{ t.trackStyle }}"><span style="{{ t.knobStyle }}"></span></button>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:24px 28px;">
+        <div style="font-size:17px; font-weight:700; margin-bottom:6px;">Marken-Standard</div>
+        <div style="font-size:14px; color:#66679B; margin-bottom:16px;">Standardwerte für neue Mandanten (überschreibbar unter Mandanten).</div>
+        <div style="display:flex; gap:26px; align-items:center; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:10px;"><span style="width:34px; height:34px; border-radius:9px; background:#5663AE;"></span><span style="font-size:14px; color:#3E3F66;">Periwinkle · #5663AE</span></div>
+          <div style="font-size:14px; color:#3E3F66;">Radius 14px</div>
+          <div style="font-size:14px; color:#3E3F66;">Schrift: Montserrat</div>
+          <a href="Mandanten.dc.html" style="margin-left:auto; font-size:14px; font-weight:600; text-decoration:none;">Mandanten verwalten →</a>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end;">
+        <a href="#" style="display:inline-flex; padding:13px 24px; border-radius:11px; background:#5663AE; color:#fff; font-size:15px; font-weight:700; text-decoration:none;">Speichern</a>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { toggles: { selfsignup: true, zertifikate: true, wartung: false } };
+  flip = (k) => () => this.setState(s => ({ toggles: { ...s.toggles, [k]: !s.toggles[k] } }));
+  row(label, desc, key) {
+    const on = this.state.toggles[key];
+    return {
+      label, desc, toggle: this.flip(key),
+      trackStyle: 'width:44px; height:26px; border-radius:13px; border:none; cursor:pointer; padding:0; position:relative; background:' + (on ? '#5663AE' : '#D8DAEA') + ';',
+      knobStyle: 'position:absolute; top:3px; left:' + (on ? '21px' : '3px') + '; width:20px; height:20px; border-radius:50%; background:#fff; transition:left .15s; box-shadow:0 1px 3px rgba(0,0,0,.2);',
+    };
+  }
+  renderVals() {
+    return {
+      toggles: [
+        this.row('Selbstregistrierung erlauben', 'Teilnehmer können sich ohne Einladung anmelden.', 'selfsignup'),
+        this.row('Zertifikate ausstellen', 'Nach Kursabschluss automatisch ein Zertifikat erzeugen.', 'zertifikate'),
+        this.row('Wartungsmodus', 'Portal für Teilnehmer vorübergehend sperren.', 'wartung'),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

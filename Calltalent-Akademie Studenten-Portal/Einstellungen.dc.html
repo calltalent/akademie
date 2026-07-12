@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  a { color: #5663AE; }
+  a:hover { color: #3E3F66; }
+</style>
+</helmet>
+<div style="display:flex; min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; background:#F4F5FA; color:#1A1A2E; font-size:18px; line-height:1.6;">
+  <dc-import name="Sidebar" active="settings" hint-size="264px,100vh"></dc-import>
+
+  <div style="flex:1 1 auto; display:flex; flex-direction:column; min-width:0;">
+    <dc-import name="TopBar" breadcrumb="Konto · Einstellungen" title="Einstellungen" hint-size="100%,90px"></dc-import>
+
+    <main style="flex:1 1 auto; padding:16px 40px 56px; max-width:920px;">
+
+      <!-- Tabs -->
+      <div style="display:flex; gap:6px; border-bottom:1px solid #E1E3EF; margin-bottom:30px;">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+          <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+
+      <!-- Breadcrumb line -->
+      <div style="font-size:13px; font-weight:600; color:#A9AAC4; margin-bottom:22px;">Einstellungen &nbsp;›&nbsp; <span style="color:#5663AE;">{{ activeLabel }}</span></div>
+
+      <!-- ALLGEMEIN -->
+      <sc-if value="{{ isAllgemein }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:30px;">
+          <div style="display:flex; align-items:center; gap:20px; margin-bottom:30px; padding-bottom:26px; border-bottom:1px solid #EEF0F7;">
+            <div style="width:76px; height:76px; border-radius:16px; background:#3E3F66; color:#F7EED4; font-weight:700; font-size:26px; display:flex; align-items:center; justify-content:center;">JW</div>
+            <div>
+              <div style="font-size:18px; font-weight:700;">Profilbild</div>
+              <div style="font-size:14px; color:#66679B; margin-bottom:10px;">JPG oder PNG, max. 2 MB.</div>
+              <a href="#" style="display:inline-flex; padding:9px 15px; border-radius:10px; border:1px solid #D8DAEA; background:#fff; font-size:14px; font-weight:600; color:#3E3F66; text-decoration:none;">Bild hochladen</a>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px 24px;">
+            <sc-for list="{{ fields }}" as="f" hint-placeholder-count="6">
+              <div style="{{ f.wrap }}">
+                <label style="display:block; font-size:14px; font-weight:600; color:#3E3F66; margin-bottom:7px;">{{ f.label }}</label>
+                <input value="{{ f.value }}" style="width:100%; padding:13px 15px; border:1px solid #D8DAEA; border-radius:11px; font-family:inherit; font-size:16px; color:#1A1A2E; background:#fff;" />
+              </div>
+            </sc-for>
+            <div style="grid-column:1 / -1;">
+              <label style="display:block; font-size:14px; font-weight:600; color:#3E3F66; margin-bottom:7px;">Über mich</label>
+              <textarea style="width:100%; min-height:96px; padding:13px 15px; border:1px solid #D8DAEA; border-radius:11px; font-family:inherit; font-size:16px; color:#1A1A2E; background:#fff; resize:vertical;">Vertriebsmitarbeiter im Innendienst, seit 2023 im B2B-Telefonvertrieb.</textarea>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:28px; padding-top:24px; border-top:1px solid #EEF0F7;">
+            <a href="#" style="display:inline-flex; padding:12px 18px; border-radius:11px; border:1px solid #D8DAEA; background:#fff; font-size:15px; font-weight:600; color:#3E3F66; text-decoration:none;">E-Mail ändern</a>
+            <a href="#" style="display:inline-flex; padding:12px 18px; border-radius:11px; border:1px solid #D8DAEA; background:#fff; font-size:15px; font-weight:600; color:#3E3F66; text-decoration:none;">Passwort ändern</a>
+            <a href="#" style="display:inline-flex; margin-left:auto; padding:12px 22px; border-radius:11px; background:#5663AE; font-size:15px; font-weight:700; color:#fff; text-decoration:none;">Änderungen speichern</a>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- BENACHRICHTIGUNGEN -->
+      <sc-if value="{{ isNotif }}" hint-placeholder-val="">
+        <div style="display:flex; flex-direction:column; gap:22px;">
+          <sc-for list="{{ notifGroups }}" as="g" hint-placeholder-count="3">
+            <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:24px 28px;">
+              <div style="font-size:16px; font-weight:700; margin-bottom:4px;">{{ g.title }}</div>
+              <div style="font-size:14px; color:#A9AAC4; margin-bottom:18px;">{{ g.desc }}</div>
+              <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:13px 0; border-top:1px solid #F2F3F9;">
+                  <span style="font-size:15px; font-weight:500; color:#1A1A2E;">{{ r.label }}</span>
+                  <button onClick="{{ r.toggle }}" style="{{ r.trackStyle }}"><span style="{{ r.knobStyle }}"></span></button>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- GERÄTE -->
+      <sc-if value="{{ isDevices }}" hint-placeholder-val="">
+        <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:10px 28px;">
+          <sc-for list="{{ devices }}" as="d" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:18px; padding:20px 0; border-bottom:1px solid #F2F3F9;">
+              <span style="flex:0 0 auto; width:46px; height:46px; border-radius:12px; background:#EEF0FA; display:flex; align-items:center; justify-content:center;">
+                <span style="width:18px; height:18px; border-radius:5px; border:2px solid #5663AE;"></span>
+              </span>
+              <div style="flex:1 1 auto; min-width:0;">
+                <div style="font-size:15px; font-weight:700;">{{ d.device }} <sc-if value="{{ d.current }}" hint-placeholder-val=""><span style="font-size:12px; font-weight:700; color:#1A1A2E; background:#F7EED4; padding:2px 9px; border-radius:8px; margin-left:6px;">Dieses Gerät</span></sc-if></div>
+                <div style="font-size:14px; color:#66679B;">{{ d.meta }}</div>
+              </div>
+              <sc-if value="{{ d.showLogout }}" hint-placeholder-val="{{ true }}">
+                <a href="#" style="flex:0 0 auto; display:inline-flex; padding:9px 16px; border-radius:10px; border:1px solid #E3C0C0; background:#fff; font-size:14px; font-weight:600; color:#B24343; text-decoration:none;">Abmelden</a>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:980}}">
+class Component extends DCLogic {
+  state = {
+    tab: 'allgemein',
+    toggles: { neueLektion: true, feedback: true, liveqa: true, wochenmail: false, abgabeFrist: true, tipps: false },
+  };
+  setTab = (t) => () => this.setState({ tab: t });
+  flip = (k) => () => this.setState(s => ({ toggles: { ...s.toggles, [k]: !s.toggles[k] } }));
+
+  tabBtn(id, label) {
+    const active = this.state.tab === id;
+    return {
+      label, onClick: this.setTab(id),
+      style: [
+        'padding:12px 18px','border:none','background:none','cursor:pointer',
+        'font-family:inherit','font-size:15px','font-weight:' + (active ? '700' : '500'),
+        'color:' + (active ? '#5663AE' : '#66679B'),
+        'border-bottom:2px solid ' + (active ? '#5663AE' : 'transparent'),
+        'margin-bottom:-1px',
+      ].join(';'),
+    };
+  }
+  toggleRow(label, key) {
+    const on = this.state.toggles[key];
+    return {
+      label, toggle: this.flip(key),
+      trackStyle: [
+        'width:44px','height:26px','border-radius:13px','border:none','cursor:pointer','padding:0',
+        'position:relative','transition:background .15s',
+        'background:' + (on ? '#5663AE' : '#D8DAEA'),
+      ].join(';'),
+      knobStyle: [
+        'position:absolute','top:3px','left:' + (on ? '21px' : '3px'),
+        'width:20px','height:20px','border-radius:50%','background:#fff','transition:left .15s',
+        'box-shadow:0 1px 3px rgba(0,0,0,.2)',
+      ].join(';'),
+    };
+  }
+
+  renderVals() {
+    const tab = this.state.tab;
+    const labels = { allgemein: 'Allgemein', notif: 'Benachrichtigungen', devices: 'Geräte' };
+    return {
+      tabs: [this.tabBtn('allgemein', 'Allgemein'), this.tabBtn('notif', 'Benachrichtigungen'), this.tabBtn('devices', 'Geräte')],
+      activeLabel: labels[tab],
+      isAllgemein: tab === 'allgemein',
+      isNotif: tab === 'notif',
+      isDevices: tab === 'devices',
+      fields: [
+        { label: 'Vorname', value: 'Jonas', wrap: '' },
+        { label: 'Nachname', value: 'Weber', wrap: '' },
+        { label: 'Telefon', value: '+49 151 2345678', wrap: '' },
+        { label: 'Stadt', value: 'Koblenz', wrap: '' },
+        { label: 'E-Mail', value: 'jonas.weber@email.de', wrap: '' },
+        { label: 'Position', value: 'Vertrieb Innendienst', wrap: '' },
+      ],
+      notifGroups: [
+        { title: 'Kurse', desc: 'Neue Inhalte und Lernerinnerungen.', rows: [
+          this.toggleRow('Neue Lektion verfügbar', 'neueLektion'),
+          this.toggleRow('Live-Q&A-Erinnerung', 'liveqa'),
+          this.toggleRow('Wöchentliche Lern-Zusammenfassung', 'wochenmail'),
+        ]},
+        { title: 'Abgaben', desc: 'Feedback und Fristen zu deinen Einsendungen.', rows: [
+          this.toggleRow('Feedback zu Abgaben', 'feedback'),
+          this.toggleRow('Erinnerung an offene Fristen', 'abgabeFrist'),
+        ]},
+        { title: 'Sonstiges', desc: 'Produktneuigkeiten und Tipps.', rows: [
+          this.toggleRow('Tipps &amp; Angebote', 'tipps'),
+        ]},
+      ],
+      devices: [
+        { device: 'MacBook Pro', meta: 'Chrome · Koblenz, DE · aktiv jetzt', current: true, showLogout: false },
+        { device: 'iPhone 15', meta: 'Safari · Koblenz, DE · vor 2 Std.', current: false, showLogout: true },
+        { device: 'Windows-PC', meta: 'Edge · Frankfurt, DE · vor 3 Tagen', current: false, showLogout: true },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

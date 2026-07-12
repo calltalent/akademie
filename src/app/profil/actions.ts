@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
+import { translateDbError } from "@/lib/errors/db";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 /**
  * Server Action für den Löschantrag (Art. 17 DSGVO), Phase 4 Block 3.
@@ -71,12 +73,12 @@ export async function requestDeletion(
       if (error.code === "23505") {
         return { error: "Es liegt bereits ein offener Löschantrag vor." };
       }
-      return { error: "Antrag konnte nicht gespeichert werden: " + error.message };
+      return { error: "Antrag konnte nicht gespeichert werden: " + translateDbError(error) };
     }
 
     revalidatePath("/profil");
     return { error: null, success: true };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+    return { error: genericErrorMessage(e) };
   }
 }

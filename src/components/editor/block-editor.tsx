@@ -43,7 +43,13 @@ export function BlockEditor({
     // Erste Render nicht speichern (initialBlocks == blocks)
     if (blocks === initialBlocks) return;
 
-    setStatus("pending");
+    // Korrektur (Josips Lint-Lauf, 12.07.2026): setStatus("pending") lief
+    // vorher synchron im Effect-Body (react-hooks/set-state-in-effect —
+    // erzwingt einen zusätzlichen, unnötigen Render direkt nach dem durch
+    // die blocks-Änderung ausgelösten Render). Über setTimeout(…, 0) in
+    // einen eigenen Callback verschoben, Verhalten für Nutzer unverändert
+    // (unter 1ms Verzögerung, unterhalb der Wahrnehmungsschwelle).
+    const pendingTimer = setTimeout(() => setStatus("pending"), 0);
     debounceRef.current = setTimeout(async () => {
       const parsed = blocksSchema.safeParse(blocks);
       if (!parsed.success) {
@@ -55,6 +61,7 @@ export function BlockEditor({
     }, 1000);
 
     return () => {
+      clearTimeout(pendingTimer);
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

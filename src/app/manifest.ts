@@ -19,7 +19,7 @@ function safeColor(value: string | undefined, fallback: string): string {
 /**
  * Mandantenfähige Web-App-Manifest-Route (Phase 4, Block 5) — ersetzt eine
  * statische public/manifest.json. Next.js generiert daraus automatisch
- * /manifest.webmanifest. `getTenant()` liest den von proxy.ts aufgelösten
+ * /manifest.webmanifest. `getTenant()` liest den von middleware.ts aufgelösten
  * Mandanten über headers() (macht diese Route automatisch dynamisch,
  * genauso wie generateMetadata() in src/app/layout.tsx) — für anonyme
  * Aufrufe ohne erkennbaren Mandanten (z. B. Root-/Portal-Domain) greift der

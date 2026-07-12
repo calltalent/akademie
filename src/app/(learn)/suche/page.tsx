@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
@@ -51,9 +52,9 @@ export default async function SearchPage({
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 px-6 py-12">
-      <a href="/" className="text-sm underline">
+      <Link href="/" className="text-sm underline">
         ← Meine Kurse
-      </a>
+      </Link>
       <h1 className="text-2xl font-semibold" style={{ color: "var(--color-primary)" }}>
         Suche
       </h1>

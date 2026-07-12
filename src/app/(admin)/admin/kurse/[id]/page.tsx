@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { ModuleLessonTree, DeleteLessonButton } from "@/components/admin/module-lesson-tree";
 import { BlockEditor } from "@/components/editor/block-editor";
-import { LessonPublishToggle } from "@/components/admin/publish-toggle";
+import { LessonPublishToggle, CourseStatusSelect } from "@/components/admin/publish-toggle";
 import { ReembedCourseButton } from "@/components/admin/reembed-course-button";
 import { RefreshTranscriptButton } from "@/components/admin/refresh-transcript-button";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
@@ -74,10 +75,11 @@ export default async function CourseEditorPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{course.title}</h1>
         <div className="flex items-center gap-4">
+          <CourseStatusSelect courseId={courseId} status={course.status} />
           <ReembedCourseButton courseId={courseId} />
-          <a href="/admin/kurse" className="text-sm underline">
+          <Link href="/admin/kurse" className="text-sm underline">
             Zurück zur Kursliste
-          </a>
+          </Link>
         </div>
       </div>
 

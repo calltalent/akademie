@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  a { color: #5663AE; }
+  a:hover { color: #3E3F66; }
+</style>
+</helmet>
+<div style="display:flex; min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; background:#F4F5FA; color:#1A1A2E; font-size:18px; line-height:1.6;">
+  <dc-import name="Sidebar" active="dashboard" hint-size="264px,100vh"></dc-import>
+
+  <div style="flex:1 1 auto; display:flex; flex-direction:column; min-width:0;">
+    <dc-import name="TopBar" breadcrumb="Lernen · Meine Kurse · Kurs" title="Vertriebspsychologie im Erstgespräch" hint-size="100%,90px"></dc-import>
+
+    <main style="flex:1 1 auto; padding:16px 40px 56px; display:grid; grid-template-columns:1fr 320px; gap:28px; align-items:start;">
+
+      <!-- Player + content -->
+      <div>
+        <div style="border-radius:16px; overflow:hidden; border:1px solid #E7E8F2; background:#fff;">
+          <div style="height:420px; background-color:#DFE2F4; background-image:repeating-linear-gradient(45deg,#DFE2F4 0 14px, rgba(255,255,255,.5) 14px 28px); display:flex; align-items:center; justify-content:center;">
+            <span style="width:74px; height:74px; border-radius:50%; background:#5663AE; display:flex; align-items:center; justify-content:center;">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"></path></svg>
+            </span>
+          </div>
+          <div style="height:6px; background:#EEF0F7;"><div style="height:100%; width:54%; background:#5663AE;"></div></div>
+        </div>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; margin:26px 0 10px;">
+          <div>
+            <div style="font-size:13px; font-weight:600; color:#A9AAC4;">LEKTION 7 VON 12</div>
+            <h2 style="margin:3px 0 0; font-size:22px; font-weight:800;">Einwände als Kaufsignal lesen</h2>
+          </div>
+          <a href="#" style="display:inline-flex; align-items:center; gap:8px; background:#5663AE; color:#fff; font-weight:700; font-size:15px; padding:12px 20px; border-radius:11px; text-decoration:none;">Nächste Lektion
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg>
+          </a>
+        </div>
+        <p style="font-size:16px; color:#3E3F66; max-width:640px;">In dieser Lektion lernst du, Einwände nicht als Ablehnung, sondern als Interesse zu deuten. Wir gehen die vier häufigsten Einwandtypen durch und wie du sie in einen Abschluss überführst.</p>
+
+        <div style="display:flex; gap:12px; margin-top:20px;">
+          <a href="#" style="display:inline-flex; align-items:center; gap:8px; padding:11px 16px; border-radius:11px; border:1px solid #D8DAEA; background:#fff; font-size:14px; font-weight:600; color:#3E3F66; text-decoration:none;">
+            <span style="width:12px; height:12px; border-radius:3px; border:2px solid #5663AE;"></span>Lesezeichen
+          </a>
+          <a href="#" style="display:inline-flex; align-items:center; gap:8px; padding:11px 16px; border-radius:11px; border:1px solid #D8DAEA; background:#fff; font-size:14px; font-weight:600; color:#3E3F66; text-decoration:none;">Arbeitsblatt (PDF)</a>
+        </div>
+      </div>
+
+      <!-- Lesson list -->
+      <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:8px; position:sticky; top:20px;">
+        <div style="padding:16px 16px 10px; font-size:16px; font-weight:700;">Lektionen</div>
+        <sc-for list="{{ lessons }}" as="l" hint-placeholder-count="8">
+          <div style="{{ l.rowStyle }}">
+            <span style="{{ l.iconStyle }}">{{ l.icon }}</span>
+            <span style="flex:1 1 auto; font-size:14px; font-weight:{{ l.weight }}; color:{{ l.color }};">{{ l.title }}</span>
+            <span style="font-size:12px; color:#A9AAC4;">{{ l.dur }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:940}}">
+class Component extends DCLogic {
+  lesson(n, title, dur, state) {
+    const cur = state === 'current';
+    const done = state === 'done';
+    return {
+      title, dur,
+      icon: done ? '✓' : String(n),
+      weight: cur ? '700' : '500',
+      color: cur ? '#1A1A2E' : (done ? '#66679B' : '#3E3F66'),
+      rowStyle: 'display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:10px; margin-bottom:2px; background:' + (cur ? '#F6F7FC' : 'transparent') + ';',
+      iconStyle: 'flex:0 0 auto; width:26px; height:26px; border-radius:8px; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; color:' + (done ? '#fff' : (cur ? '#fff' : '#66679B')) + '; background:' + (done ? '#5663AE' : (cur ? '#3E3F66' : '#EEF0F7')) + ';',
+    };
+  }
+  renderVals() {
+    return {
+      lessons: [
+        this.lesson(1, 'Warum Menschen kaufen', '6:12', 'done'),
+        this.lesson(2, 'Die ersten 30 Sekunden', '8:44', 'done'),
+        this.lesson(3, 'Rapport am Telefon', '7:20', 'done'),
+        this.lesson(4, 'Bedarf statt Produkt', '9:05', 'done'),
+        this.lesson(5, 'Fragen, die verkaufen', '10:31', 'done'),
+        this.lesson(6, 'Aktiv zuhören', '5:58', 'done'),
+        this.lesson(7, 'Einwände als Kaufsignal lesen', '11:14', 'current'),
+        this.lesson(8, 'Der Preis-Moment', '9:40', 'todo'),
+        this.lesson(9, 'Abschlusstechniken', '12:02', 'todo'),
+        this.lesson(10, 'Follow-up richtig timen', '7:33', 'todo'),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

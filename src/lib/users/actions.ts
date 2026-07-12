@@ -5,9 +5,11 @@ import { requireAdminTenant } from "@/lib/auth/staff";
 import { csvRowSchema } from "@/lib/users/csv";
 import { importUsers } from "@/lib/users/import";
 import type { CourseActionState } from "@/lib/courses/state";
+import { translateDbError } from "@/lib/errors/db";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 function errorState(e: unknown): CourseActionState {
-  return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+  return { error: genericErrorMessage(e) };
 }
 
 /** Einzel-Einladung — nutzt dieselbe Import-Logik wie der CSV-Bulk-Import. */
@@ -49,7 +51,7 @@ export async function disableMembership(userId: string): Promise<CourseActionSta
       .update({ status: "disabled" })
       .eq("tenant_id", tenant.id)
       .eq("user_id", userId);
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
     revalidatePath("/admin/nutzer");
     return { error: null, success: true };
   } catch (e) {
@@ -66,7 +68,7 @@ export async function enableMembership(userId: string): Promise<CourseActionStat
       .update({ status: "active" })
       .eq("tenant_id", tenant.id)
       .eq("user_id", userId);
-    if (error) return { error: error.message };
+    if (error) return { error: translateDbError(error) };
     revalidatePath("/admin/nutzer");
     return { error: null, success: true };
   } catch (e) {

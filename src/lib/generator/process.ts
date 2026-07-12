@@ -163,9 +163,17 @@ export async function processNextCourseGenJob(): Promise<ProcessResult> {
     await updateAiJob(job.id, { status: "done" });
     return { processed: true, jobId: job.id, status: "done", step };
   } catch (e) {
+    // e.message kann eine rohe/technische Meldung sein (z. B. eine
+    // Anthropic-API-Fehlermeldung oder ein Zod-Validierungsfehler mit
+    // englischem Standardtext) — volles Detail nur ins Server-Log, das in
+    // `ai_jobs.error` gespeicherte (und im Admin-Panel angezeigte, siehe
+    // ki-generator-panel.tsx) Feld bekommt einen klaren deutschen Satz.
     const message = e instanceof Error ? e.message : "Unbekannter Fehler bei der Kursgenerierung.";
     console.error(`[generator/process] Schritt fehlgeschlagen (Job ${job.id}, Schritt ${step}):`, message);
-    await updateAiJob(job.id, { status: "error", error: message });
+    await updateAiJob(job.id, {
+      status: "error",
+      error: "Die Kursgenerierung ist fehlgeschlagen. Bitte erneut versuchen.",
+    });
     return { processed: true, jobId: job.id, status: "error", step };
   }
 }

@@ -18,7 +18,8 @@ Sprache: Deutsch (Antworten, Commits, UI-Texte). Code, Bezeichner und Kommentare
 ## 2. Nicht verhandelbare Sicherheitsregeln
 
 1. Jede neue Tabelle: `tenant_id` + RLS aktiviert + Policies im selben Migrationsschritt. Keine Ausnahme.
-2. `service_role`-Key und API-Keys (Anthropic, Bunny, Stripe, Resend) existieren nur serverseitig (Workers-Env / Route Handlers). Niemals im Client-Bundle, niemals im Repo.
+2. `service_role`-Key und API-Keys (Anthropic, Bunny, Stripe, Resend) existieren nur serverseitig (Workers-Env / Route Handlers). Niemals im Client-Bundle, niemals im getrackten Repo (Git-Commit) — diese zwei Verbote bleiben absolut, auch mit Freigabe.
+   **Ausnahme (Josip, 12.07.2026, erweitert):** Josip darf mir einen Live-Schlüssel direkt im Chat geben, wenn er das im Einzelfall ausdrücklich erlaubt. Damit darf ich ihn: (a) für den genannten Zweck verwenden (z. B. Secret in Cloudflare/Supabase/Stripe eintragen), und (b) wenn Josip das zusätzlich ausdrücklich erlaubt, auch persistent speichern — aber ausschließlich in einer git-ignorierten lokalen Datei (`.env`/`.env.local`, siehe `.gitignore`), nie in `.env.example`, nie in PHASENSTATUS.md, nie in Memory, nie in einer getrackten Datei. Nie im Klartext zurück in den Chat echoen. Ohne diese zusätzliche Speicher-Freigabe gilt weiterhin: nach der einmaligen Aktion nicht behalten. Ohne Tool-Zugriff auf den jeweiligen Cloud-Secret-Store (aktuell: kein `wrangler secret put`-Äquivalent per MCP) bleibt das Eintragen dort praktisch entweder bei Josip selbst oder läuft über Chrome-Steuerung auf dem jeweiligen Dashboard.
 3. Alle Eingaben mit zod validieren (API-Routen und Server Actions).
 4. Stripe- und Bunny-Webhooks: Signatur prüfen, bevor irgendetwas verarbeitet wird.
 5. Datei-Uploads: Typ- und Größen-Whitelist; Storage-Pfade beginnen mit `{tenant_id}/`.

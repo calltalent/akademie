@@ -40,13 +40,39 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
   use: {
-    baseURL: "http://localhost:3000",
+    // Design-Block, Nachbesserung 2 (12.07.2026): "localhost" statt einer
+    // festen IP kann unter Windows abwechselnd auf IPv6 (::1) oder IPv4
+    // (127.0.0.1) aufgelöst werden. Next.js bindet an beide, Playwrights
+    // Bereitschafts-Polling (config.webServer) fragt aber nur EINE davon ab
+    // — bekommt keine Antwort und wartet die volle Zeit, obwohl der Server
+    // (manuell mit `npm run dev` getestet: "Ready in 463ms") tatsächlich
+    // längst läuft. Feste IPv4-Adresse macht die Prüfung eindeutig.
+    baseURL: "http://127.0.0.1:3000",
     trace: "on-first-retry",
   },
   webServer: {
     command: "npm run dev",
-    url: "http://localhost:3000",
+    url: "http://127.0.0.1:3000",
     reuseExistingServer: true,
+    // Design-Block (12.07.2026): Playwrights Standard-Wartezeit fürs
+    // Hochfahren ist 60s — bei einem kalten `next dev`-Start (erster
+    // Kompilierlauf nach Codeänderungen, v. a. unter Windows) reicht das
+    // oft nicht (Josips Testlauf: "Timed out waiting 60000ms"). Gleiche
+    // Begründung wie beim 180s-Test-Timeout oben — echte Wartezeit statt
+    // Playwright-Standard.
+    timeout: 180_000,
+    // Design-Block, Nachbesserung 3 (12.07.2026): 127.0.0.1 statt localhost
+    // hat den Timeout NICHT behoben (Josips zweiter Testlauf: erneut volle
+    // 180000ms, obwohl `npm run dev` manuell parallel "Ready in 417ms" zeigt
+    // und Port 3000 laut `netstat` frei war). Playwright unterdrückt die
+    // Ausgabe des von ihm selbst gestarteten Servers standardmäßig komplett
+    // — wir sehen also gar nicht, ob der von Playwright gestartete Prozess
+    // überhaupt bis "Ready" kommt oder vorher abbricht (z. B. andere
+    // Umgebungsvariablen als im manuellen Terminal). `stdout`/`stderr:
+    // "pipe"` schaltet diese Ausgabe für den NÄCHSTEN Testlauf sichtbar —
+    // reines Diagnose-Mittel, ändert nichts am Serververhalten selbst.
+    stdout: "pipe",
+    stderr: "pipe",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

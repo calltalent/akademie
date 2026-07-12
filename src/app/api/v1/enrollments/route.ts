@@ -4,6 +4,7 @@ import { ApiAuthError, resolveApiKeyTenant } from "@/lib/api/auth";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
+import { translateDbError } from "@/lib/errors/db";
 
 /**
  * Phase 3, Block 7 — REST-API v1 (SPEC.md §7): `GET/POST /api/v1/enrollments`.
@@ -177,7 +178,10 @@ export async function POST(request: Request) {
       .select("id, course_id, user_id, source, enrolled_at")
       .single();
     if (error || !enrollment) {
-      return NextResponse.json({ error: error?.message ?? "Einschreibung fehlgeschlagen." }, { status: 500 });
+      return NextResponse.json(
+        { error: error ? translateDbError(error) : "Einschreibung fehlgeschlagen." },
+        { status: 500 },
+      );
     }
 
     dispatchWebhookEvent(tenantId, "enrollment.created", {

@@ -12,6 +12,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Korrektur (Josips Lint-Lauf, 12.07.2026): ".open-next/**" fehlte hier
+    // — dadurch hat ESLint kompiliertes/minifiziertes Cloudflare-Worker-
+    // Build-Output als Quellcode gelesen und dort 12932 der insgesamt
+    // 12988 gemeldeten Probleme erzeugt (99,6 % — reines Bundler-Rauschen,
+    // keine echten Fehler). Ebenso die rohen Claude-Design-Export-Ordner
+    // (Referenzmaterial, kein App-Code, siehe design-reference/-Konvention)
+    // und einen doppelt liegenden Upload-Ordner im Projekt-Root.
+    ".open-next/**",
+    "design-reference/**",
+    "Calltalent-Akademie Studenten-Portal/**",
   ]),
 ]);
 

@@ -5,7 +5,7 @@ import { resolveTenantById } from "@/lib/tenant/resolve";
 import type { PublicTenant } from "@/lib/tenant/types";
 
 /**
- * Liest den von proxy.ts aufgelösten Mandanten für die aktuelle Anfrage.
+ * Liest den von middleware.ts aufgelösten Mandanten für die aktuelle Anfrage.
  * `cache()` dedupliziert innerhalb einer Anfrage (Layout + Page rufen das
  * beide auf, es wird trotzdem nur einmal nachgeladen).
  *

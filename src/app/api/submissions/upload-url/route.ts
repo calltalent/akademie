@@ -69,10 +69,17 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase.storage.from("submissions").createSignedUploadUrl(path);
   if (error || !data) {
-    return NextResponse.json(
-      { error: error?.message ?? "Upload-URL konnte nicht erzeugt werden." },
-      { status: 502 },
-    );
+    // error.message ist eine rohe Supabase-Storage-Meldung (technisch/
+    // englisch) — Detail nur loggen, Nutzer bekommt einen klaren deutschen
+    // Satz.
+    if (error) {
+      console.error("[submissions/upload-url] Upload-URL konnte nicht erzeugt werden.", {
+        tenantId: tenant.id,
+        userId: user.id,
+        error: error.message,
+      });
+    }
+    return NextResponse.json({ error: "Upload-URL konnte nicht erzeugt werden." }, { status: 502 });
   }
 
   return NextResponse.json({ path: data.path, token: data.token, signedUrl: data.signedUrl });

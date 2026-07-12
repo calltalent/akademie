@@ -241,6 +241,14 @@ export async function askTutor(params: unknown): Promise<AskTutorResult> {
       conversationId = newConv.id;
     }
 
+    // TypeScript kann über die beiden if-Blöcke oben hinweg (Narrowing ->
+    // Reassignment -> erneutes Narrowing) nicht beweisen, dass
+    // conversationId hier immer gesetzt ist (12.07.2026, build-Fund) —
+    // Guard rein für die Typprüfung, im Normalbetrieb unerreichbar.
+    if (!conversationId) {
+      return { ok: false, reason: "error", message: "Konversation konnte nicht angelegt werden." };
+    }
+
     // j) Nutzer- UND Assistenten-Nachricht protokollieren. source_lessons
     // nur an der Assistenten-Antwort (das ist, was tatsächlich zitiert
     // wurde); Tokens/Kosten nur am tatsächlichen Claude-Aufruf.

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  a { color: #5663AE; }
+  a:hover { color: #3E3F66; }
+</style>
+</helmet>
+<div style="display:flex; min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; background:#F4F5FA; color:#1A1A2E; font-size:18px; line-height:1.6;">
+  <dc-import name="Sidebar" active="bookmarks" hint-size="264px,100vh"></dc-import>
+
+  <div style="flex:1 1 auto; display:flex; flex-direction:column; min-width:0;">
+    <dc-import name="TopBar" breadcrumb="Lernen · Lesezeichen" title="Lesezeichen" hint-size="100%,90px"></dc-import>
+
+    <main style="flex:1 1 auto; padding:16px 40px 56px;">
+      <p style="font-size:16px; color:#66679B; margin:0 0 24px;">Deine markierten Lektionen — schnell zurück zu dem, was zählt.</p>
+
+      <div style="display:flex; flex-direction:column; gap:14px; max-width:820px;">
+        <sc-for list="{{ items }}" as="b" hint-placeholder-count="4">
+          <a href="Kurs.dc.html" style="display:flex; align-items:center; gap:18px; background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:16px 20px; text-decoration:none;">
+            <span style="flex:0 0 auto; width:56px; height:56px; border-radius:12px; background-color:{{ b.tint }}; background-image:repeating-linear-gradient(45deg,{{ b.tint }} 0 8px, rgba(255,255,255,.5) 8px 16px);"></span>
+            <div style="flex:1 1 auto; min-width:0;">
+              <div style="font-size:12px; font-weight:600; color:#A9AAC4;">{{ b.course }}</div>
+              <div style="font-size:16px; font-weight:700; color:#1A1A2E;">{{ b.title }}</div>
+            </div>
+            <span style="flex:0 0 auto; font-size:13px; color:#A9AAC4;">{{ b.dur }}</span>
+            <span style="flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:#EEF0FA; display:flex; align-items:center; justify-content:center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#5663AE"><path d="M6 3a2 2 0 0 0-2 2v16l8-4 8 4V5a2 2 0 0 0-2-2z"></path></svg>
+            </span>
+          </a>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:760}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      items: [
+        { course: 'VERTRIEBSPSYCHOLOGIE', title: 'Einwände als Kaufsignal lesen', dur: '11:14', tint: '#DFE2F4' },
+        { course: 'EINWANDBEHANDLUNG', title: 'Der „Zu-teuer"-Reflex', dur: '8:22', tint: '#E7E9F6' },
+        { course: 'TERMINIERUNG', title: 'Die Rückruf-Zusage sichern', dur: '6:40', tint: '#EDE7F5' },
+        { course: 'VERTRIEBSPSYCHOLOGIE', title: 'Fragen, die verkaufen', dur: '10:31', tint: '#E4E6F5' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

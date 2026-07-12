@@ -16,7 +16,7 @@ const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
   // Phase 4, Block 1 (Betreiber-Portal-Fundament): Host, unter dem das
-  // Betreiber-Portal erreichbar ist — src/proxy.ts prüft ihn VOR der
+  // Betreiber-Portal erreichbar ist — src/middleware.ts prüft ihn VOR der
   // Mandanten-Auflösung. Dev-Default portal.localhost, Prod z. B.
   // portal.calltalent.ai (siehe SPEC.md §4.3/§9.1). "" wie überall als
   // "nicht gesetzt" behandeln, damit der Default greift.

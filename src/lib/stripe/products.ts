@@ -5,6 +5,8 @@ import { requireStaffTenant } from "@/lib/auth/staff";
 import { createStripeClient } from "@/lib/stripe/client";
 import { productFormSchema } from "@/lib/stripe/schema";
 import type { ProductActionState } from "@/lib/stripe/state";
+import { translateDbError } from "@/lib/errors/db";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 /**
  * Staff-CRUD fuer Stripe-Produkte (Phase 2, Block 5). Entscheidung 2 aus der
@@ -16,7 +18,7 @@ import type { ProductActionState } from "@/lib/stripe/state";
  */
 
 function errorState(e: unknown): ProductActionState {
-  return { error: e instanceof Error ? e.message : "Unbekannter Fehler." };
+  return { error: genericErrorMessage(e) };
 }
 
 function parseProductForm(formData: FormData) {
@@ -59,8 +61,13 @@ export async function createProduct(
       stripeProductId = typeof price.product === "string" ? price.product : price.product.id;
       stripePriceId = price.id;
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Stripe-Produkt konnte nicht angelegt werden.";
-      return { error: "Stripe-Fehler: " + message };
+      // Stripe-SDK-Fehlermeldungen sind technisch/englisch — Detail nur
+      // loggen, Nutzer bekommt einen klaren deutschen Satz.
+      console.error("[stripe/products] Stripe-Produkt konnte nicht angelegt werden.", {
+        tenantId: tenant.id,
+        error: e instanceof Error ? e.message : e,
+      });
+      return { error: "Stripe-Produkt konnte nicht angelegt werden. Bitte versuche es später erneut." };
     }
 
     const { error } = await supabase.from("products").insert({
@@ -76,7 +83,7 @@ export async function createProduct(
       stripe_price_id: stripePriceId,
     });
     if (error) {
-      return { error: "Anlegen fehlgeschlagen: " + error.message };
+      return { error: "Anlegen fehlgeschlagen: " + translateDbError(error) };
     }
 
     revalidatePath("/admin/zahlungen");
@@ -157,8 +164,14 @@ export async function updateProduct(
         }
       }
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Stripe-Aktualisierung fehlgeschlagen.";
-      return { error: "Stripe-Fehler: " + message };
+      // Stripe-SDK-Fehlermeldungen sind technisch/englisch — Detail nur
+      // loggen, Nutzer bekommt einen klaren deutschen Satz.
+      console.error("[stripe/products] Stripe-Aktualisierung fehlgeschlagen.", {
+        tenantId: tenant.id,
+        productId,
+        error: e instanceof Error ? e.message : e,
+      });
+      return { error: "Stripe-Aktualisierung fehlgeschlagen. Bitte versuche es später erneut." };
     }
 
     const { error: updateError } = await supabase
@@ -177,7 +190,7 @@ export async function updateProduct(
       .eq("id", productId)
       .eq("tenant_id", tenant.id);
     if (updateError) {
-      return { error: "Aktualisieren fehlgeschlagen: " + updateError.message };
+      return { error: "Aktualisieren fehlgeschlagen: " + translateDbError(updateError) };
     }
 
     revalidatePath("/admin/zahlungen");
@@ -224,7 +237,7 @@ async function setProductActive(productId: string, active: boolean): Promise<Pro
       .eq("id", productId)
       .eq("tenant_id", tenant.id);
     if (error) {
-      return { error: error.message };
+      return { error: translateDbError(error) };
     }
 
     revalidatePath("/admin/zahlungen");

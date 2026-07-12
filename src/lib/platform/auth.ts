@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * Gespiegelt an src/lib/auth/staff.ts (checkStaffAccess/requireStaffTenant),
  * aber OHNE Tenant-Bezug — das Portal ist plattformweit, kein
  * Mandanten-Kontext (getTenant() liefert auf dem Portal-Host ohnehin null,
- * siehe src/proxy.ts: dort wird für den Portal-Host bewusst kein
+ * siehe src/middleware.ts: dort wird für den Portal-Host bewusst kein
  * x-tenant-id-Header gesetzt).
  *
  * `platform_admins` hat bewusst KEINE Client-RLS-Policy (Standard-Deny für

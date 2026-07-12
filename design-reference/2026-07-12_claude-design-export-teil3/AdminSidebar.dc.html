@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<aside style="width:264px; flex:0 0 auto; background:#3E3F66; display:flex; flex-direction:column; padding:26px 0; position:sticky; top:0; height:100vh; font-family:'Montserrat',system-ui,sans-serif;">
+  <a href="Portal.dc.html" style="padding:0 22px; display:flex; align-items:center; gap:12px; margin-bottom:8px; text-decoration:none;">
+    <div style="width:34px; height:34px; border-radius:9px; background:#5663AE; flex:0 0 auto; display:flex; align-items:center; justify-content:center; color:#F7EED4; font-weight:800; font-size:18px;">C</div>
+    <div style="line-height:1.15;">
+      <div style="font-weight:800; font-size:15px; letter-spacing:.02em; color:#FFFFFF;">CALLTALENT</div>
+      <div style="font-weight:600; font-size:11px; letter-spacing:.24em; color:#B9BBDA;">ADMIN</div>
+    </div>
+  </a>
+  <div style="margin:0 22px 24px; font-size:11px; font-weight:700; letter-spacing:.14em; color:#8688B8; background:rgba(255,255,255,.08); padding:6px 10px; border-radius:8px; display:inline-block; align-self:flex-start;">VERWALTUNG</div>
+
+  <nav style="flex:1 1 auto; padding:0 16px; overflow-y:auto;">
+    <sc-for list="{{ groups }}" as="grp" hint-placeholder-count="3">
+      <div style="font-size:11px; font-weight:700; letter-spacing:.18em; color:#8688B8; padding:0 12px; margin:14px 0 9px;">{{ grp.title }}</div>
+      <sc-for list="{{ grp.items }}" as="item" hint-placeholder-count="2">
+        <a href="{{ item.href }}" style="{{ item.style }}">
+          <span style="flex:0 0 auto; width:18px; height:18px; display:flex; align-items:center; justify-content:center;"><span style="{{ item.dot }}"></span></span>
+          <span style="flex:1 1 auto;">{{ item.label }}</span>
+          <sc-if value="{{ item.badge }}" hint-placeholder-val=""><span style="flex:0 0 auto; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:#F7EED4; color:#1A1A2E; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">{{ item.badge }}</span></sc-if>
+        </a>
+      </sc-for>
+    </sc-for>
+  </nav>
+
+  <div style="padding:16px 16px 0; border-top:1px solid rgba(255,255,255,.12); margin-top:16px;">
+    <a href="Dashboard.dc.html" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:11px; color:#B9BBDA; font-size:14px; font-weight:500; text-decoration:none;">
+      <span style="width:8px; height:8px; border-radius:2px; background:#8688B8;"></span>Zur Lernansicht
+    </a>
+  </div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;active&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;,&quot;default&quot;:&quot;overview&quot;}}">
+class Component extends DCLogic {
+  item(id, label, href, badge) {
+    const active = (this.props.active ?? 'overview') === id;
+    return {
+      label, href, badge: badge || '',
+      style: [
+        'display:flex','align-items:center','gap:12px','padding:11px 12px','border-radius:11px',
+        'margin-bottom:3px','font-size:15px','text-decoration:none',
+        'font-weight:' + (active ? '700' : '500'),
+        'color:' + (active ? '#1A1A2E' : '#DDDEEE'),
+        'background:' + (active ? '#F7EED4' : 'transparent'),
+      ].join(';'),
+      dot: 'width:13px; height:13px; border-radius:4px; border:2px solid ' + (active ? '#5663AE' : '#B9BBDA') + ';',
+    };
+  }
+  renderVals() {
+    return {
+      groups: [
+        { title: 'ÜBERSICHT', items: [ this.item('overview', 'Dashboard', 'Admin.dc.html') ] },
+        { title: 'INHALTE', items: [
+          this.item('courses', 'Kurse', 'AdminKurse.dc.html'),
+          this.item('submissions', 'Abgaben', 'AdminAbgaben.dc.html', '8'),
+        ]},
+        { title: 'NUTZER', items: [
+          this.item('members', 'Teilnehmer', 'AdminTeilnehmer.dc.html'),
+        ]},
+        { title: 'PLATTFORM', items: [
+          this.item('tenants', 'Mandanten', 'Mandanten.dc.html'),
+          this.item('settings', 'Einstellungen', 'AdminEinstellungen.dc.html'),
+        ]},
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

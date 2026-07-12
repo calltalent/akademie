@@ -6,6 +6,7 @@ import type { createClient } from "@/lib/supabase/server";
 import { blocksSchema } from "@/lib/courses/schema";
 import { questionInputSchema } from "@/lib/quiz/schema";
 import { courseDraftSchema, courseGenOutputSchema, type CourseDraft } from "@/lib/generator/schema";
+import { translateDbError } from "@/lib/errors/db";
 
 /**
  * `applyDraftAsCourse()` — Phase 3, Block 5 (Kurs-Generator). Wandelt einen
@@ -109,7 +110,7 @@ export async function applyDraftAsCourse(jobId: string): Promise<ApplyResult> {
       .select("id")
       .single();
     if (courseError || !course) {
-      return { ok: false, error: "Kurs konnte nicht angelegt werden: " + (courseError?.message ?? "unbekannt") };
+      return { ok: false, error: "Kurs konnte nicht angelegt werden: " + (courseError ? translateDbError(courseError) : "unbekannt") };
     }
     const courseId: string = course.id;
 

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  a { color: #5663AE; }
+  a:hover { color: #3E3F66; }
+</style>
+</helmet>
+<div style="display:flex; min-height:100vh; font-family:'Montserrat',system-ui,sans-serif; background:#F4F5FA; color:#1A1A2E; font-size:18px; line-height:1.6;">
+  <dc-import name="AdminSidebar" active="tenants" hint-size="264px,100vh"></dc-import>
+
+  <div style="flex:1 1 auto; display:flex; flex-direction:column; min-width:0;">
+    <header style="display:flex; align-items:center; gap:18px; padding:20px 40px; background:#F4F5FA;">
+      <div style="flex:1 1 auto; min-width:0;">
+        <div style="font-size:13px; font-weight:600; color:#A9AAC4;">Plattform · Mandanten</div>
+        <h1 style="margin:2px 0 0; font-size:26px; font-weight:800; letter-spacing:-.01em;">Mandanten</h1>
+      </div>
+      <a href="#" style="display:inline-flex; align-items:center; gap:8px; background:#5663AE; color:#fff; font-weight:700; font-size:15px; padding:12px 18px; border-radius:11px; text-decoration:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+        Mandant anlegen
+      </a>
+    </header>
+
+    <main style="flex:1 1 auto; padding:16px 40px 56px; display:grid; grid-template-columns:1.5fr 1fr; gap:24px; align-items:start;">
+
+      <!-- Tenant list -->
+      <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; overflow:hidden;">
+        <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:0; font-size:13px; font-weight:700; color:#A9AAC4; padding:20px 24px 12px; border-bottom:1px solid #EEF0F7;">
+          <div>Mandant</div><div>Teilnehmer</div><div>Status</div>
+        </div>
+        <sc-for list="{{ tenants }}" as="t" hint-placeholder-count="4">
+          <button onClick="{{ t.select }}" style="{{ t.rowStyle }}">
+            <div style="display:flex; align-items:center; gap:13px; min-width:0;">
+              <span style="{{ t.logoStyle }}">{{ t.initial }}</span>
+              <div style="text-align:left; min-width:0;">
+                <div style="font-size:15px; font-weight:700; color:#1A1A2E; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ t.name }}</div>
+                <div style="font-size:12px; color:#A9AAC4;">{{ t.domain }}</div>
+              </div>
+            </div>
+            <div style="font-size:15px; color:#3E3F66; align-self:center;">{{ t.members }}</div>
+            <div style="align-self:center;"><span style="{{ t.statusStyle }}">{{ t.statusLabel }}</span></div>
+          </button>
+        </sc-for>
+      </div>
+
+      <!-- Branding detail -->
+      <div style="background:#fff; border:1px solid #E7E8F2; border-radius:14px; padding:26px 28px; position:sticky; top:20px;">
+        <div style="font-size:13px; font-weight:600; color:#A9AAC4;">Branding &amp; Theming</div>
+        <div style="display:flex; align-items:center; gap:14px; margin:10px 0 24px;">
+          <span style="{{ sel.logoStyleLg }}">{{ sel.initial }}</span>
+          <div>
+            <div style="font-size:19px; font-weight:800;">{{ sel.name }}</div>
+            <div style="font-size:13px; color:#A9AAC4;">{{ sel.domain }}</div>
+          </div>
+        </div>
+
+        <!-- Accent -->
+        <div style="font-size:13px; font-weight:600; color:#3E3F66; margin-bottom:10px;">Akzentfarbe · --color-primary</div>
+        <div style="display:flex; gap:10px; margin-bottom:22px;">
+          <sc-for list="{{ swatches }}" as="s" hint-placeholder-count="4">
+            <button onClick="{{ s.pick }}" style="{{ s.style }}" title="{{ s.hex }}"></button>
+          </sc-for>
+        </div>
+
+        <!-- Radius -->
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <span style="font-size:13px; font-weight:600; color:#3E3F66;">Eckenradius · --radius</span>
+          <span style="font-size:13px; font-weight:700; color:#5663AE;">{{ radius }}px</span>
+        </div>
+        <input type="range" min="4" max="24" value="{{ radius }}" onInput="{{ setRadius }}" style="width:100%; accent-color:#5663AE; margin-bottom:22px;" />
+
+        <!-- Font note -->
+        <div style="font-size:13px; font-weight:600; color:#3E3F66; margin-bottom:8px;">Schrift · Fallback wenn nicht gesetzt</div>
+        <div style="font-size:14px; color:#66679B; margin-bottom:24px;">Montserrat (Calltalent-Standard) → Inter</div>
+
+        <!-- Live preview -->
+        <div style="font-size:13px; font-weight:600; color:#A9AAC4; margin-bottom:10px;">Live-Vorschau</div>
+        <div style="border:1px solid #EEF0F7; border-radius:14px; overflow:hidden;">
+          <div style="{{ previewHeaderStyle }}">
+            <span style="{{ previewLogoStyle }}">{{ sel.initial }}</span>
+            <span style="font-size:14px; font-weight:700; color:#fff;">{{ sel.name }}</span>
+          </div>
+          <div style="padding:18px;">
+            <div style="{{ previewCardStyle }}">
+              <div style="font-size:13px; color:#66679B; margin-bottom:8px;">Kursfortschritt</div>
+              <div style="height:8px; border-radius:6px; background:#EEF0F7; overflow:hidden; margin-bottom:14px;"><div style="{{ previewBarStyle }}"></div></div>
+              <div style="{{ previewBtnStyle }}">Fortsetzen</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:22px;">
+          <a href="#" style="flex:1 1 auto; text-align:center; padding:12px; border-radius:11px; background:#5663AE; color:#fff; font-size:14px; font-weight:700; text-decoration:none;">Speichern</a>
+          <a href="#" style="padding:12px 16px; border-radius:11px; border:1px solid #D8DAEA; background:#fff; color:#3E3F66; font-size:14px; font-weight:600; text-decoration:none;">Zurücksetzen</a>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = {
+    selected: 0,
+    accent: '#5663AE',
+    radius: 14,
+    tenants: [
+      { name: 'Calltalent-Akademie', domain: 'akademie.calltalent.ai', members: '1.284', status: 'aktiv', initial: 'C', accent: '#5663AE', radius: 14 },
+      { name: 'Nord Vertrieb GmbH', domain: 'lernen.nord-vertrieb.de', members: '212', status: 'aktiv', initial: 'N', accent: '#2A6FDB', radius: 8 },
+      { name: 'Süd Sales Academy', domain: 'academy.sued-sales.com', members: '96', status: 'aktiv', initial: 'S', accent: '#1F8A5B', radius: 20 },
+      { name: 'Mustermann Coaching', domain: 'portal.mustermann.de', members: '0', status: 'test', initial: 'M', accent: '#B4682A', radius: 12 },
+    ],
+  };
+
+  selectTenant = (i) => () => {
+    const t = this.state.tenants[i];
+    this.setState({ selected: i, accent: t.accent, radius: t.radius });
+  };
+  pickAccent = (hex) => () => this.setState({ accent: hex });
+  setRadius = (e) => this.setState({ radius: +e.target.value });
+
+  renderVals() {
+    const { selected, accent, radius, tenants } = this.state;
+    const sel = tenants[selected];
+    const statusMap = { aktiv: ['Aktiv', '#1F8A5B', '#E3F2EA'], test: ['Testphase', '#1A1A2E', '#F7EED4'] };
+
+    return {
+      tenants: tenants.map((t, i) => {
+        const isSel = i === selected;
+        const [lbl, col, bg] = statusMap[t.status];
+        return {
+          ...t,
+          select: this.selectTenant(i),
+          rowStyle: [
+            'display:grid','grid-template-columns:2fr 1fr 1fr','gap:0','width:100%',
+            'text-align:left','border:none','cursor:pointer','font-family:inherit',
+            'padding:15px 24px','border-bottom:1px solid #F4F5FA',
+            'border-left:3px solid ' + (isSel ? '#5663AE' : 'transparent'),
+            'background:' + (isSel ? '#F6F7FC' : '#fff'),
+          ].join(';'),
+          logoStyle: 'flex:0 0 auto; width:38px; height:38px; border-radius:10px; background:' + t.accent + '; color:#fff; font-weight:700; font-size:15px; display:flex; align-items:center; justify-content:center;',
+          statusLabel: lbl,
+          statusStyle: 'display:inline-flex; padding:5px 12px; border-radius:8px; font-size:12px; font-weight:700; color:' + col + '; background:' + bg + ';',
+        };
+      }),
+      sel: {
+        ...sel,
+        logoStyleLg: 'flex:0 0 auto; width:52px; height:52px; border-radius:13px; background:' + accent + '; color:#fff; font-weight:800; font-size:22px; display:flex; align-items:center; justify-content:center;',
+      },
+      swatches: ['#5663AE', '#2A6FDB', '#1F8A5B', '#B4682A'].map(hex => ({
+        hex, pick: this.pickAccent(hex),
+        style: [
+          'width:40px','height:40px','border-radius:10px','cursor:pointer',
+          'background:' + hex,
+          'border:3px solid ' + (accent === hex ? '#1A1A2E' : 'transparent'),
+        ].join(';'),
+      })),
+      radius,
+      setRadius: this.setRadius,
+      previewHeaderStyle: 'display:flex; align-items:center; gap:10px; padding:14px 16px; background:' + accent + ';',
+      previewLogoStyle: 'width:26px; height:26px; border-radius:7px; background:rgba(255,255,255,.25); color:#fff; font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center;',
+      previewCardStyle: 'background:#fff; border:1px solid #E7E8F2; border-radius:' + radius + 'px; padding:18px;',
+      previewBarStyle: 'height:100%; width:62%; background:' + accent + '; border-radius:6px;',
+      previewBtnStyle: 'display:inline-flex; padding:9px 16px; border-radius:' + Math.max(6, radius - 4) + 'px; background:' + accent + '; color:#fff; font-size:13px; font-weight:700;',
+    };
+  }
+}
+</script>
+</body>
+</html>

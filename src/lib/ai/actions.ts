@@ -3,6 +3,7 @@
 import { requireStaffTenant } from "@/lib/auth/staff";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { embedCourse } from "@/lib/ai/embed";
+import { genericErrorMessage } from "@/lib/errors/generic";
 
 /**
  * Staff-Server-Action für den manuellen (Re-)Embed eines gesamten Kurses
@@ -63,7 +64,6 @@ export async function reembedCourse(
       message: `${result.lessonsEmbedded} Lektion(en) verarbeitet, ${result.chunksWritten} Chunk(s) gespeichert.`,
     };
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unbekannter Fehler beim Embedding.";
-    return { success: false, message };
+    return { success: false, message: genericErrorMessage(e) };
   }
 }
