@@ -6,7 +6,7 @@ KI-native White-Label-Lernplattform (LMS) von Calltalent Ltd. Multi-Tenant: eine
 
 ## Herkunft
 
-Klon-Projekt auf Basis der Analyse von learningsuite.io (Premium-LMS, ca. 500 €/Monat). Vollständige Analyse: `VORBEREITUNG/Analyse_LearningSuite_Klon-Strategie_2026-07-10.md`. Agent: `AGENTEN/SAAS-KLON-AGENT/MASTERPROMPT.md`.
+Klon-Projekt auf Basis der Analyse von learningsuite.io (Premium-LMS, ca. 500 €/Monat). Vollständige Analyse: `VORBEREITUNG/Analyse_LearningSuite_Klon-Strategie_2026-07-10.md`. Agent: `AGENTEN/03-PRODUKT-ENTWICKLUNG/SAAS-KLON-AGENT/MASTERPROMPT.md`.
 
 Kernversprechen gegenüber dem Original: schneller (< 1 s), KI-Kursgenerator + KI-Tutor, echtes Reporting, integrierte (abschaltbare) Zahlungen, transparente Preise, Self-Service.
 

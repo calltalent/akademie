@@ -26,17 +26,33 @@ export default async function AdminAbgabenPage({
   const filterStatus: SubmissionStatus | null =
     status && (SUBMISSION_STATUSES as readonly string[]).includes(status) ? (status as SubmissionStatus) : null;
 
+  // BUGFIX (Josips Testlauf, 12.07.2026, 7. Runde): `profiles(email,
+  // full_name)` war ein mehrdeutiger PostgREST-Embed — `submissions` hat
+  // ZWEI Fremdschlüssel auf `profiles` (`user_id` und `reviewed_by`,
+  // 0001_init.sql). Ohne expliziten Beziehungs-Hinweis kann PostgREST nicht
+  // entscheiden, welcher gemeint ist, und liefert einen Fehler
+  // (PGRST201, "Could not embed") statt Daten — `submissionRows` wurde
+  // dadurch immer `null`. Da unten nur `{ data }` destrukturiert wurde (kein
+  // `error`-Check), lief das SILENT durch: die Inbox zeigte fälschlich
+  // "Keine Abgaben gefunden.", obwohl Abgaben existierten. Erstmals durch
+  // die E2E-Suite (`submission-review.spec.ts`) aufgedeckt — dieser
+  // Abfragepfad wurde vorher offenbar nie mit echten Daten durchlaufen.
+  // Fix: FK-Constraint-Name als Embed-Hinweis (`profiles!submissions_user_id_fkey`)
+  // + Fehler jetzt geloggt statt verschluckt.
   let query = supabase
     .from("submissions")
     .select(
-      "id, lesson_id, user_id, kind, content, file_path, status, grade, feedback, created_at, lessons(title, module_id), profiles(email, full_name)",
+      "id, lesson_id, user_id, kind, content, file_path, status, grade, feedback, created_at, lessons(title, module_id), profiles!submissions_user_id_fkey(email, full_name)",
     )
     .eq("tenant_id", tenant!.id)
     .order("created_at", { ascending: false });
 
   if (filterStatus) query = query.eq("status", filterStatus);
 
-  const { data: submissionRows } = await query;
+  const { data: submissionRows, error: submissionsError } = await query;
+  if (submissionsError) {
+    console.error("[admin/abgaben] Abgaben konnten nicht geladen werden:", submissionsError.message);
+  }
 
   const moduleIds = Array.from(
     new Set(

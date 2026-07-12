@@ -10,6 +10,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
+e2e/.auth/
 .DS_Store
 Thumbs.db
 *.log

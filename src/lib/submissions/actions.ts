@@ -177,6 +177,16 @@ export async function gradeSubmission(
       }
     }
 
+    // FIX (Josips Testlauf, 12.07.2026): `sendEmail()` wurde hier bisher
+    // AWAITED, obwohl der Kommentar/die Absicht "FAIL-SOFT" lautet — das
+    // deckt nur Fehler ab, nicht Langsamkeit. Ohne eigenes Timeout kann ein
+    // langsamer/hängender Resend-API-Aufruf (z. B. gegen eine synthetische
+    // Test-Adresse) die gesamte Server Action minutenlang blockieren, obwohl
+    // die Bewertung selbst (DB-Update oben) bereits sicher gespeichert ist.
+    // Gleiches Fire-and-forget-Muster wie überall sonst im Projekt für
+    // Nebeneffekt-Mails/Webhooks (z. B. dispatchWebhookEvent(), Push in
+    // completeLesson()) — `revalidatePath`/Rückgabe warten NICHT mehr auf
+    // den Mailversand.
     if (learnerProfile?.email) {
       const html = submissionGraded({
         tenantName: tenant.name,
@@ -187,15 +197,20 @@ export async function gradeSubmission(
         feedback: parsed.data.feedback,
         accentColor: tenant.branding.color_primary,
       });
-      const mailResult = await sendEmail({
+      sendEmail({
         to: learnerProfile.email,
         subject: "Abgabe bewertet",
         html,
         tenant: { name: tenant.name },
-      });
-      if (!mailResult.success) {
-        console.error("[submissions/actions] Bewertungsmail fehlgeschlagen (fail-soft):", mailResult.error);
-      }
+      })
+        .then((mailResult) => {
+          if (!mailResult.success) {
+            console.error("[submissions/actions] Bewertungsmail fehlgeschlagen (fail-soft):", mailResult.error);
+          }
+        })
+        .catch((mailError) => {
+          console.error("[submissions/actions] Ausnahme beim Bewertungsmail-Versand (fail-soft):", mailError);
+        });
     }
 
     revalidatePath("/admin/abgaben");
