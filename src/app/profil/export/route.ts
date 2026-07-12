@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { exportUserData } from "@/lib/gdpr/export";
+import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 
 /**
  * GET /profil/export — Selbst-Service-Datenexport (Art. 15/20 DSGVO),
@@ -28,6 +29,21 @@ export async function GET() {
 
     if (!user) {
       return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+    }
+
+    // BUGFIX (Security-Audit Block 7, 12.07.2026): dieser Export löst 8
+    // parallele Tabellenabfragen aus, hatte aber im Gegensatz zu praktisch
+    // jedem anderen kosten-/lastintensiven Endpunkt im Projekt kein
+    // Rate-Limit — ein kompromittierter Account konnte beliebig oft in
+    // kurzer Folge parallele Mehrfachabfragen auslösen.
+    if (
+      !(await checkRateLimit("gdpr-export-self", {
+        maxRequests: 5,
+        windowSeconds: 3600,
+        extraKey: user.id,
+      }))
+    ) {
+      return NextResponse.json({ error: RATE_LIMIT_MESSAGE }, { status: 429 });
     }
 
     const admin = createAdminClient();

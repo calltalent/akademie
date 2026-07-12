@@ -1,5 +1,5 @@
 import "server-only";
-import type { z } from "zod";
+import { z } from "zod";
 import { createAnthropicClient } from "@/lib/ai/anthropic";
 import { AI_MODELS } from "@/lib/ai/config";
 import { parseStepResponse } from "@/lib/generator/parse";
@@ -122,15 +122,38 @@ Format: {"title": string, "description": string, "modules": [{"title": string, "
   return callClaudeJsonStep({ system, user, schema: courseOutlineSchema, maxTokens: 2000 });
 }
 
+/**
+ * BUGFIX (E2E-Fund course-generator.spec.ts, Josip, 12.07.2026): Claude
+ * liefert bei diesem Schritt gelegentlich NUR das rohe "modules"-Array als
+ * Wurzel zurück statt des geforderten {"title":..., "modules":[...]}
+ * -Objekts (vermutlich Token-Spardrang bei mehreren langen Lektionstexten,
+ * da title/description bereits aus der Gliederung bekannt sind). Statt sich
+ * auf Prompt-Disziplin zu verlassen — Titel/Beschreibung sind ohnehin schon
+ * aus `outline` bekannt und laut Prompt UNVERÄNDERT zu übernehmen — wird ein
+ * Array-Ergebnis PER CODE zum erwarteten Objekt ergänzt, bevor zod
+ * validiert. Gleiches Prinzip wie bei der Quiz-Zusammenführung in Schritt 3
+ * (process.ts, "PER CODE statt per KI-Abtippen"): der KI so wenig wie
+ * möglich abverlangen, was der Code zuverlässiger selbst beisteuern kann.
+ */
+function buildLessonContentSchema(outline: CourseOutline) {
+  return z.preprocess((data) => {
+    if (Array.isArray(data)) {
+      return { title: outline.title, description: outline.description, modules: data };
+    }
+    return data;
+  }, courseContentSchema);
+}
+
 /** Schritt 2: Lektionsinhalte zur bereits festgelegten Gliederung ausformulieren. */
 export async function generateLessonContentStep(
   outline: CourseOutline,
   sourceText: string,
 ): Promise<StepResult<CourseContent>> {
   const system = `Du formulierst Lektionsinhalte für eine deutschsprachige Weiterbildungsplattform aus, basierend auf einer bereits festgelegten Gliederung und einem Quelltext. Jede Lektion bekommt einen KOMPAKTEN Fließtext "contentHtml" (120-220 Wörter, NICHT mehr — deine gesamte Antwort muss innerhalb des Token-Budgets bleiben, deshalb lieber knapp und präzise als ausführlich), ausschließlich einfache HTML-Tags: <p>, <ul>, <li>, <h3>, <strong>, <em>. Behalte Kurs-/Modul-/Lektionstitel EXAKT wie in der Gliederung bei, ändere/ergänze nur contentHtml. ${JSON_ONLY_INSTRUCTION} ${UNTRUSTED_DATA_INSTRUCTION}
-Format: {"title": string, "description": string, "modules": [{"title": string, "lessons": [{"title": string, "contentHtml": string}]}]}`;
+Format: {"title": string, "description": string, "modules": [{"title": string, "lessons": [{"title": string, "contentHtml": string}]}]}
+WICHTIG: Antworte mit dem VOLLSTÄNDIGEN Objekt inklusive der äußeren Felder "title"/"description"/"modules" — NIEMALS nur mit dem rohen "modules"-Array allein.`;
   const user = `Gliederung:\n${JSON.stringify(outline)}\n\nQuelltext (ggf. gekürzt):\n\n${wrapUntrustedSourceText(sourceText)}`;
-  return callClaudeJsonStep({ system, user, schema: courseContentSchema, maxTokens: 8000 });
+  return callClaudeJsonStep({ system, user, schema: buildLessonContentSchema(outline), maxTokens: 8000 });
 }
 
 /**

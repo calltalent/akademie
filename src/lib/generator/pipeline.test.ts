@@ -29,6 +29,24 @@ describe("extractJsonPayload", () => {
   it("wirft bei fehlenden geschweiften Klammern", () => {
     expect(() => extractJsonPayload("keine json antwort")).toThrow();
   });
+
+  // Regressionstest für den E2E-Fund course-generator.spec.ts (Josip,
+  // 12.07.2026): Claude lieferte statt {"title":...,"modules":[...]} nur das
+  // rohe "modules"-Array als Wurzel zurück. Die alte {}-Suche schnitt dabei
+  // vom ersten "{" (Modul 1) bis zum letzten "}" (Modul 2) — verlor die
+  // umschließenden []-Klammern und ergab eine ungültige, komma-getrennte
+  // Objektliste. Die neue Klammertyp-Erkennung muss die Array-Wurzel
+  // unverändert (inkl. []) durchreichen.
+  it("bewahrt eine Array-Wurzel mit mehreren Objekten unverändert (statt sie zu einer ungültigen Objektliste zu kürzen)", () => {
+    const raw = '[{"title":"Modul 1"},{"title":"Modul 2"}]';
+    expect(extractJsonPayload(raw)).toBe(raw);
+    expect(() => JSON.parse(extractJsonPayload(raw))).not.toThrow();
+  });
+
+  it("entfernt einen Codeblock um eine Array-Wurzel", () => {
+    const raw = '```json\n[{"title":"Modul 1"},{"title":"Modul 2"}]\n```';
+    expect(extractJsonPayload(raw)).toBe('[{"title":"Modul 1"},{"title":"Modul 2"}]');
+  });
 });
 
 describe("parseStepResponse", () => {

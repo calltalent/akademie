@@ -274,6 +274,22 @@ export async function importCourseData(
   let lessonCount = 0;
   const allVideoIds: string[] = [];
 
+  // BUGFIX (Security-Audit Block 7, 12.07.2026): kein Rollback bei
+  // Teil-Fehlschlag NACH dem courses-Insert — schlug z. B. Lektion 5 fehl,
+  // blieben der bereits angelegte Kurs, alle vorherigen modules/lessons UND
+  // bereits per reuploadVideoFromUrl() hochgeladene, an bunny_videos
+  // gebundene Videos stehen (Kostenfaktor Bunny-Speicher/-Traffic +
+  // unsichtbarer Datenmüll als Entwurfskurs in /admin/kurse). Fix: jeder
+  // Fehlschlag NACH dem courses-Insert läuft jetzt über rollback() — löscht
+  // den Kurs (kaskadiert modules/lessons per FK) und alle bis dahin
+  // gesammelten Bunny-Videos, bevor der Fehler zurückgegeben wird.
+  async function rollback(): Promise<void> {
+    for (const videoId of allVideoIds) {
+      await deleteBunnyVideo(videoId).catch(() => {});
+    }
+    await supabase.from("courses").delete().eq("id", courseId);
+  }
+
   for (let m = 0; m < payload.modules.length; m++) {
     const mod = payload.modules[m];
 
@@ -288,6 +304,7 @@ export async function importCourseData(
       .select("id")
       .single();
     if (moduleError || !moduleRow) {
+      await rollback();
       return {
         ok: false,
         errors: [`Modul ${m + 1}: Anlage fehlgeschlagen — ${moduleError?.message ?? "unbekannter Fehler"}`],
@@ -308,14 +325,20 @@ export async function importCourseData(
         `${payload.title} — ${lesson.title}`,
       );
       if (!resolution.ok) {
+        await rollback();
         return { ok: false, errors: [resolution.error] };
       }
+      // Bereits in dieser Lektion aufgelöste Videos sofort mitzählen, damit
+      // ein Fehlschlag WEITER unten in derselben Lektion (Validierung/
+      // Insert/saveLessonBlocks) sie beim Rollback ebenfalls erfasst.
+      allVideoIds.push(...resolution.videoIds);
 
       // Endgültige Validierung gegen das bestehende, sicherheitsgeprüfte
       // blockSchema — reine Absicherung, saveLessonBlocks() validiert
       // ohnehin noch einmal (u. a. HTML-Sanitizing).
       const finalBlocksParsed = blocksSchema.safeParse(resolution.blocks);
       if (!finalBlocksParsed.success) {
+        await rollback();
         return {
           ok: false,
           errors: [
@@ -336,6 +359,7 @@ export async function importCourseData(
         .select("id")
         .single();
       if (lessonError || !lessonRow) {
+        await rollback();
         return {
           ok: false,
           errors: [
@@ -349,6 +373,7 @@ export async function importCourseData(
       // (Sanitizing + bunny_videos-Tenant-Check) statt eigener Insert-Logik.
       const saveResult = await saveLessonBlocks(lessonId, courseId, finalBlocksParsed.data);
       if (saveResult.error) {
+        await rollback();
         return {
           ok: false,
           errors: [
@@ -357,7 +382,6 @@ export async function importCourseData(
         };
       }
 
-      allVideoIds.push(...resolution.videoIds);
       lessonCount++;
     }
   }

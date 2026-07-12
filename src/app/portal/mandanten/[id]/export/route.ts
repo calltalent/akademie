@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePlatformAdmin } from "@/lib/platform/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 
 /**
  * GET /portal/mandanten/[id]/export — Mandanten-Gesamtexport für den
@@ -40,8 +41,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requirePlatformAdmin();
+    const { user } = await requirePlatformAdmin();
     const { id } = await params;
+
+    // BUGFIX (Security-Audit Block 7, 12.07.2026): 24 parallele
+    // Tabellenabfragen ohne Rate-Limit — geringeres Risiko als beim
+    // Selbst-Export (nur Platform-Admins haben Zugriff), aber als
+    // Absicherung gegen einen kompromittierten Platform-Admin-Account und
+    // zur Konsistenz mit jedem anderen kosten-/lastintensiven Endpunkt.
+    if (
+      !(await checkRateLimit("platform-tenant-export", {
+        maxRequests: 20,
+        windowSeconds: 3600,
+        extraKey: user.id,
+      }))
+    ) {
+      return NextResponse.json({ error: RATE_LIMIT_MESSAGE }, { status: 429 });
+    }
 
     const admin = createAdminClient();
 

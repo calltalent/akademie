@@ -23,8 +23,33 @@ import type { z } from "zod";
 export function extractJsonPayload(raw: string): string {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = (fenced ? fenced[1] : raw).trim();
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
+
+  // BUGFIX (E2E-Fund course-generator.spec.ts, Josip, 12.07.2026): bislang
+  // wurde IMMER von der ersten "{" bis zur letzten "}" geschnitten — bricht,
+  // sobald Claude (entgegen dem geforderten Objekt-Format) ein Array als
+  // Wurzel liefert (z. B. nur das rohe "modules"-Array statt
+  // {"title":..., "modules":[...]}): die Ausgabe war dann eine
+  // kommagetrennte Liste mehrerer Objekte OHNE umschließende Klammern ("{A},
+  // {B}") — syntaktisch ungültiges JSON, obwohl die Antwort inhaltlich
+  // vollständig war. Fix: die WURZEL-Klammerart wird anhand des zuerst
+  // auftretenden Zeichens ("{" oder "[") bestimmt und mit der letzten
+  // Vorkommnis der PASSENDEN schließenden Klammer gepaart, statt immer von
+  // "{"/"}" auszugehen. Ein Array-Wurzelfall ergibt dadurch weiterhin
+  // syntaktisch gültiges JSON (schlägt danach ggf. korrekt an der
+  // zod-Validierung fehl, statt hier mit einer irreführenden
+  // "kein gültiges JSON"-Meldung zu enden).
+  const firstBrace = candidate.indexOf("{");
+  const firstBracket = candidate.indexOf("[");
+  let start: number;
+  let closeChar: string;
+  if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
+    start = firstBracket;
+    closeChar = "]";
+  } else {
+    start = firstBrace;
+    closeChar = "}";
+  }
+  const end = candidate.lastIndexOf(closeChar);
   if (start === -1 || end === -1 || end < start) {
     throw new Error("Keine gültige JSON-Antwort gefunden.");
   }
