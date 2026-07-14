@@ -26,6 +26,22 @@
   "observability": {
     "enabled": true
   },
+  // Nachtrag (14.07.2026, Josips Deploy-Versuch): Routen + Variablen waren
+  // bisher NUR im Cloudflare-Dashboard gesetzt, nicht hier. `wrangler deploy`
+  // überschreibt bei jedem Lauf die Remote-Konfiguration komplett mit dieser
+  // Datei — ohne die beiden Einträge unten hätte der nächste erfolgreiche
+  // Deploy sowohl die Domain-Routen als auch ALLE API-Keys (Anthropic,
+  // Supabase Service-Role, Resend, Bunny Stream, Voyage) gelöscht und die
+  // Seite lahmgelegt. `routes` hier eingetragen (unbedenklich, keine
+  // Geheimnisse). `keep_vars: true` sorgt zusätzlich dafür, dass die im
+  // Dashboard gesetzten Variablen/Secrets von künftigen Deploys NIE mehr
+  // angerührt werden — Secrets gehören ohnehin nicht in eine Git-versionierte
+  // Datei, siehe PHASENSTATUS.md.
+  "routes": [
+    { "pattern": "*.calltalent.ai/*", "zone_name": "calltalent.ai" },
+    { "pattern": "academy.calltalent.ai/*", "zone_name": "calltalent.ai" }
+  ],
+  "keep_vars": true,
   "triggers": {
     // Alle 2 Minuten - ein ai_jobs-Schritt braucht typischerweise wenige
     // Sekunden bis niedrige zweistellige Sekunden (ein Claude-Sonnet-Aufruf),
