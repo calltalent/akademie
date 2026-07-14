@@ -2076,8 +2076,25 @@ Josip meldete: `https://academy.calltalent.ai/` zeigte für nicht angemeldete Be
    - **Offene Entscheidung für Josip:** Empfehlung ist ein Upgrade auf den Cloudflare-Workers-Paid-Plan (5 $/Monat, hebt Limit auf 10 MiB) — https://dash.cloudflare.com/1721e487e86d9139ee900f52e2882622/workers/plans. Deutlich günstiger und risikoärmer als Kernfunktionen zu entfernen oder eine Bundle-Splitting-Architektur einzuführen.
    - **Nebenbefund, noch nicht behoben:** Cloudflare-Dashboard-Einstellung "Build command" für die Git-Auto-Deploy-Pipeline zeigte `npm run build` statt `npx opennextjs-cloudflare build` (fehlender OpenNext-Kompilierschritt) — beim Nachschauen in Settings stand dort inzwischen bereits der richtige Wert, ungeklärt ob/wann sich das geändert hat. Nicht dringend, da `npm run deploy` lokal der etablierte, funktionierende Weg ist.
 
-**Offen für Josip (nächste Sitzung):**
-1. Entscheiden: Workers-Paid-Upgrade (empfohlen) ODER Bundle-Verkleinerung (aufwändiger, Funktionsverlust möglich).
-2. `npm install` (synct package-lock.json nach dem clsx/cva/tailwind-merge-Entfernen), dann `npm run deploy` erneut versuchen.
-3. `git add -A && git commit -m "chore: ungenutzte Pakete entfernt (clsx, class-variance-authority, tailwind-merge)"`, dann `git push`.
-4. Nach erfolgreichem Deploy: `academy.calltalent.ai` abgemeldet testen (sollte zu `/login` springen) UND den Root-Redirect-Fix von oben nochmal bestätigen — beides hängt am selben blockierten Deploy.
+**Abschluss (14.07.2026, Fortsetzung):** Josip hat auf Cloudflare Workers Paid upgegradet (5 $/Monat, 10-MiB-Limit). Dabei zweiter, unabhängiger Fund: `wrangler.jsonc` kannte weder die Domain-Routen (`*.calltalent.ai/*`, `academy.calltalent.ai/*`) noch die im Dashboard gesetzten Variablen (Anthropic/Supabase/Resend/Bunny/Voyage-Keys) — `wrangler deploy` überschreibt bei jedem Lauf die Remote-Konfiguration vollständig mit der lokalen Datei, ein erfolgreicher Deploy hätte also Routen UND alle API-Keys gelöscht. Fix: `routes`-Array ergänzt (unbedenklich, keine Geheimnisse) + `"keep_vars": true` gesetzt (verhindert, dass künftige Deploys die Dashboard-Variablen je wieder anfassen — Secrets gehören ohnehin nicht in eine Git-Datei).
+
+`npm run deploy` danach erfolgreich (Worker-`modified_on` sprang von 12.07. auf 14.07. 18:03 UTC — erster erfolgreicher Deploy seit Beginn dieser Design-Block-6-Arbeiten). Live bestätigt: `academy.calltalent.ai` leitet abgemeldet korrekt zu `/login` weiter, Seite lädt vollständig gestylt (Supabase-Variablen intakt, `keep_vars` hat funktioniert).
+
+**Damit erledigt:** Root-Redirect-Fix live, package-lock.json synchron, Konfigurationsverlust-Risiko behoben, Cloudflare-Deploy-Pipeline (via `npm run deploy`/Wrangler) wieder funktionsfähig.
+
+## Leerer-Kurs-Fund von Josip behoben (14.07.2026, Cowork-Sitzung)
+
+Josip meldete: Klick auf einen Kurs ohne Inhalte ("Test Kurs", 0 Module) zeigte nur Titel + leeren Fortschrittsbalken + "0 von 0 Lektionen" — darunter komplett leere Seite, wirkte kaputt.
+
+**Ursache (kein Absturz, echtes fehlendes Empty-State):** `src/app/(learn)/kurs/[slug]/page.tsx` — `course.description` war für diesen Kurs leer (korrekt ausgeblendet), `firstLessonId` blieb `undefined` (kein "Kurs starten"-Button, korrekt), und die Modul-Liste rendert bei 0 Modulen einfach nichts. Alles technisch richtig, aber ohne jede Erklärung für den Nutzer.
+
+**Fix:** `progress.total === 0` (deckt sowohl "keine Module" als auch "Module ohne veröffentlichte Lektionen" ab) zeigt jetzt "Dieser Kurs hat noch keine veröffentlichten Inhalte." statt der leeren Fläche. `computeCourseProgress()` bereits vorher korrekt (`isComplete: total > 0 && ...` — kein falsches "abgeschlossen 🎉" bei 0/0, geprüft).
+
+**Nicht selbst verifiziert** (Mount-Einschränkung). **Offen für Josip:**
+1. `npm run lint -- "src/app/(learn)/kurs/[slug]/page.tsx"`
+2. `npm run dev`, `/kurs/test-kurs` (oder den echten Slug des leeren Kurses) aufrufen — sollte jetzt die Empty-State-Meldung zeigen.
+3. `git add -A && git commit -m "fix: Kurs-Seite zeigt Hinweis statt leerer Fläche bei Kursen ohne veröffentlichte Inhalte"`, dann `git push`, dann `npm run deploy`.
+
+**Weiterhin offen, nicht dringend:**
+1. Git-Auto-Deploy-Pipeline (Cloudflare Workers Builds, bei Push auf GitHub) ist nach wie vor ungeklärt/vermutlich weiterhin defekt (Build-command-Diskrepanz aus dem gestrigen Fund) — wird aber aktuell nicht gebraucht, da `npm run deploy` der etablierte, funktionierende Weg ist. Bei Bedarf später sauber einrichten oder bewusst deaktivieren, um Verwirrung zu vermeiden.
+2. `keep_vars: true` ist ein Dauerzustand — jede zukünftige NEUE Variable muss weiterhin manuell im Cloudflare-Dashboard gesetzt werden (nicht über `wrangler.jsonc`/Git), das ist so beabsichtigt.

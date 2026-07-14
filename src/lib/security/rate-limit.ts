@@ -1,6 +1,6 @@
 import "server-only";
 import { headers } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Security-Fix (security-reviewer-Audit 11.07.2026, MITTEL): kein Rate
@@ -22,7 +22,11 @@ export async function checkRateLimit(
     h.get("cf-connecting-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const key = `${namespace}:${opts.extraKey ?? ip}`;
 
-  const supabase = await createClient();
+  // Security-Härtung (14.07.2026): Admin-Client (service_role) statt Nutzer-
+  // Client, damit check_rate_limit NICHT mehr für anon/authenticated per REST
+  // aufrufbar sein muss (EXECUTE-Revoke, Migration 20260714090000). Der Limiter
+  // kennt keinen Nutzerkontext (Schlüssel = namespace:IP), daher unbedenklich.
+  const supabase = createAdminClient();
   const { data, error } = await supabase.rpc("check_rate_limit", {
     p_key: key,
     p_max_requests: opts.maxRequests,

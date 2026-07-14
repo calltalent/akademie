@@ -95,30 +95,44 @@ export default async function CourseOverviewPage({
         </a>
       )}
 
-      <div className="flex flex-col gap-4">
-        {(modules ?? []).map((m) => {
-          const moduleLessons = (lessons ?? []).filter((l) => l.module_id === m.id);
-          if (moduleLessons.length === 0) return null;
-          return (
-            <div key={m.id} className="rounded-md border p-3" style={{ borderRadius: "var(--radius)" }}>
-              <p className="mb-2 font-medium">{m.title}</p>
-              <ul className="flex flex-col gap-1">
-                {moduleLessons.map((l) => (
-                  <li key={l.id}>
-                    <a
-                      href={`/kurs/${slug}/l/${l.id}`}
-                      className="flex items-center gap-2 text-base hover:underline"
-                    >
-                      <span aria-hidden="true">{completedIds.has(l.id) ? "✓" : "○"}</span>
-                      {l.title}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
+      {progress.total === 0 ? (
+        // Fund Josip (14.07.2026): Kurse ohne veröffentlichte Lektionen (z. B.
+        // ein frisch angelegter, noch leerer Kurs) zeigten bisher GAR NICHTS
+        // unterhalb der "0 von 0 Lektionen"-Zeile — wirkte wie eine kaputte
+        // Seite statt wie ein leerer, noch nicht befüllter Kurs. Echter
+        // Zustand, keine erfundene Nachricht: `progress.total === 0` deckt
+        // sowohl "keine Module" als auch "Module ohne veröffentlichte
+        // Lektionen" ab (dieselbe Bedingung wie oben für den fehlenden
+        // "Kurs starten"-Button, siehe firstLessonId).
+        <p className="text-base text-gray-500">
+          Dieser Kurs hat noch keine veröffentlichten Inhalte.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {(modules ?? []).map((m) => {
+            const moduleLessons = (lessons ?? []).filter((l) => l.module_id === m.id);
+            if (moduleLessons.length === 0) return null;
+            return (
+              <div key={m.id} className="rounded-md border p-3" style={{ borderRadius: "var(--radius)" }}>
+                <p className="mb-2 font-medium">{m.title}</p>
+                <ul className="flex flex-col gap-1">
+                  {moduleLessons.map((l) => (
+                    <li key={l.id}>
+                      <a
+                        href={`/kurs/${slug}/l/${l.id}`}
+                        className="flex items-center gap-2 text-base hover:underline"
+                      >
+                        <span aria-hidden="true">{completedIds.has(l.id) ? "✓" : "○"}</span>
+                        {l.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </main>
   );
 }
