@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Sidebar } from "@/components/learn/sidebar";
-import { TopBar } from "@/components/learn/top-bar";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { TopBar } from "@/components/layout/TopBar";
 
 /**
  * Design-Block (12.07.2026, Claude-Design-Export
@@ -18,7 +18,16 @@ import { TopBar } from "@/components/learn/top-bar";
  * ein Lint-Hinweis. Der Mandanten-Name hat im neuen Design ohnehin keine
  * Anzeigefläche mehr, deshalb Prop ganz entfernt statt nur optional
  * gemacht (kein totes Feld). `isStaff` bekommt echte Verwendung (Admin-
- * Link in der Sidebar, siehe sidebar.tsx) statt eines ungenutzten Props.
+ * Link in der Sidebar, siehe components/layout/Sidebar.tsx) statt eines
+ * ungenutzten Props.
+ *
+ * Migration (Folgeauftrag): Chrome auf die generischen Komponenten unter
+ * components/layout/ umgestellt (Sidebar/TopBar, Prompt-1-Tokens + lucide-
+ * Icons). Produktionssicher verdrahtet: echter Nutzer statt Demo-Default,
+ * `notifications={[]}` (kein erfundener Zähler/Eintrag, DESIGN-MASTERPROMPT.md
+ * §8.1), Staff-Admin-Link via `isStaff` erhalten, aktiver Menüpunkt aus der
+ * Route abgeleitet. Die bisherigen learn/sidebar.tsx + learn/top-bar.tsx
+ * wurden im Zuge dessen entfernt (nur diese Datei hatte sie importiert).
  */
 export function AppShell({
   children,
@@ -36,14 +45,14 @@ export function AppShell({
   title?: string;
 }) {
   return (
-    <div className="flex min-h-screen" style={{ background: "#F4F5FA" }}>
+    <div className="flex min-h-screen bg-bg">
       <Sidebar isStaff={isStaff} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           breadcrumb={breadcrumb}
           title={title ?? `Willkommen zurück, ${userName}`}
-          userName={userName}
-          userEmail={userEmail}
+          user={{ name: userName, email: userEmail, role: "Kursteilnehmer" }}
+          notifications={[]}
         />
         <main className="flex-1 px-10 pb-14 pt-4">{children}</main>
       </div>

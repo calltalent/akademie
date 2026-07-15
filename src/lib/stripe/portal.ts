@@ -73,7 +73,7 @@ export async function createPortalSession(): Promise<PortalActionState> {
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: buildTenantUrl(tenant, "/profil"),
+      return_url: buildTenantUrl(tenant, "/einstellungen"),
     });
     redirectUrl = portalSession.url;
   } catch (e) {

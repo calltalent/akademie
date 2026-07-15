@@ -3,6 +3,7 @@
 import { useActionState, useEffect } from "react";
 import { createCourse } from "@/lib/courses/actions";
 import { initialCourseActionState } from "@/lib/courses/state";
+import { COURSE_CATEGORIES } from "@/lib/courses/categories";
 
 /**
  * Design-Block 6 (13.07.2026): optionales `onSuccess` ergänzt, damit dieses
@@ -46,6 +47,17 @@ export function CreateCourseForm({ onSuccess }: { onSuccess?: () => void } = {})
           pattern="[a-z0-9]+(-[a-z0-9]+)*"
           className="rounded-md border px-3 py-2 text-base"
         />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Kategorie (optional, für den Kurskatalog-Filter)
+        <select name="category" className="rounded-md border px-3 py-2 text-base">
+          <option value="">— keine —</option>
+          {COURSE_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
       </label>
       {state.error && (
         <p role="alert" className="text-sm text-red-600">

@@ -16,7 +16,7 @@ test("CSV-Import legt neue Nutzer an und zeigt sie in der Mitgliederliste", asyn
   const email2 = `e2e-import-${ts}-2@example.test`;
   const csv = `email,full_name,course_slug\n${email1},E2E Import Eins,\n${email2},E2E Import Zwei,\n`;
 
-  await page.goto(tenantUrl("/admin/nutzer"));
+  await page.goto(tenantUrl("/admin/teilnehmer"));
   await page.locator('input[type="file"]').setInputFiles({
     name: "e2e-import.csv",
     mimeType: "text/csv",

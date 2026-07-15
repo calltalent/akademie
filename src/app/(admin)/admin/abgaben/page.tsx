@@ -29,6 +29,10 @@ export default async function AdminAbgabenPage({
 }) {
   const { status } = await searchParams;
   const tenant = await getTenant();
+  // Zugriff ist über admin/layout.tsx (checkStaffAccess) gated; ohne Mandant
+  // rendert das Layout „Kein Zugriff". Die Seite wird im RSC-Baum dennoch
+  // ausgewertet — daher defensiv abbrechen statt auf tenant!.id zu laufen.
+  if (!tenant) return null;
   const supabase = await createClient();
 
   const filterStatus: SubmissionStatus | null =
@@ -52,7 +56,7 @@ export default async function AdminAbgabenPage({
     .select(
       "id, lesson_id, user_id, kind, content, file_path, status, grade, feedback, created_at, lessons(title, module_id), profiles!submissions_user_id_fkey(email, full_name)",
     )
-    .eq("tenant_id", tenant!.id)
+    .eq("tenant_id", tenant.id)
     .order("created_at", { ascending: false });
 
   if (filterStatus) query = query.eq("status", filterStatus);
@@ -72,13 +76,13 @@ export default async function AdminAbgabenPage({
   const { count: openCount } = await supabase
     .from("submissions")
     .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenant!.id)
+    .eq("tenant_id", tenant.id)
     .eq("status", "submitted")
     .gte("created_at", overdueCutoffIso);
   const { count: overdueCount } = await supabase
     .from("submissions")
     .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenant!.id)
+    .eq("tenant_id", tenant.id)
     .eq("status", "submitted")
     .lt("created_at", overdueCutoffIso);
 

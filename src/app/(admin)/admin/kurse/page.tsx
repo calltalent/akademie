@@ -60,7 +60,11 @@ export default async function AdminKursePage({
   const activeKey = TABS.some((t) => t.key === statusParam) ? statusParam! : "alle";
 
   const tenant = await getTenant();
-  const tenantId = tenant!.id;
+  // Zugriff ist über admin/layout.tsx (checkStaffAccess) gated; ohne Mandant
+  // rendert das Layout „Kein Zugriff". Die Seite wird im RSC-Baum dennoch
+  // ausgewertet — daher defensiv abbrechen statt auf tenant!.id zu laufen.
+  if (!tenant) return null;
+  const tenantId = tenant.id;
   const supabase = await createClient();
 
   const { data: courses } = await supabase

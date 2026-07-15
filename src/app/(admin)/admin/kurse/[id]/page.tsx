@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { ModuleLessonTree, DeleteLessonButton } from "@/components/admin/module-lesson-tree";
 import { BlockEditor } from "@/components/editor/block-editor";
-import { LessonPublishToggle, CourseStatusSelect } from "@/components/admin/publish-toggle";
+import { LessonPublishToggle, CourseStatusSelect, CourseCategorySelect } from "@/components/admin/publish-toggle";
 import { ReembedCourseButton } from "@/components/admin/reembed-course-button";
 import { RefreshTranscriptButton } from "@/components/admin/refresh-transcript-button";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
@@ -22,7 +22,7 @@ export default async function CourseEditorPage({
 
   const { data: course } = await supabase
     .from("courses")
-    .select("id, title, slug, status")
+    .select("id, title, slug, status, category")
     .eq("id", courseId)
     .eq("tenant_id", tenant!.id)
     .maybeSingle();
@@ -76,6 +76,7 @@ export default async function CourseEditorPage({
         <h1 className="text-2xl font-semibold">{course.title}</h1>
         <div className="flex items-center gap-4">
           <CourseStatusSelect courseId={courseId} status={course.status} />
+          <CourseCategorySelect courseId={courseId} category={course.category ?? null} />
           <ReembedCourseButton courseId={courseId} />
           <Link href="/admin/kurse" className="text-sm underline">
             Zurück zur Kursliste

@@ -11,6 +11,14 @@ import {
 import type { CourseActionState } from "@/lib/courses/state";
 import { translateDbError } from "@/lib/errors/db";
 import { genericErrorMessage } from "@/lib/errors/generic";
+import { COURSE_CATEGORIES } from "@/lib/courses/categories";
+
+/** Nur eine der Standard-Kategorien (oder null) zulassen. */
+function normalizeCategory(raw: FormDataEntryValue | string | null): string | null {
+  return typeof raw === "string" && (COURSE_CATEGORIES as readonly string[]).includes(raw)
+    ? raw
+    : null;
+}
 
 function errorState(e: unknown): CourseActionState {
   return { error: genericErrorMessage(e) };
@@ -38,12 +46,32 @@ export async function createCourse(
       title: parsed.data.title,
       slug: parsed.data.slug,
       description: parsed.data.description ?? null,
+      category: normalizeCategory(formData.get("category")),
       created_by: user.id,
     });
     if (error) {
       return { error: "Anlegen fehlgeschlagen: " + translateDbError(error) };
     }
 
+    revalidatePath("/admin/kurse");
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+export async function updateCourseCategory(
+  courseId: string,
+  category: string | null,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const { error } = await supabase
+      .from("courses")
+      .update({ category: normalizeCategory(category) })
+      .eq("id", courseId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
     revalidatePath("/admin/kurse");
     return { error: null, success: true };
   } catch (e) {

@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { checkAdminAccess } from "@/lib/auth/staff";
+import { checkPlatformAccess } from "@/lib/platform/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ApiKeysPanel } from "@/components/admin/api-keys-panel";
 import { WebhooksPanel } from "@/components/admin/webhooks-panel";
@@ -41,6 +43,11 @@ export default async function AdminEinstellungenPage() {
   }
 
   const { tenant } = access;
+  // Der „Mandanten verwalten"-Link führt ins Betreiber-Portal (/portal/
+  // mandanten) und ist nur für Plattform-Admins erreichbar — daher nur für
+  // sie einblenden (Josips Freigabe: keine toten/gesperrten Links für normale
+  // Mandanten-Admins, die diese Seite genauso sehen).
+  const isPlatformAdmin = (await checkPlatformAccess()).ok;
   const supabase = await createClient();
   const [{ data: apiKeys }, { data: webhooks }] = await Promise.all([
     supabase
@@ -99,6 +106,11 @@ export default async function AdminEinstellungenPage() {
             <div className="text-sm" style={{ color: "#3E3F66" }}>
               Schrift: {branding.font ?? "Montserrat"}
             </div>
+            {isPlatformAdmin && (
+              <Link href="/portal/mandanten" className="ml-auto text-sm font-semibold no-underline">
+                Mandanten verwalten →
+              </Link>
+            )}
           </div>
         </div>
       </div>

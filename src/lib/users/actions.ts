@@ -35,7 +35,7 @@ export async function inviteSingleUser(
       return { error: result.message ?? "Einladung fehlgeschlagen." };
     }
 
-    revalidatePath("/admin/nutzer");
+    revalidatePath("/admin/teilnehmer");
     return { error: null, success: true };
   } catch (e) {
     return errorState(e);
@@ -52,7 +52,7 @@ export async function disableMembership(userId: string): Promise<CourseActionSta
       .eq("tenant_id", tenant.id)
       .eq("user_id", userId);
     if (error) return { error: translateDbError(error) };
-    revalidatePath("/admin/nutzer");
+    revalidatePath("/admin/teilnehmer");
     return { error: null, success: true };
   } catch (e) {
     return errorState(e);
@@ -69,7 +69,7 @@ export async function enableMembership(userId: string): Promise<CourseActionStat
       .eq("tenant_id", tenant.id)
       .eq("user_id", userId);
     if (error) return { error: translateDbError(error) };
-    revalidatePath("/admin/nutzer");
+    revalidatePath("/admin/teilnehmer");
     return { error: null, success: true };
   } catch (e) {
     return errorState(e);

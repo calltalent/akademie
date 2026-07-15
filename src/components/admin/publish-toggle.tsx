@@ -1,7 +1,8 @@
 "use client";
 
 import { useTransition } from "react";
-import { updateCourseStatus, updateLessonStatus } from "@/lib/courses/actions";
+import { updateCourseStatus, updateCourseCategory, updateLessonStatus } from "@/lib/courses/actions";
+import { COURSE_CATEGORIES } from "@/lib/courses/categories";
 
 /**
  * Design-Block 6 (13.07.2026): ersetzt den früheren CoursePublishToggle
@@ -38,6 +39,44 @@ export function CourseStatusSelect({
       <option value="draft">Entwurf</option>
       <option value="published">Live</option>
       <option value="archived">Archiviert</option>
+    </select>
+  );
+}
+
+/**
+ * Kategorie eines Kurses setzen (für den Kurskatalog-Filter). Analog
+ * CourseStatusSelect — Änderung sofort per Server-Action, kein Speichern-
+ * Button. „Keine Kategorie" → null (Kurs erscheint im Katalog nur unter
+ * „Alle Kurse").
+ */
+export function CourseCategorySelect({
+  courseId,
+  category,
+}: {
+  courseId: string;
+  category: string | null;
+}) {
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <select
+      value={category ?? ""}
+      disabled={pending}
+      onChange={(e) => {
+        const next = e.target.value || null;
+        startTransition(() => {
+          updateCourseCategory(courseId, next);
+        });
+      }}
+      className="rounded-md border px-2 py-1.5 text-sm disabled:opacity-50"
+      aria-label="Kurskategorie"
+    >
+      <option value="">Keine Kategorie</option>
+      {COURSE_CATEGORIES.map((c) => (
+        <option key={c} value={c}>
+          {c}
+        </option>
+      ))}
     </select>
   );
 }

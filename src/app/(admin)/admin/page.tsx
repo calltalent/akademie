@@ -25,7 +25,11 @@ import { formatRelativeTime } from "@/lib/format/relative-time";
  */
 export default async function AdminOverviewPage() {
   const tenant = await getTenant();
-  const tenantId = tenant!.id;
+  // Zugriff ist über admin/layout.tsx (checkStaffAccess) gated; ohne Mandant
+  // rendert das Layout „Kein Zugriff". Die Seite wird im RSC-Baum dennoch
+  // ausgewertet — daher defensiv abbrechen statt auf tenant!.id zu laufen.
+  if (!tenant) return null;
+  const tenantId = tenant.id;
   const supabase = await createClient();
 
   const { data: courses } = await supabase
@@ -35,6 +39,11 @@ export default async function AdminOverviewPage() {
     .order("position", { ascending: true });
 
   const publishedCourses = (courses ?? []).filter((c) => c.status === "published");
+  // Tabelle zeigt Live UND Entwurf (Admin.dc.html „Status Live/Entwurf");
+  // archivierte Kurse bleiben außen vor.
+  const tableCourses = (courses ?? []).filter(
+    (c) => c.status === "published" || c.status === "draft",
+  );
 
   const { data: modules } = await supabase
     .from("modules")
@@ -57,6 +66,11 @@ export default async function AdminOverviewPage() {
     .select("id, role, status, created_at")
     .eq("tenant_id", tenantId);
 
+  const { data: enrollments } = await supabase
+    .from("enrollments")
+    .select("enrolled_at")
+    .eq("tenant_id", tenantId);
+
   const { data: recentSubmissions } = await supabase
     .from("submissions")
     .select("id, status, created_at, lesson_id")
@@ -75,7 +89,7 @@ export default async function AdminOverviewPage() {
 
   // Pro Kurs: veröffentlichte Lektionen + deren Fortschritts-Zeilen.
   const lessonIdsByCourse = new Map<string, Set<string>>();
-  for (const c of publishedCourses) lessonIdsByCourse.set(c.id, new Set());
+  for (const c of tableCourses) lessonIdsByCourse.set(c.id, new Set());
   for (const m of modules ?? []) {
     const set = lessonIdsByCourse.get(m.course_id);
     if (!set) continue;
@@ -84,7 +98,7 @@ export default async function AdminOverviewPage() {
     }
   }
 
-  const courseStats = publishedCourses.map((c) => {
+  const courseStats = tableCourses.map((c) => {
     const lessonIds = lessonIdsByCourse.get(c.id) ?? new Set<string>();
     const rows = (progressRows ?? []).filter((p) => lessonIds.has(p.lesson_id));
     const distinctMembers = new Set(rows.map((r) => r.user_id));
@@ -100,8 +114,8 @@ export default async function AdminOverviewPage() {
       ? Math.round(coursesWithActivity.reduce((sum, c) => sum + c.pct, 0) / coursesWithActivity.length)
       : 0;
 
-  // Neue Mitglieder pro Woche (letzte 8 Wochen) als Näherung für
-  // "Einschreibungen" — siehe Datei-Kommentar oben.
+  // Einschreibungen pro Woche (letzte 8 Wochen) aus der echten
+  // enrollments-Tabelle (enrolled_at).
   const now = new Date();
   const weekBuckets: { label: string; count: number }[] = [];
   for (let i = 7; i >= 0; i--) {
@@ -109,9 +123,9 @@ export default async function AdminOverviewPage() {
     start.setUTCDate(start.getUTCDate() - i * 7 - 6);
     const end = new Date(now);
     end.setUTCDate(end.getUTCDate() - i * 7);
-    const count = (memberships ?? []).filter((m) => {
-      const created = new Date(m.created_at);
-      return created >= start && created <= end;
+    const count = (enrollments ?? []).filter((e) => {
+      const at = new Date(e.enrolled_at as string);
+      return at >= start && at <= end;
     }).length;
     weekBuckets.push({ label: `KW${isoWeek(end)}`, count });
   }
@@ -149,7 +163,7 @@ export default async function AdminOverviewPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
         <div className="rounded-2xl border bg-white p-7" style={{ borderColor: "#E7E8F2" }}>
           <div className="mb-5 flex items-baseline justify-between">
-            <div className="text-[17px] font-bold">Neue Mitglieder</div>
+            <div className="text-[17px] font-bold">Einschreibungen</div>
             <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
               letzte 8 Wochen
             </div>
@@ -222,7 +236,7 @@ export default async function AdminOverviewPage() {
         </div>
         {courseStats.length === 0 ? (
           <p className="px-7 py-6 text-sm" style={{ color: "#A9AAC4" }}>
-            Noch keine veröffentlichten Kurse.
+            Noch keine Kurse angelegt.
           </p>
         ) : (
           courseStats.map((c) => (
@@ -245,12 +259,21 @@ export default async function AdminOverviewPage() {
                 </span>
               </div>
               <div>
-                <span
-                  className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
-                  style={{ color: "#1F8A5B", background: "#E3F2EA" }}
-                >
-                  Live
-                </span>
+                {c.status === "published" ? (
+                  <span
+                    className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
+                    style={{ color: "#1F8A5B", background: "#E3F2EA" }}
+                  >
+                    Live
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
+                    style={{ color: "#1A1A2E", background: "#F7EED4" }}
+                  >
+                    Entwurf
+                  </span>
+                )}
               </div>
             </div>
           ))

@@ -150,6 +150,6 @@ export async function completeLesson(
 
   revalidatePath(`/kurs/${courseSlug}`);
   revalidatePath("/");
-  revalidatePath("/profil");
+  revalidatePath("/einstellungen");
   return { error: null, success: true };
 }

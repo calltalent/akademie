@@ -76,7 +76,7 @@ export async function requestDeletion(
       return { error: "Antrag konnte nicht gespeichert werden: " + translateDbError(error) };
     }
 
-    revalidatePath("/profil");
+    revalidatePath("/einstellungen");
     return { error: null, success: true };
   } catch (e) {
     return { error: genericErrorMessage(e) };

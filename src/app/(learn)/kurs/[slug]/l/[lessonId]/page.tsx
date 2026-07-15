@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Check } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
@@ -100,6 +100,11 @@ export default async function LessonPage({
   const flatIds = flattenLessonIds(flatModules);
   const { prevId, nextId } = findAdjacentLessonIds(flatIds, lessonId);
   const lessonPositionIndex = flatIds.indexOf(lessonId);
+  // Kurs-Fortschritt (Anteil abgeschlossener Lektionen) für den Balken unter
+  // dem Video — Kurs.dc.html zeigt dort ~54 % ≈ „Lektion 7 von 12".
+  const coursePercent = flatIds.length
+    ? Math.round((flatIds.filter((id) => completedIds.has(id)).length / flatIds.length) * 100)
+    : 0;
 
   const progressRow = (courseProgressRows ?? []).find((p) => p.lesson_id === lessonId);
 
@@ -136,6 +141,22 @@ export default async function LessonPage({
 
           <BlockRenderer blocks={blocks} lessonId={lessonId} />
 
+          {/* Kurs-Fortschrittsbalken (Kurs.dc.html: 6px unter dem Video). */}
+          <div
+            className="mt-6 h-1.5 overflow-hidden rounded-full"
+            style={{ background: "#EEF0F7" }}
+            role="progressbar"
+            aria-valuenow={coursePercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Kursfortschritt"
+          >
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${coursePercent}%`, background: "var(--color-primary)" }}
+            />
+          </div>
+
           <div className="mt-6 flex items-center justify-between gap-4">
             <div>
               <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
@@ -143,6 +164,16 @@ export default async function LessonPage({
               </div>
               <h2 className="mt-0.5 text-[22px] font-extrabold">{lesson.title}</h2>
             </div>
+            {nextId && (
+              <a
+                href={`/kurs/${slug}/l/${nextId}`}
+                className="inline-flex flex-shrink-0 items-center gap-2 rounded-[11px] px-5 py-3 text-[15px] font-bold text-white no-underline"
+                style={{ background: "var(--color-primary)" }}
+              >
+                Nächste Lektion
+                <ArrowRight size={16} strokeWidth={2.4} aria-hidden="true" />
+              </a>
+            )}
           </div>
 
           <div className="mt-5 flex flex-wrap gap-3">

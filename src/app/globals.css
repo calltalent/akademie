@@ -31,6 +31,38 @@
   --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
+/*
+ * Referenzdesign-Palette (Ordner „Calltalent-Akademie Studenten-Portal",
+ * 12.07.2026). Markenweite, NICHT pro Mandant überschreibbare Tokens —
+ * ergänzen die Blöcke oben, überschreiben nichts. Eigener (nicht-inline)
+ * @theme-Block, damit die Werte zusätzlich als echte :root-CSS-Variablen
+ * (z. B. var(--color-navy), var(--radius-md)) verfügbar sind. Rollen aus
+ * den Inline-Styles der Referenz abgeleitet.
+ */
+@theme {
+  --color-accent: #5663ae; /* Periwinkle als feste Markenfarbe (vgl. --color-primary, aber mandantenfix) */
+  --color-navy: #3e3f66;   /* dunkle Überschriften / Sidebar-Flächen */
+  --color-ink: #1a1a2e;    /* Ink, dunkelste Textfarbe (vgl. --foreground) */
+  --color-bg: #f4f5fa;     /* App-Canvas hinter Karten (vgl. --background = weiß) */
+
+  /* Rahmen, hell → kräftig */
+  --color-border-100: #e7e8f2; /* Standard-Kartenrahmen (häufigste) */
+  --color-border-200: #e1e3ef; /* Trennlinien / Hairlines */
+  --color-border-300: #d8daea; /* Eingabefelder / kräftiger Rahmen */
+
+  /* Gedämpfte Texte & Icons, dunkel → hell */
+  --color-muted-500: #66679b; /* Sekundärtext */
+  --color-muted-400: #a9aac4; /* Label / Meta */
+  --color-muted-300: #b9bbda; /* Overline / inaktiv */
+  --color-muted-200: #c9cbe6; /* dezenteste Label / Icon-Stroke */
+
+  /* Border-Radius-Skala (Referenzdesign) */
+  --radius-sm: 11px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { ArrowRight } from "lucide-react";
 import { signInWithPassword, signInWithMagicLink } from "@/lib/auth/actions";
 import type { AuthActionState } from "@/lib/auth/actions";
 
@@ -63,8 +64,8 @@ export default function LoginPage() {
             Verkaufen ist erlernbar.
           </h2>
           <p className="text-[17px]" style={{ color: "#DDDEEE" }}>
-            Willkommen in deiner Akademie für Vertrieb am Telefon. Melde dich an, um dort
-            fortzusetzen, wo du aufgehört hast.
+            Willkommen in deiner Akademie für Vertrieb am Telefon. Setze fort, wo du
+            aufgehört hast.
           </p>
         </div>
 
@@ -96,7 +97,7 @@ export default function LoginPage() {
                 type="email"
                 required
                 autoComplete="email"
-                className="rounded-xl border px-4 py-3.5 text-base font-normal focus:outline-none focus:ring-2 focus:ring-offset-1"
+                className="rounded-md border px-4 py-3.5 text-base font-normal focus:outline-none focus:ring-2 focus:ring-offset-1"
                 style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
               />
             </label>
@@ -116,7 +117,7 @@ export default function LoginPage() {
                 required
                 minLength={8}
                 autoComplete="current-password"
-                className="w-full rounded-xl border px-4 py-3.5 text-base focus:outline-none focus:ring-2 focus:ring-offset-1"
+                className="w-full rounded-md border px-4 py-3.5 text-base focus:outline-none focus:ring-2 focus:ring-offset-1"
                 style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
               />
             </div>
@@ -128,10 +129,11 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={pwPending}
-              className="rounded-xl py-3.5 text-base font-bold text-white disabled:opacity-50"
+              className="flex items-center justify-center gap-2 rounded-md py-3.5 text-base font-bold text-white disabled:opacity-50"
               style={{ background: "var(--color-primary)" }}
             >
               Anmelden
+              <ArrowRight size={18} strokeWidth={2.2} aria-hidden="true" />
             </button>
           </form>
 
@@ -149,7 +151,7 @@ export default function LoginPage() {
                 type="email"
                 required
                 autoComplete="email"
-                className="rounded-xl border px-4 py-3.5 text-base font-normal focus:outline-none focus:ring-2 focus:ring-offset-1"
+                className="rounded-md border px-4 py-3.5 text-base font-normal focus:outline-none focus:ring-2 focus:ring-offset-1"
                 style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
               />
             </label>
@@ -166,7 +168,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={magicPending}
-              className="rounded-xl border py-3 text-[15px] font-semibold disabled:opacity-50"
+              className="rounded-md border py-3 text-[15px] font-semibold disabled:opacity-50"
               style={{ borderColor: "#D8DAEA", color: "#3E3F66", background: "#fff" }}
             >
               Magic Link senden
