@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { ArrowRight, Check } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, ArrowLeft, Check, Play, ListVideo, ChevronRight, MessageSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
@@ -9,6 +10,9 @@ import { CompleteLessonButton } from "@/components/learn/complete-lesson-button"
 import { TutorPanel } from "@/components/learn/tutor-panel";
 import { BookmarkButton } from "@/components/learn/bookmark-button";
 import { AppShell } from "@/components/learn/app-shell";
+
+const ACCENT = "#5663AE";
+const NAVY = "#3E3F66";
 
 type LessonChapter = { title: string; start: number; end: number };
 
@@ -24,19 +28,21 @@ function formatChapterTime(seconds: number): string {
 }
 
 /**
- * Design-Block (12.07.2026, Claude-Design-Export Teil 2, Kurs.dc.html — von
- * Josip als verbindlich bestätigt, siehe PHASENSTATUS.md "Design-Update
- * Teil 2"). Chrome (AppShell) + Lektionsliste rechts NEU, dem Design
- * angeglichen — die eigentliche Lern-Funktionalität (BlockRenderer,
- * Tutor-Chat, Kapitel/Transkript, Abschluss-Button, Zertifikat) bewusst
- * UNVERÄNDERT gelassen: das Design zeigt nur einen einzelnen Video-Player,
- * echte Lektionen können aber auch Text/Quiz/Abgabe/Callout/Embed-Blöcke
- * enthalten (src/lib/courses/schema.ts) — eine 1:1-Kopie des Mockups hätte
- * echte, getestete Funktionalität verloren.
+ * Design-Block (16.07.2026, Claude-Design-Import Lektion.dc.html aus dem
+ * Design-Projekt „Calltalent-Akademie Studenten-Portal"). Neugestaltung der
+ * Lektionsseite: Modul-Fortschrittsleiste oben (verlinkt die neue Modul-
+ * Detailseite `/kurs/[slug]/m/[moduleId]`), Lektions-Karte (Titel + Inhalt +
+ * Fußzeile mit Lesezeichen/Feedback/Abschließen), „Nächste Lektion"-Karte und
+ * rechts die Lektionsliste der aktuellen Sektion (= des aktuellen Moduls) mit
+ * „Nächste Sektion".
  *
- * Lesezeichen-Button jetzt echt verdrahtet (bookmark-button.tsx), "Arbeits-
- * blatt (PDF)" aus dem Export bewusst NICHT übernommen (kein Datenfeld
- * dafür vorhanden, wäre ein toter Link).
+ * WICHTIG: Die eigentliche Lern-Funktionalität bleibt unverändert — der
+ * Export zeigt nur einen einzelnen Video-Platzhalter, echte Lektionen können
+ * aber Text/Quiz/Abgabe/Callout/Embed-Blöcke enthalten (courses/schema.ts),
+ * gerendert vom BlockRenderer. Transkript/Zusammenfassung/Kapitel und der
+ * Tutor-Chat bleiben erhalten (unter der Karte, nur wenn real vorhanden).
+ * Bewusst NICHT aus dem Export übernommen: das „1/1 Aufgaben erledigt"-Badge
+ * (kein Aufgaben-Zähler pro Lektion vorhanden — wäre eine erfundene Zahl).
  */
 export default async function LessonPage({
   params,
@@ -45,6 +51,7 @@ export default async function LessonPage({
 }) {
   const { slug, lessonId } = await params;
   const tenant = await getTenant();
+  if (!tenant) redirect("/login");
   const supabase = await createClient();
 
   const {
@@ -55,10 +62,10 @@ export default async function LessonPage({
   const { data: course } = await supabase
     .from("courses")
     .select("id, title")
-    .eq("tenant_id", tenant!.id)
+    .eq("tenant_id", tenant.id)
     .eq("slug", slug)
     .maybeSingle();
-  if (!course) redirect("/");
+  if (!course) redirect("/dashboard");
 
   const { data: modules } = await supabase
     .from("modules")
@@ -99,12 +106,17 @@ export default async function LessonPage({
   }));
   const flatIds = flattenLessonIds(flatModules);
   const { prevId, nextId } = findAdjacentLessonIds(flatIds, lessonId);
-  const lessonPositionIndex = flatIds.indexOf(lessonId);
-  // Kurs-Fortschritt (Anteil abgeschlossener Lektionen) für den Balken unter
-  // dem Video — Kurs.dc.html zeigt dort ~54 % ≈ „Lektion 7 von 12".
-  const coursePercent = flatIds.length
-    ? Math.round((flatIds.filter((id) => completedIds.has(id)).length / flatIds.length) * 100)
-    : 0;
+  const nextLessonObj = nextId ? (lessons ?? []).find((l) => l.id === nextId) ?? null : null;
+
+  // Aktuelles Modul + Modul-Fortschritt für die Kopf-Leiste; „nächste Sektion"
+  // = das nachfolgende Modul (Rechte Spalte zeigt nur das aktuelle Modul).
+  const currentModuleIndex = (modules ?? []).findIndex((m) => m.id === lesson.module_id);
+  const currentModule = currentModuleIndex === -1 ? null : (modules ?? [])[currentModuleIndex];
+  const nextModule = currentModuleIndex === -1 ? null : (modules ?? [])[currentModuleIndex + 1] ?? null;
+  const currentModuleLessons = (lessons ?? []).filter((l) => l.module_id === lesson.module_id);
+  const moduleDone = currentModuleLessons.filter((l) => completedIds.has(l.id)).length;
+  const modulePercent =
+    currentModuleLessons.length > 0 ? Math.round((moduleDone / currentModuleLessons.length) * 100) : 0;
 
   const progressRow = (courseProgressRows ?? []).find((p) => p.lesson_id === lessonId);
 
@@ -115,7 +127,7 @@ export default async function LessonPage({
     .eq("lesson_id", lessonId)
     .maybeSingle();
 
-  const { data: isStaff } = await supabase.rpc("is_staff", { t: tenant!.id });
+  const { data: isStaff } = await supabase.rpc("is_staff", { t: tenant.id });
   const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
@@ -125,69 +137,114 @@ export default async function LessonPage({
   const parsedBlocks = blocksSchema.safeParse(lesson.blocks);
   const blocks: Block[] = parsedBlocks.success ? (parsedBlocks.data as Block[]) : [];
 
+  // Modul-Ring (52px, r=21 → Umfang ~132) für die Kopf-Leiste.
+  const ringC = 2 * Math.PI * 21;
+  const ringOffset = Math.max(0, Math.round(ringC - (ringC * modulePercent) / 100));
+
   return (
     <AppShell
       isStaff={Boolean(isStaff)}
       userName={displayName}
       userEmail={user.email ?? undefined}
-      breadcrumb={`Lernen · Meine Kurse · ${course.title}`}
+      breadcrumb={`Lernen · ${currentModule?.title ?? course.title}`}
       title={lesson.title}
     >
-      <div className="grid grid-cols-1 gap-7 lg:grid-cols-[1fr_320px]">
-        <div>
-          <a href={`/kurs/${slug}`} className="mb-4 inline-block text-sm underline" style={{ color: "#66679B" }}>
-            ← {course.title}
-          </a>
-
-          <BlockRenderer blocks={blocks} lessonId={lessonId} />
-
-          {/* Kurs-Fortschrittsbalken (Kurs.dc.html: 6px unter dem Video). */}
-          <div
-            className="mt-6 h-1.5 overflow-hidden rounded-full"
-            style={{ background: "#EEF0F7" }}
-            role="progressbar"
-            aria-valuenow={coursePercent}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="Kursfortschritt"
-          >
-            <div
-              className="h-full rounded-full"
-              style={{ width: `${coursePercent}%`, background: "var(--color-primary)" }}
-            />
-          </div>
-
-          <div className="mt-6 flex items-center justify-between gap-4">
-            <div>
-              <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
-                LEKTION {lessonPositionIndex + 1} VON {flatIds.length}
-              </div>
-              <h2 className="mt-0.5 text-[22px] font-extrabold">{lesson.title}</h2>
-            </div>
-            {nextId && (
-              <a
-                href={`/kurs/${slug}/l/${nextId}`}
-                className="inline-flex flex-shrink-0 items-center gap-2 rounded-[11px] px-5 py-3 text-[15px] font-bold text-white no-underline"
-                style={{ background: "var(--color-primary)" }}
-              >
-                Nächste Lektion
-                <ArrowRight size={16} strokeWidth={2.4} aria-hidden="true" />
-              </a>
-            )}
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <BookmarkButton lessonId={lessonId} courseSlug={slug} initiallyBookmarked={Boolean(bookmarkRow)} />
-          </div>
-
-          {/* Transkript/Zusammenfassung/Kapitel (Phase 3, Block 6) — nur
-              rendern, wenn tatsächlich vorhanden (kein "Kein Transkript
-              verfügbar"-Rauschen, SPEC-Zweck "Zugänglichkeit"). */}
-          {lesson.summary ? (
-            <div
-              className="mt-5 rounded-2xl border p-4 text-base leading-relaxed"
-              style={{ borderColor: "#E7E8F2", background: "#fff" }}
+      <div className="grid grid-cols-1 items-start gap-7 lg:grid-cols-[1fr_300px]">
+        {/* Linke Spalte */}
+        <div className="min-w-0">
+          {/* Modul-Fortschrittsleiste → Modul-Detailseite */}
+          {currentModule && (
+            <Link
+              href={`/kurs/${slug}/m/${currentModule.id}`}
+              className="mb-6 flex items-center gap-4 rounded-[14px] p-[14px_16px] no-underline"
+              style={{
+                background: NAVY,
+                backgroundImage:
+                  "repeating-linear-gradient(135deg,rgba(86,99,174,.5) 0 16px, rgba(62,63,102,.5) 16px 32px)",
+              }}
             >
+              <div
+                className="hidden h-14 w-24 flex-none items-center justify-center rounded-[9px] p-1 text-center sm:flex"
+                style={{
+                  backgroundColor: "#2C2D4A",
+                  backgroundImage:
+                    "repeating-linear-gradient(45deg,#2C2D4A 0 10px, rgba(86,99,174,.35) 10px 20px)",
+                }}
+                aria-hidden="true"
+              >
+                <span className="text-[10px] font-extrabold leading-tight" style={{ letterSpacing: "0.06em", color: "#C9CBE6" }}>
+                  MODUL {currentModuleIndex + 1}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[11px] font-bold uppercase" style={{ letterSpacing: "0.16em", color: "#B9BBDA" }}>
+                  {course.title}
+                </div>
+                <div className="mt-[3px] truncate text-[17px] font-bold text-white">{currentModule.title}</div>
+              </div>
+              <div className="relative flex-none" style={{ width: 52, height: 52 }} aria-hidden="true">
+                <svg width="52" height="52" viewBox="0 0 52 52">
+                  <circle cx="26" cy="26" r="21" fill="none" stroke="rgba(255,255,255,.2)" strokeWidth="5" />
+                  <circle
+                    cx="26"
+                    cy="26"
+                    r="21"
+                    fill="none"
+                    stroke="#8BE0B7"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeDasharray={ringC}
+                    strokeDashoffset={ringOffset}
+                    transform="rotate(-90 26 26)"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center text-xs font-extrabold text-white">
+                  {modulePercent}%
+                </div>
+              </div>
+            </Link>
+          )}
+
+          {/* Lektions-Karte */}
+          <div className="overflow-hidden rounded-[16px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
+            <div className="p-[24px_26px_0]">
+              <h1 className="m-0 text-2xl font-extrabold" style={{ color: "#1A1A2E" }}>
+                {lesson.title}
+              </h1>
+            </div>
+
+            <div className="px-[26px] pb-2 pt-4">
+              <BlockRenderer blocks={blocks} lessonId={lessonId} />
+            </div>
+
+            {/* Fußzeile */}
+            <div
+              className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t p-[20px_26px]"
+              style={{ borderColor: "#EEF0F7" }}
+            >
+              <div className="flex flex-wrap items-center gap-2.5">
+                <BookmarkButton lessonId={lessonId} courseSlug={slug} initiallyBookmarked={Boolean(bookmarkRow)} />
+                <Link
+                  href="/kontakt"
+                  className="inline-flex items-center gap-1.5 rounded-[11px] border bg-white px-[14px] py-[10px] text-sm font-semibold no-underline"
+                  style={{ borderColor: "#D8DAEA", color: NAVY }}
+                >
+                  <MessageSquare size={15} color={ACCENT} strokeWidth={2} aria-hidden="true" />
+                  Feedback geben
+                </Link>
+              </div>
+              <CompleteLessonButton
+                lessonId={lessonId}
+                courseSlug={slug}
+                alreadyCompleted={progressRow?.status === "completed"}
+                nextHref={nextId ? `/kurs/${slug}/l/${nextId}` : null}
+              />
+            </div>
+          </div>
+
+          {/* Zusammenfassung/Kapitel/Transkript — nur wenn real vorhanden. */}
+          {lesson.summary ? (
+            <div className="mt-5 rounded-2xl border p-4 text-base leading-relaxed" style={{ borderColor: "#E7E8F2", background: "#fff" }}>
               <p className="mb-1 text-sm font-medium" style={{ color: "#A9AAC4" }}>
                 Zusammenfassung
               </p>
@@ -225,86 +282,137 @@ export default async function LessonPage({
             </details>
           ) : null}
 
-          <div className="mt-6 flex items-center justify-between border-t pt-5" style={{ borderColor: "#E7E8F2" }}>
-            <div>
-              {prevId ? (
-                <a href={`/kurs/${slug}/l/${prevId}`} className="text-sm underline" style={{ color: "#66679B" }}>
-                  ← Vorherige Lektion
-                </a>
-              ) : (
-                <span />
-              )}
-            </div>
-            <CompleteLessonButton
-              lessonId={lessonId}
-              courseSlug={slug}
-              alreadyCompleted={progressRow?.status === "completed"}
-              nextHref={nextId ? `/kurs/${slug}/l/${nextId}` : null}
-            />
-          </div>
-
-          {/* Tutor-Panel (falls aktiv) — SPEC Zeile 34. Strikter Vergleich
-              (=== true, kein Fallback auf "truthy"), gleiches Muster wie
-              settings.payments_enabled in stripe/checkout.ts: Demo-Mandanten
-              ohne gesetztes Feld sehen den Tutor bewusst NICHT (siehe
-              PHASENSTATUS.md). Tutor ist kursweit, nicht lektionsweit
-              (SPEC §6: "pgvector-Suche über Kurs-Chunks"), deshalb courseId
-              statt lessonId. */}
-          {tenant!.settings.tutor_enabled === true && (
+          {/* Tutor-Panel (falls aktiv) — kursweit, deshalb courseId. */}
+          {tenant.settings.tutor_enabled === true && (
             <div className="mt-6">
               <TutorPanel courseId={course.id} courseSlug={slug} currentLessonId={lessonId} />
             </div>
           )}
+
+          {/* Vorherige + Nächste Lektion */}
+          <div className="mt-[22px] flex flex-col gap-3">
+            {prevId && (
+              <Link href={`/kurs/${slug}/l/${prevId}`} className="inline-flex items-center gap-1.5 self-start text-sm font-semibold no-underline" style={{ color: "#66679B" }}>
+                <ArrowLeft size={15} strokeWidth={2.2} aria-hidden="true" />
+                Vorherige Lektion
+              </Link>
+            )}
+            {nextId && nextLessonObj && (
+              <Link
+                href={`/kurs/${slug}/l/${nextId}`}
+                className="flex items-center gap-4 rounded-[14px] border bg-white p-[14px_16px] text-inherit no-underline"
+                style={{ borderColor: "#E7E8F2" }}
+              >
+                <span
+                  className="flex h-[54px] w-[88px] flex-none items-center justify-center rounded-[9px]"
+                  style={{
+                    backgroundColor: "#DFE2F4",
+                    backgroundImage:
+                      "repeating-linear-gradient(45deg,#DFE2F4 0 9px, rgba(255,255,255,.55) 9px 18px)",
+                  }}
+                  aria-hidden="true"
+                >
+                  <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full" style={{ background: ACCENT }}>
+                    <Play size={12} color="#fff" fill="#fff" />
+                  </span>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-bold uppercase" style={{ letterSpacing: "0.16em", color: "#A9AAC4" }}>
+                    Nächste Lektion
+                  </div>
+                  <div className="mt-[3px] truncate text-base font-bold" style={{ color: "#1A1A2E" }}>
+                    {nextLessonObj.title}
+                  </div>
+                </div>
+                <ArrowRight size={20} color={ACCENT} strokeWidth={2.4} aria-hidden="true" />
+              </Link>
+            )}
+          </div>
         </div>
 
-        {/* Lektionsliste — Kurs.dc.html rechte Spalte, echte Modul-/
-            Lektionsdaten + echter Fortschritt statt Demo-Reihe. */}
+        {/* Rechte Spalte: Lektionsliste der aktuellen Sektion (= Modul) */}
         <aside
-          className="h-fit rounded-2xl border p-2"
-          style={{ borderColor: "#E7E8F2", background: "#fff", position: "sticky", top: 20 }}
+          className="h-fit rounded-[16px] border bg-white p-[18px_16px] lg:sticky lg:top-5"
+          style={{ borderColor: "#E7E8F2" }}
         >
-          <div className="px-4 pb-2.5 pt-4 text-base font-bold">Lektionen</div>
-          {(modules ?? []).map((m) => {
-            const moduleLessons = (lessons ?? []).filter((l) => l.module_id === m.id);
-            if (moduleLessons.length === 0) return null;
-            return (
-              <div key={m.id}>
-                {moduleLessons.map((l) => {
-                  const done = completedIds.has(l.id);
-                  const current = l.id === lessonId;
-                  return (
-                    <a
-                      key={l.id}
-                      href={`/kurs/${slug}/l/${l.id}`}
-                      className="flex items-center gap-3 rounded-[10px] px-3 py-[11px] no-underline"
-                      style={{ background: current ? "#F6F7FC" : "transparent" }}
-                    >
-                      <span
-                        className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold"
-                        style={{
-                          color: done || current ? "#fff" : "#66679B",
-                          background: done ? "#5663AE" : current ? "#3E3F66" : "#EEF0F7",
-                        }}
-                      >
-                        {done ? <Check aria-hidden="true" size={13} /> : flatIds.indexOf(l.id) + 1}
-                      </span>
-                      <span
-                        className="flex-1 text-sm"
-                        style={{ fontWeight: current ? 700 : 500, color: current ? "#1A1A2E" : "#3E3F66" }}
-                      >
-                        {l.title}
-                      </span>
-                      {l.video_duration_s ? (
-                        <span className="text-xs" style={{ color: "#A9AAC4" }}>
-                          {Math.floor(l.video_duration_s / 60)}:{String(l.video_duration_s % 60).padStart(2, "0")}
-                        </span>
-                      ) : null}
-                    </a>
-                  );
-                })}
+          <div className="flex items-center gap-2.5 px-1 pb-3.5">
+            <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px]" style={{ background: "#EDEEF7" }} aria-hidden="true">
+              <ListVideo size={16} color={ACCENT} strokeWidth={2} />
+            </span>
+            <div className="min-w-0">
+              <div className="truncate text-[15px] font-extrabold" style={{ color: "#1A1A2E" }}>
+                {currentModule?.title ?? "Lektionen"}
               </div>
-            );
-          })}
+              <div className="text-[11px] font-bold uppercase" style={{ letterSpacing: "0.1em", color: "#A9AAC4" }}>
+                {currentModuleLessons.length} {currentModuleLessons.length === 1 ? "Lektion" : "Lektionen"}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {currentModuleLessons.map((l) => {
+              const done = completedIds.has(l.id);
+              const current = l.id === lessonId;
+              return (
+                <Link
+                  key={l.id}
+                  href={`/kurs/${slug}/l/${l.id}`}
+                  className="flex items-center gap-2.5 rounded-[11px] border p-[9px] no-underline"
+                  style={{
+                    background: current ? "#F6F7FC" : "transparent",
+                    borderColor: current ? "#E0E2EF" : "transparent",
+                  }}
+                >
+                  <span
+                    className="relative flex-none rounded-[7px]"
+                    style={{
+                      width: 56,
+                      height: 38,
+                      backgroundColor: "#DFE2F4",
+                      backgroundImage:
+                        "repeating-linear-gradient(45deg,#DFE2F4 0 7px, rgba(255,255,255,.55) 7px 14px)",
+                    }}
+                    aria-hidden="true"
+                  >
+                    <span
+                      className="absolute flex items-center justify-center rounded-full"
+                      style={{
+                        right: -4,
+                        bottom: -4,
+                        width: 17,
+                        height: 17,
+                        border: "2px solid #fff",
+                        background: done ? "#3CA36A" : "#C6C8DC",
+                      }}
+                    >
+                      {done ? (
+                        <Check size={9} strokeWidth={3.4} color="#fff" />
+                      ) : (
+                        <Play size={8} color="#fff" fill="#fff" />
+                      )}
+                    </span>
+                  </span>
+                  <span
+                    className="flex-1 text-[13px] leading-snug"
+                    style={{ fontWeight: current ? 700 : 600, color: current ? "#1A1A2E" : "#66679B" }}
+                  >
+                    {l.title}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+
+          {nextModule && (
+            <Link
+              href={`/kurs/${slug}/m/${nextModule.id}`}
+              className="mt-3.5 flex items-center justify-center gap-1.5 rounded-[11px] border p-[11px] text-sm font-semibold no-underline"
+              style={{ borderColor: "#E0E2EF", color: NAVY }}
+            >
+              Nächste Sektion
+              <ChevronRight size={15} color={ACCENT} strokeWidth={2.4} aria-hidden="true" />
+            </Link>
+          )}
         </aside>
       </div>
     </AppShell>
