@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { Block } from "@/lib/courses/schema";
-import { VideoUpload } from "@/components/editor/video-upload";
+import { VideoSourceSwitch } from "@/components/editor/video-source-switch";
 import { createQuiz } from "@/lib/quiz/actions";
 
 export type CourseQuizOption = { id: string; title: string };
@@ -80,7 +80,7 @@ export function BlockForm({
 
     case "video":
       return (
-        <VideoUpload
+        <VideoSourceSwitch
           currentVideoId={block.bunnyVideoId}
           onUploaded={(videoId) => onChange({ ...block, bunnyVideoId: videoId })}
         />
@@ -151,7 +151,7 @@ export function BlockForm({
  * Block 2/Phase 2: Auswahl/Verlinkung zu bestehenden Quizzen des Kurses +
  * „Neues Quiz anlegen". Das eigentliche Fragen-Editing passiert auf der
  * separaten Seite /admin/kurse/[id]/quiz/[quizId] — hier wird nur die
- * quizId auf dem Block gesetzt (analog zu VideoUpload/bunnyVideoId oben).
+ * quizId auf dem Block gesetzt (analog zu VideoSourceSwitch/bunnyVideoId oben).
  */
 function QuizBlockFields({
   block,
