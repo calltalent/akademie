@@ -1,0 +1,144 @@
+import { describe, expect, it } from "vitest";
+import { decideRouting, isApiPath } from "./routing";
+
+const PORTAL_HOST = "portal.calltalent.ai";
+
+describe("isApiPath", () => {
+  it("erkennt /api und /api/...", () => {
+    expect(isApiPath("/api")).toBe(true);
+    expect(isApiPath("/api/bunny/create-video")).toBe(true);
+  });
+
+  it("verwechselt ähnlich beginnende Pfade nicht mit API-Pfaden", () => {
+    expect(isApiPath("/apiary")).toBe(false);
+    expect(isApiPath("/kurse/api-grundlagen")).toBe(false);
+    expect(isApiPath("/")).toBe(false);
+  });
+});
+
+describe("decideRouting — Mandanten-Host", () => {
+  // REGRESSIONSSCHUTZ (der eigentliche Zweck dieser Datei): Genau diese
+  // Zusicherung war vom 12.07. bis 17.07.2026 verletzt. Sechs API-Routen
+  // lesen x-tenant-id über getTenant(); ohne Auflösung liefen sie alle in
+  // "Kein Mandant zu diesem Host gefunden" — Video-Upload, KI-Generator,
+  // CSV-Import, CSV-Export und Datei-Abgaben waren in Produktion tot.
+  it("löst den Mandanten auch für /api/... auf", () => {
+    expect(
+      decideRouting({
+        host: "academy.calltalent.ai",
+        pathname: "/api/bunny/create-video",
+        portalHost: PORTAL_HOST,
+      }),
+    ).toEqual({
+      servedPath: "/api/bunny/create-video",
+      resolveTenant: true,
+      rewrite: false,
+    });
+  });
+
+  it.each([
+    "/api/admin/ki/generate",
+    "/api/admin/ki/status",
+    "/api/admin/users/import",
+    "/api/admin/reporting/csv",
+    "/api/submissions/upload-url",
+  ])("löst den Mandanten für die host-abhängige Route %s auf", (pathname) => {
+    const decision = decideRouting({
+      host: "academy.calltalent.ai",
+      pathname,
+      portalHost: PORTAL_HOST,
+    });
+    expect(decision.resolveTenant).toBe(true);
+    expect(decision.servedPath).toBe(pathname);
+  });
+
+  it("löst den Mandanten für normale Seiten auf und schreibt nie um", () => {
+    expect(
+      decideRouting({
+        host: "academy.calltalent.ai",
+        pathname: "/admin/kurse",
+        portalHost: PORTAL_HOST,
+      }),
+    ).toEqual({ servedPath: "/admin/kurse", resolveTenant: true, rewrite: false });
+  });
+
+  it("gilt genauso für den Dev-Host <slug>.localhost:3000", () => {
+    const decision = decideRouting({
+      host: "calltalent.localhost:3000",
+      pathname: "/api/bunny/create-video",
+      portalHost: "portal.localhost:3000",
+    });
+    expect(decision.resolveTenant).toBe(true);
+    expect(decision.rewrite).toBe(false);
+  });
+});
+
+describe("decideRouting — Portal-Host", () => {
+  // REGRESSIONSSCHUTZ für den Stripe-Fix vom 12.07.2026: Der Webhook ist auf
+  // dem Portal-Host registriert und leitet alles aus session.metadata ab. Ein
+  // Rewrite auf /portal/api/... trifft eine nicht existierende Route -> 404,
+  // Stripe meldete "3 von 3 Zustellungen fehlgeschlagen".
+  it("schreibt /api/... NIEMALS auf /portal/api/... um", () => {
+    expect(
+      decideRouting({
+        host: PORTAL_HOST,
+        pathname: "/api/stripe/webhook",
+        portalHost: PORTAL_HOST,
+      }),
+    ).toEqual({ servedPath: "/api/stripe/webhook", resolveTenant: false, rewrite: false });
+  });
+
+  it("versucht auf dem Portal-Host keine Mandanten-Auflösung", () => {
+    const decision = decideRouting({
+      host: PORTAL_HOST,
+      pathname: "/mandanten",
+      portalHost: PORTAL_HOST,
+    });
+    expect(decision.resolveTenant).toBe(false);
+  });
+
+  it("schreibt Seiten auf /portal/... um", () => {
+    expect(
+      decideRouting({ host: PORTAL_HOST, pathname: "/mandanten", portalHost: PORTAL_HOST }),
+    ).toEqual({ servedPath: "/portal/mandanten", resolveTenant: false, rewrite: true });
+  });
+
+  it("schreibt die Wurzel um", () => {
+    expect(
+      decideRouting({ host: PORTAL_HOST, pathname: "/", portalHost: PORTAL_HOST }).servedPath,
+    ).toBe("/portal/");
+  });
+
+  it("vermeidet einen Doppel-Rewrite bei bereits vorangestelltem /portal", () => {
+    expect(
+      decideRouting({ host: PORTAL_HOST, pathname: "/portal/mandanten", portalHost: PORTAL_HOST })
+        .servedPath,
+    ).toBe("/portal/mandanten");
+    expect(
+      decideRouting({ host: PORTAL_HOST, pathname: "/portal", portalHost: PORTAL_HOST }).servedPath,
+    ).toBe("/portal");
+  });
+});
+
+describe("decideRouting — Host-Vergleich", () => {
+  it("ignoriert den Port auf beiden Seiten", () => {
+    const decision = decideRouting({
+      host: "portal.localhost:3000",
+      pathname: "/mandanten",
+      portalHost: "portal.localhost:3000",
+    });
+    expect(decision.rewrite).toBe(true);
+    expect(decision.resolveTenant).toBe(false);
+  });
+
+  it("hält einen Mandanten-Host mit gleichem Präfix nicht für den Portal-Host", () => {
+    // "portal-kunde.calltalent.ai" ist ein Mandant, kein Betreiber-Portal.
+    const decision = decideRouting({
+      host: "portal-kunde.calltalent.ai",
+      pathname: "/",
+      portalHost: PORTAL_HOST,
+    });
+    expect(decision.resolveTenant).toBe(true);
+    expect(decision.rewrite).toBe(false);
+  });
+});

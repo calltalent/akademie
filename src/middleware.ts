@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env";
 import { resolveTenantByHost } from "@/lib/tenant/resolve";
+import { decideRouting } from "@/lib/tenant/routing";
 
 /**
  * ROLLBACK zu middleware.ts (Edge-Runtime) — Phase 5, Block 8, 12.07.2026,
@@ -38,40 +39,22 @@ export async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
 
   const host = request.headers.get("host") ?? "";
-  const hostname = host.split(":")[0]; // Port abtrennen, analog extractTenantSlugFromHost()
-  const portalHostname = publicEnv.NEXT_PUBLIC_PORTAL_HOST.split(":")[0];
-  const isPortalHost = hostname === portalHostname;
 
-  let servedPath = request.nextUrl.pathname;
+  // Die eigentliche Routing-Entscheidung (Portal-Rewrite? Mandant auflösen?)
+  // liegt bewusst als reine, getestete Funktion in lib/tenant/routing.ts —
+  // siehe die Bug-Historie im Kopf jener Datei: Die beiden Regeln (Stripe-
+  // Webhook darf nie nach /portal/api/... umgeschrieben werden; Mandanten-
+  // Hosts müssen auch für /api/... aufgelöst werden) hängen an verschiedenen
+  // Achsen und haben sich hier inline schon einmal gegenseitig gekippt.
+  // routing.test.ts hält beide gleichzeitig fest.
+  const routing = decideRouting({
+    host,
+    pathname: request.nextUrl.pathname,
+    portalHost: publicEnv.NEXT_PUBLIC_PORTAL_HOST,
+  });
+  const servedPath = routing.servedPath;
 
-  // BUGFIX (Phase 5, Block 8, 12.07.2026, gefunden beim ersten Live-Checkout-
-  // Test): API-Routen (`/api/...`) sind bewusst host-unabhängig gebaut - der
-  // Stripe-Webhook z. B. leitet Mandant/Nutzer/Produkt AUSSCHLIESSLICH aus
-  // `session.metadata` ab (siehe stripe/checkout.ts), nicht aus dem Host.
-  // Auf `portal.calltalent.ai` registriert (empfohlen, weil stabiler als
-  // eine einzelne Mandanten-Domain), wurde JEDER `/api/...`-Aufruf trotzdem
-  // auf `/portal/api/...` umgeschrieben - eine Route, die nicht existiert ->
-  // Next.js lieferte 404, Stripe zeigte "3 von 3 Zustellungen fehlgeschlagen"
-  // im Dashboard. Fix: `/api/`-Pfade werden auf JEDEM Host (auch dem
-  // Portal-Host) unverändert durchgereicht, nie mit `/portal` vorangestellt
-  // und ohne Mandanten-Auflösungsversuch (die bestehenden `/api/...`-Routen
-  // lesen ohnehin keinen `x-tenant-id`-Header, siehe requireAdminTenant()/
-  // API-Key-Auth statt Host-basiertem Tenant).
-  const isApiPath = servedPath === "/api" || servedPath.startsWith("/api/");
-
-  if (isApiPath) {
-    // Weder Portal-Rewrite noch Mandanten-Header - Pfad bleibt unverändert.
-  } else if (isPortalHost) {
-    // Betreiber-Portal-Host: KEINE Mandanten-Auflösung versuchen.
-    // Doppel-Rewrite vermeiden, falls der Pfad bereits mit /portal beginnt
-    // (im Normalbetrieb nie der Fall — echte Nutzer tippen nie /portal-URLs
-    // direkt in den Browser ein — aber sauber behandelt).
-    const alreadyPortalPath =
-      servedPath === "/portal" || servedPath.startsWith("/portal/");
-    if (!alreadyPortalPath) {
-      servedPath = `/portal${servedPath}`;
-    }
-  } else {
+  if (routing.resolveTenant) {
     const tenant = await resolveTenantByHost(host);
     if (tenant) {
       requestHeaders.set("x-tenant-id", tenant.id);
@@ -90,7 +73,7 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set("x-portal-pathname", servedPath);
 
   function buildResponse() {
-    if (isPortalHost && !isApiPath) {
+    if (routing.rewrite) {
       const rewriteUrl = new URL(servedPath + request.nextUrl.search, request.url);
       return NextResponse.rewrite(rewriteUrl, {
         request: { headers: requestHeaders },
