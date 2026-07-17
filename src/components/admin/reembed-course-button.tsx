@@ -27,12 +27,13 @@ export function ReembedCourseButton({ courseId }: { courseId: string }) {
             setMessage(result.message);
           });
         }}
-        className="rounded-md border px-2 py-1 text-xs disabled:opacity-50"
+        className="inline-flex items-center rounded-[10px] border bg-white px-4 py-3 text-[15px] font-semibold disabled:opacity-50"
+        style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
       >
         {pending ? "Wird eingebettet …" : "Kurs für KI-Suche einbetten"}
       </button>
       {message ? (
-        <span role="status" className="text-xs text-gray-600">
+        <span role="status" className="text-xs font-semibold" style={{ color: "#66679B" }}>
           {message}
         </span>
       ) : null}

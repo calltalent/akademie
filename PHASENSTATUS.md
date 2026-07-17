@@ -2140,3 +2140,42 @@ Umsetzung nach Architekten-Plan `calm-watching-dewdrop.md` (nur Stufe 1 „Aufna
 **Bekannte, im Plan als Restschuld benannte Punkte (unverändert offen):** kein Reaper für verwaiste Bunny-Videos bei abgebrochenem tus-Upload; Bunny-Webhook muss weiterhin von Hand im Dashboard eingetragen sein, damit Transcribe/Untertitel (Stufe 3) je greifen.
 
 **Übergabe an `tester`** (Vitest bereits grün, Playwright/manuelle Durchklick-Punkte oben offen), danach `security-reviewer` gemäß CLAUDE.md §4.3.
+
+## Kurs-Editor + Video-Aufnahme: Marken-Design nachgezogen (17.07.2026, builder)
+
+Umsetzung nach `DesignSync`-Export `AdminKursEditor.dc.html` (neu, es gab bisher keine Editor-Datei im Design-Projekt) + `AdminVideoAufnahme.dc.html` (Zustands-Katalog) + `DESIGN-MASTERPROMPT-KURS-EDITOR.md`. Der Kurs-Editor war der letzte Bereich der App ohne Marken-Design (rohe graue `rounded-md border`-Kästen) — jetzt auf dieselbe Token-Basis wie `AdminKurse.dc.html`/`Admin.dc.html` (Periwinkle `#5663AE`, Navy `#3E3F66`, Radien 10–16px, `@theme`-Tokens aus `globals.css`). **Nicht committet, nicht deployt.**
+
+**Geänderte Dateien:**
+- `src/app/(admin)/admin/kurse/[id]/page.tsx` — Kopfzeile (Brotkrume/H1/Status-Select/Kategorie-Select/„Zurück zur Kursliste") + zweispaltiges Raster `300px 1fr`.
+- `src/components/admin/module-lesson-tree.tsx` — Modul-Karten mit beschrifteten Icon-Buttons (`aria-label` UND `title`), Lektionszeilen mit Status-Chip, aktive Lektion über linken Akzentbalken + `font-weight:800` (nie nur Farbe).
+- `src/components/admin/publish-toggle.tsx` — `CourseStatusSelect`/`CourseCategorySelect` jetzt mit sichtbarem `<label>`-Text „Status"/„Kategorie" statt nur `aria-label`; `LessonPublishToggle` optisch primär/sekundär je nach Zustand, Text unverändert.
+- `src/components/editor/block-editor.tsx` — `SaveIndicator` als Chip (grün „Gespeichert", analog gemuted/rot für die anderen zwei Zustände), Block-Karten mit Typ-Icon+Label, Block-Leiste `+ Text/+ Video/+ Bild/+ Quiz` direkt + restliche 5 hinter `<details>` „Weitere Blöcke" (Auswahl der vier primären Typen ist die einzige Hartkodierung; die Beschriftungen selbst kommen weiter aus `BLOCK_TYPE_LABELS`, die übrigen fünf werden per Differenzmenge abgeleitet — neue Block-Typen tauchen automatisch unter „Weitere Blöcke" auf).
+- `src/components/editor/block-form.tsx` — jedes Feld hat jetzt ein sichtbares `<label>` (vorher bei Bild-URL/Alt, Audio-URL, Datei-URL/Dateiname, Einbettungs-URL, Quiz-Beschriftung nur Platzhalter als Pseudo-Label — CLAUDE.md §3.4-Verstoß, jetzt behoben).
+- `src/components/editor/video-source-switch.tsx`, `video-recorder.tsx`, `upload-progress.tsx`, `video-radio-group.tsx` — siehe Teil B/C unten.
+- `src/components/admin/reembed-course-button.tsx`, `refresh-transcript-button.tsx` — nicht Teil des Auftrags, aber rendern inline in der neu gestalteten Kopfzeile; nur Optik auf Sekundär-Button-Stil gehoben, Logik unangetastet.
+
+**Bewusste Abweichungen vom Design-Export (Auftrag verlangte das explizit, keine Interpretation):**
+1. **Aufnahme bleibt inline, keine eigene Route.** `AdminVideoAufnahme.dc.html` ist im `dc`-Format ein eigenständiger Screen mit eigenem Header „Zurück zum Editor" — das wurde NICHT übernommen. Die drei Zustände (Bereit/Läuft/Fertig) sind weiterhin Teile der bestehenden Zustandsmaschine in `video-recorder.tsx` (`idle→requesting→ready→recording→stopped→confirmed`), nur die Optik der drei sichtbaren Zustände wurde an den Export angeglichen.
+2. **Upload-Hinweistext + `accept` korrigiert.** Der Export zeigt „MP4 oder MOV · bis 20 Minuten" und `accept="video/mp4,video/quicktime"` — beides falsch für Datei-Uploads (die 20-Minuten-Grenze gilt laut `recorder.ts`/Plan nur für Aufnahmen). `video-source-switch.tsx` zeigt jetzt „MP4, MOV, WebM oder MKV · bis 2 GB" und leitet `accept` weiterhin aus `ALLOWED_TYPES` (`use-bunny-upload.ts`) ab — keine erfundene Beschränkung.
+3. **Kein Untertitel-Versprechen.** Der Export-Satz „Untertitel werden nach dem Upload automatisch erzeugt" wurde nicht übernommen (Bunny-Webhook für Transcribe ist noch nicht eingetragen, siehe offener Punkt oben) — die Dropzone macht dazu keine Aussage.
+
+**Teil C — Mikrofon-Pegelanzeige (neu, Plan-Risiko R2):** `video-recorder.tsx` öffnet während `recording` einen eigenen `AudioContext`+`AnalyserNode` auf dem Mikrofon-Track des laufenden Streams (bei beiden Modi der echte Mikrofon-Track, s. Kommentar in `acquireStream`). 24-Balken-Reihe (`aria-hidden`, keine Dauerflut für Screenreader), Warnbox „Kein Ton erkannt" mit 2-Sekunden-Haltezeit gegen Flackern zwischen Wörtern, als `role="status"` nur bei Zustandswechsel ins DOM gehängt (gleiches Muster wie die bestehenden `statusMessage`/`alertMessage`-Regionen in derselben Datei). `AudioContext` wird im Cleanup-Zweig IMMER geschlossen (Phasenwechsel weg von „recording" oder Unmount); ist kein `AudioContext`/`webkitAudioContext` verfügbar, wird die Anzeige über `micMeterAvailable` einfach weggelassen, nie ein Absturz. Bewusst nur während „recording" aktiv (nicht schon während „ready") — deckungsgleich mit der Design-Platzierung; ein frühzeitiger Mikro-Check vor Aufnahmestart wäre denkbar, war aber nicht Teil des Auftrags.
+
+**Kleine, im Auftrag nicht wörtlich genannte Ergänzung:** Die Datei-Dropzone in `video-source-switch.tsx` übernimmt aus dem Export den Satz „… oder hierher ziehen" — damit das keine unwahre Behauptung wird, wurde echtes `onDrop`/`onDragOver` ergänzt (Datei aus `dataTransfer` an denselben `start()`-Pfad wie die Datei-Auswahl). Selbstständig entschieden, weil sonst Regel 2 des Auftrags („keine erfundenen Beschränkungen"/wahrheitsgemäße Texte) für genau diesen Satz verletzt gewesen wäre.
+
+**Funktionalität unverändert (verifiziert per Code-Diff, nicht nur Behauptung):** Autosave-Debounce (1s) in `block-editor.tsx` unangetastet; alle Server-Action-Aufrufe (`saveLessonBlocks`, `updateLessonTitle`, `createModule`, `createLesson`, `deleteModule`, `deleteLesson`, `moveModule`, `updateCourseStatus`, `updateCourseCategory`, `updateLessonStatus`) unverändert aufgerufen; `useBunnyUpload` weiterhin ausschließlich in `video-source-switch.tsx`, `video-recorder.tsx` importiert ihn nach wie vor NIE; MIME-Normalisierung/2-GB-Grenze/`ALLOWED_TYPES` in `use-bunny-upload.ts` nicht angefasst; `selfBrowserSurface:"exclude"`, `performance.now()`-Timer, 20-Minuten-Hard-Stopp, Fokus-Management, Meilenstein-Ansagen alle unverändert. `src/lib/courses/schema.ts` und `src/lib/courses/actions.ts` nicht angefasst (Auftragsregel).
+
+**Bekannte Diskrepanz zu einem bestehenden E2E-Test (für `tester`):** `e2e/course-completion.spec.ts` erwartet für die Modul-/Lektion-Anlage-Formulare `page.getByRole("button", { name: "+" })` — ein einzelnes „+" als einzige Beschriftung war aber selbst ein CLAUDE.md-§3.4-Verstoß (nicht aussagekräftig für Screenreader). Die Buttons heißen jetzt „Modul" bzw. „Hinzu" (mit Plus-Icon, wie im Design). Der zugehörige E2E-Locator müsste entsprechend aktualisiert werden (`getByRole("button", { name: "Modul" })` / `{ name: "Hinzu" }`). Die Lektions-Publish-Buttons „Veröffentlichen"/„Auf Entwurf setzen" (vom selben Test genutzt) sind textlich unverändert geblieben.
+
+**Verifiziert:**
+- `npx tsc --noEmit` — 0 Fehler.
+- `npx eslint` auf alle 11 geänderten Dateien — 0 Fehler, 0 Warnungen (ein `react-hooks/set-state-in-effect`-Fund im neuen Mikrofon-Pegel-Effect wurde mit demselben `setTimeout(…, 0)`-Muster wie `SaveIndicator`/`stoppedUrl` behoben).
+- `npx vitest run` — 195/195 Tests grün (unverändert gegenüber vorher, keine Lib-Logik angefasst).
+
+**Nicht selbst verifiziert (kein Browser/Kamera-Zugriff in dieser Umgebung) — offen für `tester`/Josip:**
+1. Visueller Abgleich im echten Browser gegen `AdminKursEditor.dc.html`/`AdminVideoAufnahme.dc.html` bei 1440px.
+2. Mikrofon-Pegelanzeige mit echtem Mikrofon: Balken bewegen sich bei Ton, „Kein Ton erkannt" erscheint nach ~2s Stille und wird einmalig angesagt, verschwindet wieder bei erneutem Ton.
+3. Tastatur-/Screenreader-Durchlauf durch den kompletten Editor (Segment-Controls, `<details>`-Aufklapper, alle neuen Icon-Buttons).
+4. `npm run e2e` — wie schon bekannt ohne `demo-blau`-Tenant in der aktuellen `.env`-Zielumgebung nicht lauffähig; zusätzlich der oben dokumentierte „+"-Button-Locator-Fund zu berücksichtigen.
+
+**Übergabe an `tester`.**

@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 /**
  * Kleiner, geteilter Baustein für die zwei Umschalter aus dem Aufnahme-Plan
  * (`calm-watching-dewdrop.md`, Schritt B): „Hochladen | Aufnehmen" in
@@ -7,6 +9,12 @@
  * Implementiert das WAI-ARIA-APG-„Radio Group"-Muster: echte `<button
  * role="radio">`-Elemente (kein `div onClick`, CLAUDE.md §3.4), roving
  * Tabindex (nur die aktive Option ist per Tab erreichbar) + Pfeiltasten.
+ *
+ * Design-Update (Kurs-Editor/Aufnahme-Design, AdminKursEditor.dc.html /
+ * AdminVideoAufnahme.dc.html): optisch eine Segment-Control (Pille auf
+ * hellem Grau, aktive Option gefüllt) statt roher Standard-Buttons. Optionen
+ * können jetzt zusätzlich ein Icon tragen (`icon`), rein dekorativ — die
+ * Beschriftung bleibt der sichtbare, für Barrierefreiheit maßgebliche Text.
  */
 export function VideoRadioGroup<T extends string>({
   label,
@@ -15,7 +23,7 @@ export function VideoRadioGroup<T extends string>({
   onChange,
 }: {
   label: string;
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; icon?: ReactNode }[];
   value: T;
   onChange: (next: T) => void;
 }) {
@@ -45,7 +53,12 @@ export function VideoRadioGroup<T extends string>({
   }
 
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="inline-flex flex-wrap gap-1 self-start rounded-xl border p-1"
+      style={{ background: "#F4F5FA", borderColor: "#E7E8F2" }}
+    >
       {options.map((option, index) => {
         const checked = option.value === value;
         return (
@@ -60,10 +73,14 @@ export function VideoRadioGroup<T extends string>({
             }}
             onClick={() => onChange(option.value)}
             onKeyDown={(e) => handleKeyDown(e, index)}
-            className={`rounded-md border px-3 py-2 text-sm ${
-              checked ? "border-gray-900 font-medium" : "border-gray-300"
-            }`}
+            className="inline-flex items-center gap-2 rounded-[9px] px-4 py-2.5 text-sm font-bold"
+            style={
+              checked
+                ? { background: "#5663AE", color: "#fff" }
+                : { background: "transparent", color: "#3E3F66" }
+            }
           >
+            {option.icon}
             {option.label}
           </button>
         );

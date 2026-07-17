@@ -7,10 +7,22 @@ import { createQuiz } from "@/lib/quiz/actions";
 
 export type CourseQuizOption = { id: string; title: string };
 
+const FIELD_BORDER = "#D8DAEA";
+const FIELD_LABEL_COLOR = "#3E3F66";
+const FIELD_TEXT_COLOR = "#1A1A2E";
+
+const fieldClass = "w-full rounded-[11px] border px-[15px] py-[13px] text-base";
+const labelClass = "flex flex-col gap-1.5 text-sm font-bold";
+
 /**
  * Ein Formular je Block-Typ. Bewusst einfach gehalten (Textarea/Input statt
  * Rich-Text-Editor) — Rich-Text-WYSIWYG ist eine spätere Verfeinerung,
  * kein Kern-DoD-Kriterium für Phase 1.
+ *
+ * Design-Update (AdminKursEditor.dc.html) + Barrierefreiheit (CLAUDE.md
+ * §3.4): jedes Feld hat jetzt ein sichtbares `<label>` statt teils nur eines
+ * Platzhalters als einzige Beschriftung (Bild-URL, Audio-URL, Datei-URL/
+ * Dateiname, Einbettungs-URL, Quiz-Beschriftung).
  */
 export function BlockForm({
   block,
@@ -27,54 +39,73 @@ export function BlockForm({
   switch (block.type) {
     case "text":
       return (
-        <textarea
-          value={block.html}
-          onChange={(e) => onChange({ ...block, html: e.target.value })}
-          rows={5}
-          placeholder="Text (einfaches HTML möglich) …"
-          className="w-full rounded-md border px-3 py-2 text-base"
-        />
+        <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+          Textinhalt
+          <textarea
+            value={block.html}
+            onChange={(e) => onChange({ ...block, html: e.target.value })}
+            rows={5}
+            placeholder="Text (einfaches HTML möglich) …"
+            className={`${fieldClass} resize-y leading-relaxed`}
+            style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+          />
+        </label>
       );
 
     case "callout":
       return (
-        <div className="flex flex-col gap-2">
-          <select
-            value={block.variant}
-            onChange={(e) =>
-              onChange({ ...block, variant: e.target.value as typeof block.variant })
-            }
-            className="rounded-md border px-3 py-2 text-base"
-          >
-            <option value="info">Info</option>
-            <option value="warning">Warnung</option>
-            <option value="success">Erfolg</option>
-          </select>
-          <textarea
-            value={block.text}
-            onChange={(e) => onChange({ ...block, text: e.target.value })}
-            rows={3}
-            placeholder="Hinweistext …"
-            className="w-full rounded-md border px-3 py-2 text-base"
-          />
+        <div className="flex flex-col gap-3">
+          <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+            Art des Hinweises
+            <select
+              value={block.variant}
+              onChange={(e) =>
+                onChange({ ...block, variant: e.target.value as typeof block.variant })
+              }
+              className={fieldClass}
+              style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+            >
+              <option value="info">Info</option>
+              <option value="warning">Warnung</option>
+              <option value="success">Erfolg</option>
+            </select>
+          </label>
+          <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+            Hinweistext
+            <textarea
+              value={block.text}
+              onChange={(e) => onChange({ ...block, text: e.target.value })}
+              rows={3}
+              placeholder="Hinweistext …"
+              className={`${fieldClass} resize-y leading-relaxed`}
+              style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+            />
+          </label>
         </div>
       );
 
     case "image":
       return (
-        <div className="flex flex-col gap-2">
-          <input
-            value={block.url}
-            onChange={(e) => onChange({ ...block, url: e.target.value })}
-            placeholder="Bild-URL"
-            className="w-full rounded-md border px-3 py-2 text-base"
-          />
-          <input
-            value={block.alt}
-            onChange={(e) => onChange({ ...block, alt: e.target.value })}
-            placeholder="Alt-Text (Barrierefreiheit, Pflicht)"
-            className="w-full rounded-md border px-3 py-2 text-base"
-          />
+        <div className="flex flex-col gap-3">
+          <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+            Bild-URL
+            <input
+              value={block.url}
+              onChange={(e) => onChange({ ...block, url: e.target.value })}
+              placeholder="https://…"
+              className={fieldClass}
+              style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+            />
+          </label>
+          <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+            Alt-Text (Barrierefreiheit, Pflicht)
+            <input
+              value={block.alt}
+              onChange={(e) => onChange({ ...block, alt: e.target.value })}
+              className={fieldClass}
+              style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+            />
+          </label>
         </div>
       );
 
@@ -88,40 +119,55 @@ export function BlockForm({
 
     case "audio":
       return (
-        <input
-          value={block.url}
-          onChange={(e) => onChange({ ...block, url: e.target.value })}
-          placeholder="Audio-URL"
-          className="w-full rounded-md border px-3 py-2 text-base"
-        />
+        <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+          Audio-URL
+          <input
+            value={block.url}
+            onChange={(e) => onChange({ ...block, url: e.target.value })}
+            placeholder="https://…"
+            className={fieldClass}
+            style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+          />
+        </label>
       );
 
     case "file":
       return (
-        <div className="flex flex-col gap-2">
-          <input
-            value={block.url}
-            onChange={(e) => onChange({ ...block, url: e.target.value })}
-            placeholder="Datei-URL"
-            className="w-full rounded-md border px-3 py-2 text-base"
-          />
-          <input
-            value={block.filename}
-            onChange={(e) => onChange({ ...block, filename: e.target.value })}
-            placeholder="Dateiname"
-            className="w-full rounded-md border px-3 py-2 text-base"
-          />
+        <div className="flex flex-col gap-3">
+          <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+            Datei-URL
+            <input
+              value={block.url}
+              onChange={(e) => onChange({ ...block, url: e.target.value })}
+              placeholder="https://…"
+              className={fieldClass}
+              style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+            />
+          </label>
+          <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+            Dateiname
+            <input
+              value={block.filename}
+              onChange={(e) => onChange({ ...block, filename: e.target.value })}
+              className={fieldClass}
+              style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+            />
+          </label>
         </div>
       );
 
     case "embed":
       return (
-        <input
-          value={block.url}
-          onChange={(e) => onChange({ ...block, url: e.target.value })}
-          placeholder="Einbettungs-URL (z. B. Google Slides, Figma)"
-          className="w-full rounded-md border px-3 py-2 text-base"
-        />
+        <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+          Einbettungs-URL (z. B. Google Slides, Figma)
+          <input
+            value={block.url}
+            onChange={(e) => onChange({ ...block, url: e.target.value })}
+            placeholder="https://…"
+            className={fieldClass}
+            style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+          />
+        </label>
       );
 
     case "quiz":
@@ -136,13 +182,17 @@ export function BlockForm({
 
     case "submission":
       return (
-        <textarea
-          value={block.instructions}
-          onChange={(e) => onChange({ ...block, instructions: e.target.value })}
-          rows={3}
-          placeholder="Anweisungen für die Abgabe …"
-          className="w-full rounded-md border px-3 py-2 text-base"
-        />
+        <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+          Anweisungen für die Abgabe
+          <textarea
+            value={block.instructions}
+            onChange={(e) => onChange({ ...block, instructions: e.target.value })}
+            rows={3}
+            placeholder="Anweisungen für die Abgabe …"
+            className={`${fieldClass} resize-y leading-relaxed`}
+            style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+          />
+        </label>
       );
   }
 }
@@ -181,20 +231,25 @@ function QuizBlockFields({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <input
-        value={block.title}
-        onChange={(e) => onChange({ ...block, title: e.target.value })}
-        placeholder="Block-Beschriftung (optional, z. B. „Abschlussquiz Modul 1“)"
-        className="w-full rounded-md border px-3 py-2 text-base"
-      />
+    <div className="flex flex-col gap-3">
+      <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+        Block-Beschriftung (optional)
+        <input
+          value={block.title}
+          onChange={(e) => onChange({ ...block, title: e.target.value })}
+          placeholder="z. B. „Abschlussquiz Modul 1“"
+          className={fieldClass}
+          style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+        />
+      </label>
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
         Verknüpftes Quiz
         <select
           value={block.quizId ?? ""}
           onChange={(e) => onChange({ ...block, quizId: e.target.value || null })}
-          className="rounded-md border px-3 py-2 text-base"
+          className={fieldClass}
+          style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
         >
           <option value="">— kein Quiz —</option>
           {courseQuizzes.map((q) => (
@@ -205,26 +260,28 @@ function QuizBlockFields({
         </select>
       </label>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3.5">
         <button
           type="button"
           disabled={pending || !courseId}
           onClick={handleCreateQuiz}
-          className="self-start rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+          className="inline-flex items-center rounded-[10px] border bg-white px-3.5 py-2 text-sm font-bold disabled:opacity-50"
+          style={{ borderColor: "#E7E8F2", color: FIELD_LABEL_COLOR }}
         >
           {pending ? "Wird angelegt …" : "Neues Quiz anlegen"}
         </button>
         {block.quizId && courseId && (
           <a
             href={`/admin/kurse/${courseId}/quiz/${block.quizId}`}
-            className="text-sm underline"
+            className="text-sm font-semibold"
+            style={{ color: "#5663AE" }}
           >
             Fragen bearbeiten →
           </a>
         )}
       </div>
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm font-semibold" style={{ color: "#B14A4A" }}>
           {error}
         </p>
       )}

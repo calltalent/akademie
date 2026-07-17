@@ -1,6 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  AlertTriangle,
+  Check,
+  Mic,
+  Monitor,
+  Pause,
+  Play,
+  RotateCcw,
+  Scissors,
+  Trash2,
+  Video as VideoIcon,
+} from "lucide-react";
 import type { BunnyUploadState } from "@/lib/bunny/use-bunny-upload";
 import { VideoRadioGroup } from "@/components/editor/video-radio-group";
 import {
@@ -40,6 +52,22 @@ import {
  * `uploadState` wird von `video-source-switch.tsx` durchgereicht (die
  * einzige Komponente, die den Upload-Hook hält) und steuert nur die
  * Anzeige, NIE einen eigenen Aufruf.
+ *
+ * Design-Update (AdminVideoAufnahme.dc.html) + Mikrofon-Pegelanzeige (neu,
+ * Plan-Risiko R2): ohne Bild-Vorschau bei der Bildschirmaufnahme gibt es
+ * sonst keine Rückmeldung, ob überhaupt Ton ankommt — eine stumme Aufnahme
+ * kostet trotzdem 0,10 $/Min für ein leeres Transkript. AudioContext +
+ * AnalyserNode laufen auf dem Mikrofon-Track des laufenden Streams (bei
+ * beiden Modi der tatsächliche Mikrofon-Track, siehe `acquireStream" oben —
+ * bei der Bildschirmaufnahme wird er bewusst separat per getUserMedia
+ * geholt, s. Kommentar dort). Nur aktiv während "recording" (deckt sich mit
+ * der Design-Platzierung); Balkenreihe ist `aria-hidden` (keine Dauerflut für
+ * Screenreader), die "Kein Ton erkannt"-Warnung ist `role="status"` und wird
+ * nur bei Zustandswechsel ins DOM gehängt (gleiches Muster wie die
+ * bestehenden `statusMessage`/`alertMessage`-Regionen unten). AudioContext
+ * wird im Cleanup immer geschlossen, sonst bleibt sie offen und hält das
+ * Mikrofon; ist `AudioContext` nicht verfügbar, wird die Anzeige einfach
+ * weggelassen (nie ein Absturz).
  */
 
 type RecordingMode = "screen" | "webcam";
@@ -54,10 +82,15 @@ type Phase =
   | { kind: "confirmed" }
   | { kind: "error"; message: string };
 
-const MODE_OPTIONS: { value: RecordingMode; label: string }[] = [
-  { value: "screen", label: "Bildschirm aufnehmen" },
-  { value: "webcam", label: "Webcam aufnehmen" },
+const MODE_OPTIONS: { value: RecordingMode; label: string; icon: React.ReactNode }[] = [
+  { value: "screen", label: "Bildschirm", icon: <Monitor size={16} aria-hidden="true" /> },
+  { value: "webcam", label: "Webcam", icon: <VideoIcon size={16} aria-hidden="true" /> },
 ];
+
+const MIC_BAR_COUNT = 24;
+const MIC_SILENCE_HOLD_MS = 2000;
+/** Byte-Skala (0–255) von AnalyserNode.getByteFrequencyData: unterhalb gilt als Stille. */
+const MIC_SILENCE_THRESHOLD = 8;
 
 export function VideoRecorder({
   onConfirm,
@@ -73,6 +106,9 @@ export function VideoRecorder({
   const [statusMessage, setStatusMessage] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
   const [stoppedUrl, setStoppedUrl] = useState<string | null>(null);
+  const [micLevels, setMicLevels] = useState<number[]>(() => Array(MIC_BAR_COUNT).fill(4));
+  const [micSilent, setMicSilent] = useState(false);
+  const [micMeterAvailable, setMicMeterAvailable] = useState(true);
 
   const phaseRef = useRef<Phase>(phase);
   phaseRef.current = phase;
@@ -94,6 +130,11 @@ export function VideoRecorder({
   // bleibt erhalten, damit eine 20-Minuten-Aufnahme nicht bei einem
   // Netzwerkfehler verloren geht.
   const retainedRef = useRef<{ blob: Blob; filename: string } | null>(null);
+  // Mikrofon-Pegelanzeige (Teil C): eigener AudioContext/AnalyserNode, unabhängig
+  // vom MediaRecorder — misst nur, sendet nichts.
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const levelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const liveVideoRef = useRef<HTMLVideoElement | null>(null);
   const stoppedVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -138,6 +179,90 @@ export function VideoRecorder({
       }
     };
   }, []);
+
+  // Mikrofon-Pegelanzeige (Teil C, Plan-Risiko R2): eigener AudioContext auf
+  // dem Mikrofon-Track des laufenden Streams, nur während "recording" (deckt
+  // sich mit der Design-Platzierung im "Aufnahme läuft"-Panel). Schließt den
+  // AudioContext bei jedem Verlassen von "recording" (Phasenwechsel oder
+  // Unmount) — sonst bleibt sie offen und hält das Mikrofon zusätzlich zum
+  // MediaRecorder-Stream fest.
+  useEffect(() => {
+    if (phase.kind !== "recording") return;
+    const stream = streamRef.current;
+    const audioTrack = stream?.getAudioTracks()[0];
+    if (!audioTrack) return;
+
+    const AudioContextCtor: typeof AudioContext | undefined =
+      typeof window !== "undefined"
+        ? (window.AudioContext ??
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)
+        : undefined;
+    if (!AudioContextCtor) {
+      // setState per setTimeout(…, 0) statt synchron im Effect-Body — gleiches
+      // Muster wie SaveIndicator (block-editor.tsx)/stoppedUrl oben:
+      // react-hooks/set-state-in-effect erzwingt sonst einen zusätzlichen
+      // Render direkt nach diesem, Verhalten für Nutzer unverändert.
+      const unavailableTimer = setTimeout(() => setMicMeterAvailable(false), 0);
+      return () => clearTimeout(unavailableTimer);
+    }
+
+    let cancelled = false;
+    let silentSince = performance.now();
+    let unavailableTimer: ReturnType<typeof setTimeout> | null = null;
+
+    try {
+      const audioContext = new AudioContextCtor();
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 64;
+      analyser.smoothingTimeConstant = 0.6;
+      const source = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
+      source.connect(analyser);
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const step = Math.max(1, Math.floor(dataArray.length / MIC_BAR_COUNT));
+
+      levelIntervalRef.current = setInterval(() => {
+        if (cancelled) return;
+        analyser.getByteFrequencyData(dataArray);
+        const avg = dataArray.reduce((sum, v) => sum + v, 0) / dataArray.length;
+
+        setMicLevels(
+          Array.from({ length: MIC_BAR_COUNT }, (_, i) => {
+            const v = dataArray[i * step] ?? 0;
+            return Math.max(4, Math.min(100, Math.round((v / 255) * 130)));
+          }),
+        );
+
+        const now = performance.now();
+        if (avg > MIC_SILENCE_THRESHOLD) {
+          silentSince = now;
+          setMicSilent(false);
+        } else if (now - silentSince > MIC_SILENCE_HOLD_MS) {
+          setMicSilent(true);
+        }
+      }, 150);
+    } catch {
+      unavailableTimer = setTimeout(() => setMicMeterAvailable(false), 0);
+    }
+
+    return () => {
+      cancelled = true;
+      if (unavailableTimer) clearTimeout(unavailableTimer);
+      if (levelIntervalRef.current) {
+        clearInterval(levelIntervalRef.current);
+        levelIntervalRef.current = null;
+      }
+      analyserRef.current = null;
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+      setMicLevels(Array(MIC_BAR_COUNT).fill(4));
+      setMicSilent(false);
+    };
+  }, [phase.kind]);
 
   // Objekt-URL für die Vorschau des aufgenommenen Blobs im "stopped"-Panel —
   // wird bei jedem Verlassen von "stopped" (oder Unmount) wieder freigegeben.
@@ -390,42 +515,47 @@ export function VideoRecorder({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {/* Moduswahl nur anzeigen/erreichbar, solange ein Wechsel sicher ist
           (siehe handleModeChange) — sonst könnte ein Klick während der
           Aufnahme den Dateinamen der fertigen Aufnahme falsch beschriften. */}
       {(phase.kind === "idle" || phase.kind === "ready") && (
-        <VideoRadioGroup
-          label="Aufnahmemodus"
-          value={mode}
-          onChange={handleModeChange}
-          options={MODE_OPTIONS}
-        />
+        <VideoRadioGroup label="Aufnahmemodus" value={mode} onChange={handleModeChange} options={MODE_OPTIONS} />
       )}
 
       {mode === "screen" && (phase.kind === "idle" || phase.kind === "ready" || phase.kind === "requesting") && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm" style={{ color: "#66679B" }}>
           Hinweis: Beim Teilen des ganzen Bildschirms können Inhalte Dritter sichtbar werden. Teile nach
           Möglichkeit nur ein einzelnes Fenster oder einen Tab.
         </p>
       )}
 
       {phase.kind === "idle" && (
-        <button
-          type="button"
-          onClick={handleRequestAccess}
-          className="self-start rounded-md border px-3 py-2 text-sm"
-        >
-          {mode === "screen" ? "Bildschirmfreigabe starten" : "Kamera aktivieren"}
-        </button>
+        <div className="flex flex-wrap items-center gap-3.5">
+          <button
+            type="button"
+            onClick={handleRequestAccess}
+            className="inline-flex items-center gap-2.5 self-start rounded-xl px-[22px] py-3.5 text-base font-bold text-white"
+            style={{ background: "#5663AE" }}
+          >
+            <span className="h-3.5 w-3.5 rounded-full bg-white" aria-hidden="true" />
+            {mode === "screen" ? "Bildschirmfreigabe starten" : "Kamera aktivieren"}
+          </button>
+          <p className="flex items-center gap-2.5 text-sm font-semibold" style={{ color: "#3E3F66" }}>
+            <Mic size={18} aria-hidden="true" style={{ color: "#5663AE" }} />
+            Mikrofon-Zugriff ist erforderlich — dein Browser fragt beim Start nach der Erlaubnis.
+          </p>
+        </div>
       )}
 
       {phase.kind === "requesting" && (
-        <p className="text-sm text-gray-500">Zugriff wird angefragt …</p>
+        <p className="text-sm" style={{ color: "#66679B" }}>
+          Zugriff wird angefragt …
+        </p>
       )}
 
       {(phase.kind === "ready" || phase.kind === "recording") && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-4">
           {/* BUGFIX (Josips Test, 17.07.2026): "das Bild flimmert und die Ansicht
               vergrößert/verkleinert sich dauernd".
               Zwei zusammenwirkende Ursachen, beide hier behoben:
@@ -444,9 +574,11 @@ export function VideoRecorder({
                  filmt sich selbst (Bild-im-Bild-im-Bild ...) und flackert.
                  Deshalb im Bildschirm-Modus bewusst KEINE Selbst-Vorschau —
                  man sieht seinen Bildschirm ja bereits. Stattdessen eine ruhige
-                 Statusfläche. Nur die Webcam zeigt eine echte Vorschau (dort
-                 gibt es keine Rückkopplung, und man muss sich sehen können). */}
-          <div className="w-full max-w-md overflow-hidden rounded-md border bg-black">
+                 Statusfläche (Design: dunkle Navy-Fläche mit Streifenmuster,
+                 AdminVideoAufnahme.dc.html). Nur die Webcam zeigt eine echte
+                 Vorschau (dort gibt es keine Rückkopplung, und man muss sich
+                 sehen können). */}
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border" style={{ borderColor: "#E7E8F2" }}>
             {mode === "webcam" ? (
               // Muted: sonst Mikrofon-Rückkopplung durch die Live-Vorschau (Lautsprecher → Mikrofon).
               <video
@@ -461,17 +593,28 @@ export function VideoRecorder({
               />
             ) : (
               <div
-                className="flex aspect-[16/9] w-full items-center justify-center bg-black px-4 text-center"
+                className="flex aspect-[16/9] w-full flex-col items-center justify-center gap-3.5 px-6 text-center"
+                style={{
+                  background: "#3E3F66",
+                  backgroundImage:
+                    "repeating-linear-gradient(135deg, rgba(86,99,174,.45) 0 16px, rgba(62,63,102,.45) 16px 32px)",
+                }}
                 aria-hidden="true"
               >
-                <span className="text-sm text-gray-300">
+                <span
+                  className="flex h-[52px] w-[52px] items-center justify-center rounded-xl"
+                  style={{ background: "rgba(255,255,255,.14)" }}
+                >
+                  <Monitor size={24} aria-hidden="true" color="#fff" />
+                </span>
+                <span className="text-lg font-extrabold text-white">
                   {phase.kind === "recording"
-                    ? "Dein Bildschirm wird aufgezeichnet."
-                    : "Bildschirm freigegeben — bereit zur Aufnahme."}
-                  <br />
-                  <span className="text-xs text-gray-500">
-                    Keine Vorschau: Sie würde sich selbst abfilmen.
-                  </span>
+                    ? "Dein Bildschirm wird aufgezeichnet"
+                    : "Bildschirm freigegeben — bereit zur Aufnahme"}
+                </span>
+                <span className="max-w-[380px] text-sm font-semibold" style={{ color: "#C9CBE6" }}>
+                  Es wird bewusst keine Vorschau angezeigt — sie würde sich selbst abfilmen.
+                  {phase.kind === "recording" ? " Die Aufnahme läuft trotzdem." : ""}
                 </span>
               </div>
             )}
@@ -480,17 +623,23 @@ export function VideoRecorder({
             <button
               type="button"
               onClick={startRecording}
-              className="self-start rounded-md border px-3 py-2 text-sm"
+              className="inline-flex items-center gap-2.5 self-start rounded-xl px-[22px] py-3.5 text-base font-bold text-white"
+              style={{ background: "#5663AE" }}
             >
+              <span className="h-3.5 w-3.5 rounded-full bg-white" aria-hidden="true" />
               Aufnahme starten
             </button>
           )}
           {phase.kind === "recording" && (
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-2 text-sm font-medium text-red-600">
+            <div className="flex flex-wrap items-center gap-4">
+              <span
+                className="inline-flex items-center gap-2 rounded-[10px] px-3.5 py-2 text-sm font-extrabold"
+                style={{ background: "#FBEAEA", color: "#B14A4A" }}
+              >
                 <span
                   aria-hidden="true"
-                  className="motion-safe:animate-pulse inline-block h-2.5 w-2.5 rounded-full bg-red-600"
+                  className="motion-safe:animate-pulse inline-block h-3 w-3 rounded-full"
+                  style={{ background: "#B14A4A" }}
                 />
                 Aufnahme läuft
               </span>
@@ -502,81 +651,156 @@ export function VideoRecorder({
                   einer Vollbild-Freigabe zappelt das sichtbar im Video mit. */}
               <span
                 aria-hidden="true"
-                className="min-w-[3.5rem] text-sm tabular-nums text-gray-600"
+                className="min-w-[3.5rem] text-lg font-extrabold tabular-nums"
+                style={{ color: "#1A1A2E" }}
               >
                 {formatDuration(elapsedS)}
               </span>
-              <span
-                aria-hidden="true"
-                className="min-w-[5rem] text-sm tabular-nums text-gray-400"
-              >
+              <span aria-hidden="true" className="min-w-[5rem] text-sm font-semibold tabular-nums" style={{ color: "#3E3F66" }}>
                 {formatFileSize(sizeBytes)}
               </span>
+              <div className="flex-1" />
               <button
                 ref={stopButtonRef}
                 type="button"
                 aria-label={`Aufnahme beenden (läuft seit ${Math.floor(elapsedS / 60)} Minuten)`}
                 onClick={finalizeRecording}
-                className="rounded-md border px-3 py-2 text-sm"
+                className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[15px] font-bold text-white"
+                style={{ background: "#5663AE" }}
               >
+                <span className="h-3 w-3 rounded-sm bg-white" aria-hidden="true" />
                 Aufnahme beenden
               </button>
+            </div>
+          )}
+
+          {phase.kind === "recording" && micMeterAvailable && (
+            <div className="rounded-xl border p-3.5" style={{ borderColor: "#EEF0F7" }}>
+              <div className="mb-3 flex flex-wrap items-center gap-2.5">
+                <Mic size={17} aria-hidden="true" style={{ color: micSilent ? "#B14A4A" : "#1F8A5B" }} />
+                <span className="text-sm font-bold" style={{ color: "#1A1A2E" }}>
+                  Mikrofon-Pegel
+                </span>
+                <span className="text-[13px] font-bold" style={{ color: micSilent ? "#B14A4A" : "#1F8A5B" }}>
+                  {micSilent ? "Kein Ton erkannt" : "Ton wird erkannt"}
+                </span>
+              </div>
+              <div aria-hidden="true" className="flex h-[34px] items-end gap-1">
+                {micLevels.map((h, i) => (
+                  <span
+                    key={i}
+                    className="min-h-[4px] flex-1 rounded-sm"
+                    style={{ height: `${h}%`, background: h > 88 ? "#B14A4A" : h > 60 ? "#5663AE" : "#8BE0B7" }}
+                  />
+                ))}
+              </div>
+              {micSilent && (
+                <p
+                  role="status"
+                  className="mt-3 flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-sm font-bold"
+                  style={{ borderColor: "#E9CFCF", background: "#FBEAEA", color: "#B14A4A" }}
+                >
+                  <AlertTriangle size={17} aria-hidden="true" />
+                  Kein Ton erkannt — prüfe, ob das richtige Mikrofon aktiv und nicht stummgeschaltet ist.
+                </p>
+              )}
             </div>
           )}
         </div>
       )}
 
       {phase.kind === "stopped" && (
-        <div className="flex flex-col gap-2">
-          <h3 ref={stoppedHeadingRef} tabIndex={-1} className="text-base font-semibold outline-none">
+        <div className="flex flex-col gap-3">
+          <h3
+            ref={stoppedHeadingRef}
+            tabIndex={-1}
+            className="text-base font-extrabold outline-none"
+            style={{ color: "#1A1A2E" }}
+          >
             Aufnahme fertig
           </h3>
           {/* Gleiche feste Box wie die Live-Vorschau: sonst springt das Layout,
               sobald die Aufnahme geladen ist und ihr Seitenverhältnis bekannt
               wird (hier ohne Rückkopplung, aber unruhig). */}
-          <div className="w-full max-w-md overflow-hidden rounded-md border bg-black">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border bg-black" style={{ borderColor: "#E7E8F2" }}>
             <video
               ref={stoppedVideoRef}
               src={stoppedUrl ?? undefined}
               playsInline
               className="aspect-[16/9] w-full bg-black object-contain"
             />
+            <span
+              aria-hidden="true"
+              className="absolute right-3 bottom-3 rounded-lg px-2.5 py-1 text-[13px] font-bold text-white tabular-nums"
+              style={{ background: "rgba(26,26,46,.82)" }}
+            >
+              Dauer {formatDuration(phase.durationS)}
+            </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={() => stoppedVideoRef.current?.play()}
-              className="rounded-md border px-3 py-1 text-sm"
+              className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-4 py-2 text-sm font-bold"
+              style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
             >
+              <Play size={14} aria-hidden="true" />
               Abspielen
             </button>
             <button
               type="button"
               onClick={() => stoppedVideoRef.current?.pause()}
-              className="rounded-md border px-3 py-1 text-sm"
+              className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-4 py-2 text-sm font-bold"
+              style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
             >
+              <Pause size={14} aria-hidden="true" />
               Pause
             </button>
             {/* Kein Scrubber: das WebM hat noch keine Duration (Stufe-2-Thema,
                 Blocker B7) — stattdessen unsere selbst gemessene Dauer. */}
-            <span className="text-sm text-gray-500">Dauer: {formatDuration(phase.durationS)}</span>
+            <span className="text-sm font-semibold" style={{ color: "#66679B" }}>
+              Dauer: {formatDuration(phase.durationS)}
+            </span>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             <button
               type="button"
               onClick={handleUseRecording}
-              className="rounded-md border px-3 py-2 text-sm font-medium"
+              className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[15px] font-bold text-white"
+              style={{ background: "#5663AE" }}
             >
+              <Check size={16} aria-hidden="true" />
               Verwenden
             </button>
-            <button type="button" onClick={handleDiscard} className="rounded-md border px-3 py-2 text-sm">
-              Neu aufnehmen
+            {/* Stufe 2 (Schnitt) existiert noch nicht — sichtbar deaktiviert
+                statt totem Link (Design-Vorgabe, Übergabebericht). */}
+            <button
+              type="button"
+              disabled
+              title="Zuschneiden ist noch nicht verfügbar (kommt in einer späteren Version)."
+              className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-[18px] py-3 text-[15px] font-semibold disabled:opacity-50"
+              style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
+            >
+              <Scissors size={16} aria-hidden="true" />
+              Zuschneiden
             </button>
             <button
               type="button"
               onClick={handleDiscard}
-              className="rounded-md border px-3 py-2 text-sm text-red-600"
+              className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-[18px] py-3 text-[15px] font-semibold"
+              style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
             >
+              <RotateCcw size={16} aria-hidden="true" />
+              Neu aufnehmen
+            </button>
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={handleDiscard}
+              className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-[18px] py-3 text-[15px] font-semibold"
+              style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
+            >
+              <Trash2 size={16} aria-hidden="true" />
               Verwerfen
             </button>
           </div>
@@ -584,8 +808,8 @@ export function VideoRecorder({
       )}
 
       {phase.kind === "confirmed" && (
-        <div className="flex flex-col gap-2">
-          <p aria-hidden="true" className="text-sm text-gray-600">
+        <div className="flex flex-col gap-2.5">
+          <p aria-hidden="true" className="text-sm font-semibold" style={{ color: "#3E3F66" }}>
             {uploadState.status === "creating" && "Video wird angelegt …"}
             {uploadState.status === "uploading" && `Hochladen … ${uploadState.percent}%`}
             {uploadState.status === "done" && "Upload abgeschlossen."}
@@ -593,15 +817,22 @@ export function VideoRecorder({
             {uploadState.status === "idle" && "Wird vorbereitet …"}
           </p>
           {uploadState.status === "error" && (
-            <div className="flex gap-2">
-              <button type="button" onClick={handleRetryUpload} className="rounded-md border px-3 py-2 text-sm">
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handleRetryUpload}
+                className="inline-flex items-center rounded-[10px] border bg-white px-4 py-2.5 text-sm font-bold"
+                style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
+              >
                 Erneut versuchen
               </button>
               <button
                 type="button"
                 onClick={handleDiscard}
-                className="rounded-md border px-3 py-2 text-sm text-red-600"
+                className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-4 py-2.5 text-sm font-bold"
+                style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
               >
+                <Trash2 size={14} aria-hidden="true" />
                 Verwerfen
               </button>
             </div>
@@ -616,7 +847,8 @@ export function VideoRecorder({
             setAlertMessage("");
             setPhase({ kind: "idle" });
           }}
-          className="self-start rounded-md border px-3 py-2 text-sm"
+          className="inline-flex items-center self-start rounded-[10px] border bg-white px-4 py-2.5 text-sm font-bold"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
           Erneut versuchen
         </button>
@@ -630,12 +862,21 @@ export function VideoRecorder({
        * sichtbarer Text ist hier genauso wichtig wie die ARIA-Semantik.
        */}
       {statusMessage && (
-        <p role="status" aria-live="polite" className="text-sm text-gray-700">
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-xl border px-4 py-3 text-sm font-semibold"
+          style={{ borderColor: "#E7E8F2", background: "#F4F5FA", color: "#3E3F66" }}
+        >
           {statusMessage}
         </p>
       )}
       {alertMessage && (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p
+          role="alert"
+          className="rounded-xl border px-4 py-3 text-sm font-bold"
+          style={{ borderColor: "#E9CFCF", background: "#FBEAEA", color: "#B14A4A" }}
+        >
           {alertMessage}
         </p>
       )}

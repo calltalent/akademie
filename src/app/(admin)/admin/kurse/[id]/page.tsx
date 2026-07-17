@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { ModuleLessonTree, DeleteLessonButton } from "@/components/admin/module-lesson-tree";
@@ -8,6 +9,17 @@ import { ReembedCourseButton } from "@/components/admin/reembed-course-button";
 import { RefreshTranscriptButton } from "@/components/admin/refresh-transcript-button";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
 
+/**
+ * Design-Update (AdminKursEditor.dc.html, Übergabebericht siehe
+ * PHASENSTATUS.md): der Kurs-Editor war der einzige Bereich der Anwendung
+ * ohne Marken-Design (rohe graue `rounded-md border`-Kästen). Kopfzeile mit
+ * Brotkrume + Status-/Kategorie-Auswahl (jetzt mit sichtbarem Label, siehe
+ * publish-toggle.tsx), zweispaltiges Raster (300px Baum / restlicher Platz
+ * Editor). `ReembedCourseButton`/`RefreshTranscriptButton` sind nicht Teil
+ * des Referenz-Exports (der kennt weder KI-Einbettung noch Transkript-
+ * Refresh), bleiben aber erhalten (Funktionsverlust ist nicht erlaubt) und
+ * bekommen nur die neue Sekundär-Button-Optik.
+ */
 export default async function CourseEditorPage({
   params,
   searchParams,
@@ -71,20 +83,32 @@ export default async function CourseEditorPage({
     : [];
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{course.title}</h1>
-        <div className="flex items-center gap-4">
+    <div className="flex flex-col gap-2">
+      <header className="flex flex-wrap items-start gap-5">
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-semibold" style={{ color: "#66679B" }}>
+            Inhalte · Kurse
+          </div>
+          <h1 className="mt-0.5 truncate text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
+            {course.title}
+          </h1>
+        </div>
+        <div className="flex flex-wrap items-end gap-4">
           <CourseStatusSelect courseId={courseId} status={course.status} />
           <CourseCategorySelect courseId={courseId} category={course.category ?? null} />
           <ReembedCourseButton courseId={courseId} />
-          <Link href="/admin/kurse" className="text-sm underline">
+          <Link
+            href="/admin/kurse"
+            className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-4 py-3 text-[15px] font-semibold no-underline"
+            style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
+          >
+            <ArrowLeft size={16} aria-hidden="true" style={{ color: "#5663AE" }} />
             Zurück zur Kursliste
           </Link>
         </div>
-      </div>
+      </header>
 
-      <div className="flex gap-6">
+      <main className="mt-1.5 grid items-start gap-[26px]" style={{ gridTemplateColumns: "300px 1fr" }}>
         <ModuleLessonTree
           courseId={courseId}
           modules={modulesWithLessons}
@@ -92,7 +116,7 @@ export default async function CourseEditorPage({
         />
 
         {activeLesson ? (
-          <div className="flex flex-1 flex-col gap-3">
+          <div className="flex min-w-0 flex-col gap-5">
             <BlockEditor
               lessonId={activeLesson.id}
               courseId={courseId}
@@ -100,13 +124,13 @@ export default async function CourseEditorPage({
               initialBlocks={activeLessonBlocks}
               courseQuizzes={courseQuizzes}
             />
-            <div className="flex items-center justify-between border-t pt-3">
+            <div className="flex flex-wrap items-center gap-3">
               <LessonPublishToggle
                 lessonId={activeLesson.id}
                 courseId={courseId}
                 status={activeLesson.status}
               />
-              <div className="flex items-center gap-4">
+              <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
                 {activeLesson.video_bunny_id ? (
                   <RefreshTranscriptButton lessonId={activeLesson.id} />
                 ) : null}
@@ -119,11 +143,11 @@ export default async function CourseEditorPage({
             </div>
           </div>
         ) : (
-          <p className="flex-1 text-base text-gray-500">
+          <p className="min-w-0 text-base" style={{ color: "#66679B" }}>
             Lektion links auswählen oder anlegen, um Blöcke zu bearbeiten.
           </p>
         )}
-      </div>
+      </main>
     </div>
   );
 }
