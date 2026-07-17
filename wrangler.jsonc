@@ -23,6 +23,31 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // R2-Bucket für die ffmpeg.wasm-Dateien des Video-Schnitts (Stufe 2).
+  //
+  // WARUM NICHT public/: Workers Static Assets erlauben maximal 25 MiB PRO
+  // DATEI; `ffmpeg-core.wasm` ist gemessene 30,7 MiB. In `public/ffmpeg/`
+  // gelegt bricht `npm run deploy` — und zwar erst beim Deploy, nachdem lokal
+  // alles läuft.
+  //
+  // WARUM R2 statt Bunny Storage (Entscheidung Josip, 17.07.2026): kostet im
+  // Freikontingent 0 $ (31 MB von 10 GB, Egress bei R2 generell kostenlos),
+  // und vor allem werden die Dateien über eine eigene Route desselben Workers
+  // ausgeliefert => SAME-ORIGIN. Damit entfallen CORS-Konfiguration, der
+  // toBlobURL-Umweg, ein zusätzlicher API-Key und eine neue Env-Variable
+  // (die wegen `keep_vars: true` sonst von Hand im Dashboard gesetzt werden
+  // müsste). Cloudflare ist als Hoster ohnehin schon Auftragsverarbeiter —
+  // es kommt also kein neuer Anbieter dazu.
+  //
+  // `jurisdiction: "eu"` hält die Daten in der EU, passend zu Supabase
+  // EU-Frankfurt und der Bunny-EU-Library (CLAUDE.md §1.2).
+  "r2_buckets": [
+    {
+      "binding": "FFMPEG_BUCKET",
+      "bucket_name": "calltalent-akademie-ffmpeg",
+      "jurisdiction": "eu"
+    }
+  ],
   "observability": {
     "enabled": true
   },

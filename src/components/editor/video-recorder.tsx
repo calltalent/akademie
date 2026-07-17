@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   AlertTriangle,
   Check,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import type { BunnyUploadState } from "@/lib/bunny/use-bunny-upload";
 import { VideoRadioGroup } from "@/components/editor/video-radio-group";
+import { TRIM_SIZE_LIMIT_BYTES } from "@/lib/video/segments";
 import {
   buildRecordingFilename,
   classifyMediaError,
@@ -68,7 +70,22 @@ import {
  * wird im Cleanup immer geschlossen, sonst bleibt sie offen und hält das
  * Mikrofon; ist `AudioContext` nicht verfügbar, wird die Anzeige einfach
  * weggelassen (nie ein Absturz).
+ *
+ * Stufe 2 „Schnitt" (neu): der „Zuschneiden"-Knopf im "stopped"-Panel öffnet
+ * `VideoTrimmer` (Phase "trimming"). `next/dynamic({ssr:false})` sorgt dafür,
+ * dass `video-trimmer.tsx` — und mit ihm der spätere Import von
+ * `ffmpeg-client.ts`/`@ffmpeg/ffmpeg` — nicht schon im Admin-Erst-Bundle
+ * landet, sondern erst beim tatsächlichen Öffnen nachgeladen wird. Der
+ * Trimmer liefert sein (ggf. geschnittenes) Blob über sein eigenes
+ * `onConfirm` zurück; das läuft hier über denselben `confirmBlob()`-Pfad wie
+ * der normale „Verwenden"-Knopf — also GENAUSO wenig ein Aufruf von
+ * `useBunnyUpload` innerhalb dieser Datei wie vorher (Kostensicherheit
+ * unangetastet, `video-trimmer.tsx` importiert den Upload-Hook ebenfalls nie).
  */
+const VideoTrimmer = dynamic(
+  () => import("@/components/editor/video-trimmer").then((m) => m.VideoTrimmer),
+  { ssr: false },
+);
 
 type RecordingMode = "screen" | "webcam";
 
@@ -78,6 +95,7 @@ type Phase =
   | { kind: "ready" }
   | { kind: "recording" }
   | { kind: "stopped"; blob: Blob; durationS: number }
+  | { kind: "trimming"; blob: Blob; durationS: number }
   // "Verwenden" wurde geklickt — ab hier bestimmt `uploadState` (Prop) die Anzeige.
   | { kind: "confirmed" }
   | { kind: "error"; message: string };
@@ -489,14 +507,43 @@ export function VideoRecorder({
     }
   }
 
-  function handleUseRecording() {
-    if (phase.kind !== "stopped") return;
+  // Gemeinsamer Endpunkt für "Verwenden" UND den Trimmer-Rückweg (Stufe 2) —
+  // beide sollen sich IDENTISCH verhalten: Dateiname bauen, retainedRef für
+  // "Erneut versuchen" setzen, in "confirmed" wechseln, `onConfirm` (Prop
+  // nach oben zu video-source-switch.tsx) aufrufen. Kein Aufruf von
+  // `useBunnyUpload` hier — der Hook lebt ausschließlich in
+  // video-source-switch.tsx (Kostensicherheit, siehe Dateikopf).
+  function confirmBlob(blob: Blob) {
     const filename = buildRecordingFilename(mode);
-    retainedRef.current = { blob: phase.blob, filename };
+    retainedRef.current = { blob, filename };
     prevUploadPercentRef.current = 0;
     setAlertMessage("");
     setPhase({ kind: "confirmed" });
-    onConfirm(phase.blob, filename);
+    onConfirm(blob, filename);
+  }
+
+  function handleUseRecording() {
+    if (phase.kind !== "stopped") return;
+    confirmBlob(phase.blob);
+  }
+
+  function handleStartTrim() {
+    if (phase.kind !== "stopped") return;
+    setAlertMessage("");
+    setStatusMessage("");
+    setPhase({ kind: "trimming", blob: phase.blob, durationS: phase.durationS });
+  }
+
+  // Vom Trimmer aufgerufen ("Zuschnitt übernehmen"/"Ohne Zuschnitt
+  // hochladen") — läuft GENAUSO wie "Verwenden" in einen Upload, nur mit dem
+  // (ggf. geschnittenen) Blob statt dem Original.
+  function handleTrimConfirm(blob: Blob) {
+    confirmBlob(blob);
+  }
+
+  function handleTrimCancel() {
+    if (phase.kind !== "trimming") return;
+    setPhase({ kind: "stopped", blob: phase.blob, durationS: phase.durationS });
   }
 
   function handleDiscard() {
@@ -772,12 +819,21 @@ export function VideoRecorder({
               <Check size={16} aria-hidden="true" />
               Verwenden
             </button>
-            {/* Stufe 2 (Schnitt) existiert noch nicht — sichtbar deaktiviert
-                statt totem Link (Design-Vorgabe, Übergabebericht). */}
+            {/* Stufe 2 (Schnitt): Größen-Gate (Plan-Risiko R6) — über dem
+                Limit bleibt der Knopf deaktiviert MIT sichtbarer Begründung
+                (nicht nur `title`, siehe Text unten), statt den Trimmer zu
+                öffnen und dort erst zu scheitern. Innerhalb des Trimmers
+                selbst gilt dieselbe Grenze defensiv noch einmal (siehe
+                video-trimmer.tsx) — "niemals eine Sackgasse". */}
             <button
               type="button"
-              disabled
-              title="Zuschneiden ist noch nicht verfügbar (kommt in einer späteren Version)."
+              onClick={handleStartTrim}
+              disabled={phase.blob.size > TRIM_SIZE_LIMIT_BYTES}
+              title={
+                phase.blob.size > TRIM_SIZE_LIMIT_BYTES
+                  ? `Aufnahme zu groß zum Zuschneiden im Browser (${formatFileSize(phase.blob.size)}).`
+                  : undefined
+              }
               className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-[18px] py-3 text-[15px] font-semibold disabled:opacity-50"
               style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
             >
@@ -804,7 +860,22 @@ export function VideoRecorder({
               Verwerfen
             </button>
           </div>
+          {phase.blob.size > TRIM_SIZE_LIMIT_BYTES && (
+            <p className="text-sm font-semibold" style={{ color: "#B14A4A" }}>
+              Aufnahme zu groß zum Zuschneiden im Browser ({formatFileSize(phase.blob.size)}). Du kannst sie ohne
+              Zuschnitt hochladen.
+            </p>
+          )}
         </div>
+      )}
+
+      {phase.kind === "trimming" && (
+        <VideoTrimmer
+          blob={phase.blob}
+          durationS={phase.durationS}
+          onConfirm={handleTrimConfirm}
+          onCancel={handleTrimCancel}
+        />
       )}
 
       {phase.kind === "confirmed" && (
