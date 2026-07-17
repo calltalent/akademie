@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
+import { checkAdminAccess } from "@/lib/auth/staff";
 import { NewCourseDialog } from "@/components/admin/new-course-dialog";
+import { DeleteCourseIconButton } from "@/components/admin/delete-course-icon-button";
 
 /**
  * Design-Block 6 (13.07.2026, Claude-Design-Export Teil 3,
@@ -34,6 +37,27 @@ import { NewCourseDialog } from "@/components/admin/new-course-dialog";
  *
  * "Neuer Kurs" öffnet das bestehende CreateCourseForm in einem Modal
  * (new-course-dialog.tsx) statt einer im Export nicht vorhandenen Zielseite.
+ *
+ * Aktionsspalte (17.07.2026, Josips Wunsch): statt des früheren Textlinks
+ * "Bearb." zwei Symbole — Stift (Bearbeiten) und Papierkorb (Löschen ohne
+ * Umweg über den Kurs). Beide tragen ein `aria-label` MIT Kurstitel; ein
+ * Symbol ohne zugänglichen Namen wäre ein Barrierefreiheits-Verstoß
+ * (CLAUDE.md §3.4), und beim Durchtabben einer Liste hört man sonst nur
+ * mehrfach "Bearbeiten"/"Löschen" ohne Bezug zur Zeile.
+ *
+ * Der Kurstitel ist zusätzlich selbst ein Link auf denselben Editor — zwei
+ * Wege zum selben Ziel ist hier Absicht: der Titel ist das große, offensicht-
+ * liche Klickziel (ein 36px-Stift als EINZIGER Weg in den Kurs wäre eine
+ * unnötig kleine Trefferfläche), der Stift bleibt die explizite, beschriftete
+ * Aktion neben dem Papierkorb.
+ *
+ * Der Papierkorb erscheint NUR für owner/admin (`checkAdminAccess()`):
+ * `deleteCourse()` verlangt serverseitig `requireAdminTenant()` — einem
+ * Trainer einen Knopf zu zeigen, der ausnahmslos in einer Fehlermeldung
+ * endet, wäre in einer Liste gleich reihenweise irreführend. Der Stift bleibt
+ * für alle Staff sichtbar (Bearbeiten verlangt nur `is_staff()`). Das ist die
+ * zweite Verteidigungslinie in der UI-Schicht, nicht die Absicherung selbst —
+ * die liegt weiterhin in RLS + Server Action (siehe lib/auth/staff.ts).
  */
 
 const TINTS = ["#DFE2F4", "#E7E9F6", "#EDE7F5", "#E4E6F5", "#E9E6F3"];
@@ -88,6 +112,23 @@ export default async function AdminKursePage({
     .select("course_id")
     .eq("tenant_id", tenantId);
 
+  // Für den Lösch-Bestätigungsdialog: echte Zählungen, keine Schätzung —
+  // dieselbe Anforderung wie im Kurs-Editor ([id]/page.tsx). Hier bewusst EINE
+  // Abfrage über alle Kurse des Mandanten statt einer `count`-Abfrage pro
+  // Zeile (die Detailseite betrachtet genau einen Kurs und zählt deshalb
+  // dort per `head: true`).
+  const { data: certificates } = await supabase
+    .from("certificates")
+    .select("course_id")
+    .eq("tenant_id", tenantId);
+
+  // Rollen-Gate für den Papierkorb (siehe Kopfkommentar). Bewusst NACH den
+  // Datenabfragen und ohne eigenes Fehlerverhalten: schlägt die Prüfung fehl,
+  // ist `isAdmin` false und die Liste rendert ohne Löschknopf — der Zugriff
+  // auf die Seite selbst ist bereits über admin/layout.tsx gegated.
+  const adminAccess = await checkAdminAccess();
+  const isAdmin = adminAccess.ok;
+
   const courseIdByModule = new Map((modules ?? []).map((m) => [m.id, m.course_id]));
   const lessonCountByCourse = new Map<string, number>();
   for (const l of lessons ?? []) {
@@ -98,6 +139,10 @@ export default async function AdminKursePage({
   const memberCountByCourse = new Map<string, number>();
   for (const e of enrollments ?? []) {
     memberCountByCourse.set(e.course_id, (memberCountByCourse.get(e.course_id) ?? 0) + 1);
+  }
+  const certificateCountByCourse = new Map<string, number>();
+  for (const c of certificates ?? []) {
+    certificateCountByCourse.set(c.course_id, (certificateCountByCourse.get(c.course_id) ?? 0) + 1);
   }
 
   const allCourses = courses ?? [];
@@ -178,7 +223,13 @@ export default async function AdminKursePage({
                       backgroundImage: `repeating-linear-gradient(45deg, ${tint} 0 6px, rgba(255,255,255,.5) 6px 12px)`,
                     }}
                   />
-                  <span className="font-semibold">{c.title}</span>
+                  <Link
+                    href={`/admin/kurse/${c.id}`}
+                    className="font-semibold no-underline hover:underline"
+                    style={{ color: "inherit" }}
+                  >
+                    {c.title}
+                  </Link>
                 </div>
                 <div style={{ color: "#3E3F66" }}>{lessonCountByCourse.get(c.id) ?? 0}</div>
                 <div style={{ color: "#3E3F66" }}>{memberCountByCourse.get(c.id) ?? 0}</div>
@@ -190,10 +241,25 @@ export default async function AdminKursePage({
                     {meta.label}
                   </span>
                 </div>
-                <div>
-                  <Link href={`/admin/kurse/${c.id}`} className="text-sm font-semibold no-underline">
-                    Bearb.
+                <div className="flex items-center justify-end gap-2">
+                  <Link
+                    href={`/admin/kurse/${c.id}`}
+                    aria-label={`Kurs bearbeiten: ${c.title}`}
+                    title="Bearbeiten"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-[9px] border bg-white no-underline"
+                    style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
+                  >
+                    <Pencil size={16} aria-hidden="true" />
                   </Link>
+                  {isAdmin && (
+                    <DeleteCourseIconButton
+                      courseId={c.id}
+                      title={c.title}
+                      lessonCount={lessonCountByCourse.get(c.id) ?? 0}
+                      enrollmentCount={memberCountByCourse.get(c.id) ?? 0}
+                      certificateCount={certificateCountByCourse.get(c.id) ?? 0}
+                    />
+                  )}
                 </div>
               </div>
             );
