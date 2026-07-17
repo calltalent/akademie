@@ -131,13 +131,24 @@ export async function processVideoTranscript(
 
     // Stufe 3 (Untertitel DE+EN): EN-Caption per claude-haiku-Übersetzung des
     // DE-VTT nachziehen. Nur wenn die Quell-Caption tatsächlich Deutsch ist
-    // (`sourceLanguage: "de"` in triggerTranscription() — case-insensitiv
-    // geprüft) UND das rohe VTT oben erfolgreich geholt wurde. Fail-soft wie
-    // `summarizeTranscript()` unten: `ensureEnglishCaption()` wirft NIE nach
-    // außen (eigener try/catch + Error-`ai_jobs` darin), ein
-    // Übersetzungsfehler darf das bereits ermittelte DE-Transkript nie
-    // gefährden.
-    if (deVttRaw && caption?.srclang.toLowerCase() === "de") {
+    // (`sourceLanguage: "de"` in triggerTranscription()) UND das rohe VTT oben
+    // erfolgreich geholt wurde. Fail-soft wie `summarizeTranscript()` unten:
+    // `ensureEnglishCaption()` wirft NIE nach außen (eigener try/catch +
+    // Error-`ai_jobs` darin), ein Übersetzungsfehler darf das bereits
+    // ermittelte DE-Transkript nie gefährden.
+    //
+    // BUGFIX (17.07.2026, erster echter End-to-End-Test, R15-Gate aus dem
+    // Plan): hier stand zuvor `caption?.srclang.toLowerCase() === "de"`.
+    // Bunny kennzeichnet eine KI-generierte Caption-Spur (unser Fall, per
+    // triggerTranscription() ausgelöst) mit dem Suffix `-auto` — der
+    // tatsächliche Wert war `"de-auto"`, nicht `"de"`. Der exakte Vergleich
+    // schlug lautlos fehl: kein Fehler, kein Log, keine `ai_jobs`-Zeile,
+    // `ensureEnglishCaption()` wurde schlicht nie aufgerufen. Deshalb jetzt
+    // nur den Sprachcode vor einem etwaigen `-auto`/Regions-Suffix vergleichen
+    // — deckt sowohl Bunnys Auto-Form ("de-auto") als auch eine manuell
+    // hochgeladene, suffixlose Caption ("de") ab.
+    const srclang = caption?.srclang.toLowerCase().split("-")[0];
+    if (deVttRaw && srclang === "de") {
       await ensureEnglishCaption({
         bunnyVideoId,
         tenantId: lesson.tenant_id,
