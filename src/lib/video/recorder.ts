@@ -101,6 +101,29 @@ export function formatDuration(totalSeconds: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+/**
+ * `mm:ss.f` (eine Nachkommastelle) — für den Video-Trimmer (video-trimmer.tsx),
+ * NICHT für `formatDuration()`s bisherige Aufrufer (Aufnahme-Dauer-Anzeigen:
+ * niemand braucht Zehntelsekunden, während eine 20-minütige Aufnahme läuft).
+ *
+ * BUGFIX (18.07.2026, Josips Fund): der Trimmer zeigte für zwei tatsächlich
+ * unterschiedliche Zeiten (z. B. 0,9 s und 1,4 s) identisch "00:01" an, weil
+ * `formatDuration()` auf ganze Sekunden abrundet — dadurch wirkte ein
+ * gezogener Mini-Abschnitt wie ein Fehler ("Start = Ende"), obwohl er real
+ * nur unter einer Sekunde lag. `parseTimecode()` unterstützte
+ * Nachkommastellen im Eingabefeld bereits (Regex `\d+(\.\d+)?`) — nur die
+ * ANZEIGE beim Zurückschreiben rundete sie sofort wieder weg.
+ */
+export function formatDurationPrecise(totalSeconds: number): string {
+  const safe = Number.isFinite(totalSeconds) ? Math.max(0, totalSeconds) : 0;
+  const totalDeciseconds = Math.round(safe * 10);
+  const wholeSeconds = Math.floor(totalDeciseconds / 10);
+  const decisecond = totalDeciseconds % 10;
+  const minutes = Math.floor(wholeSeconds / 60);
+  const seconds = wholeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${decisecond}`;
+}
+
 /** Menschenlesbare Dateigröße für die Live-Anzeige während der Aufnahme. */
 export function formatFileSize(bytes: number): string {
   const safe = Number.isFinite(bytes) ? Math.max(0, bytes) : 0;

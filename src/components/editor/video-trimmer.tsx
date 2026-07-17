@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Pause, Play, Scissors, Trash2, X } from "lucide-react";
-import { formatDuration, formatFileSize } from "@/lib/video/recorder";
+import { formatDurationPrecise, formatFileSize } from "@/lib/video/recorder";
 import {
   coversFullDuration,
   createInitialSegments,
@@ -16,6 +16,7 @@ import {
   TRIM_SIZE_LIMIT_BYTES,
   type Segment,
 } from "@/lib/video/segments";
+import { extractFilmstrip } from "@/lib/video/filmstrip";
 
 /**
  * Video-Trimmer für den Kurs-Editor (Stufe 2 „Schnitt" — Plan
@@ -61,20 +62,30 @@ import {
  * Kostensicherheit (Plan-Vorgabe, unverändert wichtig): diese Datei
  * importiert `useBunnyUpload` NIE. Das fertige (ggf. geschnittene) Blob geht
  * ausschließlich über `onConfirm` nach oben.
+ *
+ * FILMSTREIFEN (18.07.2026, Josips Wunsch): die Zeitleiste zeigt jetzt echte
+ * Video-Vorschaubilder statt reiner Farbflächen — siehe `lib/video/filmstrip.ts`
+ * für die Extraktion (bewusst OHNE ffmpeg/Seek, siehe dortiger Kommentar).
+ * Zusammen damit: `formatDuration()` (ganze Sekunden) ist innerhalb dieser
+ * Datei durch `formatDurationPrecise()` (Zehntelsekunden) ersetzt — sonst
+ * hätte man zwei sichtbar unterschiedliche Frames im Filmstreifen ausgewählt,
+ * aber identische "00:01" in den Feldern gesehen (genau der Fund, der zu
+ * dieser Änderung geführt hat).
  */
 
 const RESULT_TOLERANCE_S = 1;
 const SKIP_SECONDS = 5;
+const FILMSTRIP_THUMB_COUNT = 24;
 
 function buildResultMessage(requestedTotalS: number, actualTotalS: number): string {
   const deltaS = actualTotalS - requestedTotalS;
   if (Math.abs(deltaS) < RESULT_TOLERANCE_S) {
-    return `Zuschnitt angewendet — Gesamtlänge ${formatDuration(actualTotalS)}, wie angefordert.`;
+    return `Zuschnitt angewendet — Gesamtlänge ${formatDurationPrecise(actualTotalS)}, wie angefordert.`;
   }
   const richtung = deltaS > 0 ? "länger" : "kürzer";
   return (
-    `Zuschnitt angewendet — tatsächliche Länge ${formatDuration(actualTotalS)} ` +
-    `(angefordert ${formatDuration(requestedTotalS)}, ${Math.abs(deltaS).toFixed(1)} s ${richtung} durch ` +
+    `Zuschnitt angewendet — tatsächliche Länge ${formatDurationPrecise(actualTotalS)} ` +
+    `(angefordert ${formatDurationPrecise(requestedTotalS)}, ${Math.abs(deltaS).toFixed(1)} s ${richtung} durch ` +
     `Keyframe-Rundung — siehe Hinweis oben).`
   );
 }
@@ -88,17 +99,26 @@ function buildResultMessage(requestedTotalS: number, actualTotalS: number): stri
  * `touch-action: none` auf Track UND Griffen ist Pflicht, nicht Kosmetik:
  * ohne das würde ein Ziehversuch auf einem Touch-Gerät als Seiten-Scroll
  * interpretiert, bevor der Pointer-Move überhaupt ankommt.
+ *
+ * Filmstreifen (18.07.2026): echte Frame-Vorschaubilder (`thumbnails`, von
+ * `VideoTrimmer` per `extractFilmstrip()` befüllt) bilden die unterste Ebene,
+ * halbtransparente Behalten-/Entfernt-Einfärbung liegt DARÜBER (Frame bleibt
+ * durch die Einfärbung hindurch erkennbar) — genau das gewünschte "sofort
+ * sehen, welcher Frame ausgewählt ist". Fehlende Slots (noch nicht extrahiert)
+ * zeigen eine neutrale Fläche statt einer Lücke.
  */
 function TimelineBar({
   segments,
   durationS,
   currentPositionS,
+  thumbnails,
   onSetBound,
   onSeek,
 }: {
   segments: Segment[];
   durationS: number;
   currentPositionS: number;
+  thumbnails: (string | null)[];
   onSetBound: (id: string, bound: "start" | "end", valueS: number) => void;
   onSeek: (valueS: number) => void;
 }) {
@@ -170,22 +190,47 @@ function TimelineBar({
     }, 0);
   }
 
+  const filmstripStarted = thumbnails.some((t) => t !== null);
+
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between text-[13px] font-bold" style={{ color: "#3E3F66" }}>
         <span aria-hidden="true">Zeitleiste — Linien ziehen zum Anpassen, Klicken zum Springen</span>
+        {!filmstripStarted && (
+          <span aria-hidden="true" className="font-semibold" style={{ color: "#A9AAC4" }}>
+            Filmstreifen wird erstellt …
+          </span>
+        )}
       </div>
       <div
         ref={trackRef}
         onClick={handleTrackClick}
         aria-hidden="true"
-        className="relative h-11 cursor-pointer select-none"
+        className="relative h-16 cursor-pointer select-none"
         style={{ touchAction: "none" }}
       >
+        {/* Filmstreifen — unterste Ebene, ein Frame je Slot. */}
         <div
-          className="absolute inset-x-0 top-1/2 flex h-[26px] -translate-y-1/2 overflow-hidden rounded-lg border"
+          className="absolute inset-x-0 top-1/2 flex h-10 -translate-y-1/2 overflow-hidden rounded-lg border"
           style={{ borderColor: "#E7E8F2" }}
         >
+          {thumbnails.map((dataUrl, i) => (
+            <div
+              key={i}
+              className="h-full flex-1"
+              style={{
+                backgroundColor: "#EEF0F7",
+                backgroundImage: dataUrl ? `url(${dataUrl})` : undefined,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Behalten-/Entfernt-Einfärbung — halbtransparent, damit der Frame
+            darunter erkennbar bleibt (anders als vorher: keine Deckfarbe mehr). */}
+        <div className="absolute inset-x-0 top-1/2 flex h-10 -translate-y-1/2 overflow-hidden rounded-lg">
           {blocks.map((b, i) =>
             b.widthPct <= 0 ? null : (
               <div
@@ -193,7 +238,9 @@ function TimelineBar({
                 style={{
                   flex: `${b.widthPct} 1 0%`,
                   background:
-                    b.kind === "keep" ? "#5663AE" : "repeating-linear-gradient(45deg, #EEF0F7 0 6px, #E0E2EF 6px 12px)",
+                    b.kind === "keep"
+                      ? "rgba(86,99,174,0.4)"
+                      : "repeating-linear-gradient(45deg, rgba(20,20,36,0.6) 0 6px, rgba(20,20,36,0.4) 6px 12px)",
                 }}
               />
             ),
@@ -235,13 +282,13 @@ function TimelineBar({
       </div>
       <div className="mt-2 flex gap-5 text-[13px] font-semibold" style={{ color: "#3E3F66" }} aria-hidden="true">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-3.5 w-3.5 rounded" style={{ background: "#5663AE" }} />
-          Behalten
+          <span className="h-3.5 w-3.5 rounded" style={{ background: "#7079BE" }} />
+          Behalten (Frame durchscheinend)
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span
             className="h-3.5 w-3.5 rounded"
-            style={{ background: "repeating-linear-gradient(45deg, #EEF0F7 0 4px, #E0E2EF 4px 8px)" }}
+            style={{ background: "repeating-linear-gradient(45deg, #3A3A50 0 4px, #2A2A3D 4px 8px)" }}
           />
           Entfernt
         </span>
@@ -275,8 +322,8 @@ function SegmentRow({
   onRemove: (id: string) => void;
   canRemove: boolean;
 }) {
-  const [startText, setStartText] = useState(() => formatDuration(segment.startS));
-  const [endText, setEndText] = useState(() => formatDuration(segment.endS));
+  const [startText, setStartText] = useState(() => formatDurationPrecise(segment.startS));
+  const [endText, setEndText] = useState(() => formatDurationPrecise(segment.endS));
   const [lastFocused, setLastFocused] = useState<"start" | "end">("start");
   const [fieldError, setFieldError] = useState("");
 
@@ -288,20 +335,25 @@ function SegmentRow({
   // gleiches Muster wie `SaveIndicator`/`stoppedUrl` in `video-recorder.tsx`
   // (react-hooks/set-state-in-effect erzwingt sonst einen zusätzlichen
   // Render direkt nach diesem) — Verhalten für Nutzer unverändert.
+  //
+  // `formatDurationPrecise()` statt `formatDuration()` (18.07.2026, Josips
+  // Fund): zwei unterschiedliche, per Maus gezogene Zeiten unter einer
+  // Sekunde Abstand zeigten mit ganzen Sekunden identisch "00:01" — siehe
+  // Dateikopf-Kommentar.
   useEffect(() => {
-    const timer = setTimeout(() => setStartText(formatDuration(segment.startS)), 0);
+    const timer = setTimeout(() => setStartText(formatDurationPrecise(segment.startS)), 0);
     return () => clearTimeout(timer);
   }, [segment.startS]);
   useEffect(() => {
-    const timer = setTimeout(() => setEndText(formatDuration(segment.endS)), 0);
+    const timer = setTimeout(() => setEndText(formatDurationPrecise(segment.endS)), 0);
     return () => clearTimeout(timer);
   }, [segment.endS]);
 
   function commitStart() {
     const parsed = parseTimecode(startText);
     if (parsed === null) {
-      setFieldError("Ungültige Zeit — Format mm:ss verwenden.");
-      setStartText(formatDuration(segment.startS));
+      setFieldError("Ungültige Zeit — Format mm:ss oder mm:ss.f verwenden.");
+      setStartText(formatDurationPrecise(segment.startS));
       return;
     }
     setFieldError("");
@@ -311,8 +363,8 @@ function SegmentRow({
   function commitEnd() {
     const parsed = parseTimecode(endText);
     if (parsed === null) {
-      setFieldError("Ungültige Zeit — Format mm:ss verwenden.");
-      setEndText(formatDuration(segment.endS));
+      setFieldError("Ungültige Zeit — Format mm:ss oder mm:ss.f verwenden.");
+      setEndText(formatDurationPrecise(segment.endS));
       return;
     }
     setFieldError("");
@@ -341,7 +393,7 @@ function SegmentRow({
           <input
             type="text"
             inputMode="numeric"
-            placeholder="mm:ss"
+            placeholder="mm:ss.f"
             value={startText}
             onFocus={() => setLastFocused("start")}
             onChange={(e) => setStartText(e.target.value)}
@@ -356,7 +408,7 @@ function SegmentRow({
           <input
             type="text"
             inputMode="numeric"
-            placeholder="mm:ss"
+            placeholder="mm:ss.f"
             value={endText}
             onFocus={() => setLastFocused("end")}
             onChange={(e) => setEndText(e.target.value)}
@@ -427,6 +479,9 @@ export function VideoTrimmer({
   const [alertMessage, setAlertMessage] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [currentPositionS, setCurrentPositionS] = useState(0);
+  const [thumbnails, setThumbnails] = useState<(string | null)[]>(() =>
+    new Array(FILMSTRIP_THUMB_COUNT).fill(null),
+  );
 
   const idCounterRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -452,6 +507,29 @@ export function VideoTrimmer({
     };
   }, [blob, tooLargeToTrim]);
 
+  // Filmstreifen (siehe lib/video/filmstrip.ts) — eigenes, verstecktes
+  // Video-Element, unabhängig von der sichtbaren Vorschau oben. `blob`/
+  // `durationS` ändern sich über die Lebensdauer EINER VideoTrimmer-Instanz
+  // nie (video-recorder.tsx setzt keinen `key`, ruft nie mit neuem Blob
+  // erneut auf, solange die Phase "trimming" bleibt) — der Anfangswert von
+  // `thumbnails` (alles `null`) deckt den Start deshalb bereits ab, ein
+  // zusätzliches Zurücksetzen hier wäre nicht nur unnötig, sondern liefe
+  // Gefahr, ein bereits eingetroffenes erstes Vorschaubild wieder zu
+  // überschreiben (Reihenfolge zwischen Reset und erstem Callback nicht
+  // garantiert). `setThumbnails` mit funktionalem Updater, damit einzelne
+  // Slots eintreffen können, ohne vorherige zu überschreiben.
+  useEffect(() => {
+    if (tooLargeToTrim || durationS <= 0) return;
+    const { cancel } = extractFilmstrip(blob, durationS, FILMSTRIP_THUMB_COUNT, ({ index, dataUrl }) => {
+      setThumbnails((prev) => {
+        const next = prev.slice();
+        next[index] = dataUrl;
+        return next;
+      });
+    });
+    return cancel;
+  }, [blob, durationS, tooLargeToTrim]);
+
   const orderedSegments = sortSegments(segments);
   const normalized = normalizeSegments(segments, durationS);
   const resultingDurationS = totalDurationS(normalized);
@@ -474,14 +552,14 @@ export function VideoTrimmer({
     const next = splitSegment(segments, id, atS, [nextId(), nextId()]);
     if (next === segments) {
       setAlertMessage(
-        `Die aktuelle Wiedergabeposition (${formatDuration(atS)}) liegt nicht innerhalb dieses Abschnitts ` +
+        `Die aktuelle Wiedergabeposition (${formatDurationPrecise(atS)}) liegt nicht innerhalb dieses Abschnitts ` +
           "(oder zu nah an dessen Rand) — Abspielen/Pause nutzen, um erst dorthin zu gelangen.",
       );
       return;
     }
     setSegments(next);
     setAlertMessage("");
-    setStatusMessage(`Abschnitt bei ${formatDuration(atS)} geteilt.`);
+    setStatusMessage(`Abschnitt bei ${formatDurationPrecise(atS)} geteilt.`);
   }
 
   function handleRemove(id: string) {
@@ -623,7 +701,7 @@ export function VideoTrimmer({
           5 Sekunden vor
         </button>
         <span aria-hidden="true" className="text-sm font-semibold tabular-nums" style={{ color: "#66679B" }}>
-          Position {formatDuration(currentPositionS)} / {formatDuration(durationS)}
+          Position {formatDurationPrecise(currentPositionS)} / {formatDurationPrecise(durationS)}
         </span>
       </div>
 
@@ -654,6 +732,7 @@ export function VideoTrimmer({
           segments={segments}
           durationS={durationS}
           currentPositionS={currentPositionS}
+          thumbnails={thumbnails}
           onSetBound={handleSetBound}
           onSeek={(valueS) => {
             const video = videoRef.current;
@@ -698,7 +777,7 @@ export function VideoTrimmer({
         <div className="text-[15px] font-bold" style={{ color: "#1A1A2E" }}>
           Gesamtlänge nach Schnitt:{" "}
           <span className="tabular-nums" style={{ color: "#5663AE" }}>
-            {formatDuration(resultingDurationS)}
+            {formatDurationPrecise(resultingDurationS)}
           </span>
         </div>
         <div className="flex-1" />

@@ -3,6 +3,7 @@ import {
   buildRecordingFilename,
   classifyMediaError,
   formatDuration,
+  formatDurationPrecise,
   formatFileSize,
   getMilestoneMessage,
   getRecordingStoppedMessage,
@@ -58,6 +59,42 @@ describe("formatDuration", () => {
 
   it("rundet auf ganze Sekunden ab (kein Aufrunden)", () => {
     expect(formatDuration(59.9)).toBe("00:59");
+  });
+});
+
+describe("formatDurationPrecise", () => {
+  it("zeigt eine Nachkommastelle (Zehntelsekunden)", () => {
+    expect(formatDurationPrecise(0)).toBe("00:00.0");
+    expect(formatDurationPrecise(1.3)).toBe("00:01.3");
+    expect(formatDurationPrecise(65.9)).toBe("01:05.9");
+  });
+
+  it("unterscheidet zwei Zeiten, die formatDuration identisch abrunden würde", () => {
+    // Josips Fund (18.07.2026): 1,1s und 1,9s zeigten mit formatDuration()
+    // beide "00:01" (beide floor(x) === 1) — mit einer Nachkommastelle sind
+    // sie unterscheidbar.
+    expect(formatDuration(1.1)).toBe(formatDuration(1.9));
+    expect(formatDurationPrecise(1.1)).not.toBe(formatDurationPrecise(1.9));
+    expect(formatDurationPrecise(1.1)).toBe("00:01.1");
+    expect(formatDurationPrecise(1.9)).toBe("00:01.9");
+  });
+
+  it("rundet auf die nächste Zehntelsekunde (nicht ab)", () => {
+    expect(formatDurationPrecise(1.35)).toBe("00:01.4");
+    expect(formatDurationPrecise(1.34)).toBe("00:01.3");
+  });
+
+  it("trägt bei .95+ korrekt in die nächste Sekunde über", () => {
+    expect(formatDurationPrecise(1.96)).toBe("00:02.0");
+  });
+
+  it("klemmt negative/ungültige Werte auf 0", () => {
+    expect(formatDurationPrecise(-5)).toBe("00:00.0");
+    expect(formatDurationPrecise(NaN)).toBe("00:00.0");
+  });
+
+  it("funktioniert über 60 Minuten hinaus", () => {
+    expect(formatDurationPrecise(3661.2)).toBe("61:01.2");
   });
 });
 
