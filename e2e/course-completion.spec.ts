@@ -47,16 +47,24 @@ test("Staff legt Kurs+Lektion an, veröffentlicht beides, Student schließt die 
   // frischen Kursseite eindeutig).
   await page.waitForTimeout(1000);
 
+  // Der Submit-Button wird über `type="submit"` innerhalb des bereits
+  // eindeutig gescopeten Formulars adressiert, NICHT über seine Beschriftung
+  // (Design-Update 17.07.2026: aus dem reinen "+" wurde "Modul" bzw. "Hinzu"
+  // — ein alleinstehendes "+" war selbst ein Barrierefreiheits-Verstoß). Der
+  // Test hing vorher an genau dieser Beschriftung und wäre stumm gebrochen;
+  // aufgefallen ist es nur, weil der builder es gemeldet hat — die Suite
+  // selbst läuft mangels demo-blau-Seed nicht. An `type="submit"` gebunden
+  // überlebt der Test das nächste Design-Update.
   const moduleForm = page.locator("form").filter({ has: page.getByPlaceholder("Neues Modul …") });
   await moduleForm.getByPlaceholder("Neues Modul …").fill("Modul 1");
-  await moduleForm.getByRole("button", { name: "+" }).click();
+  await moduleForm.locator('button[type="submit"]').click();
   await expect(page.getByText("Modul 1")).toBeVisible({ timeout: 30000 });
 
   // --- Staff: Lektion anlegen ---
   await page.waitForTimeout(500);
   const lessonForm = page.locator("form").filter({ has: page.getByPlaceholder("Neue Lektion …") });
   await lessonForm.getByPlaceholder("Neue Lektion …").fill(lessonTitle);
-  await lessonForm.getByRole("button", { name: "+" }).click();
+  await lessonForm.locator('button[type="submit"]').click();
   const lessonLink = page.getByRole("link", { name: lessonTitle });
   await expect(lessonLink).toBeVisible({ timeout: 30000 });
 
