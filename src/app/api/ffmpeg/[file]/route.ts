@@ -64,6 +64,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fil
   }
 
   if (!object) {
+    // Wenn das hier feuert, fehlt die Datei im Bucket — siehe den
+    // `--remote`-Hinweis bei `getObject()` unten.
     console.error(`[api/ffmpeg] Objekt fehlt im R2-Bucket "calltalent-akademie-ffmpeg": ${filename}`);
     return NextResponse.json({ error: "Datei nicht gefunden." }, { status: 404 });
   }
@@ -78,7 +80,34 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fil
   });
 }
 
+/**
+ * Synchrones `getCloudflareContext()` ist im Request-Kontext eines Route
+ * Handlers die richtige und dokumentierte Variante. Die async-Variante
+ * (`{ async: true }`) ist laut OpenNext-Doku für SSG-/Build-Zeit-Kontexte
+ * gedacht — hier also nicht verwenden.
+ *
+ * WICHTIG, WENN DIESE ROUTE 404 LIEFERT (17.07.2026, erster Live-Test — hat
+ * mich Stunden gekostet, deshalb hier dokumentiert):
+ *
+ * `wrangler r2 object put|get` arbeitet OHNE `--remote` auf einer LOKAL
+ * simulierten R2-Instanz (`.wrangler/state/`), nicht auf dem echten Bucket.
+ * Der Upload meldet trotzdem "Upload complete", und ein anschließendes
+ * `get` meldet "Download complete" — beides liest/schreibt nur die lokale
+ * Platte. Der echte Bucket bleibt leer, die Route liefert 404, und die
+ * Bindung ist dabei völlig in Ordnung.
+ *
+ * Erkennungsmerkmal: ohne `--remote` fehlt in der wrangler-Ausgabe das
+ * Jurisdiktions-Suffix — 'in bucket "calltalent-akademie-ffmpeg"' statt
+ * 'in bucket "calltalent-akademie-ffmpeg (eu)"'. Ausserdem weist wrangler
+ * selbst mit "Use --remote if you want to access the remote instance"
+ * darauf hin.
+ *
+ * Also IMMER mit `--remote --jurisdiction eu` hochladen:
+ *   npx wrangler r2 object put calltalent-akademie-ffmpeg/ffmpeg-core.wasm \
+ *     --file=node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.wasm \
+ *     --content-type=application/wasm --jurisdiction eu --remote
+ */
 async function getObject(filename: keyof typeof ALLOWED_FILES) {
-  const { env } = await getCloudflareContext({ async: true });
+  const { env } = getCloudflareContext();
   return env.FFMPEG_BUCKET.get(filename);
 }
