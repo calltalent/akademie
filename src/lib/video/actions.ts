@@ -21,6 +21,13 @@ import { processVideoTranscript } from "@/lib/video/transcript";
  * Ownership-Check über `requireStaffTenant()` + `.eq("tenant_id", …)` —
  * Defense-in-Depth wie überall (Muster aus courses/actions.ts), bevor
  * irgendetwas gegen Bunny ausgelöst wird.
+ *
+ * `processVideoTranscript()` ruft hier bewusst mit `{force:true}` (Teil 1,
+ * Idempotenz-Sperre gegen doppelte Bunny-Webhook-Zustellungen, Plan
+ * `calm-watching-dewdrop.md`): ohne `force` würde ein bereits vorhandenes
+ * Transkript den Lauf sofort überspringen — Josips "Transkript
+ * aktualisieren"-Knopf (z. B. nach Video-Austausch) muss aber bewusst neu
+ * laufen können.
  */
 
 export type RefreshTranscriptResult = { ok: boolean; message: string };
@@ -53,7 +60,7 @@ export async function refreshLessonTranscript(lessonId: string): Promise<Refresh
       };
     }
 
-    const result = await processVideoTranscript(lesson.video_bunny_id);
+    const result = await processVideoTranscript(lesson.video_bunny_id, { force: true });
     if (!result.ok) {
       return { ok: false, message: result.message };
     }

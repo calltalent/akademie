@@ -126,7 +126,15 @@ export async function enforceQuota(
  */
 export async function recordAiJob(params: {
   tenantId: string;
-  kind: "course_gen" | "quiz_gen" | "transcript" | "summary" | "embed";
+  // "translation" (Stufe 3, Untertitel DE+EN, Plan `calm-watching-dewdrop.md`):
+  // ensureEnglishCaption() (src/lib/video/translate-captions.ts) protokolliert
+  // damit die claude-haiku-Kosten der VTT-Übersetzung. Erfordert die
+  // CHECK-Constraint-Erweiterung in supabase/migrations/
+  // 20260717120000_ai_jobs_kind_translation.sql (0001_init.sql bleibt
+  // unverändert, CLAUDE.md §3) — OHNE angewendete Migration schlägt der
+  // INSERT an der DB-Constraint fehl und recordAiJob() loggt das fail-soft
+  // (siehe unten), statt zu werfen.
+  kind: "course_gen" | "quiz_gen" | "transcript" | "summary" | "embed" | "translation";
   model: string;
   tokensIn: number;
   tokensOut: number;

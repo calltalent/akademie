@@ -157,3 +157,51 @@ export function getCaptionVttUrl(videoId: string, srclang: string): string | nul
   if (!cdnHostname) return null;
   return `https://${cdnHostname}/${videoId}/captions/${srclang}.vtt`;
 }
+
+/**
+ * Stufe 3 „Untertitel DE + EN" (Plan `calm-watching-dewdrop.md`). Lädt eine
+ * fertige VTT-Untertitelspur zu einem bereits transkribierten Bunny-Video
+ * hoch — genutzt von `ensureEnglishCaption()` (src/lib/video/
+ * translate-captions.ts), um die per claude-haiku übersetzte EN-Spur
+ * neben der von Bunny erzeugten DE-Spur einzuhängen. Laut Bunny-Doku ein
+ * Upsert pro `srclang`: ein erneuter Aufruf mit gleichem `srclang`
+ * überschreibt die vorhandene Spur statt einen Duplikat-Fehler zu werfen —
+ * relevant für die Idempotenz-Betrachtung in `ensureEnglishCaption()`
+ * (benignes TOCTOU, siehe dortiger Kommentar).
+ *
+ * Base64-Falle: `captionsFile` muss laut Bunny-Doku Base64-kodiert sein.
+ * `btoa()` wirft bei Nicht-Latin1-Zeichen (deutsche VTT enthalten ä/ö/ü/ß)
+ * bzw. verstümmelt sie in manchen Runtimes lautlos — `Buffer.from(vttText,
+ * "utf8").toString("base64")` kodiert stattdessen die tatsächlichen
+ * UTF-8-Bytes korrekt. Cloudflare-Workers-Kompatibilität: `nodejs_compat` ist
+ * an, diese Datei nutzt bereits `node:crypto` (`createHash` oben) — `Buffer`
+ * steht über denselben Compat-Layer zur Verfügung.
+ */
+export async function addCaption(
+  videoId: string,
+  srclang: string,
+  label: string,
+  vttText: string,
+): Promise<void> {
+  const { libraryId, apiKey } = bunnyConfig();
+
+  const captionsFile = Buffer.from(vttText, "utf8").toString("base64");
+
+  const response = await fetch(
+    `https://video.bunnycdn.com/library/${libraryId}/videos/${videoId}/captions/${srclang}`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        AccessKey: apiKey,
+      },
+      body: JSON.stringify({ srclang, label, captionsFile }),
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Bunny „Add Caption" fehlgeschlagen: ${text}`);
+  }
+}

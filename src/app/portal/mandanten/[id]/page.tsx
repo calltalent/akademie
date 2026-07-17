@@ -27,6 +27,12 @@ const AI_JOB_KIND_LABELS: Record<string, string> = {
   transcript: "Transkript",
   summary: "Zusammenfassung",
   embed: "Embeddings",
+  // Stufe 3 „Untertitel DE+EN" (Plan calm-watching-dewdrop.md):
+  // ensureEnglishCaption() (src/lib/video/translate-captions.ts) schreibt
+  // ai_jobs mit kind:"translation" — ohne diesen Eintrag würde die englische
+  // Kind-Kennung roh in dieser sonst durchgehend deutschen Kostenübersicht
+  // auftauchen (Fallback-Verhalten unten: AI_JOB_KIND_LABELS[kind] ?? kind).
+  translation: "Untertitel-Übersetzung",
 };
 
 /** Erster des laufenden Monats als ISO-Datum — Format der `usage_counters.month`-Spalte (analog src/lib/ai/usage.ts, dort nicht exportiert). */

@@ -3,6 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getBunnyVideo, getCaptionVttUrl } from "@/lib/bunny/client";
 import { parseVttToPlainText } from "@/lib/video/vtt";
+import { ensureEnglishCaption } from "@/lib/video/translate-captions";
 import { createAnthropicClient } from "@/lib/ai/anthropic";
 import { AI_MODELS, BUNNY_TRANSCRIBE_MODEL } from "@/lib/ai/config";
 import { recordAiJob } from "@/lib/ai/usage";
@@ -20,12 +21,25 @@ import { genericErrorMessage } from "@/lib/errors/generic";
  * der Webhook (der nie werfen darf, um keinen Bunny-Retry-Sturm auszulösen)
  * als auch die Server Action (sanitized Error-Handling) einheitlich damit
  * umgehen können.
+ *
+ * IDEMPOTENZ-SPERRE (Teil 1, Plan `calm-watching-dewdrop.md`, echter
+ * Produktions-Fund: Bunny hat `Status 9` für EIN Video DREIFACH zugestellt —
+ * jeder Lauf hätte real bezahlte Claude-Aufrufe (Zusammenfassung, jetzt auch
+ * Übersetzung) ausgelöst). Ohne `opts.force` gilt ein bereits vorhandenes
+ * Transkript als "fertig": kein erneuter Bunny-/Claude-Aufruf, keine neue
+ * `ai_jobs`-Zeile. `refreshLessonTranscript()` (src/lib/video/actions.ts,
+ * Josips "Transkript aktualisieren"-Knopf) ruft bewusst mit `{force:true}`,
+ * damit ein absichtlicher Neu-Lauf weiterhin funktioniert. Der Bunny-Webhook
+ * (`Status 9`, src/app/api/bunny/webhook/route.ts) ruft OHNE `force` auf.
  */
 export type ProcessTranscriptResult =
   | { ok: true; lessonId: string }
   | { ok: false; reason: "lesson_not_found" | "error"; message: string };
 
-export async function processVideoTranscript(bunnyVideoId: string): Promise<ProcessTranscriptResult> {
+export async function processVideoTranscript(
+  bunnyVideoId: string,
+  opts: { force?: boolean } = {},
+): Promise<ProcessTranscriptResult> {
   const admin = createAdminClient();
 
   // ABWEICHUNG/Voraussetzung (siehe PHASENSTATUS.md): lessons.video_bunny_id
@@ -33,7 +47,7 @@ export async function processVideoTranscript(bunnyVideoId: string): Promise<Proc
   // synchron zum video-Block gepflegt — ohne das gäbe es hier nichts zu finden.
   const { data: lesson, error: lessonError } = await admin
     .from("lessons")
-    .select("id, tenant_id, title")
+    .select("id, tenant_id, title, transcript")
     .eq("video_bunny_id", bunnyVideoId)
     .maybeSingle();
 
@@ -46,6 +60,14 @@ export async function processVideoTranscript(bunnyVideoId: string): Promise<Proc
     return { ok: false, reason: "lesson_not_found", message: "Keine Lektion zu diesem Video gefunden." };
   }
 
+  if (lesson.transcript && !opts.force) {
+    console.info(
+      "[video/transcript] Transkript für dieses Video ist bereits vorhanden, Lauf übersprungen (Idempotenz-Sperre gegen doppelte Bunny-Webhook-Zustellungen, kein `force`):",
+      bunnyVideoId,
+    );
+    return { ok: true, lessonId: lesson.id };
+  }
+
   try {
     const videoDetails = await getBunnyVideo(bunnyVideoId);
 
@@ -56,6 +78,12 @@ export async function processVideoTranscript(bunnyVideoId: string): Promise<Proc
     // — Kapitel/Metadaten werden trotzdem gespeichert (Auftrag: "besser ein
     // eingeschränktes Ergebnis als ein kompletter Blocker").
     let transcriptText = "";
+    // Rohes DE-VTT (Stufe 3, Untertitel DE+EN): `parseVttToPlainText()`
+    // konsumiert die VTT bisher sofort zu Fließtext — für
+    // `ensureEnglishCaption()` unten wird zusätzlich der ROHE Text mit
+    // Zeitstempeln gebraucht, deshalb einmal geholt und beides daraus
+    // abgeleitet, statt ein zweites Mal zu fetchen.
+    let deVttRaw: string | null = null;
     const caption = videoDetails.captions[0];
     if (caption) {
       const vttUrl = getCaptionVttUrl(bunnyVideoId, caption.srclang);
@@ -63,7 +91,9 @@ export async function processVideoTranscript(bunnyVideoId: string): Promise<Proc
         try {
           const vttResponse = await fetch(vttUrl);
           if (vttResponse.ok) {
-            transcriptText = parseVttToPlainText(await vttResponse.text());
+            const rawVtt = await vttResponse.text();
+            deVttRaw = rawVtt;
+            transcriptText = parseVttToPlainText(rawVtt);
           } else {
             console.error(
               "[video/transcript] VTT-Abruf fehlgeschlagen (Status):",
@@ -98,6 +128,23 @@ export async function processVideoTranscript(bunnyVideoId: string): Promise<Proc
       input: { bunnyVideoId },
       output: { chapterCount: videoDetails.chapters.length, hasTranscript: transcriptText.length > 0 },
     });
+
+    // Stufe 3 (Untertitel DE+EN): EN-Caption per claude-haiku-Übersetzung des
+    // DE-VTT nachziehen. Nur wenn die Quell-Caption tatsächlich Deutsch ist
+    // (`sourceLanguage: "de"` in triggerTranscription() — case-insensitiv
+    // geprüft) UND das rohe VTT oben erfolgreich geholt wurde. Fail-soft wie
+    // `summarizeTranscript()` unten: `ensureEnglishCaption()` wirft NIE nach
+    // außen (eigener try/catch + Error-`ai_jobs` darin), ein
+    // Übersetzungsfehler darf das bereits ermittelte DE-Transkript nie
+    // gefährden.
+    if (deVttRaw && caption?.srclang.toLowerCase() === "de") {
+      await ensureEnglishCaption({
+        bunnyVideoId,
+        tenantId: lesson.tenant_id,
+        deVtt: deVttRaw,
+        existingCaptions: videoDetails.captions,
+      });
+    }
 
     // Zusammenfassung nur bei tatsächlich vorhandenem Transkripttext — ohne
     // Text kein sinnvoller/nötiger Claude-Aufruf.
