@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { Block } from "@/lib/courses/schema";
 import { VideoSourceSwitch } from "@/components/editor/video-source-switch";
+import { ImageUpload } from "@/components/editor/image-upload";
 import { createQuiz } from "@/lib/quiz/actions";
 
 export type CourseQuizOption = { id: string; title: string };
@@ -87,8 +88,12 @@ export function BlockForm({
     case "image":
       return (
         <div className="flex flex-col gap-3">
+          <ImageUpload
+            currentUrl={block.url}
+            onUploaded={(url) => onChange({ ...block, url })}
+          />
           <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
-            Bild-URL
+            Bild-URL (oder direkt eine bereits gehostete Adresse eintragen)
             <input
               value={block.url}
               onChange={(e) => onChange({ ...block, url: e.target.value })}
