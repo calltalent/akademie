@@ -40,12 +40,23 @@ import {
  * dann gemeinsam in EINEM ffmpeg-Ladevorgang, ausgelöst durch „Zuschnitt
  * übernehmen".
  *
- * KEYBOARD-FIRST, KEIN DRAG-TIMELINE (CLAUDE.md §3.4, wichtigste Vorgabe des
- * Plans für dieses Bauteil — der Auftraggeber ist sehbehindert, ziehbare
- * Griffe sind für ihn wertlos): echte `<ul>`-Liste, jede Zeile mit
- * beschrifteten mm:ss-Feldern, „Position übernehmen" (nutzt
- * `video.currentTime`), „Abschnitt teilen", „Abschnitt entfernen". Die
- * gestreifte Zeitleiste ist rein ergänzend, `aria-hidden="true"`.
+ * KEYBOARD-FIRST BLEIBT DIE PRIMÄRE BEDIENUNG (CLAUDE.md §3.4 — der
+ * Auftraggeber ist sehbehindert, ziehbare Griffe sind für ihn wertlos): echte
+ * `<ul>`-Liste, jede Zeile mit beschrifteten mm:ss-Feldern, „Position
+ * übernehmen" (nutzt `video.currentTime`), „Abschnitt teilen", „Abschnitt
+ * entfernen". Diese Felder/Knöpfe bleiben unverändert und decken jeden
+ * Schnitt vollständig ab, ganz ohne Maus.
+ *
+ * ZUSÄTZLICH (17.07.2026, Josips Wunsch nach einer visuellen
+ * Video-Schnitt-Optik): die Zeitleiste ist jetzt PARALLEL dazu per Maus/Touch
+ * bedienbar — ziehbare Start-/Ende-Linien je Abschnitt (Pointer Events,
+ * `setPointerCapture`, funktioniert für Maus und Touch gleichermaßen) plus
+ * Klick-zum-Springen. Bewusst ERGÄNZEND, nicht ersetzend: die Leiste bleibt
+ * `aria-hidden="true"` (für Screenreader unsichtbar, exakt wie vorher) und
+ * ruft für jede Bewegung exakt dieselbe `onSetBound()`-Funktion auf, die auch
+ * die mm:ss-Felder committen — ein Ziehen erzeugt keinen zweiten Zustand,
+ * beide Bedienwege schreiben in dieselben `segments`. Wer nicht sehen oder
+ * nicht ziehen kann, verliert dadurch nichts.
  *
  * Kostensicherheit (Plan-Vorgabe, unverändert wichtig): diese Datei
  * importiert `useBunnyUpload` NIE. Das fertige (ggf. geschnittene) Blob geht
@@ -68,8 +79,34 @@ function buildResultMessage(requestedTotalS: number, actualTotalS: number): stri
   );
 }
 
-function TimelineBar({ segments, durationS }: { segments: Segment[]; durationS: number }) {
+/**
+ * Video-Editor-Optik (siehe Dateikopf): ziehbare Start-/Ende-Linien je
+ * Abschnitt + Klick-zum-Springen + Abspielposition als Linie. Bleibt
+ * `aria-hidden="true"` — rein zusätzliche Maus-/Touch-Bedienung, ruft für
+ * jede Bewegung dieselbe `onSetBound()` auf wie die mm:ss-Felder oben.
+ *
+ * `touch-action: none` auf Track UND Griffen ist Pflicht, nicht Kosmetik:
+ * ohne das würde ein Ziehversuch auf einem Touch-Gerät als Seiten-Scroll
+ * interpretiert, bevor der Pointer-Move überhaupt ankommt.
+ */
+function TimelineBar({
+  segments,
+  durationS,
+  currentPositionS,
+  onSetBound,
+  onSeek,
+}: {
+  segments: Segment[];
+  durationS: number;
+  currentPositionS: number;
+  onSetBound: (id: string, bound: "start" | "end", valueS: number) => void;
+  onSeek: (valueS: number) => void;
+}) {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const draggingRef = useRef(false);
+
   if (durationS <= 0) return null;
+  const orderedForHandles = sortSegments(segments);
   const normalized = normalizeSegments(segments, durationS);
   const blocks: { kind: "keep" | "cut"; widthPct: number }[] = [];
   let cursor = 0;
@@ -85,26 +122,118 @@ function TimelineBar({ segments, durationS }: { segments: Segment[]; durationS: 
   }
   if (blocks.length === 0) return null;
 
+  function timeFromClientX(clientX: number): number {
+    const rect = trackRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return 0;
+    const ratio = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+    return ratio * durationS;
+  }
+
+  function handleTrackClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (draggingRef.current) return; // Klick direkt nach einem Ziehvorgang nicht zusätzlich als Sprung werten.
+    onSeek(timeFromClientX(e.clientX));
+  }
+
+  function handleHandlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      // Wirft laut Spec `NotFoundError`, wenn die Pointer-ID zwischen dem
+      // Event und diesem Aufruf schon ungültig wurde (seltener Edge-Fall,
+      // z. B. sehr schnelles Multi-Touch) — dann bleibt es beim einfachen
+      // Klick-zum-Springen statt eines Ziehvorgangs, kein Absturz.
+      e.currentTarget.setPointerCapture(e.pointerId);
+      draggingRef.current = true;
+    } catch {
+      draggingRef.current = false;
+    }
+  }
+
+  function handleHandlePointerMove(e: React.PointerEvent<HTMLDivElement>, id: string, bound: "start" | "end") {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    const valueS = timeFromClientX(e.clientX);
+    onSetBound(id, bound, valueS);
+    onSeek(valueS);
+  }
+
+  function handleHandlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Capture wurde nie erfolgreich hergestellt (siehe handleHandlePointerDown) — nichts freizugeben.
+    }
+    // Kurze Verzögerung: der `click` auf dem Track feuert NACH `pointerup`
+    // auf demselben Zyklus — ohne den Timer würde ein beendeter Ziehvorgang
+    // sofort danach fälschlich als zusätzlicher Sprung interpretiert.
+    setTimeout(() => {
+      draggingRef.current = false;
+    }, 0);
+  }
+
   return (
-    <div aria-hidden="true">
-      <div className="mb-2 text-[13px] font-bold" style={{ color: "#3E3F66" }}>
-        Zeitleiste (nur Anzeige)
+    <div>
+      <div className="mb-2 flex items-baseline justify-between text-[13px] font-bold" style={{ color: "#3E3F66" }}>
+        <span aria-hidden="true">Zeitleiste — Linien ziehen zum Anpassen, Klicken zum Springen</span>
       </div>
-      <div className="flex h-[26px] overflow-hidden rounded-lg border" style={{ borderColor: "#E7E8F2" }}>
-        {blocks.map((b, i) =>
-          b.widthPct <= 0 ? null : (
-            <div
-              key={i}
-              style={{
-                flex: `${b.widthPct} 1 0%`,
-                background:
-                  b.kind === "keep" ? "#5663AE" : "repeating-linear-gradient(45deg, #EEF0F7 0 6px, #E0E2EF 6px 12px)",
-              }}
-            />
-          ),
-        )}
+      <div
+        ref={trackRef}
+        onClick={handleTrackClick}
+        aria-hidden="true"
+        className="relative h-11 cursor-pointer select-none"
+        style={{ touchAction: "none" }}
+      >
+        <div
+          className="absolute inset-x-0 top-1/2 flex h-[26px] -translate-y-1/2 overflow-hidden rounded-lg border"
+          style={{ borderColor: "#E7E8F2" }}
+        >
+          {blocks.map((b, i) =>
+            b.widthPct <= 0 ? null : (
+              <div
+                key={i}
+                style={{
+                  flex: `${b.widthPct} 1 0%`,
+                  background:
+                    b.kind === "keep" ? "#5663AE" : "repeating-linear-gradient(45deg, #EEF0F7 0 6px, #E0E2EF 6px 12px)",
+                }}
+              />
+            ),
+          )}
+        </div>
+
+        {orderedForHandles.flatMap((seg, i) => [
+          <div
+            key={`${seg.id}-start`}
+            onPointerDown={handleHandlePointerDown}
+            onPointerMove={(e) => handleHandlePointerMove(e, seg.id, "start")}
+            onPointerUp={handleHandlePointerUp}
+            title={`Start Abschnitt ${i + 1} — ziehen zum Anpassen`}
+            className="absolute top-0 h-full w-3 -translate-x-1/2 cursor-ew-resize"
+            style={{ left: `${(Math.min(Math.max(seg.startS, 0), durationS) / durationS) * 100}%`, touchAction: "none" }}
+          >
+            <div className="mx-auto h-full w-[3px] rounded-full" style={{ background: "#1A1A2E" }} />
+          </div>,
+          <div
+            key={`${seg.id}-end`}
+            onPointerDown={handleHandlePointerDown}
+            onPointerMove={(e) => handleHandlePointerMove(e, seg.id, "end")}
+            onPointerUp={handleHandlePointerUp}
+            title={`Ende Abschnitt ${i + 1} — ziehen zum Anpassen`}
+            className="absolute top-0 h-full w-3 -translate-x-1/2 cursor-ew-resize"
+            style={{ left: `${(Math.min(Math.max(seg.endS, 0), durationS) / durationS) * 100}%`, touchAction: "none" }}
+          >
+            <div className="mx-auto h-full w-[3px] rounded-full" style={{ background: "#1A1A2E" }} />
+          </div>,
+        ])}
+
+        <div
+          className="pointer-events-none absolute top-0 h-full w-[2px] -translate-x-1/2"
+          style={{
+            left: `${(Math.min(Math.max(currentPositionS, 0), durationS) / durationS) * 100}%`,
+            background: "#B14A4A",
+          }}
+        />
       </div>
-      <div className="mt-2 flex gap-5 text-[13px] font-semibold" style={{ color: "#3E3F66" }}>
+      <div className="mt-2 flex gap-5 text-[13px] font-semibold" style={{ color: "#3E3F66" }} aria-hidden="true">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-3.5 w-3.5 rounded" style={{ background: "#5663AE" }} />
           Behalten
@@ -115,6 +244,14 @@ function TimelineBar({ segments, durationS }: { segments: Segment[]; durationS: 
             style={{ background: "repeating-linear-gradient(45deg, #EEF0F7 0 4px, #E0E2EF 4px 8px)" }}
           />
           Entfernt
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-3.5 w-1 rounded-full" style={{ background: "#1A1A2E" }} />
+          Schnittlinie (ziehbar)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-3.5 w-1 rounded-full" style={{ background: "#B14A4A" }} />
+          Wiedergabeposition
         </span>
       </div>
     </div>
@@ -513,7 +650,16 @@ export function VideoTrimmer({
           ))}
         </ul>
 
-        <TimelineBar segments={segments} durationS={durationS} />
+        <TimelineBar
+          segments={segments}
+          durationS={durationS}
+          currentPositionS={currentPositionS}
+          onSetBound={handleSetBound}
+          onSeek={(valueS) => {
+            const video = videoRef.current;
+            if (video) video.currentTime = valueS;
+          }}
+        />
 
         <div
           className="flex items-start gap-2.5 rounded-xl border px-4 py-3"
