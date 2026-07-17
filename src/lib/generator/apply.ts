@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireStaffTenant } from "@/lib/auth/staff";
 import type { createClient } from "@/lib/supabase/server";
 import { blocksSchema } from "@/lib/courses/schema";
+import { slugify } from "@/lib/courses/slug";
+import { resolveUniqueCourseSlug } from "@/lib/courses/resolve-slug";
 import { questionInputSchema } from "@/lib/quiz/schema";
 import { courseDraftSchema, courseGenOutputSchema, type CourseDraft } from "@/lib/generator/schema";
 import { translateDbError } from "@/lib/errors/db";
@@ -36,24 +38,6 @@ import { translateDbError } from "@/lib/errors/db";
 
 type ApplyResult = { ok: true; courseId: string } | { ok: false; error: string };
 
-/** Entfernt kombinierende diakritische Zeichen (U+0300-U+036F) nach NFKD-Normalisierung (ä -> a, ...). */
-function stripDiacritics(input: string): string {
-  return Array.from(input)
-    .filter((ch) => {
-      const code = ch.codePointAt(0) ?? 0;
-      return !(code >= 0x0300 && code <= 0x036f);
-    })
-    .join("");
-}
-
-function slugify(input: string): string {
-  const base = stripDiacritics(input.toLowerCase().normalize("NFKD"))
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-  return base || "kurs";
-}
-
 export async function applyDraftAsCourse(jobId: string): Promise<ApplyResult> {
   try {
     const { tenant, user, supabase } = await requireStaffTenant();
@@ -85,17 +69,7 @@ export async function applyDraftAsCourse(jobId: string): Promise<ApplyResult> {
 
     // Eindeutigen Slug ermitteln (unique(tenant_id, slug), 0001_init.sql).
     const baseSlug = slugify(draft.title);
-    let slug = baseSlug;
-    for (let attempt = 1; attempt <= 20; attempt++) {
-      const { data: existing } = await supabase
-        .from("courses")
-        .select("id")
-        .eq("tenant_id", tenant.id)
-        .eq("slug", slug)
-        .maybeSingle();
-      if (!existing) break;
-      slug = `${baseSlug}-${attempt + 1}`;
-    }
+    const slug = await resolveUniqueCourseSlug(supabase, tenant.id, baseSlug);
 
     // Kurs immer als Entwurf anlegen (courses.status default 'draft').
     const { data: course, error: courseError } = await supabase

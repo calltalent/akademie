@@ -1,13 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaffTenant } from "@/lib/auth/staff";
+import { redirect } from "next/navigation";
+import { requireStaffTenant, requireAdminTenant } from "@/lib/auth/staff";
 import {
   blocksSchema,
   courseSchema,
   lessonSchema,
   moduleSchema,
 } from "@/lib/courses/schema";
+import { slugify } from "@/lib/courses/slug";
+import { resolveUniqueCourseSlug } from "@/lib/courses/resolve-slug";
 import type { CourseActionState } from "@/lib/courses/state";
 import { translateDbError } from "@/lib/errors/db";
 import { genericErrorMessage } from "@/lib/errors/generic";
@@ -98,20 +101,104 @@ export async function updateCourseStatus(
   }
 }
 
-export async function deleteCourse(courseId: string): Promise<CourseActionState> {
+/**
+ * Titel UND Slug ändern (Josips Entscheidung, siehe PHASENSTATUS.md — bewusst
+ * NICHT nur der Titel, alte `/kurs/<slug>`-Links laufen danach ins Leere).
+ * Bleibt Staff-Level wie `updateCourseStatus`/`updateCourseCategory` — anders
+ * als das Löschen (siehe `deleteCourse`) ist Umbenennen nicht destruktiv
+ * genug, um Trainern das Recht zu entziehen.
+ *
+ * Slug-Kollisionsauflösung über `resolveUniqueCourseSlug` mit
+ * `excludeCourseId = courseId`: ohne die Selbst-Ausnahme würde der Kurs bei
+ * JEDEM Speichern (auch ohne Titeländerung) mit seinem eigenen, bereits
+ * existierenden Slug kollidieren und ein neues `-2` anhängen.
+ */
+export async function updateCourseTitle(
+  courseId: string,
+  title: string,
+): Promise<CourseActionState & { slug?: string }> {
   try {
     const { tenant, supabase } = await requireStaffTenant();
+    const parsed = courseSchema.pick({ title: true }).safeParse({ title });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Ungültiger Titel." };
+    }
+
+    const baseSlug = slugify(parsed.data.title);
+    const slug = await resolveUniqueCourseSlug(supabase, tenant.id, baseSlug, courseId);
+
+    const { error } = await supabase
+      .from("courses")
+      .update({ title: parsed.data.title, slug })
+      .eq("id", courseId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+
+    revalidatePath("/admin/kurse");
+    revalidatePath(`/admin/kurse/${courseId}`);
+    return { error: null, success: true, slug };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
+ * SICHERHEITSHÄRTUNG (Josips Entscheidung, siehe PHASENSTATUS.md): Löschen
+ * kaskadiert per FK `on delete cascade` (0001_init.sql) auf certificates,
+ * progress, submissions, enrollments, bookmarks, embeddings,
+ * tutor_conversations, quizzes, attempts — ein Trainer (niedrigste
+ * Staff-Rolle, von `requireStaffTenant()` bislang zugelassen) darf
+ * ausgestellte Kundenzertifikate nicht vernichten können. Gleiche
+ * `memberships_admin_write`-Linie wie die Nutzerverwaltung (siehe
+ * `requireAdminTenant()`-Kommentar in src/lib/auth/staff.ts) — deshalb hier
+ * `requireAdminTenant()` statt `requireStaffTenant()`.
+ *
+ * `confirmTitle` muss serverseitig EXAKT mit dem aktuellen Kurstitel
+ * übereinstimmen — frisch aus der DB nachgeladen, NICHT dem Client vertraut
+ * (eine reine Client-seitige Prüfung wäre umgehbar).
+ *
+ * `redirect()` bewusst AUSSERHALB des try/catch (gleiches Muster wie
+ * `deleteTenant()`, src/lib/platform/actions.ts): Next.js implementiert
+ * Redirects über eine interne Kontrollfluss-Exception, die ein umgebendes
+ * try/catch sonst fälschlich als regulären Fehler abfangen würde.
+ */
+export async function deleteCourse(
+  courseId: string,
+  confirmTitle: string,
+): Promise<CourseActionState> {
+  let deleted = false;
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+
+    const { data: course, error: courseError } = await supabase
+      .from("courses")
+      .select("title")
+      .eq("id", courseId)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+    if (courseError) return { error: translateDbError(courseError) };
+    if (!course) return { error: "Kurs nicht gefunden." };
+    if (confirmTitle !== course.title) {
+      return { error: "Bestätigung stimmt nicht überein — bitte den Kurstitel exakt eingeben." };
+    }
+
     const { error } = await supabase
       .from("courses")
       .delete()
       .eq("id", courseId)
       .eq("tenant_id", tenant.id);
     if (error) return { error: translateDbError(error) };
-    revalidatePath("/admin/kurse");
-    return { error: null, success: true };
+
+    deleted = true;
   } catch (e) {
     return errorState(e);
   }
+
+  if (deleted) {
+    revalidatePath("/admin/kurse");
+    redirect("/admin/kurse");
+  }
+  return { error: "Unbekannter Fehler beim Löschen." };
 }
 
 // --- Module ---

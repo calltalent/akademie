@@ -7,6 +7,8 @@ import { BlockEditor } from "@/components/editor/block-editor";
 import { LessonPublishToggle, CourseStatusSelect, CourseCategorySelect } from "@/components/admin/publish-toggle";
 import { ReembedCourseButton } from "@/components/admin/reembed-course-button";
 import { RefreshTranscriptButton } from "@/components/admin/refresh-transcript-button";
+import { CourseTitleEditor } from "@/components/admin/course-title-editor";
+import { DeleteCourseButton } from "@/components/admin/delete-course-button";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
 
 /**
@@ -19,6 +21,18 @@ import { blocksSchema, type Block } from "@/lib/courses/schema";
  * des Referenz-Exports (der kennt weder KI-Einbettung noch Transkript-
  * Refresh), bleiben aber erhalten (Funktionsverlust ist nicht erlaubt) und
  * bekommen nur die neue Sekundär-Button-Optik.
+ *
+ * Kurs umbenennen/löschen (Josips Entscheidung, siehe PHASENSTATUS.md):
+ * beides im Editor statt in der Kursliste. `CourseTitleEditor` ersetzt die
+ * bisher statische Titel-Überschrift im Kopf. `DeleteCourseButton` bekommt
+ * echte Zählungen (Lektionen/Teilnehmer/Zertifikate) als Props von hier —
+ * der Plan verlangt die Fußzeile des Editors neben "Lektion löschen"; da
+ * eine Kurslöschung aber unabhängig von der Lektionsauswahl möglich sein
+ * muss (auch ohne ausgewählte Lektion), erscheint der Knopf in BEIDEN
+ * Zweigen der activeLesson-Verzweigung unten — einmal in der bestehenden
+ * Fußzeile neben "Lektion löschen", einmal in einer eigenen Fußzeile im
+ * Platzhalter-Zweig. Kein Auftragskonflikt, nur eine im Plan offen
+ * gelassene Detailentscheidung (CLAUDE.md §4.5).
  */
 export default async function CourseEditorPage({
   params,
@@ -67,6 +81,17 @@ export default async function CourseEditorPage({
     .order("title", { ascending: true });
   const courseQuizzes = courseQuizzesRaw ?? [];
 
+  // Echte Zählungen für den Lösch-Bestätigungsdialog (DeleteCourseButton) —
+  // keine Schätzung, siehe PHASENSTATUS.md.
+  const { count: enrollmentCount } = await supabase
+    .from("enrollments")
+    .select("id", { count: "exact", head: true })
+    .eq("course_id", courseId);
+  const { count: certificateCount } = await supabase
+    .from("certificates")
+    .select("id", { count: "exact", head: true })
+    .eq("course_id", courseId);
+
   const modulesWithLessons = (modules ?? []).map((m) => ({
     id: m.id,
     title: m.title,
@@ -85,14 +110,7 @@ export default async function CourseEditorPage({
   return (
     <div className="flex flex-col gap-2">
       <header className="flex flex-wrap items-start gap-5">
-        <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-semibold" style={{ color: "#66679B" }}>
-            Inhalte · Kurse
-          </div>
-          <h1 className="mt-0.5 truncate text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
-            {course.title}
-          </h1>
-        </div>
+        <CourseTitleEditor courseId={courseId} initialTitle={course.title} initialSlug={course.slug} />
         <div className="flex flex-wrap items-end gap-4">
           <CourseStatusSelect courseId={courseId} status={course.status} />
           <CourseCategorySelect courseId={courseId} category={course.category ?? null} />
@@ -139,13 +157,31 @@ export default async function CourseEditorPage({
                   courseId={courseId}
                   title={activeLesson.title}
                 />
+                <DeleteCourseButton
+                  courseId={courseId}
+                  title={course.title}
+                  lessonCount={(lessons ?? []).length}
+                  enrollmentCount={enrollmentCount ?? 0}
+                  certificateCount={certificateCount ?? 0}
+                />
               </div>
             </div>
           </div>
         ) : (
-          <p className="min-w-0 text-base" style={{ color: "#66679B" }}>
-            Lektion links auswählen oder anlegen, um Blöcke zu bearbeiten.
-          </p>
+          <div className="flex min-w-0 flex-col gap-5">
+            <p className="text-base" style={{ color: "#66679B" }}>
+              Lektion links auswählen oder anlegen, um Blöcke zu bearbeiten.
+            </p>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <DeleteCourseButton
+                courseId={courseId}
+                title={course.title}
+                lessonCount={(lessons ?? []).length}
+                enrollmentCount={enrollmentCount ?? 0}
+                certificateCount={certificateCount ?? 0}
+              />
+            </div>
+          </div>
         )}
       </main>
     </div>
