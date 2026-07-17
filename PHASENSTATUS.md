@@ -2262,6 +2262,8 @@ Umsetzung nach Architekten-Plan `calm-watching-dewdrop.md`, Abschnitt „Stufe 2
 
 Vorbedingungen laut Auftrag bereits erfüllt vorgefunden und verifiziert: `@ffmpeg/ffmpeg`/`@ffmpeg/core`/`@ffmpeg/util` installiert; R2-Bucket `calltalent-akademie-ffmpeg` (EU-Jurisdiktion) enthält `ffmpeg-core.js`/`ffmpeg-core.wasm`/`814.ffmpeg.js`; `FFMPEG_BUCKET`-Bindung stand bereits in `wrangler.jsonc`.
 
+> **KORREKTUR (17.07.2026, nachträglich):** Die Aussage „Bucket enthält die drei Dateien" war **falsch** — sie beruhte auf einem `wrangler r2 object get` **ohne `--remote`**, das nur lokal simulierten Storage liest. Der echte Bucket war leer, die Route lieferte in Produktion 404. Ebenso konnte die unten als „LIVE über den laufenden Server geprüft" dokumentierte Verifikation den Fehler prinzipiell nicht finden (Dev-Server liest denselben lokalen Sim-Storage). Inzwischen behoben und in Produktion verifiziert — vollständige Analyse im Abschnitt **„Kurs-Editor Stufe 2: deployt + Produktions-404 behoben"** am Ende dieser Datei.
+
 **Teil 1 — Auslieferungs-Route + Cloudflare-Typen:**
 - Neu `src/app/api/ffmpeg/[file]/route.ts` — liest über `getCloudflareContext({async:true})` (`@opennextjs/cloudflare`, im Repo bisher nirgends benutzt) aus der R2-Bindung. Strikte zod-Enum-Whitelist der drei erlaubten Dateinamen (Pfadparameter wird nie ungeprüft an R2 durchgereicht), korrekte `Content-Type` je Datei (`application/wasm` für die wasm-Datei), `Cache-Control: public, max-age=31536000, immutable`, sauberes 404 bei fehlendem Objekt, nur `GET` (andere Methoden liefern automatisch 405). Bewusst ohne Auth-Prüfung — Begründung im Datei-Kopf (öffentliche Binärdatei, Web-Worker-Fetch hat ohnehin keine Session-Cookies).
 - `next.config.ts` — `import("@opennextjs/cloudflare").then(m => m.initOpenNextCloudflareForDev())` ergänzt (offizielles OpenNext-Muster, dynamischer Import), damit die R2-Bindung unter `npm run dev` existiert.
@@ -2315,3 +2317,64 @@ Design geholt über `DesignSync`/`get_file` (`AdminVideoSchnitt.dc.html`, Projek
 **Bekannte, im Plan als Restschuld benannte Punkte (unverändert offen):** Bunny-Webhook muss weiterhin von Hand im Dashboard eingetragen sein; kein Reaper für verwaiste Bunny-Videos.
 
 **Übergabe an `tester`** (Vitest + Build + Live-R2-Route bereits grün; echter Browser-Zyklus, Playwright/axe, `npm run preview` unter WSL oben offen), danach `security-reviewer` gemäß CLAUDE.md §4.3.
+
+---
+
+## Kurs-Editor Stufe 2: deployt + Produktions-404 behoben (17.07.2026)
+
+Stufen 1–3 sind committet und deployt (Worker-Version `60ddc085`). Beim **ersten echten Live-Test** der Auslieferungs-Route lieferte `/api/ffmpeg/*` in Produktion konstant **404** — obwohl derselbe Code unter `npm run dev` nachweislich 200 lieferte (siehe „Live verifiziert" im Stufe-2-Block oben, inkl. korrekter 32.232.419 Bytes).
+
+### Ursache: `wrangler r2 object put|get` schreibt ohne `--remote` NUR lokal
+
+`wrangler r2 object put|get` arbeitet **ohne `--remote`** auf einer lokal simulierten R2-Instanz (`.wrangler/state/`), nicht auf dem echten Bucket. Der Upload meldet trotzdem `Upload complete`, ein anschließendes `get` meldet `Download complete` in korrekter Byte-Größe. **Der echte Bucket blieb dabei durchgehend leer.**
+
+**Warum das keine der bisherigen Verifikationen gefangen hat — bitte verstehen, bevor jemand die Route „repariert":**
+
+1. Die Aussage im Stufe-2-Block oben, der Bucket „enthält `ffmpeg-core.js`/`ffmpeg-core.wasm`/`814.ffmpeg.js`", war zum Zeitpunkt des Schreibens **falsch**. Sie stützte sich auf ein `wrangler r2 object get` ohne `--remote` — die Prüfung las also exakt die lokale Datei zurück, die der ebenso lokale Upload zuvor geschrieben hatte. **Eine Verifikation, die sich selbst bestätigt.**
+2. Der `npm run dev`-Test (Zeile „R2-Route LIVE über den laufenden Server geprüft") konnte den Fehler **prinzipiell nicht** finden: `initOpenNextCloudflareForDev()` bindet den Dev-Server an **denselben lokalen Sim-Storage**. Dev grün + Prod 404 ist die *erwartete* Signatur dieses Fehlers, kein Widerspruch.
+3. Bindung und Konfiguration waren die ganze Zeit **korrekt** — `wrangler versions view` bestätigt serverseitig `env.FFMPEG_BUCKET (calltalent-akademie-ffmpeg (eu)) → R2 Bucket`. Genau das führte in die Irre: die Suche lief zunächst auf der Kontext-/Bindungs-Ebene (`getCloudflareContext({async:true})` → synchron umgestellt), was den 404 **nicht** behob.
+
+### Erkennungsmerkmale (für das nächste Mal)
+
+- wrangler weist selbst darauf hin: `Use --remote if you want to access the remote instance.`
+- **Ohne `--remote` fehlt in der Ausgabe das Jurisdiktions-Suffix**: `in bucket "calltalent-akademie-ffmpeg"` statt `in bucket "calltalent-akademie-ffmpeg (eu)"`. Das ist der zuverlässigste Schnelltest.
+- Beweisführung, die den Fall geklärt hat: `env.FFMPEG_BUCKET.list()` **aus dem Worker heraus** (temporär, via `wrangler tail`) meldete `0 Objekte`, während `wrangler r2 object get --remote` mit `The specified key does not exist.` antwortete. Erst diese beiden Messungen — beide gegen die *echte* Instanz — waren aussagekräftig.
+
+### Behebung
+
+Dateien mit `--remote --jurisdiction eu` hochgeladen:
+
+```
+npx wrangler r2 object put calltalent-akademie-ffmpeg/ffmpeg-core.wasm \
+  --file=node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.wasm \
+  --content-type=application/wasm --jurisdiction eu --remote
+```
+
+(analog `ffmpeg-core.js` aus `node_modules/@ffmpeg/core/dist/umd/` und `814.ffmpeg.js` aus `node_modules/@ffmpeg/ffmpeg/dist/umd/`, beide `--content-type=text/javascript`).
+
+Die Falle ist zusätzlich am Aufrufer dokumentiert (Kommentar über `getObject()` in `src/app/api/ffmpeg/[file]/route.ts`), inkl. des vollständigen Upload-Befehls.
+
+**Code-Änderung** (Commit `dbe58dd`) beschränkt sich auf `getObject()`: `getCloudflareContext({async:true})` → synchron. Das war **nicht** die Ursache des 404, ist im Request-Kontext eines Route Handlers laut OpenNext-Doku aber die richtige Variante (die async-Form ist für SSG-/Build-Zeit-Kontexte und greift dort auf lokale Entwicklungswerte zurück). Die Umstellung bleibt daher bestehen — aber ausdrücklich **nicht** als Erklärung für den 404.
+
+### Live verifiziert (Produktion, `academy.calltalent.ai`, Version `60ddc085`)
+
+Echte HTTP-Roundtrips gegen die Produktions-Domain (nicht Dev, nicht Mock):
+
+| Datei | Status | Content-Type | Bytes |
+|---|---|---|---|
+| `814.ffmpeg.js` | 200 | `text/javascript; charset=utf-8` | 3.177 |
+| `ffmpeg-core.js` | 200 | `text/javascript; charset=utf-8` | 112.059 |
+| `ffmpeg-core.wasm` | 200 | `application/wasm` | 32.232.419 |
+| `evil.js` | 404 | — | Whitelist hält |
+
+Alle drei Größen stimmen byte-genau mit den Dateien in `node_modules/` überein; `Cache-Control: public, max-age=31536000, immutable` ist gesetzt. Damit ist **B4 (25-MiB-Asset-Limit) endgültig entschärft** und Stufe 2 in Produktion lauffähig.
+
+**Nebenbei bereinigt:** `tsconfig.tsbuildinfo` aus der Versionierung genommen (`git rm --cached`) — Build-Artefakt, per `.gitignore:18` ohnehin ignoriert, in `3569160` versehentlich mitcommittet; erzeugte bei jedem Build Diff-Rauschen.
+
+### Weiterhin offen (unverändert)
+
+1. **Bunny-Webhook** muss im Dashboard eingetragen sein — ohne ihn feuert Status 3/9 nie, also keine Transkripte und keine Untertitel (Stufe 3 bleibt sonst tot).
+2. **EN-Übersetzung ist noch nie gelaufen** (R15-Gate) — empfohlener Test: „Untertitel & Transkript aktualisieren" an einer Lektion mit echtem deutschem Video.
+3. **Echter Browser-Zyklus** Aufnahme → Schnitt → Upload → Wiedergabe im Bunny-Player; Tastatur-only-Durchlauf; Kameraleuchte-Test.
+4. `npm run e2e` weiterhin nicht lauffähig (kein `demo-blau`-Tenant in der `.env`-Zielumgebung; Docker lokal nicht installiert).
+5. Kein Reaper für verwaiste Bunny-Videos bei abgebrochenem tus-Upload.
