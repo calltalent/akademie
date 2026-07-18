@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { Bold, Italic, Underline } from "lucide-react";
 import type { Block } from "@/lib/courses/schema";
 import { VideoSourceSwitch } from "@/components/editor/video-source-switch";
@@ -17,11 +17,10 @@ const fieldClass = "w-full rounded-[11px] border px-[15px] py-[13px] text-base";
 const labelClass = "flex flex-col gap-1.5 text-sm font-bold";
 
 /**
- * Ein Formular je Block-Typ. Bewusst einfach gehalten (Textarea/Input statt
- * vollem Rich-Text-Editor) — der Textblock hat seit 18.07.2026 immerhin eine
- * kleine Fett-/Kursiv-/Unterstreichen-Toolbar (siehe `TextBlockFields`
- * unten), ein contentEditable-WYSIWYG bleibt darüber hinaus eine spätere
- * Verfeinerung, kein Kern-DoD-Kriterium für Phase 1.
+ * Ein Formular je Block-Typ. Bewusst einfach gehalten (Input/Select statt
+ * vollem Rich-Text-Editor) — einzige Ausnahme ist der Textblock, der seit
+ * 18.07.2026 ein `contentEditable`-WYSIWYG mit Fett-/Kursiv-/
+ * Unterstreichen-Toolbar hat (siehe `TextBlockFields` unten).
  *
  * Design-Update (AdminKursEditor.dc.html) + Barrierefreiheit (CLAUDE.md
  * §3.4): jedes Feld hat jetzt ein sichtbares `<label>` statt teils nur eines
@@ -196,21 +195,46 @@ export function BlockForm({
 /**
  * Textformatierung (18.07.2026, Josips Auftrag: "Fetten, Kursiv,
  * Unterstrichenen Text ... Wörter im Satz je nach Bedarf boldieren,
- * unterstreichen oder kursiv setzen ... Symbole unter dem Textblock").
+ * unterstreichen oder kursiv setzen ... Symbole unter dem Textblock";
+ * Folgeauftrag selben Tags: "Textinhalt nicht als HTML anzeigen, sondern als
+ * normaler Text" + "Button dunkler wenn die Auswahl schon formatiert ist" +
+ * "Standardtext soll nicht boldiert sein").
  *
- * Bewusst KEIN vollständiger WYSIWYG-/contentEditable-Umbau: das Feld bleibt
- * die bestehende Roh-HTML-`<textarea>` (siehe Dateikopf-Kommentar oben,
- * `schema.ts`s `sanitizeLessonHtml()` erlaubt `strong`/`em`/`u` bereits seit
- * Phase 1) — die drei Knöpfe fügen beim Klick lediglich die passenden Tags
- * um die AKTUELLE TEXTAUSWAHL im Feld ein (`selectionStart`/`selectionEnd`),
- * exakt wie ein Markdown-Editor-Toolbar. Das ist die kleinstmögliche
- * Änderung, die "Wort im Satz auswählen und formatieren" ermöglicht, ohne
- * die bereits funktionierende Sanitize-bei-Speichern-Architektur anzufassen
- * oder ein Rich-Text-Framework einzuführen.
+ * Jetzt ein echtes WYSIWYG-Feld (`contentEditable`-`div` statt Roh-HTML-
+ * `<textarea>`): fett/kursiv/unterstrichen erscheinen visuell, keine
+ * sichtbaren `<strong>`-Tags mehr. `document.execCommand` übernimmt Toggle
+ * + native Selektions-/Undo-Behandlung (kein eigener Range-Wrapping-Code
+ * nötig) — `queryCommandState` liefert im Gegenzug gratis den aktiven
+ * Formatierungsstatus der aktuellen Auswahl für die Button-Hervorhebung.
  *
- * Ohne Auswahl (Cursor blinkt nur) werden leere Tags an der Cursorposition
- * eingefügt und der Cursor zwischen sie gesetzt — Standardverhalten von
- * Editor-Toolbars: weitertippen erzeugt direkt formatierten Text.
+ * Zwei Browser-Eigenheiten von execCommand brauchen Nacharbeit, sonst
+ * verschwindet Formatierung beim Speichern lautlos:
+ * - Bold/Italic erzeugen `<b>`/`<i>`, nicht `<strong>`/`<em>`. `schema.ts`s
+ *   `sanitizeLessonHtml()`-Whitelist (`ALLOWED_TEXT_TAGS`) kennt nur
+ *   Letztere — ein nicht erlaubtes Tag wird beim Speichern entfernt, aber
+ *   der TEXT bleibt (Tag wird nur entpackt), d. h. die Formatierung selbst
+ *   ginge unbemerkt verloren. Deshalb `normalizeFormattingTags()` vor jedem
+ *   `onChange`.
+ * - Enter erzeugt in Chrome standardmäßig verschachtelte `<div>` (ebenfalls
+ *   nicht erlaubt → Absätze würden beim Speichern zusammenfallen). Fest auf
+ *   `<p>` gestellt (`defaultParagraphSeparator`), das steht auf der
+ *   Whitelist.
+ *
+ * `innerHTML` wird NUR beim ersten Mount aus `block.html` gesetzt
+ * (unkontrolliertes Feld, wie ein `defaultValue`) — ein Re-Sync bei jedem
+ * Tastendruck würde den Cursor auf Feldende zurückwerfen, weil
+ * `contentEditable` anders als `<textarea>.value` keine Selektion über eine
+ * `innerHTML`-Neuzuweisung hinweg erhält. Jede spätere `block.html`-Änderung
+ * stammt ohnehin aus dem eigenen `onInput` dieser Instanz.
+ *
+ * `onMouseDown` mit `preventDefault()` auf den drei Knöpfen verhindert, dass
+ * der Klick dem Button den Fokus gibt und damit die Textauswahl im Feld vor
+ * dem `execCommand`-Aufruf zerstört — Standardmuster für contentEditable-
+ * Toolbars.
+ *
+ * Die vom Auftrag verlangte dunklere Button-Hervorhebung ist zugleich ein
+ * ARIA-Toggle-Button (`aria-pressed`), nicht nur eine Farbänderung
+ * (CLAUDE.md §3.4: Zustand nie nur über Farbe).
  */
 function TextBlockFields({
   block,
@@ -219,80 +243,132 @@ function TextBlockFields({
   block: Extract<Block, { type: "text" }>;
   onChange: (next: Block) => void;
 }) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editableRef = useRef<HTMLDivElement>(null);
+  const [activeFormats, setActiveFormats] = useState({ bold: false, italic: false, underline: false });
 
-  function wrapSelection(openTag: string, closeTag: string) {
-    const el = textareaRef.current;
+  useEffect(() => {
+    const el = editableRef.current;
     if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const value = block.html;
-    const next = `${value.slice(0, start)}${openTag}${value.slice(start, end)}${closeTag}${value.slice(end)}`;
-    onChange({ ...block, html: next });
-    // Erst NACH dem durch onChange ausgelösten Re-Render kennt das Feld den
-    // neuen Wert — Fokus/Selektion deshalb NACH diesem Render setzen, sonst
-    // wirft der Browser die Selektion auf den alten (kürzeren) Wert zurück
-    // bzw. ans Ende (Standardverhalten bei programmatischer `.value`-
-    // Zuweisung auf ein fokussiertes Feld). `setTimeout(…, 0)` statt
-    // `requestAnimationFrame` — GLEICHES Muster wie `SegmentRow`/
-    // `SaveIndicator` in diesem Projekt (video-trimmer.tsx/
-    // video-recorder.tsx): rAF wird in Hintergrund-/nicht sichtbaren Tabs
-    // vom Browser ausgesetzt (beim Testen verifiziert — feuert dort
-    // überhaupt nicht), `setTimeout` läuft zuverlässig auch dort.
-    setTimeout(() => {
-      el.focus();
-      const selectionStart = start + openTag.length;
-      el.setSelectionRange(selectionStart, selectionStart + (end - start));
-    }, 0);
+    el.innerHTML = block.html;
+    document.execCommand("defaultParagraphSeparator", false, "p");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function normalizeFormattingTags(html: string): string {
+    return html
+      .replace(/<(\/?)b(\s|>)/gi, "<$1strong$2")
+      .replace(/<(\/?)i(\s|>)/gi, "<$1em$2");
+  }
+
+  function handleInput() {
+    const el = editableRef.current;
+    if (!el) return;
+    onChange({ ...block, html: normalizeFormattingTags(el.innerHTML) });
+  }
+
+  function updateActiveFormats() {
+    setActiveFormats({
+      bold: document.queryCommandState("bold"),
+      italic: document.queryCommandState("italic"),
+      underline: document.queryCommandState("underline"),
+    });
+  }
+
+  function toggleFormat(command: "bold" | "italic" | "underline") {
+    const el = editableRef.current;
+    if (!el) return;
+    el.focus();
+    document.execCommand("defaultParagraphSeparator", false, "p");
+    document.execCommand(command);
+    handleInput();
+    updateActiveFormats();
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+      <div className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
         Textinhalt
-        <textarea
-          ref={textareaRef}
-          value={block.html}
-          onChange={(e) => onChange({ ...block, html: e.target.value })}
-          rows={5}
-          placeholder="Text (einfaches HTML möglich) …"
-          className={`${fieldClass} resize-y leading-relaxed`}
-          style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+        <div
+          ref={editableRef}
+          contentEditable
+          suppressContentEditableWarning
+          role="textbox"
+          aria-multiline="true"
+          aria-label="Textinhalt"
+          data-placeholder="Text …"
+          onInput={handleInput}
+          onKeyUp={updateActiveFormats}
+          onMouseUp={updateActiveFormats}
+          onFocus={updateActiveFormats}
+          // `:empty` greift nur ohne JEDES Kindelement — trifft den frisch
+          // angelegten Block (html: "") zuverlässig, nicht zwingend jeden
+          // Zustand nach manuellem Leerlöschen (manche Browser lassen dabei
+          // ein einzelnes `<br>` zurück). Für ein einfaches Textfeld ist das
+          // ein akzeptabler Kompromiss statt eines eigenen Placeholder-Overlays.
+          className={`${fieldClass} min-h-[7.5rem] leading-relaxed empty:before:content-[attr(data-placeholder)] empty:before:text-[#8A8B9E]`}
+          style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR, fontWeight: 400 }}
         />
-      </label>
+      </div>
       <div className="flex gap-1.5" role="group" aria-label="Textformatierung für die Auswahl im Textfeld">
-        <button
-          type="button"
-          onClick={() => wrapSelection("<strong>", "</strong>")}
-          aria-label="Ausgewählten Text fett formatieren"
+        <FormatButton
+          active={activeFormats.bold}
+          onClick={() => toggleFormat("bold")}
+          label="Ausgewählten Text fett formatieren"
           title="Fett"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border bg-white"
-          style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
         >
           <Bold size={14} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          onClick={() => wrapSelection("<em>", "</em>")}
-          aria-label="Ausgewählten Text kursiv formatieren"
+        </FormatButton>
+        <FormatButton
+          active={activeFormats.italic}
+          onClick={() => toggleFormat("italic")}
+          label="Ausgewählten Text kursiv formatieren"
           title="Kursiv"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border bg-white"
-          style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
         >
           <Italic size={14} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          onClick={() => wrapSelection("<u>", "</u>")}
-          aria-label="Ausgewählten Text unterstreichen"
+        </FormatButton>
+        <FormatButton
+          active={activeFormats.underline}
+          onClick={() => toggleFormat("underline")}
+          label="Ausgewählten Text unterstreichen"
           title="Unterstrichen"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border bg-white"
-          style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
         >
           <Underline size={14} aria-hidden="true" />
-        </button>
+        </FormatButton>
       </div>
     </div>
+  );
+}
+
+function FormatButton({
+  active,
+  onClick,
+  label,
+  title,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      title={title}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border"
+      style={{
+        borderColor: active ? "#5663AE" : FIELD_BORDER,
+        background: active ? "#5663AE" : "#fff",
+        color: active ? "#fff" : FIELD_TEXT_COLOR,
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
