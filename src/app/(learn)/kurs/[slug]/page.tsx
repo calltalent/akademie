@@ -5,6 +5,7 @@ import { getTenant } from "@/lib/tenant/context";
 import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/compute";
 import { CertificateBadge } from "@/components/learn/certificate-badge";
 import { AppShell } from "@/components/learn/app-shell";
+import { getVideoThumbnailUrl } from "@/lib/bunny/client";
 
 /**
  * Design-Block (16.07.2026, Claude-Design-Import KursUebersicht.dc.html aus
@@ -28,6 +29,12 @@ import { AppShell } from "@/components/learn/app-shell";
  * Feature), sobald eines gesetzt ist — sonst der stilisierte CSS-Platzhalter
  * aus dem Export. Die „App"-Kachel rechts bleibt statischer Marketing-Inhalt
  * (kein erfundenes Datenmodell dafür).
+ *
+ * Modulkacheln zeigen analog `modules.cover_url` (19.07.2026, Modulbild-
+ * Feature), das „Weiter"-Banner das Bunny-Video-Thumbnail der nächsten
+ * Lektion (`getVideoThumbnailUrl()`, siehe Kopfkommentar dort zur
+ * "erster Frame"-Einschränkung) — jeweils mit Fallback auf den bisherigen
+ * Platzhalter, falls (noch) kein Bild bzw. kein Video gesetzt ist.
  */
 
 const ACCENT = "#5663AE";
@@ -86,13 +93,13 @@ export default async function CourseOverviewPage({
 
   const { data: modules } = await supabase
     .from("modules")
-    .select("id, title, position")
+    .select("id, title, position, cover_url")
     .eq("course_id", course.id)
     .order("position", { ascending: true });
 
   const { data: lessons } = await supabase
     .from("lessons")
-    .select("id, title, module_id, status, position, video_duration_s")
+    .select("id, title, module_id, status, position, video_duration_s, video_bunny_id")
     .in("module_id", (modules ?? []).map((m) => m.id))
     .eq("status", "published")
     .order("position", { ascending: true });
@@ -121,6 +128,9 @@ export default async function CourseOverviewPage({
     (lessons ?? []).filter((l) => l.module_id === m.id),
   );
   const nextLesson = orderedLessons.find((l) => !completedIds.has(l.id)) ?? null;
+  const nextLessonThumbUrl = nextLesson?.video_bunny_id
+    ? getVideoThumbnailUrl(nextLesson.video_bunny_id as string)
+    : null;
 
   const moduleCards = (modules ?? [])
     .map((m, i) => {
@@ -135,7 +145,7 @@ export default async function CourseOverviewPage({
       const minutes = Math.round(totalSeconds / 60);
       const lessonLabel = `${mLessons.length} ${mLessons.length === 1 ? "Lektion" : "Lektionen"}`;
       const meta = minutes > 0 ? `${lessonLabel} · ${minutes} Min.` : lessonLabel;
-      return { id: m.id, title: m.title, number: i + 1, pct, meta };
+      return { id: m.id, title: m.title, coverUrl: (m.cover_url as string | null) ?? null, number: i + 1, pct, meta };
     })
     .filter((c): c is NonNullable<typeof c> => c !== null);
 
@@ -246,15 +256,26 @@ export default async function CourseOverviewPage({
               style={{ background: NAVY }}
             >
               <div
-                className="flex h-14 w-[88px] flex-none items-center justify-center rounded-[9px]"
-                style={{
-                  backgroundColor: "#2C2D4A",
-                  backgroundImage:
-                    "repeating-linear-gradient(45deg,#2C2D4A 0 10px, rgba(86,99,174,.4) 10px 20px)",
-                }}
+                className="relative flex h-14 w-[88px] flex-none items-center justify-center overflow-hidden rounded-[9px]"
+                style={
+                  nextLessonThumbUrl
+                    ? undefined
+                    : {
+                        backgroundColor: "#2C2D4A",
+                        backgroundImage:
+                          "repeating-linear-gradient(45deg,#2C2D4A 0 10px, rgba(86,99,174,.4) 10px 20px)",
+                      }
+                }
                 aria-hidden="true"
               >
-                <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full" style={{ background: ACCENT }}>
+                {nextLessonThumbUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element -- Bunny-CDN-URL, kein next/image-Loader konfiguriert
+                  <img src={nextLessonThumbUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
+                )}
+                <span
+                  className="relative flex h-[30px] w-[30px] items-center justify-center rounded-full"
+                  style={{ background: ACCENT }}
+                >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff">
                     <path d="M8 5v14l11-7z" />
                   </svg>
@@ -298,19 +319,24 @@ export default async function CourseOverviewPage({
                   className="flex items-center gap-[18px] rounded-[14px] border bg-white p-[16px_18px] text-inherit no-underline"
                   style={{ borderColor: "#E7E8F2" }}
                 >
-                  <div
-                    className="flex h-16 w-24 flex-none items-center justify-center rounded-[10px] p-1.5 text-center"
-                    style={{
-                      backgroundColor: NAVY,
-                      backgroundImage:
-                        "repeating-linear-gradient(135deg,rgba(86,99,174,.5) 0 12px, rgba(62,63,102,.5) 12px 24px)",
-                    }}
-                    aria-hidden="true"
-                  >
-                    <span className="text-[11px] font-extrabold leading-tight" style={{ letterSpacing: "0.08em", color: "#C9CBE6" }}>
-                      MODUL {m.number}
-                    </span>
-                  </div>
+                  {m.coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
+                    <img src={m.coverUrl} alt="" className="h-16 w-24 flex-none rounded-[10px] object-cover object-center" />
+                  ) : (
+                    <div
+                      className="flex h-16 w-24 flex-none items-center justify-center rounded-[10px] p-1.5 text-center"
+                      style={{
+                        backgroundColor: NAVY,
+                        backgroundImage:
+                          "repeating-linear-gradient(135deg,rgba(86,99,174,.5) 0 12px, rgba(62,63,102,.5) 12px 24px)",
+                      }}
+                      aria-hidden="true"
+                    >
+                      <span className="text-[11px] font-extrabold leading-tight" style={{ letterSpacing: "0.08em", color: "#C9CBE6" }}>
+                        MODUL {m.number}
+                      </span>
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="text-lg font-bold" style={{ color: "#1A1A2E" }}>
                       {m.title}

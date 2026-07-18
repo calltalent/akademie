@@ -159,6 +159,29 @@ export function getCaptionVttUrl(videoId: string, srclang: string): string | nul
 }
 
 /**
+ * Lektionsbild = Video-Thumbnail (19.07.2026, Josips Auftrag: "immer der
+ * erste Frame vom Video"). `thumbnail.jpg` ist Bunnys eigenes, dokumentiertes
+ * Auto-Thumbnail pro Video (Feld `thumbnailFileName` in der „Get Video"-
+ * Antwort, praktisch immer "thumbnail.jpg") — anders als bei
+ * `getCaptionVttUrl` oben ist dieses CDN-Muster fest etabliert, kein
+ * unverifizierter Annahmepunkt.
+ *
+ * EINSCHRÄNKUNG: Bunny wählt diesen Frame selbst aus der Videoanalyse (ein
+ * paar Sekunden nach Start, nicht zwingend Bild 0) — es gibt in Bunnys API
+ * keinen Endpunkt, der einen Frame zu einem exakten Zeitstempel extrahiert.
+ * „Immer der erste Frame" ist damit „Bunnys automatisches Vorschaubild, sehr
+ * nah am Anfang", nicht byte-genau Frame 0. Für einen pixelgenauen ersten
+ * Frame bräuchte es eine eigene Extraktion (z. B. ffmpeg serverseitig oder
+ * ein clientseitiger Canvas-Grab von der direkten CDN-Quelle) — deutlich
+ * mehr Aufwand für einen in der Praxis kaum wahrnehmbaren Unterschied.
+ */
+export function getVideoThumbnailUrl(videoId: string): string | null {
+  const { cdnHostname } = bunnyConfig();
+  if (!cdnHostname) return null;
+  return `https://${cdnHostname}/${videoId}/thumbnail.jpg`;
+}
+
+/**
  * Stufe 3 „Untertitel DE + EN" (Plan `calm-watching-dewdrop.md`). Lädt eine
  * fertige VTT-Untertitelspur zu einem bereits transkribierten Bunny-Video
  * hoch — genutzt von `ensureEnglishCaption()` (src/lib/video/

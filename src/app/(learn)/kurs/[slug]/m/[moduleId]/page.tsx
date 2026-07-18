@@ -4,6 +4,7 @@ import { Check, Play, ArrowLeft, ListVideo, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { AppShell } from "@/components/learn/app-shell";
+import { getVideoThumbnailUrl } from "@/lib/bunny/client";
 
 /**
  * Design-Block (16.07.2026, Claude-Design-Import Modul.dc.html aus dem
@@ -25,6 +26,11 @@ import { AppShell } from "@/components/learn/app-shell";
  * gibt kein Coach-/Trainer-Datenmodell pro Kurs — statt „Andrea Baumann"
  * hart zu verdrahten, bleibt sie weg, bis eine echte Quelle definiert ist)
  * und die „N Seiten"-Angabe je Lektion (kein Datenfeld dafür).
+ *
+ * Bilder (19.07.2026, Josips Auftrag): Modul-Hero zeigt `modules.cover_url`,
+ * jede Lektionszeile das Bunny-Video-Thumbnail (`getVideoThumbnailUrl()`) —
+ * jeweils mit Fallback auf den bisherigen Platzhalter/Play-Icon, falls
+ * (noch) kein Bild bzw. kein Video gesetzt ist.
  */
 
 const ACCENT = "#5663AE";
@@ -66,7 +72,7 @@ export default async function ModulePage({
 
   const { data: modules } = await supabase
     .from("modules")
-    .select("id, title, position")
+    .select("id, title, position, cover_url")
     .eq("course_id", course.id)
     .order("position", { ascending: true });
 
@@ -98,7 +104,7 @@ export default async function ModulePage({
 
   const { data: lessons } = await supabase
     .from("lessons")
-    .select("id, title, section_id, position, status, video_duration_s")
+    .select("id, title, section_id, position, status, video_duration_s, video_bunny_id")
     .eq("module_id", mod.id)
     .eq("status", "published")
     .order("position", { ascending: true });
@@ -174,19 +180,28 @@ export default async function ModulePage({
                 "repeating-linear-gradient(135deg,rgba(86,99,174,.5) 0 16px, rgba(62,63,102,.5) 16px 32px)",
             }}
           >
-            <div
-              className="hidden h-[120px] w-[170px] flex-none items-center justify-center rounded-[12px] p-1.5 text-center sm:flex"
-              style={{
-                backgroundColor: "#2C2D4A",
-                backgroundImage:
-                  "repeating-linear-gradient(45deg,#2C2D4A 0 12px, rgba(86,99,174,.35) 12px 24px)",
-              }}
-              aria-hidden="true"
-            >
-              <span className="text-xs font-extrabold leading-tight" style={{ letterSpacing: "0.08em", color: "#C9CBE6" }}>
-                MODUL {moduleIndex + 1}
-              </span>
-            </div>
+            {mod.cover_url ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
+              <img
+                src={mod.cover_url}
+                alt=""
+                className="hidden h-[120px] w-[170px] flex-none rounded-[12px] object-cover object-center sm:block"
+              />
+            ) : (
+              <div
+                className="hidden h-[120px] w-[170px] flex-none items-center justify-center rounded-[12px] p-1.5 text-center sm:flex"
+                style={{
+                  backgroundColor: "#2C2D4A",
+                  backgroundImage:
+                    "repeating-linear-gradient(45deg,#2C2D4A 0 12px, rgba(86,99,174,.35) 12px 24px)",
+                }}
+                aria-hidden="true"
+              >
+                <span className="text-xs font-extrabold leading-tight" style={{ letterSpacing: "0.08em", color: "#C9CBE6" }}>
+                  MODUL {moduleIndex + 1}
+                </span>
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <h1 className="mb-2 text-2xl font-extrabold text-white">{mod.title}</h1>
               <div className="text-sm font-semibold" style={{ letterSpacing: "0.04em", color: "#C9CBE6" }}>
@@ -236,6 +251,9 @@ export default async function ModulePage({
                       {card.lessons.map((l) => {
                         const done = completedIds.has(l.id);
                         const mins = lessonMinutes((l.video_duration_s as number | null) ?? null);
+                        const thumbUrl = l.video_bunny_id
+                          ? getVideoThumbnailUrl(l.video_bunny_id as string)
+                          : null;
                         return (
                           <Link
                             key={l.id}
@@ -244,15 +262,26 @@ export default async function ModulePage({
                             style={{ borderColor: "#EEF0F7" }}
                           >
                             <span
-                              className="flex h-12 w-[74px] flex-none items-center justify-center rounded-[8px]"
-                              style={{
-                                backgroundColor: "#DFE2F4",
-                                backgroundImage:
-                                  "repeating-linear-gradient(45deg,#DFE2F4 0 9px, rgba(255,255,255,.55) 9px 18px)",
-                              }}
+                              className="relative flex h-12 w-[74px] flex-none items-center justify-center overflow-hidden rounded-[8px]"
+                              style={
+                                thumbUrl
+                                  ? undefined
+                                  : {
+                                      backgroundColor: "#DFE2F4",
+                                      backgroundImage:
+                                        "repeating-linear-gradient(45deg,#DFE2F4 0 9px, rgba(255,255,255,.55) 9px 18px)",
+                                    }
+                              }
                               aria-hidden="true"
                             >
-                              <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full" style={{ background: ACCENT }}>
+                              {thumbUrl && (
+                                // eslint-disable-next-line @next/next/no-img-element -- Bunny-CDN-URL, kein next/image-Loader konfiguriert
+                                <img src={thumbUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
+                              )}
+                              <span
+                                className="relative flex h-[22px] w-[22px] items-center justify-center rounded-full"
+                                style={{ background: ACCENT }}
+                              >
                                 <Play size={10} color="#fff" fill="#fff" />
                               </span>
                             </span>

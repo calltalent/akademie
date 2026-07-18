@@ -117,6 +117,31 @@ export async function updateCourseCoverUrl(
   }
 }
 
+/** Modulbild (19.07.2026, Josips Auftrag: "ähnlich wie für Kurse") — gleiches Muster wie `updateCourseCoverUrl`, nur auf `modules` statt `courses`. */
+export async function updateModuleCoverUrl(
+  moduleId: string,
+  courseId: string,
+  url: string,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const parsed = z.string().url().safeParse(url);
+    if (!parsed.success) {
+      return { error: "Ungültige Bild-URL." };
+    }
+    const { error } = await supabase
+      .from("modules")
+      .update({ cover_url: parsed.data })
+      .eq("id", moduleId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+    revalidatePath(`/admin/kurse/${courseId}`);
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
 export async function updateCourseStatus(
   courseId: string,
   status: "draft" | "published" | "archived",

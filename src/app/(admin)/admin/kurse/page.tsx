@@ -5,7 +5,8 @@ import { getTenant } from "@/lib/tenant/context";
 import { checkAdminAccess } from "@/lib/auth/staff";
 import { NewCourseDialog } from "@/components/admin/new-course-dialog";
 import { DeleteCourseIconButton } from "@/components/admin/delete-course-icon-button";
-import { CourseThumbnailUpload } from "@/components/admin/course-thumbnail-upload";
+import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
+import { updateCourseCoverUrl } from "@/lib/courses/actions";
 
 /**
  * Design-Block 6 (13.07.2026, Claude-Design-Export Teil 3,
@@ -30,7 +31,9 @@ import { CourseThumbnailUpload } from "@/components/admin/course-thumbnail-uploa
  * Kursbild (18.07.2026, Josips Auftrag): die früher rein dekorative
  * Karo-Kachel links vom Titel zeigt jetzt das echte `cover_url`-Bild (16:9,
  * `object-fit: cover`) bzw. — falls noch keins gesetzt ist — eine anklick-
- * bare Platzhalterkachel zum Hochladen, siehe `course-thumbnail-upload.tsx`.
+ * bare Platzhalterkachel zum Hochladen, siehe die generische
+ * `components/admin/thumbnail-upload.tsx` (seit 19.07.2026 auch fürs
+ * Modulbild in `module-lesson-tree.tsx` wiederverwendet).
  *
  * Statusänderung (Live/Entwurf/Archiviert) ist bewusst NICHT mehr inline in
  * dieser Liste (Export zeigt dort nur einen Anzeige-Badge) — die echte
@@ -214,10 +217,11 @@ export default async function AdminKursePage({
                 }}
               >
                 <div className="flex items-center gap-3.5">
-                  <CourseThumbnailUpload
-                    courseId={c.id}
+                  <ThumbnailUpload
                     initialUrl={c.cover_url}
-                    courseTitle={c.title}
+                    entityLabel="Kursbild"
+                    entityTitle={c.title}
+                    onUpload={updateCourseCoverUrl.bind(null, c.id)}
                   />
                   <Link
                     href={`/admin/kurse/${c.id}`}

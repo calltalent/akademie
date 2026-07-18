@@ -12,14 +12,17 @@ import {
   deleteLesson,
   moveModule,
   moveSection,
+  updateModuleCoverUrl,
 } from "@/lib/courses/actions";
 import { initialCourseActionState } from "@/lib/courses/state";
+import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
 
 type LessonRow = { id: string; title: string; status: string };
 type SectionRow = { id: string; title: string; lessons: LessonRow[] };
 type ModuleRow = {
   id: string;
   title: string;
+  coverUrl: string | null;
   sections: SectionRow[];
   /** Lektionen mit `section_id = null` — vor Migration 20260718150000
    * angelegt, oder über den KI-Generator/CSV-Import entstanden (beide
@@ -51,6 +54,11 @@ type ModuleRow = {
  * Modul, ohne Sektion — sie erscheinen unter "Lektionen ohne Sektion" am
  * Ende des Moduls, damit sie im Editor auffindbar und bearbeitbar bleiben
  * statt lautlos zu verschwinden.
+ *
+ * MODULBILD (19.07.2026, Josips Auftrag: "ähnlich wie für Kurse"): gleiche
+ * anklickbare 16:9-Kachel wie beim Kurs-Thumbnail, nur auf `modules.cover_url`
+ * (Migration 20260719090000) statt `courses.cover_url` — beide teilen sich
+ * `components/admin/thumbnail-upload.tsx`.
  */
 const LESSON_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   published: { label: "Veröffentlicht", color: "#1F8A5B", bg: "#E3F2EA" },
@@ -98,7 +106,13 @@ function ModuleBlock({
 }) {
   return (
     <div className="rounded-[14px] border bg-white p-3.5" style={{ borderColor: "#E7E8F2" }}>
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex items-center gap-2.5">
+        <ThumbnailUpload
+          initialUrl={mod.coverUrl}
+          entityLabel="Modulbild"
+          entityTitle={mod.title}
+          onUpload={updateModuleCoverUrl.bind(null, mod.id, courseId)}
+        />
         <span className="min-w-0 flex-1 break-words text-[16px] font-extrabold" style={{ color: "#1A1A2E" }}>
           {mod.title}
         </span>

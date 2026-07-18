@@ -7,44 +7,34 @@ import {
   ALLOWED_IMAGE_MIME_TYPES,
   MAX_IMAGE_FILE_SIZE_BYTES,
 } from "@/lib/courses/asset-upload-schema";
-import { updateCourseCoverUrl } from "@/lib/courses/actions";
 
 type UploadState = { status: "idle" } | { status: "uploading" } | { status: "error"; message: string };
 
 /**
- * Kurs-Thumbnail (16:9) in der Kursliste (Josips Auftrag, 18.07.2026:
- * "Option für das Hinzufügen vom Kurs-Thumbnail ... Klick öffnet die
- * Dateiauswahl vom PC ... automatisch zugeschnitten und positioniert").
+ * Generische 16:9-Bild-Kachel (Kurs-Thumbnail, 18.07.2026; verallgemeinert
+ * 19.07.2026 für das Modulbild — "ähnlich wie für Kurse", Josips Auftrag).
+ * Kennt weder Kurs noch Modul: der Aufrufer bindet die Persistenz über
+ * `onUpload` (z. B. `(url) => updateCourseCoverUrl(courseId, url)` bzw.
+ * `(url) => updateModuleCoverUrl(moduleId, courseId, url)`), diese Kachel
+ * kümmert sich nur um Dateiauswahl/-validierung/-upload + optimistisches
+ * Anzeigen. Ein Wechsel der Persistenz-Zielentität braucht dadurch keine
+ * zweite Kopie dieser ~100 Zeilen Upload-Mechanik.
  *
  * "Automatisch zugeschnitten und positioniert" ist bewusst über CSS gelöst
- * (`object-fit: cover; object-position: center` auf der 16:9-Box), nicht
- * über einen manuellen Zuschneide-Dialog: das Wort "automatisch" im Auftrag
- * heißt gerade OHNE Handeingriff — ein Crop-Werkzeug (Ziehen/Zoomen) wäre
- * das Gegenteil davon und eine erhebliche Zusatzfunktion, die nicht verlangt
- * wurde. Ein hochgeladenes Bild beliebigen Formats füllt die Kachel dadurch
- * immer lückenlos, mittig beschnitten.
- *
- * Kein Drag&Drop hier (anders als `image-upload.tsx` für den `+Bild`-Block):
- * der Auftrag nennt für diese Stelle nur "Klick öffnet Dateiauswahl" — eine
- * kleine Tabellen-/Listenkachel ist zudem keine sinnvolle Drop-Zielfläche
- * neben den übrigen Zeilen. Upload-Mechanik (signierte URL, Bucket,
- * Grössen-/Typ-Whitelist) ist exakt dieselbe wie beim Bild-Block —
- * geteilte Konstanten aus `asset-upload-schema.ts`, keine Dopplung.
- *
- * Lokal optimistisch aktualisiert (kein `router.refresh()` nötig): die
- * Kachel zeigt das neue Bild sofort, `updateCourseCoverUrl()` persistiert im
- * Hintergrund. Bei einem Fehler bliebe der Server-Stand ohnehin die Wahrheit
- * beim nächsten echten Neuladen — für eine Kachel in einer Verwaltungsliste
- * ist das ausreichend, ein Rollback-Mechanismus wäre hier Überbau.
+ * (`object-fit: cover; object-position: center`), nicht über einen manuellen
+ * Zuschneide-Dialog — siehe ursprüngliche Begründung beim Kurs-Thumbnail.
  */
-export function CourseThumbnailUpload({
-  courseId,
+export function ThumbnailUpload({
   initialUrl,
-  courseTitle,
+  entityLabel,
+  entityTitle,
+  onUpload,
 }: {
-  courseId: string;
   initialUrl: string | null;
-  courseTitle: string;
+  /** z. B. "Kursbild" oder "Modulbild" — für das aria-label. */
+  entityLabel: string;
+  entityTitle: string;
+  onUpload: (url: string) => Promise<{ error: string | null }>;
 }) {
   const [url, setUrl] = useState(initialUrl);
   const [state, setState] = useState<UploadState>({ status: "idle" });
@@ -80,13 +70,13 @@ export function CourseThumbnailUpload({
       .from("course-assets")
       .uploadToSignedUrl(path, token, file);
     if (uploadError) {
-      console.error("[course-thumbnail-upload] Datei-Upload fehlgeschlagen.", uploadError);
+      console.error("[thumbnail-upload] Datei-Upload fehlgeschlagen.", uploadError);
       setState({ status: "error", message: "Datei-Upload fehlgeschlagen. Bitte versuche es erneut." });
       return;
     }
 
     const { data } = browserSupabase.storage.from("course-assets").getPublicUrl(path);
-    const result = await updateCourseCoverUrl(courseId, data.publicUrl);
+    const result = await onUpload(data.publicUrl);
     if (result.error) {
       setState({ status: "error", message: result.error });
       return;
@@ -102,10 +92,10 @@ export function CourseThumbnailUpload({
       <label
         className="relative flex h-8 w-14 flex-none cursor-pointer items-center justify-center overflow-hidden rounded-[8px]"
         style={{ background: "#DFE2F4" }}
-        title={url ? "Kursbild ändern" : "Kursbild hinzufügen"}
+        title={url ? `${entityLabel} ändern` : `${entityLabel} hinzufügen`}
       >
         {url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert (gleiche Begründung wie block-renderer.tsx)
+          // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
           <img
             src={url}
             alt=""
@@ -127,7 +117,7 @@ export function CourseThumbnailUpload({
           type="file"
           accept={ALLOWED_IMAGE_MIME_TYPES.join(",")}
           disabled={pending}
-          aria-label={url ? `Kursbild ändern: ${courseTitle}` : `Kursbild hinzufügen: ${courseTitle}`}
+          aria-label={url ? `${entityLabel} ändern: ${entityTitle}` : `${entityLabel} hinzufügen: ${entityTitle}`}
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) handleFile(file);
