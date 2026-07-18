@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaffTenant, requireAdminTenant } from "@/lib/auth/staff";
@@ -8,6 +9,7 @@ import {
   courseSchema,
   lessonSchema,
   moduleSchema,
+  sectionSchema,
 } from "@/lib/courses/schema";
 import { slugify } from "@/lib/courses/slug";
 import { resolveUniqueCourseSlug } from "@/lib/courses/resolve-slug";
@@ -76,6 +78,39 @@ export async function updateCourseCategory(
       .eq("tenant_id", tenant.id);
     if (error) return { error: translateDbError(error) };
     revalidatePath("/admin/kurse");
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
+ * Kursbild (18.07.2026, Josips Auftrag: "Kursübersicht -> Option für
+ * Kurs-Thumbnail 16:9"). `courses.cover_url` existiert bereits seit
+ * 0001_init.sql, war bisher aber komplett ungenutzt (keine Schreib-/
+ * Leseseite) — nur diese Spalte fehlte, keine Migration nötig. Der Upload
+ * selbst läuft über den bereits bestehenden `course-assets`-Bucket-Fluss
+ * (`/api/course-assets/upload-url`, siehe `image-upload.tsx`); diese Action
+ * übernimmt nur das Verknüpfen der fertigen URL mit dem Kurs.
+ */
+export async function updateCourseCoverUrl(
+  courseId: string,
+  url: string,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const parsed = z.string().url().safeParse(url);
+    if (!parsed.success) {
+      return { error: "Ungültige Bild-URL." };
+    }
+    const { error } = await supabase
+      .from("courses")
+      .update({ cover_url: parsed.data })
+      .eq("id", courseId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+    revalidatePath("/admin/kurse");
+    revalidatePath(`/admin/kurse/${courseId}`);
     return { error: null, success: true };
   } catch (e) {
     return errorState(e);
@@ -295,10 +330,126 @@ export async function moveModule(
   }
 }
 
+// --- Sektionen (Modul -> Sektion -> Lektion, Migration 20260718150000) ---
+// Gleiches Muster wie Module oben (Zähl-basierte Position, Swap-Reorder) —
+// Sektionen sind strukturell Module, nur eine Ebene tiefer.
+
+export async function createSection(
+  moduleId: string,
+  courseId: string,
+  _prevState: CourseActionState,
+  formData: FormData,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const parsed = sectionSchema.safeParse({ title: formData.get("title") });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+
+    const { count } = await supabase
+      .from("sections")
+      .select("id", { count: "exact", head: true })
+      .eq("module_id", moduleId);
+
+    const { error } = await supabase.from("sections").insert({
+      tenant_id: tenant.id,
+      module_id: moduleId,
+      title: parsed.data.title,
+      position: count ?? 0,
+    });
+    if (error) return { error: translateDbError(error) };
+
+    revalidatePath(`/admin/kurse/${courseId}`);
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
+ * Löscht die Sektion. Lektionen darin werden NICHT mitgelöscht — die
+ * Fremdschlüssel-Regel ist `on delete set null` (Migration
+ * 20260718150000_sections.sql), sie fallen auf "lose im Modul" zurück statt
+ * mit der Sektion zu verschwinden. Bewusst anders als `deleteModule()`
+ * (dort kaskadiert das Löschen bis zu den Lektionen, weil ein Modul ohne
+ * Lektionen keinen Sinn ergibt) — eine Sektion ist reine Gliederung, ihr
+ * Verschwinden darf keine Lerninhalte mitreißen.
+ */
+export async function deleteSection(
+  sectionId: string,
+  courseId: string,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const { error } = await supabase
+      .from("sections")
+      .delete()
+      .eq("id", sectionId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+    revalidatePath(`/admin/kurse/${courseId}`);
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+export async function moveSection(
+  sectionId: string,
+  moduleId: string,
+  courseId: string,
+  direction: "up" | "down",
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const { data: sections, error: listError } = await supabase
+      .from("sections")
+      .select("id, position")
+      .eq("module_id", moduleId)
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: true });
+    if (listError || !sections) return { error: listError ? translateDbError(listError) : "Fehler." };
+
+    const idx = sections.findIndex((s) => s.id === sectionId);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= sections.length) {
+      return { error: null, success: true }; // Rand erreicht, kein Fehler
+    }
+
+    const a = sections[idx];
+    const b = sections[swapIdx];
+    await supabase
+      .from("sections")
+      .update({ position: b.position })
+      .eq("id", a.id)
+      .eq("tenant_id", tenant.id);
+    await supabase
+      .from("sections")
+      .update({ position: a.position })
+      .eq("id", b.id)
+      .eq("tenant_id", tenant.id);
+
+    revalidatePath(`/admin/kurse/${courseId}`);
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
 // --- Lektionen ---
 
+/**
+ * Lektionen entstehen jetzt INNERHALB einer Sektion (Josips Auftrag,
+ * 18.07.2026), nicht mehr direkt im Modul. `moduleId` wird bewusst NICHT vom
+ * Client übernommen, sondern hier aus der Sektion selbst nachgeladen — sonst
+ * könnte ein manipulierter Aufruf eine Lektion mit inkonsistentem
+ * module_id/section_id-Paar anlegen (die Sektion gehört zu Modul A, die
+ * Lektion trägt aber module_id von Modul B). Der Lookup dient zugleich als
+ * Existenz-/Mandantenprüfung der Sektion, bevor überhaupt geschrieben wird.
+ */
 export async function createLesson(
-  moduleId: string,
+  sectionId: string,
   courseId: string,
   _prevState: CourseActionState,
   formData: FormData,
@@ -310,14 +461,24 @@ export async function createLesson(
       return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
     }
 
+    const { data: section, error: sectionError } = await supabase
+      .from("sections")
+      .select("id, module_id")
+      .eq("id", sectionId)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+    if (sectionError) return { error: translateDbError(sectionError) };
+    if (!section) return { error: "Sektion nicht gefunden." };
+
     const { count } = await supabase
       .from("lessons")
       .select("id", { count: "exact", head: true })
-      .eq("module_id", moduleId);
+      .eq("section_id", sectionId);
 
     const { error } = await supabase.from("lessons").insert({
       tenant_id: tenant.id,
-      module_id: moduleId,
+      module_id: section.module_id,
+      section_id: sectionId,
       title: parsed.data.title,
       position: count ?? 0,
       blocks: [],

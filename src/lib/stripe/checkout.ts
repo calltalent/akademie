@@ -128,6 +128,15 @@ export async function createCheckoutSession(productSlug: string): Promise<Checko
         user_id: user.id,
       },
       customer_email: user.email ?? undefined,
+      // Design-Block (18.07.2026, Claude-Design-Import KursKauf.dc.html): der
+      // Export zeigt ein eigenes "Rechnungsdaten"/"Zahlungsdaten"-Formular
+      // (Name, Adresse, USt-ID, Zahlungsmittel). Diese App darf solche Daten
+      // nie selbst entgegennehmen (kein PCI-Scope, siehe kaufen/[productSlug]/
+      // page.tsx-Kommentar) - stattdessen sammelt die gehostete Stripe-Seite
+      // sie jetzt zusaetzlich ab, um die Absicht des Exports einzuloesen.
+      billing_address_collection: "required",
+      phone_number_collection: { enabled: true },
+      tax_id_collection: { enabled: true },
       success_url: buildTenantUrl(tenant, "/?checkout=success"),
       cancel_url: buildTenantUrl(tenant, `/kaufen/${slugCheck.data}?checkout=cancelled`),
     });

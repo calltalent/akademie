@@ -5,6 +5,7 @@ import { getTenant } from "@/lib/tenant/context";
 import { checkAdminAccess } from "@/lib/auth/staff";
 import { NewCourseDialog } from "@/components/admin/new-course-dialog";
 import { DeleteCourseIconButton } from "@/components/admin/delete-course-icon-button";
+import { CourseThumbnailUpload } from "@/components/admin/course-thumbnail-upload";
 
 /**
  * Design-Block 6 (13.07.2026, Claude-Design-Export Teil 3,
@@ -26,9 +27,10 @@ import { DeleteCourseIconButton } from "@/components/admin/delete-course-icon-bu
  * in lib/reporting/queries.ts, api/v1/enrollments) und damit hier die
  * präzisere, dokumentierte Wahl für eine Verwaltungsliste.
  *
- * Farbige Karo-Kacheln links vom Titel sind rein dekorativ (5 Tönungen aus
- * dem Export im Rundlauf nach Zeilenindex) — im Export beliebig zugewiesen,
- * hier ebenso ohne fachliche Bedeutung, keine erfundene Datenquelle.
+ * Kursbild (18.07.2026, Josips Auftrag): die früher rein dekorative
+ * Karo-Kachel links vom Titel zeigt jetzt das echte `cover_url`-Bild (16:9,
+ * `object-fit: cover`) bzw. — falls noch keins gesetzt ist — eine anklick-
+ * bare Platzhalterkachel zum Hochladen, siehe `course-thumbnail-upload.tsx`.
  *
  * Statusänderung (Live/Entwurf/Archiviert) ist bewusst NICHT mehr inline in
  * dieser Liste (Export zeigt dort nur einen Anzeige-Badge) — die echte
@@ -59,8 +61,6 @@ import { DeleteCourseIconButton } from "@/components/admin/delete-course-icon-bu
  * zweite Verteidigungslinie in der UI-Schicht, nicht die Absicherung selbst —
  * die liegt weiterhin in RLS + Server Action (siehe lib/auth/staff.ts).
  */
-
-const TINTS = ["#DFE2F4", "#E7E9F6", "#EDE7F5", "#E4E6F5", "#E9E6F3"];
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   published: { label: "Live", color: "#1F8A5B", bg: "#E3F2EA" },
@@ -93,7 +93,7 @@ export default async function AdminKursePage({
 
   const { data: courses } = await supabase
     .from("courses")
-    .select("id, title, slug, status")
+    .select("id, title, slug, status, cover_url")
     .eq("tenant_id", tenantId)
     .order("position", { ascending: true });
 
@@ -202,9 +202,8 @@ export default async function AdminKursePage({
             Keine Kurse in dieser Ansicht.
           </p>
         ) : (
-          visibleCourses.map((c, i) => {
+          visibleCourses.map((c) => {
             const meta = STATUS_META[c.status] ?? STATUS_META.draft;
-            const tint = TINTS[i % TINTS.length];
             return (
               <div
                 key={c.id}
@@ -215,13 +214,10 @@ export default async function AdminKursePage({
                 }}
               >
                 <div className="flex items-center gap-3.5">
-                  <span
-                    aria-hidden="true"
-                    className="h-8 w-11 flex-none rounded-[8px]"
-                    style={{
-                      backgroundColor: tint,
-                      backgroundImage: `repeating-linear-gradient(45deg, ${tint} 0 6px, rgba(255,255,255,.5) 6px 12px)`,
-                    }}
+                  <CourseThumbnailUpload
+                    courseId={c.id}
+                    initialUrl={c.cover_url}
+                    courseTitle={c.title}
                   />
                   <Link
                     href={`/admin/kurse/${c.id}`}

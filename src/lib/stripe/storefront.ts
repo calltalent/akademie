@@ -53,3 +53,58 @@ export async function getPublicProduct(tenantId: string, slug: string): Promise<
     currency: data.currency,
   };
 }
+
+export type PublicProductFeatures = {
+  moduleCount: number;
+  lessonCount: number;
+  totalMinutes: number;
+};
+
+/**
+ * Design-Block (18.07.2026, Claude-Design-Import KursKauf.dc.html) - liefert
+ * die Eckdaten fuer die Produktkarte der Kaufseite ("N Module * M Lektionen *
+ * X Min. Videomaterial"), berechnet aus den ueber `products.course_ids`
+ * verknuepften Kursen. Bewusst eine EIGENE Funktion statt die Zahlen in
+ * getPublicProduct() mit auszuliefern: `course_ids` selbst verlaesst diese
+ * Funktion nie, nur die aggregierten Zahlen - gleiches Sicherheitsprinzip wie
+ * bei den Stripe-internen IDs oben (so wenig wie noetig an den Client).
+ * `null`, wenn das Produkt keinem Kurs zugeordnet ist - die Kaufseite zeigt
+ * dann keine Feature-Liste statt erfundener Platzhalterzahlen.
+ */
+export async function getPublicProductFeatures(
+  tenantId: string,
+  slug: string,
+): Promise<PublicProductFeatures | null> {
+  const admin = createAdminClient();
+  const { data: product } = await admin
+    .from("products")
+    .select("course_ids")
+    .eq("tenant_id", tenantId)
+    .eq("slug", slug)
+    .eq("active", true)
+    .maybeSingle();
+
+  const courseIds = (product?.course_ids as string[] | null) ?? [];
+  if (courseIds.length === 0) return null;
+
+  const { data: modules } = await admin.from("modules").select("id").in("course_id", courseIds);
+  const moduleIds = (modules ?? []).map((m) => m.id as string);
+  if (moduleIds.length === 0) return { moduleCount: 0, lessonCount: 0, totalMinutes: 0 };
+
+  const { data: lessons } = await admin
+    .from("lessons")
+    .select("video_duration_s")
+    .in("module_id", moduleIds)
+    .eq("status", "published");
+
+  const totalSeconds = (lessons ?? []).reduce(
+    (sum, l) => sum + ((l.video_duration_s as number | null) ?? 0),
+    0,
+  );
+
+  return {
+    moduleCount: moduleIds.length,
+    lessonCount: (lessons ?? []).length,
+    totalMinutes: Math.round(totalSeconds / 60),
+  };
+}

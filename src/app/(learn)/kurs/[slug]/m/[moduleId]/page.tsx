@@ -12,13 +12,17 @@ import { AppShell } from "@/components/learn/app-shell";
  * (Kurs-Übersicht → direkt Lektion). Sie sitzt jetzt zwischen KursUebersicht
  * und Lektion: Hero + Lektionsliste eines einzelnen Moduls.
  *
- * Datenmodell-Hinweis: Der Export gruppiert Lektionen zusätzlich in
- * „Sektionen" innerhalb eines Moduls — dieses Zwischenlevel existiert im
- * Schema NICHT (Kurs → Modul → Lektion, keine sections-Tabelle). Statt
- * Fantasie-Sektionen zu erfinden, werden die Lektionen des Moduls in EINER
- * Sektionskarte gezeigt (DESIGN-MASTERPROMPT.md §8.1 „keine erfundenen
- * Daten"). Ebenfalls bewusst weggelassen: die „DEIN COACH"-Karte des Exports
- * (es gibt kein Coach-/Trainer-Datenmodell pro Kurs — statt „Andrea Baumann"
+ * SEKTIONEN (18.07.2026, Josips Auftrag, Migration 20260718150000): der
+ * Export gruppierte Lektionen schon immer in „Sektionen" — dieses Level gab
+ * es im Schema damals noch nicht (siehe PHASENSTATUS.md), jede Sektion wurde
+ * deshalb notgedrungen zu EINER Karte zusammengefasst. Jetzt real: pro
+ * Sektion eine eigene Karte mit eigener Überschrift; Lektionen OHNE Sektion
+ * (vor der Migration angelegt oder über KI-Generator/CSV-Import entstanden)
+ * erscheinen weiterhin, in einer Karte ohne Sektionstitel — keine Lektion
+ * verschwindet durch die neue Gruppierung.
+ *
+ * Weiterhin bewusst weggelassen: die „DEIN COACH"-Karte des Exports (es
+ * gibt kein Coach-/Trainer-Datenmodell pro Kurs — statt „Andrea Baumann"
  * hart zu verdrahten, bleibt sie weg, bis eine echte Quelle definiert ist)
  * und die „N Seiten"-Angabe je Lektion (kein Datenfeld dafür).
  */
@@ -85,9 +89,16 @@ export default async function ModulePage({
     );
   }
 
+  // Sektionen dieses Moduls (Migration 20260718150000_sections.sql).
+  const { data: sections } = await supabase
+    .from("sections")
+    .select("id, title, position")
+    .eq("module_id", mod.id)
+    .order("position", { ascending: true });
+
   const { data: lessons } = await supabase
     .from("lessons")
-    .select("id, title, position, status, video_duration_s")
+    .select("id, title, section_id, position, status, video_duration_s")
     .eq("module_id", mod.id)
     .eq("status", "published")
     .order("position", { ascending: true });
@@ -115,6 +126,24 @@ export default async function ModulePage({
     const m = Math.round(seconds / 60);
     return `${m} ${m === 1 ? "Minute" : "Minuten"}`;
   }
+
+  // Eine Karte je Sektion (statt vorher EINER Karte fürs ganze Modul, siehe
+  // Dateikopf) + eine Auffang-Karte für Lektionen ohne Sektion. Fehlt jede
+  // Sektion (Modul noch nicht auf Sektionen umgestellt), zeigt die
+  // Auffang-Karte den Modultitel — exakt das bisherige Aussehen, keine
+  // Regression für unveränderte Module.
+  const sectionsWithLessons = (sections ?? []).map((s) => ({
+    key: s.id,
+    title: s.title,
+    lessons: lessonList.filter((l) => l.section_id === s.id),
+  }));
+  const looseLessons = lessonList.filter((l) => !l.section_id);
+  const lessonCards = [
+    ...sectionsWithLessons,
+    ...(looseLessons.length > 0
+      ? [{ key: "loose", title: sectionsWithLessons.length > 0 ? "Weitere Lektionen" : mod.title, lessons: looseLessons }]
+      : []),
+  ].filter((card) => card.lessons.length > 0);
 
   return (
     <AppShell
@@ -166,76 +195,91 @@ export default async function ModulePage({
             </div>
           </div>
 
-          {/* Lektionen (eine Sektionskarte — es gibt kein Sektions-Level im Schema) */}
-          {lessonList.length === 0 ? (
+          {/* Lektionen — eine Karte je Sektion (siehe Dateikopf) */}
+          {lessonCards.length === 0 ? (
             <p className="text-base" style={{ color: "#66679B" }}>
               Dieses Modul hat noch keine veröffentlichten Lektionen.
             </p>
           ) : (
-            <div className="rounded-[16px] border bg-white p-[20px_22px]" style={{ borderColor: "#E7E8F2" }}>
-              <div className="mb-4 flex items-center gap-3.5">
-                <span
-                  className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px]"
-                  style={{ background: "#EDEEF7" }}
-                  aria-hidden="true"
-                >
-                  <ListVideo size={18} color={ACCENT} strokeWidth={2} />
-                </span>
-                <div className="flex-1 text-lg font-extrabold" style={{ color: "#1A1A2E" }}>
-                  {mod.title}
-                </div>
-                {totalMinutes > 0 && (
-                  <div className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
-                    <Clock size={14} strokeWidth={2} aria-hidden="true" />
-                    {totalMinutes} Min.
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col gap-2.5">
-                {lessonList.map((l) => {
-                  const done = completedIds.has(l.id);
-                  const mins = lessonMinutes((l.video_duration_s as number | null) ?? null);
-                  return (
-                    <Link
-                      key={l.id}
-                      href={`/kurs/${slug}/l/${l.id}`}
-                      className="flex items-center gap-3.5 rounded-[12px] border p-[12px_14px] text-inherit no-underline"
-                      style={{ borderColor: "#EEF0F7" }}
-                    >
+            <div className="flex flex-col gap-4">
+              {lessonCards.map((card) => {
+                const cardSeconds = card.lessons.reduce(
+                  (sum, l) => sum + ((l.video_duration_s as number | null) ?? 0),
+                  0,
+                );
+                const cardMinutes = Math.round(cardSeconds / 60);
+                return (
+                  <div
+                    key={card.key}
+                    className="rounded-[16px] border bg-white p-[20px_22px]"
+                    style={{ borderColor: "#E7E8F2" }}
+                  >
+                    <div className="mb-4 flex items-center gap-3.5">
                       <span
-                        className="flex h-12 w-[74px] flex-none items-center justify-center rounded-[8px]"
-                        style={{
-                          backgroundColor: "#DFE2F4",
-                          backgroundImage:
-                            "repeating-linear-gradient(45deg,#DFE2F4 0 9px, rgba(255,255,255,.55) 9px 18px)",
-                        }}
+                        className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px]"
+                        style={{ background: "#EDEEF7" }}
                         aria-hidden="true"
                       >
-                        <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full" style={{ background: ACCENT }}>
-                          <Play size={10} color="#fff" fill="#fff" />
-                        </span>
+                        <ListVideo size={18} color={ACCENT} strokeWidth={2} />
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-base font-bold" style={{ color: "#1A1A2E" }}>
-                          {l.title}
-                        </div>
-                        {mins && (
-                          <div className="mt-1 text-xs font-semibold" style={{ color: "#A9AAC4" }}>
-                            {mins}
-                          </div>
-                        )}
+                      <div className="flex-1 text-lg font-extrabold" style={{ color: "#1A1A2E" }}>
+                        {card.title}
                       </div>
-                      <span
-                        className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full"
-                        style={{ background: done ? "#E4F5EC" : "#F0F1F8" }}
-                        aria-hidden="true"
-                      >
-                        <Check size={14} strokeWidth={3} color={done ? "#3CA36A" : "#C6C8DC"} />
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
+                      {cardMinutes > 0 && (
+                        <div className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
+                          <Clock size={14} strokeWidth={2} aria-hidden="true" />
+                          {cardMinutes} Min.
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2.5">
+                      {card.lessons.map((l) => {
+                        const done = completedIds.has(l.id);
+                        const mins = lessonMinutes((l.video_duration_s as number | null) ?? null);
+                        return (
+                          <Link
+                            key={l.id}
+                            href={`/kurs/${slug}/l/${l.id}`}
+                            className="flex items-center gap-3.5 rounded-[12px] border p-[12px_14px] text-inherit no-underline"
+                            style={{ borderColor: "#EEF0F7" }}
+                          >
+                            <span
+                              className="flex h-12 w-[74px] flex-none items-center justify-center rounded-[8px]"
+                              style={{
+                                backgroundColor: "#DFE2F4",
+                                backgroundImage:
+                                  "repeating-linear-gradient(45deg,#DFE2F4 0 9px, rgba(255,255,255,.55) 9px 18px)",
+                              }}
+                              aria-hidden="true"
+                            >
+                              <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full" style={{ background: ACCENT }}>
+                                <Play size={10} color="#fff" fill="#fff" />
+                              </span>
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-base font-bold" style={{ color: "#1A1A2E" }}>
+                                {l.title}
+                              </div>
+                              {mins && (
+                                <div className="mt-1 text-xs font-semibold" style={{ color: "#A9AAC4" }}>
+                                  {mins}
+                                </div>
+                              )}
+                            </div>
+                            <span
+                              className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full"
+                              style={{ background: done ? "#E4F5EC" : "#F0F1F8" }}
+                              aria-hidden="true"
+                            >
+                              <Check size={14} strokeWidth={3} color={done ? "#3CA36A" : "#C6C8DC"} />
+                            </span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

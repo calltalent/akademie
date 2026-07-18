@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Check } from "lucide-react";
 import { createCheckoutSession } from "@/lib/stripe/checkout";
 
 /**
@@ -16,6 +17,13 @@ import { createCheckoutSession } from "@/lib/stripe/checkout";
  * `createCheckoutSession()` loest bei Erfolg serverseitig `redirect()` aus
  * (wirft intern) - der `if (result?.error)`-Zweig wird deshalb nur bei
  * einem tatsaechlichen Fehler erreicht.
+ *
+ * Design-Block (18.07.2026, Claude-Design-Import KursKauf.dc.html): Stil und
+ * Text jetzt wie der "Zahlungspflichtig bestellen"-Button der Kosten-
+ * Zusammenfassung im Export (voller Breite, gruener CTA, Haekchen-Icon) -
+ * bewusste Wortwahl fuer die deutsche Button-Loesung (§312j BGB). Verhalten
+ * unveraendert: loest weiterhin nur createCheckoutSession() aus und leitet
+ * zu Stripe Checkout weiter, kein eigenes Bestell-/Zahlungsformular.
  */
 export function BuyButton({ productSlug }: { productSlug: string }) {
   const [pending, startTransition] = useTransition();
@@ -37,13 +45,14 @@ export function BuyButton({ productSlug }: { productSlug: string }) {
         type="button"
         onClick={handleClick}
         disabled={pending}
-        className="self-start rounded-md px-5 py-2.5 text-base text-white disabled:opacity-50"
-        style={{ background: "var(--color-primary)", borderRadius: "var(--radius)" }}
+        className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-[15px] text-base font-extrabold text-white disabled:opacity-50"
+        style={{ background: "#1F8A5B" }}
       >
-        {pending ? "Wird vorbereitet …" : "Kaufen"}
+        {pending ? "Wird vorbereitet …" : "Zahlungspflichtig bestellen"}
+        {!pending && <Check size={18} strokeWidth={2.6} aria-hidden="true" />}
       </button>
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm" style={{ color: "#B24343" }}>
           {error}
         </p>
       )}

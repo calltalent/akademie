@@ -67,9 +67,16 @@ export default async function CourseEditorPage({
     .eq("course_id", courseId)
     .order("position", { ascending: true });
 
+  // Sektionen (Modul -> Sektion -> Lektion, Migration 20260718150000).
+  const { data: sections } = await supabase
+    .from("sections")
+    .select("id, title, module_id, position")
+    .in("module_id", (modules ?? []).map((m) => m.id))
+    .order("position", { ascending: true });
+
   const { data: lessons } = await supabase
     .from("lessons")
-    .select("id, title, module_id, status, blocks, position, video_bunny_id")
+    .select("id, title, module_id, section_id, status, blocks, position, video_bunny_id")
     .in("module_id", (modules ?? []).map((m) => m.id))
     .order("position", { ascending: true });
 
@@ -95,8 +102,20 @@ export default async function CourseEditorPage({
   const modulesWithLessons = (modules ?? []).map((m) => ({
     id: m.id,
     title: m.title,
-    lessons: (lessons ?? [])
-      .filter((l) => l.module_id === m.id)
+    sections: (sections ?? [])
+      .filter((s) => s.module_id === m.id)
+      .map((s) => ({
+        id: s.id,
+        title: s.title,
+        lessons: (lessons ?? [])
+          .filter((l) => l.section_id === s.id)
+          .map((l) => ({ id: l.id, title: l.title, status: l.status })),
+      })),
+    // Lektionen ohne Sektion (vor der Migration angelegt, oder über
+    // KI-Generator/CSV-Import entstanden — beide schreiben module_id ohne
+    // section_id) bleiben im Baum sichtbar statt zu verschwinden.
+    looseLessons: (lessons ?? [])
+      .filter((l) => l.module_id === m.id && !l.section_id)
       .map((l) => ({ id: l.id, title: l.title, status: l.status })),
   }));
 

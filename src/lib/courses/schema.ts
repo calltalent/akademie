@@ -162,10 +162,16 @@ export const moduleSchema = z.object({
   title: z.string().min(1, "Titel erforderlich.").max(300),
 });
 
+/** Sektion (Modul -> Sektion -> Lektion, Migration 20260718150000_sections.sql) — gleiche Form wie moduleSchema, eigener Typ für Klarheit an den Aufrufstellen. */
+export const sectionSchema = z.object({
+  title: z.string().min(1, "Titel erforderlich.").max(300),
+});
+
 export const lessonSchema = z.object({
   title: z.string().min(1, "Titel erforderlich.").max(300),
 });
 
 export type CourseInput = z.infer<typeof courseSchema>;
 export type ModuleInput = z.infer<typeof moduleSchema>;
+export type SectionInput = z.infer<typeof sectionSchema>;
 export type LessonInput = z.infer<typeof lessonSchema>;

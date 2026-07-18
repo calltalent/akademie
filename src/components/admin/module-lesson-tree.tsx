@@ -5,15 +5,28 @@ import { useActionState } from "react";
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import {
   createModule,
+  createSection,
   createLesson,
   deleteModule,
+  deleteSection,
   deleteLesson,
   moveModule,
+  moveSection,
 } from "@/lib/courses/actions";
 import { initialCourseActionState } from "@/lib/courses/state";
 
 type LessonRow = { id: string; title: string; status: string };
-type ModuleRow = { id: string; title: string; lessons: LessonRow[] };
+type SectionRow = { id: string; title: string; lessons: LessonRow[] };
+type ModuleRow = {
+  id: string;
+  title: string;
+  sections: SectionRow[];
+  /** Lektionen mit `section_id = null` — vor Migration 20260718150000
+   * angelegt, oder über den KI-Generator/CSV-Import entstanden (beide
+   * schreiben weiterhin direkt auf `module_id`, ohne Sektion). Bleiben
+   * sichtbar statt zu verschwinden, siehe Kopfkommentar unten. */
+  looseLessons: LessonRow[];
+};
 
 /**
  * Design-Update (AdminKursEditor.dc.html): Modul-/Lektionsbaum als
@@ -21,6 +34,23 @@ type ModuleRow = { id: string; title: string; lessons: LessonRow[] };
  * (Entwurf/Veröffentlicht) als Farb-Chip, die aktive Lektion zusätzlich zur
  * Hintergrundfarbe über einen linken Akzentbalken + kräftigere Schrift
  * hervorgehoben (CLAUDE.md §3.4: Zustand nie nur über Farbe).
+ *
+ * SEKTIONEN (18.07.2026, Josips Auftrag): neue Zwischenebene Modul ->
+ * Sektion -> Lektion (Migration 20260718150000_sections.sql). Bewusst
+ * ADDITIV umgesetzt — `lessons.module_id` bleibt die Pflichtspalte,
+ * `section_id` ist zusätzlich und NULLABLE. Lektionen werden jetzt INNERHALB
+ * einer Sektion angelegt (`createLesson()` nimmt eine `sectionId`, keine
+ * `moduleId` mehr entgegen). Ein frisch angelegtes Modul hat 0 Sektionen —
+ * die erste Aktion ist also "Neue Sektion", nicht mehr "Neue Lektion" (genau
+ * der vom Auftrag verlangte Ablauf: "nach der Modulerstellung auch die
+ * Option für Sektionen").
+ *
+ * `looseLessons` (Lektionen ohne section_id) werden NICHT versteckt: der
+ * KI-Kursgenerator (`lib/generator/apply.ts`) und der CSV-Import
+ * (`lib/import/course-import.ts`) legen Lektionen weiterhin direkt unters
+ * Modul, ohne Sektion — sie erscheinen unter "Lektionen ohne Sektion" am
+ * Ende des Moduls, damit sie im Editor auffindbar und bearbeitbar bleiben
+ * statt lautlos zu verschwinden.
  */
 const LESSON_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   published: { label: "Veröffentlicht", color: "#1F8A5B", bg: "#E3F2EA" },
@@ -91,39 +121,150 @@ function ModuleBlock({
         </IconButton>
       </div>
 
-      <ul className="mb-3 flex flex-col gap-1.5">
-        {mod.lessons.map((lesson) => {
-          const isActive = activeLessonId === lesson.id;
-          const meta = LESSON_STATUS_META[lesson.status] ?? LESSON_STATUS_META.draft;
-          return (
-            <li key={lesson.id}>
-              <a
-                href={`/admin/kurse/${courseId}?lesson=${lesson.id}`}
-                aria-current={isActive ? "page" : undefined}
-                className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-sm no-underline"
-                style={{
-                  border: `1px solid ${isActive ? "#D8DAEA" : "transparent"}`,
-                  borderLeft: `4px solid ${isActive ? "#5663AE" : "transparent"}`,
-                  background: isActive ? "#F6F7FC" : "transparent",
-                }}
-              >
-                <span className="min-w-0 flex-1 truncate" style={{ fontWeight: isActive ? 800 : 600, color: "#1A1A2E" }}>
-                  {lesson.title}
-                </span>
-                <span
-                  className="flex-none rounded-[7px] px-2 py-0.5 text-[11px] font-bold"
-                  style={{ color: meta.color, background: meta.bg }}
-                >
-                  {meta.label}
-                </span>
-              </a>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="flex flex-col gap-3">
+        {mod.sections.map((section, sIdx) => (
+          <SectionBlock
+            key={section.id}
+            courseId={courseId}
+            moduleId={mod.id}
+            section={section}
+            isFirst={sIdx === 0}
+            isLast={sIdx === mod.sections.length - 1}
+            activeLessonId={activeLessonId}
+          />
+        ))}
 
-      <NewLessonForm courseId={courseId} moduleId={mod.id} />
+        {mod.looseLessons.length > 0 && (
+          <div className="rounded-[10px] p-2.5" style={{ background: "#FBF6EA" }}>
+            <div className="mb-1.5 text-[12px] font-bold" style={{ color: "#8A6D2F" }}>
+              Lektionen ohne Sektion
+            </div>
+            <LessonList
+              courseId={courseId}
+              lessons={mod.looseLessons}
+              activeLessonId={activeLessonId}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3">
+        <NewSectionForm courseId={courseId} moduleId={mod.id} />
+      </div>
     </div>
+  );
+}
+
+function SectionBlock({
+  courseId,
+  moduleId,
+  section,
+  isFirst,
+  isLast,
+  activeLessonId,
+}: {
+  courseId: string;
+  moduleId: string;
+  section: SectionRow;
+  isFirst: boolean;
+  isLast: boolean;
+  activeLessonId?: string;
+}) {
+  return (
+    <div className="rounded-[11px] border p-2.5" style={{ borderColor: "#EEF0F7", background: "#FAFAFD" }}>
+      <div className="mb-2 flex items-center gap-1.5">
+        <span
+          aria-hidden="true"
+          className="h-4 w-0.5 flex-none rounded-full"
+          style={{ background: "#A9AAC4" }}
+        />
+        <span className="min-w-0 flex-1 break-words text-[14px] font-bold" style={{ color: "#3E3F66" }}>
+          {section.title}
+        </span>
+        <IconButton
+          small
+          label="Sektion nach oben"
+          disabled={isFirst}
+          onClick={() => moveSection(section.id, moduleId, courseId, "up")}
+        >
+          <ChevronUp size={13} aria-hidden="true" />
+        </IconButton>
+        <IconButton
+          small
+          label="Sektion nach unten"
+          disabled={isLast}
+          onClick={() => moveSection(section.id, moduleId, courseId, "down")}
+        >
+          <ChevronDown size={13} aria-hidden="true" />
+        </IconButton>
+        <IconButton
+          small
+          label="Sektion löschen"
+          danger
+          onClick={() => {
+            const msg =
+              section.lessons.length > 0
+                ? `Sektion „${section.title}" löschen? ${section.lessons.length} ${section.lessons.length === 1 ? "Lektion bleibt" : "Lektionen bleiben"} erhalten und rutscht/rutschen ins Modul (ohne Sektion).`
+                : `Sektion „${section.title}" wirklich löschen?`;
+            if (confirm(msg)) {
+              deleteSection(section.id, courseId);
+            }
+          }}
+        >
+          <Trash2 size={13} aria-hidden="true" />
+        </IconButton>
+      </div>
+
+      <LessonList courseId={courseId} lessons={section.lessons} activeLessonId={activeLessonId} />
+
+      <div className="mt-2">
+        <NewLessonForm courseId={courseId} sectionId={section.id} />
+      </div>
+    </div>
+  );
+}
+
+function LessonList({
+  courseId,
+  lessons,
+  activeLessonId,
+}: {
+  courseId: string;
+  lessons: LessonRow[];
+  activeLessonId?: string;
+}) {
+  if (lessons.length === 0) return null;
+  return (
+    <ul className="flex flex-col gap-1.5">
+      {lessons.map((lesson) => {
+        const isActive = activeLessonId === lesson.id;
+        const meta = LESSON_STATUS_META[lesson.status] ?? LESSON_STATUS_META.draft;
+        return (
+          <li key={lesson.id}>
+            <a
+              href={`/admin/kurse/${courseId}?lesson=${lesson.id}`}
+              aria-current={isActive ? "page" : undefined}
+              className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-sm no-underline"
+              style={{
+                border: `1px solid ${isActive ? "#D8DAEA" : "transparent"}`,
+                borderLeft: `4px solid ${isActive ? "#5663AE" : "transparent"}`,
+                background: isActive ? "#F6F7FC" : "transparent",
+              }}
+            >
+              <span className="min-w-0 flex-1 truncate" style={{ fontWeight: isActive ? 800 : 600, color: "#1A1A2E" }}>
+                {lesson.title}
+              </span>
+              <span
+                className="flex-none rounded-[7px] px-2 py-0.5 text-[11px] font-bold"
+                style={{ color: meta.color, background: meta.bg }}
+              >
+                {meta.label}
+              </span>
+            </a>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -132,14 +273,17 @@ function IconButton({
   onClick,
   disabled = false,
   danger = false,
+  small = false,
   children,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
   danger?: boolean;
+  small?: boolean;
   children: ReactNode;
 }) {
+  const size = small ? "h-7 w-7" : "h-8 w-8";
   return (
     <button
       type="button"
@@ -147,7 +291,7 @@ function IconButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] border bg-white disabled:opacity-30"
+      className={`flex ${size} flex-none items-center justify-center rounded-[9px] border bg-white disabled:opacity-30`}
       style={{ borderColor: "#E7E8F2", color: danger ? "#B14A4A" : "#5663AE" }}
     >
       {children}
@@ -190,8 +334,43 @@ function NewModuleForm({ courseId }: { courseId: string }) {
   );
 }
 
-function NewLessonForm({ courseId, moduleId }: { courseId: string; moduleId: string }) {
-  const boundAction = createLesson.bind(null, moduleId, courseId);
+function NewSectionForm({ courseId, moduleId }: { courseId: string; moduleId: string }) {
+  const boundAction = createSection.bind(null, moduleId, courseId);
+  const [state, action, pending] = useActionState(boundAction, initialCourseActionState);
+
+  return (
+    <form action={action} className="flex flex-col gap-1.5">
+      <div className="flex gap-2">
+        <input
+          name="title"
+          type="text"
+          required
+          aria-label="Titel der neuen Sektion"
+          placeholder="Neue Sektion …"
+          className="min-w-0 flex-1 rounded-[10px] border bg-white px-2.5 py-2 text-sm"
+          style={{ borderColor: "#D8DAEA" }}
+        />
+        <button
+          type="submit"
+          disabled={pending}
+          className="inline-flex flex-none items-center gap-1 rounded-[10px] border px-3 py-2 text-sm font-bold disabled:opacity-50"
+          style={{ borderColor: "#5663AE", color: "#5663AE" }}
+        >
+          <Plus size={13} aria-hidden="true" />
+          Sektion
+        </button>
+      </div>
+      {state.error && (
+        <p role="alert" className="text-xs font-semibold" style={{ color: "#B14A4A" }}>
+          {state.error}
+        </p>
+      )}
+    </form>
+  );
+}
+
+function NewLessonForm({ courseId, sectionId }: { courseId: string; sectionId: string }) {
+  const boundAction = createLesson.bind(null, sectionId, courseId);
   const [state, action, pending] = useActionState(boundAction, initialCourseActionState);
 
   return (

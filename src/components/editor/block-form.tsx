@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { Bold, Italic, Underline } from "lucide-react";
 import type { Block } from "@/lib/courses/schema";
 import { VideoSourceSwitch } from "@/components/editor/video-source-switch";
 import { ImageUpload } from "@/components/editor/image-upload";
@@ -17,8 +18,10 @@ const labelClass = "flex flex-col gap-1.5 text-sm font-bold";
 
 /**
  * Ein Formular je Block-Typ. Bewusst einfach gehalten (Textarea/Input statt
- * Rich-Text-Editor) — Rich-Text-WYSIWYG ist eine spätere Verfeinerung,
- * kein Kern-DoD-Kriterium für Phase 1.
+ * vollem Rich-Text-Editor) — der Textblock hat seit 18.07.2026 immerhin eine
+ * kleine Fett-/Kursiv-/Unterstreichen-Toolbar (siehe `TextBlockFields`
+ * unten), ein contentEditable-WYSIWYG bleibt darüber hinaus eine spätere
+ * Verfeinerung, kein Kern-DoD-Kriterium für Phase 1.
  *
  * Design-Update (AdminKursEditor.dc.html) + Barrierefreiheit (CLAUDE.md
  * §3.4): jedes Feld hat jetzt ein sichtbares `<label>` statt teils nur eines
@@ -39,19 +42,7 @@ export function BlockForm({
 }) {
   switch (block.type) {
     case "text":
-      return (
-        <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
-          Textinhalt
-          <textarea
-            value={block.html}
-            onChange={(e) => onChange({ ...block, html: e.target.value })}
-            rows={5}
-            placeholder="Text (einfaches HTML möglich) …"
-            className={`${fieldClass} resize-y leading-relaxed`}
-            style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
-          />
-        </label>
-      );
+      return <TextBlockFields block={block} onChange={onChange} />;
 
     case "callout":
       return (
@@ -200,6 +191,109 @@ export function BlockForm({
         </label>
       );
   }
+}
+
+/**
+ * Textformatierung (18.07.2026, Josips Auftrag: "Fetten, Kursiv,
+ * Unterstrichenen Text ... Wörter im Satz je nach Bedarf boldieren,
+ * unterstreichen oder kursiv setzen ... Symbole unter dem Textblock").
+ *
+ * Bewusst KEIN vollständiger WYSIWYG-/contentEditable-Umbau: das Feld bleibt
+ * die bestehende Roh-HTML-`<textarea>` (siehe Dateikopf-Kommentar oben,
+ * `schema.ts`s `sanitizeLessonHtml()` erlaubt `strong`/`em`/`u` bereits seit
+ * Phase 1) — die drei Knöpfe fügen beim Klick lediglich die passenden Tags
+ * um die AKTUELLE TEXTAUSWAHL im Feld ein (`selectionStart`/`selectionEnd`),
+ * exakt wie ein Markdown-Editor-Toolbar. Das ist die kleinstmögliche
+ * Änderung, die "Wort im Satz auswählen und formatieren" ermöglicht, ohne
+ * die bereits funktionierende Sanitize-bei-Speichern-Architektur anzufassen
+ * oder ein Rich-Text-Framework einzuführen.
+ *
+ * Ohne Auswahl (Cursor blinkt nur) werden leere Tags an der Cursorposition
+ * eingefügt und der Cursor zwischen sie gesetzt — Standardverhalten von
+ * Editor-Toolbars: weitertippen erzeugt direkt formatierten Text.
+ */
+function TextBlockFields({
+  block,
+  onChange,
+}: {
+  block: Extract<Block, { type: "text" }>;
+  onChange: (next: Block) => void;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function wrapSelection(openTag: string, closeTag: string) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const value = block.html;
+    const next = `${value.slice(0, start)}${openTag}${value.slice(start, end)}${closeTag}${value.slice(end)}`;
+    onChange({ ...block, html: next });
+    // Erst NACH dem durch onChange ausgelösten Re-Render kennt das Feld den
+    // neuen Wert — Fokus/Selektion deshalb NACH diesem Render setzen, sonst
+    // wirft der Browser die Selektion auf den alten (kürzeren) Wert zurück
+    // bzw. ans Ende (Standardverhalten bei programmatischer `.value`-
+    // Zuweisung auf ein fokussiertes Feld). `setTimeout(…, 0)` statt
+    // `requestAnimationFrame` — GLEICHES Muster wie `SegmentRow`/
+    // `SaveIndicator` in diesem Projekt (video-trimmer.tsx/
+    // video-recorder.tsx): rAF wird in Hintergrund-/nicht sichtbaren Tabs
+    // vom Browser ausgesetzt (beim Testen verifiziert — feuert dort
+    // überhaupt nicht), `setTimeout` läuft zuverlässig auch dort.
+    setTimeout(() => {
+      el.focus();
+      const selectionStart = start + openTag.length;
+      el.setSelectionRange(selectionStart, selectionStart + (end - start));
+    }, 0);
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+        Textinhalt
+        <textarea
+          ref={textareaRef}
+          value={block.html}
+          onChange={(e) => onChange({ ...block, html: e.target.value })}
+          rows={5}
+          placeholder="Text (einfaches HTML möglich) …"
+          className={`${fieldClass} resize-y leading-relaxed`}
+          style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+        />
+      </label>
+      <div className="flex gap-1.5" role="group" aria-label="Textformatierung für die Auswahl im Textfeld">
+        <button
+          type="button"
+          onClick={() => wrapSelection("<strong>", "</strong>")}
+          aria-label="Ausgewählten Text fett formatieren"
+          title="Fett"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border bg-white"
+          style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+        >
+          <Bold size={14} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={() => wrapSelection("<em>", "</em>")}
+          aria-label="Ausgewählten Text kursiv formatieren"
+          title="Kursiv"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border bg-white"
+          style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+        >
+          <Italic size={14} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={() => wrapSelection("<u>", "</u>")}
+          aria-label="Ausgewählten Text unterstreichen"
+          title="Unterstrichen"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border bg-white"
+          style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+        >
+          <Underline size={14} aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /**
