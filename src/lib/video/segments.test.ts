@@ -3,6 +3,7 @@ import {
   coversFullDuration,
   createInitialSegments,
   MIN_SEGMENT_LENGTH_S,
+  neighborBounds,
   normalizeSegments,
   parseTimecode,
   removeSegment,
@@ -304,6 +305,52 @@ describe("setSegmentBound", () => {
   it("erzwingt keine Validierung — ein zwischenzeitlich ungültiger Wert bleibt bestehen", () => {
     const result = setSegmentBound([{ id: "a", startS: 0, endS: 10 }], "a", "start", 999);
     expect(result).toEqual([{ id: "a", startS: 999, endS: 10 }]);
+  });
+});
+
+describe("neighborBounds", () => {
+  it("liefert 0/durationS ohne Nachbarn (einziges Segment)", () => {
+    expect(neighborBounds([{ id: "a", startS: 0, endS: 100 }], "a", 100)).toEqual({
+      minStartS: 0,
+      maxEndS: 100,
+    });
+  });
+
+  it("begrenzt auf das Ende des vorherigen und den Start des nächsten Segments", () => {
+    // Fund im Code-Review (18.07.2026): ohne diese Begrenzung kann ein
+    // Segment über eine Lücke hinweg ins Nachbarsegment hineinragen —
+    // normalizeSegments() merged dann still, der dazwischenliegende
+    // entfernte Bereich verschwindet kommentarlos.
+    const segments: Segment[] = [
+      { id: "a", startS: 0, endS: 8 },
+      { id: "b", startS: 10, endS: 20 },
+    ];
+    expect(neighborBounds(segments, "a", 20)).toEqual({ minStartS: 0, maxEndS: 10 });
+    expect(neighborBounds(segments, "b", 20)).toEqual({ minStartS: 8, maxEndS: 20 });
+  });
+
+  it("funktioniert unabhängig von der Array-Reihenfolge (sortiert intern)", () => {
+    const segments: Segment[] = [
+      { id: "b", startS: 10, endS: 20 },
+      { id: "a", startS: 0, endS: 8 },
+    ];
+    expect(neighborBounds(segments, "a", 20)).toEqual({ minStartS: 0, maxEndS: 10 });
+  });
+
+  it("liefert 0/durationS für eine unbekannte id", () => {
+    expect(neighborBounds([{ id: "a", startS: 0, endS: 10 }], "missing", 10)).toEqual({
+      minStartS: 0,
+      maxEndS: 10,
+    });
+  });
+
+  it("berücksichtigt bei drei Segmenten nur die direkten Nachbarn", () => {
+    const segments: Segment[] = [
+      { id: "a", startS: 0, endS: 5 },
+      { id: "b", startS: 7, endS: 12 },
+      { id: "c", startS: 15, endS: 20 },
+    ];
+    expect(neighborBounds(segments, "b", 20)).toEqual({ minStartS: 5, maxEndS: 15 });
   });
 });
 

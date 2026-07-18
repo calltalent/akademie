@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Pause, Play, Scissors, Trash2, X } from "lucide-react";
+import { Check, LocateFixed, Pause, Play, Scissors, Trash2, X } from "lucide-react";
 import { formatDurationPrecise, formatFileSize } from "@/lib/video/recorder";
 import {
   coversFullDuration,
   createInitialSegments,
+  MIN_SEGMENT_LENGTH_S,
+  neighborBounds,
   normalizeSegments,
   parseTimecode,
   removeSegment,
@@ -43,21 +45,36 @@ import { extractFilmstrip } from "@/lib/video/filmstrip";
  *
  * KEYBOARD-FIRST BLEIBT DIE PRIMÄRE BEDIENUNG (CLAUDE.md §3.4 — der
  * Auftraggeber ist sehbehindert, ziehbare Griffe sind für ihn wertlos): echte
- * `<ul>`-Liste, jede Zeile mit beschrifteten mm:ss-Feldern, „Position
- * übernehmen" (nutzt `video.currentTime`), „Abschnitt teilen", „Abschnitt
- * entfernen". Diese Felder/Knöpfe bleiben unverändert und decken jeden
- * Schnitt vollständig ab, ganz ohne Maus.
+ * `<ul>`-Liste, jede Zeile mit beschrifteten mm:ss.f-Feldern und je einem
+ * „Position"-Knopf pro Feld (setzt Start/Ende auf `video.currentTime`),
+ * globales „Hier schneiden" an der Wiedergabeposition, „Entfernen" pro
+ * Zeile. Alles ist ohne Maus vollständig bedienbar.
  *
- * ZUSÄTZLICH (17.07.2026, Josips Wunsch nach einer visuellen
- * Video-Schnitt-Optik): die Zeitleiste ist jetzt PARALLEL dazu per Maus/Touch
- * bedienbar — ziehbare Start-/Ende-Linien je Abschnitt (Pointer Events,
- * `setPointerCapture`, funktioniert für Maus und Touch gleichermaßen) plus
+ * Maus/Touch PARALLEL dazu (17.07.2026): Zeitleiste mit ziehbaren Start-/
+ * Ende-Linien je Abschnitt (Pointer Events, `setPointerCapture`) plus
  * Klick-zum-Springen. Bewusst ERGÄNZEND, nicht ersetzend: die Leiste bleibt
- * `aria-hidden="true"` (für Screenreader unsichtbar, exakt wie vorher) und
- * ruft für jede Bewegung exakt dieselbe `onSetBound()`-Funktion auf, die auch
- * die mm:ss-Felder committen — ein Ziehen erzeugt keinen zweiten Zustand,
- * beide Bedienwege schreiben in dieselben `segments`. Wer nicht sehen oder
- * nicht ziehen kann, verliert dadurch nichts.
+ * `aria-hidden="true"` und ruft für jede Bewegung dieselbe `onSetBound()`
+ * auf wie die Felder — beide Bedienwege schreiben in dieselben `segments`.
+ *
+ * VEREINFACHUNG (18.07.2026, Josips Wunsch „einfacher und intuitiver" — mit
+ * Screenshot eines real erreichten kaputten Zustands Start 00:01/Ende 00:00):
+ * 1. Grenzen können sich nicht mehr kreuzen: Ziehen klemmt an der
+ *    Gegen-Grenze (minus `MIN_SEGMENT_LENGTH_S`), getippte/übernommene Werte
+ *    werden mit klarer Meldung abgewiesen („Start muss vor dem Ende liegen")
+ *    statt still einen leeren Abschnitt zu erzeugen — im Screenshot war
+ *    dadurch ohne erkennbaren Grund alles „entfernt", Gesamtlänge 00:00.
+ * 2. EIN globaler „Hier schneiden"-Knopf bei den Wiedergabe-Knöpfen statt
+ *    „Abschnitt teilen" in jeder Zeile — Teilen wirkt ohnehin immer an der
+ *    Wiedergabeposition, der Knopf gehört zur Wiedergabe, nicht zur Zeile
+ *    (der Zeilen-Knopf schlug zudem fehl, sobald die Position nicht in
+ *    SEINER Zeile lag — eine reine Verwirrungsquelle).
+ * 3. Abspielen/Pause als EIN umschaltender Knopf; „−5 s"/„+5 s" kompakt
+ *    (volle Beschriftung im aria-label).
+ * 4. Statt des einen Knopfs „Position als Start/Ende übernehmen" (dessen
+ *    Ziel unsichtbar am zuletzt fokussierten Feld hing) je ein eigener
+ *    „Position"-Knopf direkt neben jedem Feld.
+ * 5. Zeitleiste steht ÜBER der Abschnittsliste (primäres Element wie in
+ *    Schnittprogrammen); Keyframe-Hinweis als schlichte Textzeile.
  *
  * Kostensicherheit (Plan-Vorgabe, unverändert wichtig): diese Datei
  * importiert `useBunnyUpload` NIE. Das fertige (ggf. geschnittene) Blob geht
@@ -171,7 +188,27 @@ function TimelineBar({
 
   function handleHandlePointerMove(e: React.PointerEvent<HTMLDivElement>, id: string, bound: "start" | "end") {
     if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
-    const valueS = timeFromClientX(e.clientX);
+    const seg = segments.find((s) => s.id === id);
+    if (!seg) return;
+    // Grenzen können sich beim Ziehen nicht mehr kreuzen (Josips
+    // Screenshot-Fund, 18.07.2026: Start 00:01/Ende 00:00 → der Abschnitt
+    // fiel aus der Normalisierung, alles erschien „entfernt", Gesamtlänge
+    // 00:00, ohne erkennbaren Grund). Der Griff klemmt an der Gegen-Grenze
+    // mit `MIN_SEGMENT_LENGTH_S` Mindestabstand — exakt das Verhalten
+    // echter Schnittprogramme.
+    //
+    // BUGFIX (Code-Review, 18.07.2026): zusätzlich an NACHBARSEGMENTEN
+    // klemmen (`neighborBounds`), nicht nur an der eigenen Gegen-Grenze.
+    // Ohne das ließ sich ein Griff über eine Lücke hinweg in ein
+    // Nachbarsegment ziehen — `normalizeSegments()` merged bei echter
+    // Überlappung still, ein bereits gesetzter Schnitt zwischen den beiden
+    // Segmenten verschwand dabei kommentarlos.
+    const { minStartS, maxEndS } = neighborBounds(segments, id, durationS);
+    const raw = timeFromClientX(e.clientX);
+    const valueS =
+      bound === "start"
+        ? Math.min(Math.max(raw, minStartS), Math.max(minStartS, seg.endS - MIN_SEGMENT_LENGTH_S))
+        : Math.min(Math.max(raw, seg.startS + MIN_SEGMENT_LENGTH_S), Math.min(durationS, maxEndS));
     onSetBound(id, bound, valueS);
     onSeek(valueS);
   }
@@ -254,7 +291,7 @@ function TimelineBar({
             onPointerMove={(e) => handleHandlePointerMove(e, seg.id, "start")}
             onPointerUp={handleHandlePointerUp}
             title={`Start Abschnitt ${i + 1} — ziehen zum Anpassen`}
-            className="absolute top-0 h-full w-3 -translate-x-1/2 cursor-ew-resize"
+            className="absolute top-0 h-full w-4 -translate-x-1/2 cursor-ew-resize"
             style={{ left: `${(Math.min(Math.max(seg.startS, 0), durationS) / durationS) * 100}%`, touchAction: "none" }}
           >
             <div className="mx-auto h-full w-[3px] rounded-full" style={{ background: "#1A1A2E" }} />
@@ -265,7 +302,7 @@ function TimelineBar({
             onPointerMove={(e) => handleHandlePointerMove(e, seg.id, "end")}
             onPointerUp={handleHandlePointerUp}
             title={`Ende Abschnitt ${i + 1} — ziehen zum Anpassen`}
-            className="absolute top-0 h-full w-3 -translate-x-1/2 cursor-ew-resize"
+            className="absolute top-0 h-full w-4 -translate-x-1/2 cursor-ew-resize"
             style={{ left: `${(Math.min(Math.max(seg.endS, 0), durationS) / durationS) * 100}%`, touchAction: "none" }}
           >
             <div className="mx-auto h-full w-[3px] rounded-full" style={{ background: "#1A1A2E" }} />
@@ -283,7 +320,7 @@ function TimelineBar({
       <div className="mt-2 flex gap-5 text-[13px] font-semibold" style={{ color: "#3E3F66" }} aria-hidden="true">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-3.5 w-3.5 rounded" style={{ background: "#7079BE" }} />
-          Behalten (Frame durchscheinend)
+          Behalten
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span
@@ -308,38 +345,50 @@ function TimelineBar({
 function SegmentRow({
   segment,
   index,
+  durationS,
+  neighborBounds: bounds,
   videoRef,
   onSetBound,
-  onSplit,
   onRemove,
   canRemove,
 }: {
   segment: Segment;
   index: number;
+  durationS: number;
+  /** Grenzen des vorherigen/nächsten Segments — siehe `applyBound()` unten. */
+  neighborBounds: { minStartS: number; maxEndS: number };
   videoRef: React.RefObject<HTMLVideoElement | null>;
   onSetBound: (id: string, bound: "start" | "end", valueS: number) => void;
-  onSplit: (id: string) => void;
   onRemove: (id: string) => void;
   canRemove: boolean;
 }) {
   const [startText, setStartText] = useState(() => formatDurationPrecise(segment.startS));
   const [endText, setEndText] = useState(() => formatDurationPrecise(segment.endS));
-  const [lastFocused, setLastFocused] = useState<"start" | "end">("start");
   const [fieldError, setFieldError] = useState("");
 
+  /**
+   * BUGFIX (Code-Review, 18.07.2026): eine `role="alert"`-Region sagt nur
+   * bei einer echten DOM-Textänderung an. Tippt der Nutzer zweimal
+   * hintereinander einen ungültigen Wert (oder erzeugt zweimal denselben
+   * Überlappungs-Konflikt), ist der zweite Fehlertext identisch zum ersten
+   * — React mutiert den Text-Node dann nicht, ein Screenreader-Nutzer hört
+   * NICHTS und hält die zweite Eingabe für akzeptiert (das Feld wird dabei
+   * still auf den alten Wert zurückgesetzt). Erst leeren, dann im nächsten
+   * Tick setzen erzwingt bei jedem Aufruf eine echte Textänderung.
+   */
+  function announceFieldError(text: string) {
+    setFieldError("");
+    setTimeout(() => setFieldError(text), 0);
+  }
+
   // Text-Felder mit dem tatsächlichen Wert synchron halten, wenn er sich
-  // von AUSSEN ändert (Position übernehmen, Teilen, Entfernen einer anderen
-  // Zeile) — läuft nur bei einer echten Wertänderung, nicht bei jedem
-  // Render, damit eine laufende Eingabe (vor dem onBlur-Commit) nie
-  // überschrieben wird. `setTimeout(…, 0)` statt direkt im Effect-Body:
-  // gleiches Muster wie `SaveIndicator`/`stoppedUrl` in `video-recorder.tsx`
+  // von AUSSEN ändert (Position-Knopf, Ziehen in der Zeitleiste, Teilen) —
+  // läuft nur bei einer echten Wertänderung, nicht bei jedem Render, damit
+  // eine laufende Eingabe (vor dem onBlur-Commit) nie überschrieben wird.
+  // `setTimeout(…, 0)` statt direkt im Effect-Body: gleiches Muster wie
+  // `SaveIndicator`/`stoppedUrl` in `video-recorder.tsx`
   // (react-hooks/set-state-in-effect erzwingt sonst einen zusätzlichen
   // Render direkt nach diesem) — Verhalten für Nutzer unverändert.
-  //
-  // `formatDurationPrecise()` statt `formatDuration()` (18.07.2026, Josips
-  // Fund): zwei unterschiedliche, per Maus gezogene Zeiten unter einer
-  // Sekunde Abstand zeigten mit ganzen Sekunden identisch "00:01" — siehe
-  // Dateikopf-Kommentar.
   useEffect(() => {
     const timer = setTimeout(() => setStartText(formatDurationPrecise(segment.startS)), 0);
     return () => clearTimeout(timer);
@@ -349,37 +398,94 @@ function SegmentRow({
     return () => clearTimeout(timer);
   }, [segment.endS]);
 
-  function commitStart() {
-    const parsed = parseTimecode(startText);
-    if (parsed === null) {
-      setFieldError("Ungültige Zeit — Format mm:ss oder mm:ss.f verwenden.");
-      setStartText(formatDurationPrecise(segment.startS));
+  /**
+   * Gemeinsamer Übernahme-Pfad für getippte Werte UND die „Position"-Knöpfe.
+   * VALIDIERT statt still zu clampen (anders als das Ziehen in der
+   * Zeitleiste): ein getippter Start hinter dem Ende ist fast immer ein
+   * Versehen — oder die Absicht, ZUERST das Ende zu verschieben. Eine klare
+   * Meldung plus Zurücksetzen des Felds erklärt das; stilles Umbiegen auf
+   * `endS − 0,1` würde einen nie eingegebenen Wert erzeugen. Werte über der
+   * Videolänge werden dagegen stillschweigend gekappt (die Absicht „bis zum
+   * Schluss" ist eindeutig).
+   *
+   * BUGFIX (Code-Review, 18.07.2026), zwei Funde:
+   * 1. Prüfte bisher NUR gegen die eigene Gegen-Grenze, nie gegen
+   *    Nachbarsegmente (`bounds`, von der übergeordneten Komponente per
+   *    `neighborBounds()` berechnet) — ein Wert konnte dadurch über eine
+   *    Lücke hinweg in ein Nachbarsegment hineinragen. `normalizeSegments()`
+   *    merged bei echter Überlappung still, ein bereits gesetzter Schnitt
+   *    zwischen den beiden Segmenten verschwand dabei kommentarlos — und
+   *    zwar genau über den Tastatur-/„Position"-Pfad, den diese
+   *    Umgestaltung eigentlich als verlässlich auszeichnen sollte.
+   * 2. Der Erfolgspfad schrieb den Feldtext nie zurück — nur die
+   *    Sync-Effekte oben taten das, und die feuern NICHT, wenn der gekappte
+   *    Wert zufällig dem bisherigen entspricht (z. B. Ende auf einen Wert
+   *    über der Videolänge getippt → kappt auf `durationS`, das aber schon
+   *    der bisherige Wert war). Das Feld zeigte dann dauerhaft den nie
+   *    übernommenen getippten Text an. Jetzt schreibt der Erfolgspfad IMMER
+   *    den kanonischen, formatierten Wert zurück — kanonisiert nebenbei
+   *    auch uneinheitliche Eingaben wie „10:00" zu „10:00.0".
+   */
+  function applyBound(bound: "start" | "end", rawS: number) {
+    const clamped = Math.min(Math.max(rawS, 0), durationS);
+    if (bound === "start") {
+      const min = Math.max(0, bounds.minStartS);
+      const max = segment.endS - MIN_SEGMENT_LENGTH_S;
+      if (clamped > max) {
+        announceFieldError("Start muss vor dem Ende liegen — zuerst das Ende nach hinten verschieben.");
+        setStartText(formatDurationPrecise(segment.startS));
+        return;
+      }
+      if (clamped < min) {
+        announceFieldError("Start würde den vorherigen Abschnitt überlappen.");
+        setStartText(formatDurationPrecise(segment.startS));
+        return;
+      }
+      setFieldError("");
+      setStartText(formatDurationPrecise(clamped));
+      onSetBound(segment.id, "start", clamped);
       return;
     }
-    setFieldError("");
-    onSetBound(segment.id, "start", parsed);
-  }
-
-  function commitEnd() {
-    const parsed = parseTimecode(endText);
-    if (parsed === null) {
-      setFieldError("Ungültige Zeit — Format mm:ss oder mm:ss.f verwenden.");
+    const min = segment.startS + MIN_SEGMENT_LENGTH_S;
+    const max = Math.min(durationS, bounds.maxEndS);
+    if (clamped < min) {
+      announceFieldError("Ende muss nach dem Start liegen — zuerst den Start nach vorn verschieben.");
+      setEndText(formatDurationPrecise(segment.endS));
+      return;
+    }
+    if (clamped > max) {
+      announceFieldError("Ende würde den nächsten Abschnitt überlappen.");
       setEndText(formatDurationPrecise(segment.endS));
       return;
     }
     setFieldError("");
-    onSetBound(segment.id, "end", parsed);
+    setEndText(formatDurationPrecise(clamped));
+    onSetBound(segment.id, "end", clamped);
   }
 
-  function handleTakePosition() {
+  function commit(bound: "start" | "end") {
+    const parsed = parseTimecode(bound === "start" ? startText : endText);
+    if (parsed === null) {
+      announceFieldError("Ungültige Zeit — Format mm:ss oder mm:ss.f verwenden.");
+      if (bound === "start") setStartText(formatDurationPrecise(segment.startS));
+      else setEndText(formatDurationPrecise(segment.endS));
+      return;
+    }
+    applyBound(bound, parsed);
+  }
+
+  function takePosition(bound: "start" | "end") {
     const video = videoRef.current;
     if (!video) return;
-    onSetBound(segment.id, lastFocused, video.currentTime);
+    applyBound(bound, video.currentTime);
   }
+
+  const positionButtonClass =
+    "inline-flex items-center gap-1 rounded-[10px] border bg-white px-2.5 py-2.5 text-[13px] font-semibold";
 
   return (
     <li className="rounded-xl border p-4" style={{ borderColor: "#EEF0F7" }}>
-      <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-wrap items-end gap-3">
         <span
           aria-hidden="true"
           className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] text-[15px] font-extrabold"
@@ -395,60 +501,63 @@ function SegmentRow({
             inputMode="numeric"
             placeholder="mm:ss.f"
             value={startText}
-            onFocus={() => setLastFocused("start")}
             onChange={(e) => setStartText(e.target.value)}
-            onBlur={commitStart}
+            onBlur={() => commit("start")}
             className="w-24 rounded-[10px] border px-3 py-2.5 text-base tabular-nums"
             style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
           />
         </label>
+        <button
+          type="button"
+          onClick={() => takePosition("start")}
+          title="Start auf aktuelle Wiedergabeposition setzen"
+          aria-label={`Start von Abschnitt ${index + 1} auf die aktuelle Wiedergabeposition setzen`}
+          className={positionButtonClass}
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
+        >
+          <LocateFixed size={13} aria-hidden="true" />
+          Position
+        </button>
 
-        <label className="flex flex-col gap-1.5 text-[13px] font-bold" style={{ color: "#3E3F66" }}>
+        <label className="ml-2 flex flex-col gap-1.5 text-[13px] font-bold" style={{ color: "#3E3F66" }}>
           {`Ende (Abschnitt ${index + 1})`}
           <input
             type="text"
             inputMode="numeric"
             placeholder="mm:ss.f"
             value={endText}
-            onFocus={() => setLastFocused("end")}
             onChange={(e) => setEndText(e.target.value)}
-            onBlur={commitEnd}
+            onBlur={() => commit("end")}
             className="w-24 rounded-[10px] border px-3 py-2.5 text-base tabular-nums"
             style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
           />
         </label>
+        <button
+          type="button"
+          onClick={() => takePosition("end")}
+          title="Ende auf aktuelle Wiedergabeposition setzen"
+          aria-label={`Ende von Abschnitt ${index + 1} auf die aktuelle Wiedergabeposition setzen`}
+          className={positionButtonClass}
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
+        >
+          <LocateFixed size={13} aria-hidden="true" />
+          Position
+        </button>
 
         <div className="flex-1" />
 
-        <div className="flex flex-wrap items-end gap-2">
-          <button
-            type="button"
-            onClick={handleTakePosition}
-            className="inline-flex items-center gap-1.5 rounded-[10px] border bg-white px-3 py-2.5 text-sm font-semibold"
-            style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
-          >
-            {lastFocused === "start" ? "Position als Start übernehmen" : "Position als Ende übernehmen"}
-          </button>
-          <button
-            type="button"
-            onClick={() => onSplit(segment.id)}
-            className="inline-flex items-center gap-1.5 rounded-[10px] border bg-white px-3 py-2.5 text-sm font-semibold"
-            style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
-          >
-            Abschnitt teilen
-          </button>
-          <button
-            type="button"
-            onClick={() => onRemove(segment.id)}
-            disabled={!canRemove}
-            title={canRemove ? undefined : "Mindestens ein Abschnitt muss erhalten bleiben."}
-            className="inline-flex items-center gap-1.5 rounded-[10px] border bg-white px-3 py-2.5 text-sm font-semibold disabled:opacity-50"
-            style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
-          >
-            <Trash2 size={14} aria-hidden="true" />
-            Abschnitt entfernen
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => onRemove(segment.id)}
+          disabled={!canRemove}
+          title={canRemove ? undefined : "Mindestens ein Abschnitt muss erhalten bleiben."}
+          aria-label={`Abschnitt ${index + 1} entfernen`}
+          className="inline-flex items-center gap-1.5 rounded-[10px] border bg-white px-3 py-2.5 text-sm font-semibold disabled:opacity-50"
+          style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
+        >
+          <Trash2 size={14} aria-hidden="true" />
+          Entfernen
+        </button>
       </div>
       {fieldError && (
         <p role="alert" className="mt-2.5 text-sm font-bold" style={{ color: "#B14A4A" }}>
@@ -479,6 +588,19 @@ export function VideoTrimmer({
   const [alertMessage, setAlertMessage] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [currentPositionS, setCurrentPositionS] = useState(0);
+  // Für den EINEN umschaltenden Abspielen/Pause-Knopf — gespeist aus den
+  // play/pause-Events des Video-Elements selbst (nicht aus dem Klick), damit
+  // der Knopf auch stimmt, wenn der Browser die Wiedergabe von sich aus
+  // beendet (Video zu Ende, Hintergrund-Tab).
+  const [isPlaying, setIsPlaying] = useState(false);
+  // Tastatur-Äquivalent zum Klick-zum-Springen in der (aria-hidden) Zeitleiste
+  // (Code-Review-Fund, 18.07.2026: ohne dieses Feld gab es KEINEN
+  // nicht-visuellen Weg, gezielt eine bestimmte Position anzusteuern — nur
+  // Abspielen+Timing nach Gehör). Eigenes Feld statt Wiederverwendung der
+  // Positionsanzeige, da diese nur ANZEIGT, während dieses Feld eine
+  // EINGABE ist.
+  const [seekToText, setSeekToText] = useState("");
+  const [seekError, setSeekError] = useState("");
   const [thumbnails, setThumbnails] = useState<(string | null)[]>(() =>
     new Array(FILMSTRIP_THUMB_COUNT).fill(null),
   );
@@ -545,15 +667,21 @@ export function VideoTrimmer({
   // `nextId()`-Zähler) liefe das doppelt. Da jeder Aufruf hier aus einem
   // einzelnen Klick-Handler stammt (kein gleichzeitiges Update aus zwei
   // Quellen), ist der Closure-Wert unproblematisch aktuell.
-  function handleSplit(id: string) {
+  function handleSplitAtPosition() {
     const video = videoRef.current;
     if (!video) return;
     const atS = video.currentTime;
-    const next = splitSegment(segments, id, atS, [nextId(), nextId()]);
+    // Das zu teilende Segment ergibt sich aus der Wiedergabeposition selbst —
+    // der frühere „Abschnitt teilen"-Knopf PRO ZEILE hat genau das
+    // verschleiert (er schlug fehl, sobald die Position nicht in SEINER
+    // Zeile lag). `splitSegment()` prüft den Mindestabstand zu den Grenzen
+    // und gibt bei Ablehnung dieselbe Referenz zurück.
+    const target = segments.find((s) => atS >= s.startS && atS <= s.endS);
+    const next = target ? splitSegment(segments, target.id, atS, [nextId(), nextId()]) : segments;
     if (next === segments) {
       setAlertMessage(
-        `Die aktuelle Wiedergabeposition (${formatDurationPrecise(atS)}) liegt nicht innerhalb dieses Abschnitts ` +
-          "(oder zu nah an dessen Rand) — Abspielen/Pause nutzen, um erst dorthin zu gelangen.",
+        `Die Wiedergabeposition (${formatDurationPrecise(atS)}) liegt in einem entfernten Bereich oder zu nah ` +
+          "an einem bestehenden Schnitt — per Abspielen, ±5 s oder Klick in die Zeitleiste erst dorthin gelangen.",
       );
       return;
     }
@@ -564,14 +692,43 @@ export function VideoTrimmer({
 
   function handleRemove(id: string) {
     if (segments.length <= 1) return;
+    // BUGFIX (Code-Review, 18.07.2026), zwei Funde:
+    // 1. Der entfernte Zeile-<li> enthält den gerade fokussierten
+    //    „Entfernen"-Knopf — React unmountet ihn mit, der Browser wirft den
+    //    Fokus auf <body>, der nächste Tab beginnt am Dokumentanfang.
+    //    Fokus geht deshalb explizit auf die (immer vorhandene, bereits
+    //    beim Mounten genutzte) Überschrift zurück.
+    // 2. Ein statischer Text „Abschnitt entfernt." wird bei ZWEI
+    //    aufeinanderfolgenden Entfernungen für eine `role="status"`-Region
+    //    nicht erneut angesagt (identischer Text → keine DOM-Mutation).
+    //    Die verbleibende Anzahl macht den Text zwischen aufeinander-
+    //    folgenden Entfernungen zuverlässig unterschiedlich (sie sinkt jedes
+    //    Mal) und liefert nebenbei nützlichen Kontext.
+    const removedIndex = orderedSegments.findIndex((s) => s.id === id);
+    const remaining = segments.length - 1;
     setSegments(removeSegment(segments, id));
-    setStatusMessage("Abschnitt entfernt.");
+    setStatusMessage(
+      `Abschnitt ${removedIndex + 1} entfernt — ${remaining} ${remaining === 1 ? "Abschnitt verbleibt" : "Abschnitte verbleiben"}.`,
+    );
+    headingRef.current?.focus();
   }
 
   function skip(deltaS: number) {
     const video = videoRef.current;
     if (!video) return;
     video.currentTime = Math.min(Math.max(video.currentTime + deltaS, 0), durationS);
+  }
+
+  function handleSeekToTime(e: React.FormEvent) {
+    e.preventDefault();
+    const parsed = parseTimecode(seekToText);
+    if (parsed === null) {
+      setSeekError("Ungültige Zeit — Format mm:ss oder mm:ss.f verwenden.");
+      return;
+    }
+    const video = videoRef.current;
+    if (video) video.currentTime = Math.min(Math.max(parsed, 0), durationS);
+    setSeekError("");
   }
 
   async function handleApply() {
@@ -662,72 +819,119 @@ export function VideoTrimmer({
           src={previewUrl ?? undefined}
           playsInline
           onTimeUpdate={(e) => setCurrentPositionS(e.currentTarget.currentTime)}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
           className="aspect-[16/9] w-full bg-black object-contain"
         />
       </div>
       <div className="flex flex-wrap items-center gap-3">
+        {/* EIN umschaltender Abspielen/Pause-Knopf statt zwei — der jeweils
+            sinnlose Knopf („Pause" bei stehendem Video) entfällt. Feste
+            Mindestbreite, damit der Wechsel der Beschriftung die Leiste
+            nicht springen lässt. */}
         <button
           type="button"
-          onClick={() => videoRef.current?.play()}
-          className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-4 py-2 text-sm font-bold"
+          onClick={() => {
+            const video = videoRef.current;
+            if (!video) return;
+            if (video.paused) video.play().catch(() => {});
+            else video.pause();
+          }}
+          className="inline-flex min-w-[126px] items-center justify-center gap-2 rounded-[10px] border bg-white px-4 py-2 text-sm font-bold"
           style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
-          <Play size={14} aria-hidden="true" />
-          Abspielen
-        </button>
-        <button
-          type="button"
-          onClick={() => videoRef.current?.pause()}
-          className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-4 py-2 text-sm font-bold"
-          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
-        >
-          <Pause size={14} aria-hidden="true" />
-          Pause
+          {isPlaying ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
+          {isPlaying ? "Pause" : "Abspielen"}
         </button>
         <button
           type="button"
           onClick={() => skip(-SKIP_SECONDS)}
-          className="inline-flex items-center rounded-[10px] border bg-white px-4 py-2 text-sm font-bold"
+          aria-label="5 Sekunden zurück"
+          className="inline-flex items-center rounded-[10px] border bg-white px-4 py-2 text-sm font-bold tabular-nums"
           style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
-          5 Sekunden zurück
+          −5 s
         </button>
         <button
           type="button"
           onClick={() => skip(SKIP_SECONDS)}
-          className="inline-flex items-center rounded-[10px] border bg-white px-4 py-2 text-sm font-bold"
+          aria-label="5 Sekunden vor"
+          className="inline-flex items-center rounded-[10px] border bg-white px-4 py-2 text-sm font-bold tabular-nums"
           style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
-          5 Sekunden vor
+          +5 s
         </button>
-        <span aria-hidden="true" className="text-sm font-semibold tabular-nums" style={{ color: "#66679B" }}>
-          Position {formatDurationPrecise(currentPositionS)} / {formatDurationPrecise(durationS)}
+        {/* BUGFIX (Code-Review, 18.07.2026, hohe Schwere): NICHT mehr
+            aria-hidden. Diese Zeile ist keine Live-Region (keine
+            automatischen Ansagen, kein Flooding-Risiko) — aber vorher war
+            sie die EINZIGE Positionsanzeige der gesamten Komponente UND
+            komplett aus dem Accessibility-Tree entfernt. Ein Screenreader-
+            Nutzer hatte dadurch keinerlei Möglichkeit zu erfahren, wo der
+            Abspielkopf steht, bevor er „Position" oder „Hier schneiden"
+            auslöst — beide Aktionen setzen genau diese Kenntnis voraus. Jetzt
+            im Browse-Modus jederzeit auf Nachfrage lesbar. */}
+        <span className="text-sm font-semibold tabular-nums" style={{ color: "#66679B" }}>
+          Wiedergabeposition {formatDurationPrecise(currentPositionS)} von {formatDurationPrecise(durationS)}
         </span>
+        <div className="flex-1" />
+        {/* DER Schnitt-Knopf — global an der Wiedergabeposition, siehe
+            Dateikopf (VEREINFACHUNG Punkt 2). Rechtsbündig und farblich
+            abgesetzt: das ist die zentrale Editier-Aktion dieser Leiste. */}
+        <button
+          type="button"
+          onClick={handleSplitAtPosition}
+          disabled={busy}
+          // BUGFIX (Code-Review, 18.07.2026, WCAG 2.5.3 „Label in Name"):
+          // aria-label MUSS den sichtbaren Text enthalten — sonst matcht
+          // Sprachsteuerung ("Klicke Hier schneiden") den Knopf nicht, und
+          // ein Screenreader-Nutzer hört einen anderen Namen, als ein
+          // sehender Kollege vorliest.
+          aria-label="Hier schneiden — Video an der aktuellen Wiedergabeposition in zwei Abschnitte teilen"
+          className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-4 py-2 text-sm font-bold disabled:opacity-50"
+          style={{ borderColor: "#5663AE", color: "#5663AE" }}
+        >
+          <Scissors size={14} aria-hidden="true" />
+          Hier schneiden
+        </button>
       </div>
 
+      {/* Tastatur-Äquivalent zum (mausbedienten) Klick-zum-Springen in der
+          Zeitleiste (Code-Review-Fund, 18.07.2026, hohe Schwere): ohne dieses
+          Feld gab es keinen nicht-visuellen Weg, gezielt eine bestimmte
+          Position anzusteuern. */}
+      <form onSubmit={handleSeekToTime} className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1.5 text-[13px] font-bold" style={{ color: "#3E3F66" }}>
+          Position ansteuern
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="mm:ss.f"
+            value={seekToText}
+            onChange={(e) => setSeekToText(e.target.value)}
+            className="w-28 rounded-[10px] border px-3 py-2.5 text-base tabular-nums"
+            style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
+          />
+        </label>
+        <button
+          type="submit"
+          className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-4 py-2.5 text-sm font-bold"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
+        >
+          <LocateFixed size={14} aria-hidden="true" />
+          Springen
+        </button>
+        {seekError && (
+          <p role="alert" className="text-sm font-bold" style={{ color: "#B14A4A" }}>
+            {seekError}
+          </p>
+        )}
+      </form>
+
       <div className="flex flex-col gap-3.5 rounded-2xl border p-4" style={{ borderColor: "#EEF0F7" }}>
-        <div className="flex items-center gap-2.5">
-          <span className="h-[22px] w-1 rounded-[3px]" style={{ background: "#5663AE" }} />
-          <h4 className="text-[17px] font-extrabold" style={{ color: "#1A1A2E" }}>
-            Zu behaltende Abschnitte
-          </h4>
-        </div>
-
-        <ul className="flex flex-col gap-3.5">
-          {orderedSegments.map((segment, index) => (
-            <SegmentRow
-              key={segment.id}
-              segment={segment}
-              index={index}
-              videoRef={videoRef}
-              onSetBound={handleSetBound}
-              onSplit={handleSplit}
-              onRemove={handleRemove}
-              canRemove={segments.length > 1}
-            />
-          ))}
-        </ul>
-
+        {/* Zeitleiste ZUERST — das primäre Element wie in Schnittprogrammen
+            (VEREINFACHUNG Punkt 5). Für Screenreader unsichtbar
+            (aria-hidden in TimelineBar), deren Lesefluss beginnt also
+            unverändert bei der Überschrift darunter. */}
         <TimelineBar
           segments={segments}
           durationS={durationS}
@@ -740,15 +944,32 @@ export function VideoTrimmer({
           }}
         />
 
-        <div
-          className="flex items-start gap-2.5 rounded-xl border px-4 py-3"
-          style={{ borderColor: "#E0E2EF", background: "#F6F7FC" }}
-        >
-          <AlertTriangle size={18} aria-hidden="true" style={{ color: "#5663AE", flexShrink: 0, marginTop: 1 }} />
-          <span className="text-sm font-semibold" style={{ color: "#3E3F66" }}>
-            Schnitte erfolgen am nächsten Keyframe (bis ~2 Sekunden Abweichung) — dafür ohne Qualitätsverlust.
-          </span>
+        <div className="flex items-center gap-2.5">
+          <span className="h-[22px] w-1 rounded-[3px]" style={{ background: "#5663AE" }} />
+          <h4 className="text-[17px] font-extrabold" style={{ color: "#1A1A2E" }}>
+            Behaltene Abschnitte
+          </h4>
         </div>
+
+        <ul className="flex flex-col gap-3.5">
+          {orderedSegments.map((segment, index) => (
+            <SegmentRow
+              key={segment.id}
+              segment={segment}
+              index={index}
+              durationS={durationS}
+              neighborBounds={neighborBounds(segments, segment.id, durationS)}
+              videoRef={videoRef}
+              onSetBound={handleSetBound}
+              onRemove={handleRemove}
+              canRemove={segments.length > 1}
+            />
+          ))}
+        </ul>
+
+        <p className="text-[13px] font-semibold" style={{ color: "#66679B" }}>
+          Schnitte erfolgen am nächsten Keyframe (bis ~2 Sekunden Abweichung) — dafür ohne Qualitätsverlust.
+        </p>
 
         {busy && progressPercent !== null && (
           <div aria-hidden="true" className="h-2 overflow-hidden rounded-full" style={{ background: "#EEF0F7" }}>
@@ -781,6 +1002,21 @@ export function VideoTrimmer({
           </span>
         </div>
         <div className="flex-1" />
+        {/* Reihenfolge nach Gewicht: Abbrechen (verwirft) links, dann der
+            Ausweichweg, ganz rechts die primäre Aktion. Deren Symbol ist
+            jetzt ein Häkchen — die Schere gehört eindeutig zu „Hier
+            schneiden" in der Wiedergabeleiste, zwei Scheren-Knöpfe mit
+            verschiedener Bedeutung wären eine Verwechslungsfalle. */}
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={busy}
+          className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-[18px] py-3 text-[15px] font-semibold disabled:opacity-50"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
+        >
+          <X size={16} aria-hidden="true" />
+          Abbrechen
+        </button>
         <button
           type="button"
           onClick={handleUseWithoutTrim}
@@ -797,18 +1033,8 @@ export function VideoTrimmer({
           className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[15px] font-bold text-white disabled:opacity-60"
           style={{ background: "#5663AE" }}
         >
-          <Scissors size={16} aria-hidden="true" />
+          <Check size={16} aria-hidden="true" />
           {busy ? "Wird geschnitten …" : "Zuschnitt übernehmen"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="inline-flex items-center gap-2 rounded-[10px] border bg-white px-[18px] py-3 text-[15px] font-semibold disabled:opacity-50"
-          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
-        >
-          <X size={16} aria-hidden="true" />
-          Abbrechen
         </button>
       </div>
     </div>

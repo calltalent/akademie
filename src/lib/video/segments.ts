@@ -154,6 +154,37 @@ export function setSegmentBound(segments: Segment[], id: string, bound: "start" 
 }
 
 /**
+ * Liefert die durch NACHBARSEGMENTE vorgegebene erlaubte Spanne für das
+ * Segment `id` — verhindert, dass Start/Ende in ein Nachbarsegment
+ * hineinragt. Ohne diese Prüfung verschmilzt `normalizeSegments()` bei
+ * echter Überlappung (siehe dortiger Kommentar) STILL zwei Segmente zu
+ * einem — ein bereits gesetzter Schnitt zwischen ihnen verschwindet dann
+ * kommentarlos aus Zeitleiste UND „Gesamtlänge nach Schnitt" (Fund im
+ * Code-Review, 18.07.2026: sowohl über Ziehen in der Zeitleiste als auch
+ * über getippte Werte/„Position"-Knopf erreichbar, da beide Wege bisher nur
+ * gegen die EIGENE Gegen-Grenze prüften, nie gegen Nachbarn).
+ *
+ * `minStartS`/`maxEndS` sind die Grenzen des vorherigen bzw. nächsten
+ * Segments in Sortierreihenfolge — 0 bzw. `durationS`, falls kein Nachbar
+ * existiert.
+ */
+export function neighborBounds(
+  segments: Segment[],
+  id: string,
+  durationS: number,
+): { minStartS: number; maxEndS: number } {
+  const sorted = sortSegments(segments);
+  const index = sorted.findIndex((s) => s.id === id);
+  if (index === -1) return { minStartS: 0, maxEndS: durationS };
+  const prev = sorted[index - 1];
+  const next = sorted[index + 1];
+  return {
+    minStartS: prev ? prev.endS : 0,
+    maxEndS: next ? next.startS : durationS,
+  };
+}
+
+/**
  * Parst ein getipptes Zeitfeld ("mm:ss", "m:ss.s" oder "h:mm:ss") in ganze/
  * gebrochene Sekunden. `null` bei nicht interpretierbarer oder negativer
  * Eingabe — die aufrufende UI behält dann den vorherigen Wert bei, statt
