@@ -21,6 +21,7 @@ export type CatalogItem = {
   meta: string;
   enrolled: boolean;
   category: string | null;
+  coverUrl: string | null;
   tint: string;
 };
 
@@ -71,17 +72,22 @@ export function KurskatalogGrid({ items }: { items: CatalogItem[] }) {
               href={`/kurs/${c.slug}`}
               className="flex flex-col overflow-hidden rounded-[14px] border border-border-100 bg-white text-inherit no-underline"
             >
-              <div
-                className="h-[132px]"
-                style={{
-                  backgroundColor: c.tint,
-                  backgroundImage:
-                    "repeating-linear-gradient(45deg, " +
-                    c.tint +
-                    " 0 10px, rgba(255,255,255,.55) 10px 20px)",
-                }}
-                aria-hidden="true"
-              />
+              {c.coverUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
+                <img src={c.coverUrl} alt="" className="h-[132px] w-full object-cover object-center" />
+              ) : (
+                <div
+                  className="h-[132px]"
+                  style={{
+                    backgroundColor: c.tint,
+                    backgroundImage:
+                      "repeating-linear-gradient(45deg, " +
+                      c.tint +
+                      " 0 10px, rgba(255,255,255,.55) 10px 20px)",
+                  }}
+                  aria-hidden="true"
+                />
+              )}
               <div className="flex flex-1 flex-col p-5">
                 {c.eyebrow && (
                   <div className="mb-1.5 text-xs font-semibold uppercase tracking-[0.03em] text-muted-400">

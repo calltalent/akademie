@@ -31,7 +31,7 @@ export default async function DashboardPage() {
 
   const { data: courses } = await supabase
     .from("courses")
-    .select("id, title, slug, status")
+    .select("id, title, slug, status, cover_url")
     .eq("tenant_id", tenant.id)
     .eq("status", "published")
     .order("position", { ascending: true });
@@ -117,6 +117,7 @@ export default async function DashboardPage() {
 
     return {
       course,
+      coverUrl: (course.cover_url as string | null) ?? null,
       tint: THUMB_TINTS[index % THUMB_TINTS.length],
       eyebrow: courseModules[0]?.title ?? null,
       progress,
@@ -178,7 +179,7 @@ export default async function DashboardPage() {
       </div>
 
       <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {courseCards.map(({ course, tint, eyebrow, progress }) => {
+        {courseCards.map(({ course, coverUrl, tint, eyebrow, progress }) => {
           const notStarted = progress.completed === 0;
 
           return (
@@ -188,17 +189,22 @@ export default async function DashboardPage() {
                 className="flex h-full flex-col overflow-hidden border no-underline"
                 style={{ borderRadius: 14, borderColor: "#E7E8F2" }}
               >
-                <div
-                  className="h-[132px]"
-                  style={{
-                    backgroundColor: tint,
-                    backgroundImage:
-                      "repeating-linear-gradient(45deg, " +
-                      tint +
-                      " 0 10px, rgba(255,255,255,.55) 10px 20px)",
-                  }}
-                  aria-hidden="true"
-                />
+                {coverUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
+                  <img src={coverUrl} alt="" className="h-[132px] w-full object-cover object-center" />
+                ) : (
+                  <div
+                    className="h-[132px]"
+                    style={{
+                      backgroundColor: tint,
+                      backgroundImage:
+                        "repeating-linear-gradient(45deg, " +
+                        tint +
+                        " 0 10px, rgba(255,255,255,.55) 10px 20px)",
+                    }}
+                    aria-hidden="true"
+                  />
+                )}
                 <div className="flex flex-1 flex-col p-5">
                   {eyebrow && (
                     <div

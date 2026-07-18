@@ -24,8 +24,10 @@ import { AppShell } from "@/components/learn/app-shell";
  * toter Link auszuliefern (gleiche Linie wie Josips „keine toten Links");
  * (2) das „Weiter"-Banner entfällt, wenn nichts mehr offen ist (Kurs fertig
  * bzw. leer) — dann steht dort ggf. das echte Zertifikat (CertificateBadge).
- * Thumbnails/„App"-Kachel sind wie im Export stilisierte CSS-Platzhalter bzw.
- * statische Marketing-Inhalte (keine erfundenen Bilder/Funktionen).
+ * Hero-Thumbnail zeigt `courses.cover_url` (18.07.2026, Kursbild-Upload-
+ * Feature), sobald eines gesetzt ist — sonst der stilisierte CSS-Platzhalter
+ * aus dem Export. Die „App"-Kachel rechts bleibt statischer Marketing-Inhalt
+ * (kein erfundenes Datenmodell dafür).
  */
 
 const ACCENT = "#5663AE";
@@ -61,7 +63,7 @@ export default async function CourseOverviewPage({
 
   const { data: course } = await supabase
     .from("courses")
-    .select("id, title, description, status")
+    .select("id, title, description, status, cover_url")
     .eq("tenant_id", tenant.id)
     .eq("slug", slug)
     .maybeSingle();
@@ -157,20 +159,29 @@ export default async function CourseOverviewPage({
                 "repeating-linear-gradient(135deg,rgba(86,99,174,.5) 0 16px, rgba(62,63,102,.5) 16px 32px)",
             }}
           >
-            <div
-              className="hidden h-[130px] w-[180px] flex-none items-center justify-center rounded-[12px] sm:flex"
-              style={{
-                backgroundColor: "#2C2D4A",
-                backgroundImage:
-                  "repeating-linear-gradient(45deg,#2C2D4A 0 12px, rgba(86,99,174,.35) 12px 24px)",
-              }}
-              aria-hidden="true"
-            >
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#C9CBE6" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 9V5a3 3 0 0 0-6 0v4" />
-                <rect x="2" y="9" width="20" height="12" rx="2" />
-              </svg>
-            </div>
+            {course.cover_url ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
+              <img
+                src={course.cover_url}
+                alt=""
+                className="hidden h-[130px] w-[180px] flex-none rounded-[12px] object-cover object-center sm:block"
+              />
+            ) : (
+              <div
+                className="hidden h-[130px] w-[180px] flex-none items-center justify-center rounded-[12px] sm:flex"
+                style={{
+                  backgroundColor: "#2C2D4A",
+                  backgroundImage:
+                    "repeating-linear-gradient(45deg,#2C2D4A 0 12px, rgba(86,99,174,.35) 12px 24px)",
+                }}
+                aria-hidden="true"
+              >
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#C9CBE6" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 9V5a3 3 0 0 0-6 0v4" />
+                  <rect x="2" y="9" width="20" height="12" rx="2" />
+                </svg>
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <div className="text-xs font-bold" style={{ letterSpacing: "0.2em", color: "#B9BBDA" }}>
                 KURS

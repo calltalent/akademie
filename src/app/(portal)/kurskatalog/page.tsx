@@ -31,7 +31,7 @@ export default async function KurskatalogPage() {
 
   const { data: courses } = await supabase
     .from("courses")
-    .select("id, title, slug, status, category")
+    .select("id, title, slug, status, category, cover_url")
     .eq("tenant_id", tenant.id)
     .eq("status", "published")
     .order("position", { ascending: true });
@@ -100,6 +100,7 @@ export default async function KurskatalogPage() {
       meta,
       enrolled: enrolledIds.has(course.id),
       category: (course.category as string | null) ?? null,
+      coverUrl: (course.cover_url as string | null) ?? null,
       tint: THUMB_TINTS[index % THUMB_TINTS.length],
     };
   });
