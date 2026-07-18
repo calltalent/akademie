@@ -164,11 +164,11 @@ export default async function CourseOverviewPage({
               <img
                 src={course.cover_url}
                 alt=""
-                className="hidden h-[130px] w-[180px] flex-none rounded-[12px] object-cover object-center sm:block"
+                className="hidden aspect-video w-[180px] flex-none rounded-[12px] object-cover object-center sm:block"
               />
             ) : (
               <div
-                className="hidden h-[130px] w-[180px] flex-none items-center justify-center rounded-[12px] sm:flex"
+                className="hidden aspect-video w-[180px] flex-none items-center justify-center rounded-[12px] sm:flex"
                 style={{
                   backgroundColor: "#2C2D4A",
                   backgroundImage:

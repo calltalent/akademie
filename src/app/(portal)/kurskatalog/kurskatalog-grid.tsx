@@ -74,10 +74,10 @@ export function KurskatalogGrid({ items }: { items: CatalogItem[] }) {
             >
               {c.coverUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
-                <img src={c.coverUrl} alt="" className="h-[132px] w-full object-cover object-center" />
+                <img src={c.coverUrl} alt="" className="aspect-video w-full object-cover object-center" />
               ) : (
                 <div
-                  className="h-[132px]"
+                  className="aspect-video w-full"
                   style={{
                     backgroundColor: c.tint,
                     backgroundImage:
