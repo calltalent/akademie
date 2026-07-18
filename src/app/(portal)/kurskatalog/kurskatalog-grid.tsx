@@ -65,12 +65,16 @@ export function KurskatalogGrid({ items }: { items: CatalogItem[] }) {
             : "Keine Kurse in dieser Kategorie."}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 320px))" }}>
           {filtered.map((c) => (
             <a
               key={c.id}
               href={`/kurs/${c.slug}`}
-              className="flex flex-col overflow-hidden rounded-[14px] border border-border-100 bg-white text-inherit no-underline"
+              className="flex flex-col overflow-hidden rounded-[14px] border bg-white text-inherit no-underline"
+              style={{
+                borderColor: "#D8DAEA",
+                boxShadow: "0 1px 2px rgba(26,26,46,.05), 0 4px 10px rgba(26,26,46,.06)",
+              }}
             >
               {c.coverUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert

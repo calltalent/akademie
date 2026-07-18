@@ -178,7 +178,7 @@ export default async function DashboardPage() {
         </a>
       </div>
 
-      <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid gap-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 320px))" }}>
         {courseCards.map(({ course, coverUrl, tint, eyebrow, progress }) => {
           const notStarted = progress.completed === 0;
 
@@ -187,7 +187,11 @@ export default async function DashboardPage() {
               <a
                 href={`/kurs/${course.slug}`}
                 className="flex h-full flex-col overflow-hidden border no-underline"
-                style={{ borderRadius: 14, borderColor: "#E7E8F2" }}
+                style={{
+                  borderRadius: 14,
+                  borderColor: "#D8DAEA",
+                  boxShadow: "0 1px 2px rgba(26,26,46,.05), 0 4px 10px rgba(26,26,46,.06)",
+                }}
               >
                 {coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
