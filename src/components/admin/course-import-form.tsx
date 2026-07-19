@@ -1,16 +1,20 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { importCourseFromFile } from "@/lib/import/actions";
 import { initialImportActionState } from "@/lib/import/state";
 
 /**
- * Migrations-Importer-Formular (Phase 4, Block 4): einfacher JSON-Upload,
- * kein Client-JS für das Datei-Lesen nötig — der Browser übernimmt das über
- * den normalen Formular-Upload (`formData.get("file")` in der Server
- * Action). Muster wie src/app/portal/mandanten/neu/page.tsx: `action` direkt
- * an `<form>` gebunden, Seiteneffekte (Datei-Feld leeren) per `useEffect`
- * auf `state`. Barrierefreiheit: `label`/`htmlFor`, sichtbarer Fokus-Ring,
+ * Migrations-Importer-Formular (Design-Update 19.07.2026, siehe Kopfkommentar
+ * in admin/import/page.tsx). Funktional unverändert zum Phase-4-Original:
+ * einfacher JSON-Upload, kein Client-JS für das Datei-Lesen nötig — der
+ * Browser übernimmt das über den normalen Formular-Upload (`formData.get
+ * ("file")` in der Server Action). Neu ist nur die Dateiname-Anzeige
+ * (`fileLabel`-State) fürs eigene Datei-Auswahl-Steuerelement aus dem Export
+ * — der native `<input type="file">` bleibt technisch bestehen (Formular-
+ * Übermittlung, Tastatur-/Screenreader-Bedienung unverändert), wird aber
+ * visuell versteckt und über das umgebende `<label>` ausgelöst.
+ * Barrierefreiheit: `label`/`htmlFor`, sichtbarer Fokus-Ring,
  * `role="alert"`/`role="status"` für Fehler/Erfolg (CLAUDE.md §3.4).
  */
 export function CourseImportForm() {
@@ -19,56 +23,84 @@ export function CourseImportForm() {
     initialImportActionState,
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileLabel, setFileLabel] = useState("Keine ausgewählt");
 
   useEffect(() => {
     if (state.success && fileInputRef.current) {
       fileInputRef.current.value = "";
+      setFileLabel("Keine ausgewählt");
     }
   }, [state]);
 
   return (
-    <div
-      className="flex flex-col gap-4 rounded-md border p-4"
-      style={{ borderRadius: "var(--radius)" }}
-    >
-      <div>
-        <h2 className="text-lg font-medium">Kurs aus JSON importieren</h2>
-        <p className="mt-1 text-sm text-gray-600">
-          Für den Umzug eigener Altdaten (Kursstruktur mit Modulen, Lektionen
-          und Blöcken). Video-Blöcke können statt einer Bunny-Video-ID eine{" "}
-          <code>sourceUrl</code> enthalten — das Video wird dann automatisch
-          zu Bunny übernommen. Maximal 5 MB, maximal 50 Module, maximal 100
-          Lektionen je Modul.
-        </p>
-      </div>
+    <div className="rounded-[14px] border bg-white p-[28px]" style={{ borderColor: "#E7E8F2" }}>
+      <div className="mb-2.5 text-[17px] font-bold">Kurs aus JSON importieren</div>
+      <p className="mb-5 text-[15px]" style={{ color: "#66679B" }}>
+        Für den Umzug eigener Altdaten (Kursstruktur mit Modulen, Lektionen und
+        Blöcken). Video-Blöcke können statt einer Bunny-Video-ID eine{" "}
+        <code
+          className="rounded-[5px] px-1.5 py-0.5 text-[13px]"
+          style={{ background: "#F4F5FA" }}
+        >
+          sourceUrl
+        </code>{" "}
+        enthalten — das Video wird dann automatisch zu Bunny übernommen.
+        Maximal 5 MB, maximal 50 Module, maximal 100 Lektionen je Modul.
+      </p>
 
-      <form action={action} className="flex flex-col gap-3">
-        <label htmlFor="import-file" className="flex flex-col gap-1 text-sm">
-          JSON-Datei
-          <input
-            ref={fileInputRef}
-            id="import-file"
-            name="file"
-            type="file"
-            accept=".json,application/json"
-            required
-            className="rounded-md border px-3 py-2 text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-            style={{ borderRadius: "var(--radius)" }}
-          />
-        </label>
+      <form action={action} className="flex flex-col items-start gap-[22px]">
+        <div className="w-full">
+          <label
+            htmlFor="import-file"
+            className="mb-2 block text-[13px] font-semibold"
+            style={{ color: "#66679B" }}
+          >
+            JSON-Datei
+          </label>
+          <label
+            htmlFor="import-file"
+            className="flex cursor-pointer items-center gap-3 rounded-[10px] border px-4 py-3 focus-within:ring-2 focus-within:ring-offset-2"
+            style={{ borderColor: "#E7E8F2" }}
+          >
+            <span
+              className="shrink-0 rounded-lg px-3.5 py-[7px] text-[13px] font-bold"
+              style={{ background: "#F4F5FA", color: "#3E3F66" }}
+            >
+              Datei auswählen
+            </span>
+            <span className="truncate text-sm" style={{ color: "#A9AAC4" }}>
+              {fileLabel}
+            </span>
+            <input
+              ref={fileInputRef}
+              id="import-file"
+              name="file"
+              type="file"
+              accept=".json,application/json"
+              required
+              className="sr-only"
+              onChange={(e) => setFileLabel(e.target.files?.[0]?.name ?? "Keine ausgewählt")}
+            />
+          </label>
+        </div>
 
         <button
           type="submit"
           disabled={pending}
-          className="self-start rounded-md px-4 py-2 text-base text-white disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-          style={{ background: "var(--color-primary)", borderRadius: "var(--radius)" }}
+          className="inline-flex items-center justify-center gap-2 rounded-[11px] px-[22px] py-3 text-[15px] font-bold text-white disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+          style={{ background: "#5663AE" }}
         >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 3v13"></path>
+            <path d="m7 11 5 5 5-5"></path>
+            <path d="M5 21h14"></path>
+          </svg>
           {pending ? "Importiere …" : "Import starten"}
         </button>
       </form>
 
       {state.error && (
-        <div role="alert" className="flex flex-col gap-1 text-sm text-red-600">
+        <div role="alert" className="mt-4 flex flex-col gap-1 text-sm" style={{ color: "#B24343" }}>
           <p>{state.error}</p>
           {state.errors && state.errors.length > 0 && (
             <ul className="list-disc pl-5">
@@ -81,7 +113,7 @@ export function CourseImportForm() {
       )}
 
       {state.success && (
-        <div role="status" className="flex flex-col gap-1 text-sm text-green-700">
+        <div role="status" className="mt-4 flex flex-col gap-1 text-sm" style={{ color: "#1F8A5B" }}>
           <p>
             Import erfolgreich: {state.moduleCount} Modul(e), {state.lessonCount}{" "}
             Lektion(en), {state.videoCount} Video(s) übernommen.
