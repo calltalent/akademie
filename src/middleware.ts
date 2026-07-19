@@ -35,6 +35,15 @@ import { decideRouting } from "@/lib/tenant/routing";
  * (Rewrite, keine sichtbare Weiterleitung) auf /portal/... umgeschrieben,
  * `resolveTenantByHost()` wird für diesen Host gar nicht erst aufgerufen.
  */
+
+/** Unicode-sicheres Base64 ohne `Buffer` (siehe Kopfkommentar: keine Node-APIs in dieser Datei). */
+function utf8ToBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 export async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
 
@@ -59,6 +68,17 @@ export async function middleware(request: NextRequest) {
     if (tenant) {
       requestHeaders.set("x-tenant-id", tenant.id);
       requestHeaders.set("x-tenant-slug", tenant.slug);
+      // Performance-Fix (19.07.2026, siehe Kommentar in tenant/resolve.ts):
+      // volles Mandanten-Objekt als Header mitgeben, statt nur die ID —
+      // `getTenant()` (tenant/context.ts) liest es direkt hieraus, ohne den
+      // Mandanten in JEDER Server Component erneut aus der DB nachzuladen.
+      // Base64 statt rohem JSON: Header-Werte müssen laut HTTP-Spezifikation
+      // reine ASCII-Bytes sein — ein Mandantenname mit Umlauten (ä/ö/ü)
+      // würde als rohes JSON in manchen Runtimes einen Fehler beim Setzen
+      // des Headers auslösen. `TextEncoder`+`btoa` statt `Buffer` — Middleware
+      // läuft auf der Edge-Runtime (s. Dateikopf-Kommentar oben), die
+      // Node-Buffer nicht garantiert unterstützt, beide genutzten APIs schon.
+      requestHeaders.set("x-tenant-data", utf8ToBase64(JSON.stringify(tenant)));
     } else {
       requestHeaders.set("x-tenant-missing", "1");
     }

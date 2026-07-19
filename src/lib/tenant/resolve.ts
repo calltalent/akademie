@@ -112,22 +112,40 @@ export async function resolveTenantById(
   return data as unknown as PublicTenant;
 }
 
+/**
+ * Performance-Fix (19.07.2026, Josips Fund: Login/Seitenaufbau spürbar
+ * langsam): lief vorher als bis zu ZWEI sequenzielle Abfragen — erst
+ * `resolveTenantBySlug()`, bei Fehlschlag danach `resolveTenantByCustomDomain()`
+ * (die ihrerseits nochmal eine `tenants`-Abfrage macht). Für jeden Host, der
+ * wie eine erste-Ebene-Subdomain AUSSIEHT, aber als `custom_domain`
+ * eingetragen ist (z. B. "academy.calltalent.ai" für den Mandanten mit Slug
+ * "calltalent" — genau der produktiv genutzte Fall), bedeutete das JEDEN
+ * einzelnen Request zwei DB-Rundläufe statt einem, bevor überhaupt die
+ * eigentliche Seite geladen wird. Jetzt EIN Query mit `.or()` für
+ * Slug-ODER-Custom-Domain-Treffer — spart den zweiten Rundlauf im
+ * Normalfall vollständig ein. `tenant_domains`-Alias-Fallback (seltener Pfad,
+ * z. B. eine zweite Domain desselben Mandanten) bleibt als zweiter Query
+ * bestehen, da er nicht in dieselbe Abfrage passt.
+ */
 export async function resolveTenantByHost(
   host: string,
 ): Promise<PublicTenant | null> {
-  const slug = extractTenantSlugFromHost(host);
-  if (slug) {
-    const bySlug = await resolveTenantBySlug(slug);
-    if (bySlug) return bySlug;
-    // FALLBACK (Block 8, 12.07.2026): seit dem Umstieg auf <slug>.calltalent.ai
-    // (erste Ebene, s. o.) matcht extractTenantSlugFromHost() JEDE erste-
-    // Ebene-Subdomain von calltalent.ai — auch eine, die eigentlich als
-    // `custom_domain` eines Mandanten eingetragen ist (z. B.
-    // "learning.calltalent.ai" für den Mandanten mit Slug "calltalent").
-    // Ohne diesen Fallback würde ein solcher Host nie bei
-    // resolveTenantByCustomDomain() ankommen, weil `slug` hier immer
-    // wahrheitswertig ist (auch wenn kein Mandant diesen Slug trägt).
-  }
   const hostname = host.split(":")[0];
-  return resolveTenantByCustomDomain(hostname);
+  const slug = extractTenantSlugFromHost(host);
+
+  const admin = createAdminClient();
+  let query = admin.from("tenants").select(TENANT_COLUMNS).eq("status", "active");
+  query = slug ? query.or(`slug.eq.${slug},custom_domain.eq.${hostname}`) : query.eq("custom_domain", hostname);
+  const { data } = await query.maybeSingle();
+  if (data) return data as unknown as PublicTenant;
+
+  // Alias-Fallback (siehe Kommentar oben): eine zusätzliche, nicht in
+  // `tenants.custom_domain` eingetragene Domain desselben Mandanten.
+  const { data: aliasRow } = await admin
+    .from("tenant_domains")
+    .select("tenant_id")
+    .eq("domain", hostname)
+    .maybeSingle();
+  if (!aliasRow) return null;
+  return resolveTenantById(aliasRow.tenant_id);
 }
