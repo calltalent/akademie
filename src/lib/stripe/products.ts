@@ -254,3 +254,60 @@ export async function archiveProduct(productId: string): Promise<ProductActionSt
 export async function reactivateProduct(productId: string): Promise<ProductActionState> {
   return setProductActive(productId, true);
 }
+
+/**
+ * Produkt endgültig entfernen (19.07.2026, Josips Auftrag). Anders als
+ * `archiveProduct()` oben eine ECHTE Löschung der `products`-Zeile — löscht
+ * aber bewusst NICHT das Stripe-Produkt selbst: Stripe erlaubt kein Löschen
+ * eines Produkts mit bereits erzeugten Preisen (unsere Produkte haben immer
+ * mindestens einen), der API-Aufruf würde also ohnehin fehlschlagen. Wie bei
+ * `setProductActive()` reicht "deaktivieren" auf der Stripe-Seite völlig aus
+ * — die Sichtbarkeit im eigenen Shop hängt allein an unserer `products`-Zeile.
+ *
+ * `orders.product_id`/`subscriptions.product_id` stehen auf `on delete set
+ * null` (0001_init.sql) — bestehende Bestellungen/Abos bleiben nach dem
+ * Löschen vollständig erhalten, nur ohne Produktbezug. Beide Stellen zeigen
+ * das bereits heute korrekt an (`OrdersTable`: "Unbekanntes Produkt",
+ * `/kaufen/[productSlug]`: "Dieses Produkt ist nicht verfügbar.") — kein
+ * zusätzlicher Code nötig, damit ein gelöschtes Produkt nirgends als Fehler
+ * statt als bewusster Zustand erscheint.
+ */
+export async function deleteProduct(productId: string): Promise<ProductActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const { data: existing } = await supabase
+      .from("products")
+      .select("stripe_product_id")
+      .eq("id", productId)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+    if (!existing) {
+      return { error: "Produkt nicht gefunden." };
+    }
+
+    if (existing.stripe_product_id) {
+      try {
+        const stripe = createStripeClient();
+        await stripe.products.update(existing.stripe_product_id, { active: false });
+      } catch (e) {
+        // Nicht kritisch — s. Kopfkommentar, die Sichtbarkeit hängt an der
+        // lokalen Zeile, die im Anschluss ohnehin gelöscht wird.
+        console.error("[stripe/products] Stripe-Produkt konnte beim Löschen nicht deaktiviert werden:", e);
+      }
+    }
+
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", productId)
+      .eq("tenant_id", tenant.id);
+    if (error) {
+      return { error: translateDbError(error) };
+    }
+
+    revalidatePath("/admin/zahlungen");
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}

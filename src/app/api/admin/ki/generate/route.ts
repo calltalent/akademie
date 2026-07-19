@@ -65,6 +65,27 @@ export async function POST(request: Request) {
   const titleParsed = titleSchema.safeParse(formData.get("title") ?? undefined);
   const titleHint = titleParsed.success ? titleParsed.data : undefined;
 
+  // "Zielkurs"-Auswahl (Design-Import AdminKiGenerator.dc.html, 19.07.2026):
+  // leer/"new" = neuen Kurs anlegen (bisheriges Verhalten). Serverseitig
+  // gegen den Mandanten geprüft, statt der Client-Auswahl blind zu
+  // vertrauen (Eingabegrenze, CLAUDE.md §2.3) — sonst könnte ein
+  // manipulierter Aufruf versuchen, Module an einen fremden Kurs
+  // anzuhängen.
+  const targetCourseIdRaw = formData.get("targetCourseId");
+  let targetCourseId: string | undefined;
+  if (typeof targetCourseIdRaw === "string" && targetCourseIdRaw && targetCourseIdRaw !== "new") {
+    const { data: targetCourse } = await ctx.supabase
+      .from("courses")
+      .select("id")
+      .eq("id", targetCourseIdRaw)
+      .eq("tenant_id", ctx.tenant.id)
+      .maybeSingle();
+    if (!targetCourse) {
+      return NextResponse.json({ error: "Zielkurs nicht gefunden." }, { status: 400 });
+    }
+    targetCourseId = targetCourse.id;
+  }
+
   let extraction: { text: string; truncated: boolean };
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -81,6 +102,7 @@ export async function POST(request: Request) {
     sourceText: extraction.text,
     sourceFilename: file.name.slice(0, 300),
     titleHint,
+    targetCourseId,
   });
   if (!input.success) {
     return NextResponse.json({ error: "Dokumentinhalt konnte nicht verarbeitet werden." }, { status: 422 });

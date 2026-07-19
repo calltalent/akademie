@@ -50,6 +50,9 @@ export type CourseReportRow = {
   completionRatePct: number;
 };
 
+/** Design-Import AdminReporting.dc.html (19.07.2026): "Abgeschlossen"/"Aktiv"/"Inaktiv"-Status je Zeile, abgeleitet aus vorhandenen Feldern (kein Zusatzquery nötig). */
+export type UserReportStatus = "completed" | "active" | "inactive";
+
 export type UserReportRow = {
   userId: string;
   userName: string;
@@ -60,16 +63,28 @@ export type UserReportRow = {
   completedLessonsCount: number;
   totalLessonsCount: number;
   lastActivityAt: string | null;
+  status: UserReportStatus;
 };
 
+/**
+ * Design-Import AdminReporting.dc.html (19.07.2026): eine Zeile je
+ * Quiz+Nutzer-Kombination mit mindestens einem Versuch (Josips Auftrag: die
+ * Funktionen sollen genau wie im Design abgebildet werden). Ersetzt die
+ * vorherige, rein pro Quiz aggregierte Fassung — nichts anderes im Repo hing
+ * an dieser Granularität (nur diese Seite + ihr eigener CSV-Export, siehe
+ * queries.ts-Kopfkommentar; `getUserReport()` bleibt für die öffentliche
+ * v1-API unverändert). Die feinere Granularität ist zugleich Voraussetzung
+ * für "Bericht zurücksetzen" je Zeile — ein sinnvoller Reset braucht ein
+ * konkretes Nutzer+Quiz-Paar, kein Mandanten-weites Aggregat.
+ */
 export type QuizReportRow = {
   quizId: string;
   quizTitle: string;
   courseTitle: string;
+  userId: string;
+  userName: string;
   attemptsCount: number;
-  passedCount: number;
-  failedCount: number;
-  avgScorePct: number | null;
+  bestScorePct: number | null;
 };
 
 type CourseStructure = {
@@ -305,6 +320,16 @@ export async function getUserReport(
     const progress = computeCourseProgress(moduleSummaries);
     const profile = profiles.get(e.user_id);
 
+    // "Abgeschlossen" = alle veröffentlichten Lektionen fertig (dieselbe
+    // Definition wie die Zertifikats-Ausstellung); "Aktiv" = mindestens eine
+    // Lektion begonnen/abgeschlossen, aber nicht fertig; "Inaktiv" =
+    // eingeschrieben, aber noch kein einziger progress-Eintrag.
+    const status: UserReportStatus = progress.isComplete
+      ? "completed"
+      : entry
+        ? "active"
+        : "inactive";
+
     rows.push({
       userId: e.user_id,
       userName: profile?.fullName || profile?.email || "Unbekannt",
@@ -315,6 +340,7 @@ export async function getUserReport(
       completedLessonsCount: progress.completed,
       totalLessonsCount: progress.total,
       lastActivityAt: entry?.lastActivity ?? null,
+      status,
     });
   }
 
@@ -323,12 +349,13 @@ export async function getUserReport(
 }
 
 /**
- * Quiz-Auswertung: pro Quiz Anzahl Versuche, bestanden/nicht bestanden und
- * Durchschnittsergebnis (%). "Versuche" zählt ALLE attempts-Zeilen
- * (begonnen + abgeschickt); bestanden/nicht-bestanden/Durchschnitt
- * berücksichtigen NUR abgeschickte Versuche (`submitted_at is not null`),
- * da `score_pct`/`passed` erst dann gesetzt sind (siehe attempts-Schema,
- * 0001_init.sql Zeilen 185-197).
+ * Quiz-Auswertung: eine Zeile je Quiz+Nutzer-Kombination mit mindestens
+ * einem Versuch (siehe `QuizReportRow`-Kommentar oben zur Granularität).
+ * "Versuche" zählt ALLE attempts-Zeilen dieses Nutzers für dieses Quiz
+ * (begonnen + abgeschickt); "Bestes Ergebnis" ist das höchste `score_pct`
+ * unter den ABGESCHICKTEN Versuchen (`submitted_at is not null`), da
+ * `score_pct` erst dann gesetzt ist (siehe attempts-Schema, 0001_init.sql
+ * Zeilen 185-197) — `null`, falls noch kein Versuch abgeschickt wurde.
  */
 export async function getQuizReport(tenantId: string): Promise<QuizReportRow[]> {
   const supabase = await createClient();
@@ -346,37 +373,48 @@ export async function getQuizReport(tenantId: string): Promise<QuizReportRow[]> 
     ? await supabase.from("courses").select("id, title").in("id", courseIds)
     : { data: [] as { id: string; title: string }[] };
   const courseTitleById = new Map((courseRows ?? []).map((c) => [c.id, c.title]));
+  const quizById = new Map((quizRows ?? []).map((q) => [q.id, q]));
 
   const { data: attemptRows } = await supabase
     .from("attempts")
-    .select("quiz_id, submitted_at, score_pct, passed")
+    .select("quiz_id, user_id, submitted_at, score_pct")
     .eq("tenant_id", tenantId);
 
-  const attemptsByQuiz = new Map<string, { submitted_at: string | null; score_pct: number | null; passed: boolean | null }[]>();
+  const profiles = await loadProfilesByIds(
+    supabase,
+    Array.from(new Set((attemptRows ?? []).map((a) => a.user_id))),
+  );
+
+  type Bucket = { attemptsCount: number; bestScorePct: number | null };
+  const byQuizUser = new Map<string, Bucket>();
   for (const a of attemptRows ?? []) {
-    const list = attemptsByQuiz.get(a.quiz_id) ?? [];
-    list.push(a);
-    attemptsByQuiz.set(a.quiz_id, list);
+    const key = `${a.quiz_id}|${a.user_id}`;
+    const bucket = byQuizUser.get(key) ?? { attemptsCount: 0, bestScorePct: null };
+    bucket.attemptsCount += 1;
+    if (a.submitted_at !== null && a.score_pct !== null) {
+      bucket.bestScorePct = bucket.bestScorePct === null ? a.score_pct : Math.max(bucket.bestScorePct, a.score_pct);
+    }
+    byQuizUser.set(key, bucket);
   }
 
-  return (quizRows ?? []).map((q) => {
-    const attempts = attemptsByQuiz.get(q.id) ?? [];
-    const submitted = attempts.filter((a) => a.submitted_at !== null);
-    const passedCount = submitted.filter((a) => a.passed === true).length;
-    const failedCount = submitted.filter((a) => a.passed === false).length;
-    const avgScorePct =
-      submitted.length === 0
-        ? null
-        : Math.round(submitted.reduce((sum, a) => sum + (a.score_pct ?? 0), 0) / submitted.length);
+  const rows: QuizReportRow[] = [];
+  for (const [key, bucket] of byQuizUser) {
+    const [quizId, userId] = key.split("|");
+    const quiz = quizById.get(quizId);
+    if (!quiz) continue; // Quiz nicht (mehr) im Mandanten gefunden
+    const profile = profiles.get(userId);
 
-    return {
-      quizId: q.id,
-      quizTitle: q.title,
-      courseTitle: (q.course_id && courseTitleById.get(q.course_id)) || "Kein Kurs zugeordnet",
-      attemptsCount: attempts.length,
-      passedCount,
-      failedCount,
-      avgScorePct,
-    };
-  });
+    rows.push({
+      quizId,
+      quizTitle: quiz.title,
+      courseTitle: (quiz.course_id && courseTitleById.get(quiz.course_id)) || "Kein Kurs zugeordnet",
+      userId,
+      userName: profile?.fullName || profile?.email || "Unbekannt",
+      attemptsCount: bucket.attemptsCount,
+      bestScorePct: bucket.bestScorePct,
+    });
+  }
+
+  rows.sort((a, b) => a.quizTitle.localeCompare(b.quizTitle, "de") || a.userName.localeCompare(b.userName, "de"));
+  return rows;
 }

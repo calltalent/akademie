@@ -100,17 +100,13 @@ export async function GET(request: Request) {
       );
       filenamePrefix = "nutzerbericht";
     } else {
+      // Granularität seit 19.07.2026 eine Zeile je Quiz+Nutzer statt der
+      // vorherigen Mandanten-weiten Aggregation je Quiz — siehe Kommentar in
+      // lib/reporting/queries.ts (QuizReportRow).
       const rows = await getQuizReport(tenant.id);
       csv = toCsv(
-        ["Quiz", "Kurs", "Versuche", "Bestanden", "Nicht bestanden", "Durchschnitt (%)"],
-        rows.map((r) => [
-          r.quizTitle,
-          r.courseTitle,
-          r.attemptsCount,
-          r.passedCount,
-          r.failedCount,
-          r.avgScorePct ?? "—",
-        ]),
+        ["Quiz", "Kurs", "Nutzer", "Versuche", "Bestes Ergebnis (%)"],
+        rows.map((r) => [r.quizTitle, r.courseTitle, r.userName, r.attemptsCount, r.bestScorePct ?? "—"]),
       );
       filenamePrefix = "quizauswertung";
     }

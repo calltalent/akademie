@@ -140,6 +140,14 @@ export const courseGenInputSchema = z.object({
   sourceText: z.string().min(1, "Kein Text extrahiert.").max(120000),
   sourceFilename: z.string().max(300).optional(),
   titleHint: z.string().trim().max(300).optional(),
+  /**
+   * Design-Import AdminKiGenerator.dc.html (19.07.2026, "Zielkurs"-Auswahl
+   * im Upload-Formular): fehlt/undefiniert = neuen Kurs anlegen (bisheriges
+   * Verhalten, unverändert). Gesetzt = Entwurf wird in
+   * `applyDraftAsCourse()` an DIESEN bereits bestehenden Kurs angehängt
+   * (neue Module ans Ende), statt einen zweiten Kurs anzulegen.
+   */
+  targetCourseId: z.string().uuid().optional(),
 });
 export type CourseGenInput = z.infer<typeof courseGenInputSchema>;
 
@@ -154,5 +162,14 @@ export const courseGenOutputSchema = z.object({
   outline: courseOutlineSchema.optional(),
   content: courseContentSchema.optional(),
   draft: courseDraftSchema.optional(),
+  /**
+   * Design-Import AdminKiGenerator.dc.html (19.07.2026): gesetzt, sobald
+   * `applyDraftAsCourse()` erfolgreich einen Kurs daraus gemacht hat —
+   * unterscheidet in der Entwürfe-Liste "Zu prüfen" (done, noch nicht
+   * übernommen) von "Übernommen" (done, bereits übernommen). Keine eigene
+   * Spalte/Migration nötig, `output` ist bereits die flexible
+   * Zustands-Ablage dieser Job-Art.
+   */
+  appliedCourseId: z.string().uuid().optional(),
 });
 export type CourseGenOutput = z.infer<typeof courseGenOutputSchema>;

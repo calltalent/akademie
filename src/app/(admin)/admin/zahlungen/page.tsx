@@ -1,18 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { ProductForm } from "@/components/admin/product-form";
-import { ProductActiveToggle } from "@/components/admin/product-active-toggle";
+import { ProductRow } from "@/components/admin/product-row";
 import { OrdersTable, type OrderRow } from "@/components/admin/orders-table";
-import { PayLinkIcon } from "@/components/admin/pay-link-icon";
-import { PRODUCT_KIND_LABELS, type ProductKind } from "@/lib/stripe/schema";
 
-function formatPrice(cents: number, currency: string): string {
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency: currency.toUpperCase() }).format(
-    cents / 100,
-  );
-}
-
-/** Für die KPI-Summen oben — anders als `formatPrice()` je Zeile bewusst fest auf EUR: die App rechnet in der Praxis ausschließlich in Euro, ein Aufsummieren über potenziell verschiedene Währungen hinweg wäre ohnehin falsch. */
+/** Für die KPI-Summen oben — bewusst fest auf EUR: die App rechnet in der Praxis ausschließlich in Euro, ein Aufsummieren über potenziell verschiedene Währungen hinweg wäre ohnehin falsch. */
 function formatEuroCents(cents: number): string {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
 }
@@ -52,7 +44,12 @@ function deltaColor(tone: DeltaTone): string {
  * - Die bereits bestehende Bearbeiten-Funktion (aufklappbares Formular je
  *   Produkt, `ProductForm`/`ProductActiveToggle`) bleibt erhalten, obwohl
  *   der Export nur die Neuanlage zeigt — würde sonst eine vorhandene
- *   Funktion ersatzlos verschwinden.
+ *   Funktion ersatzlos verschwinden. Seit demselben Folgeauftrag als
+ *   eigenständiges Bearbeiten-Symbol (Stift) statt einer klickbaren
+ *   Gesamtzeile, plus ein Löschen-Symbol (`ProductRow`,
+ *   `deleteProduct()` in stripe/products.ts) — "die Kaufseite bearbeiten"
+ *   ist dasselbe wie "das Produkt bearbeiten", da `/kaufen/[productSlug]`
+ *   kein eigenes Inhaltsmodell hat, siehe Kommentar dort.
  * - Die Kopf-Avatar-Kachel des Exports ("AK") fällt weg, wie bei allen
  *   anderen bereits umgestellten Admin-Seiten (Kurse, Teilnehmer) — kein
  *   Vorbild dafür in diesem Bereich, rein dekorativ ohne echte Daten.
@@ -207,7 +204,7 @@ export default async function AdminZahlungenPage() {
             </div>
             <div
               className="grid items-center gap-0 px-[28px] pb-2.5 text-[13px] font-bold"
-              style={{ gridTemplateColumns: "2fr 1fr 1fr 0.8fr 0.5fr", color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" }}
+              style={{ gridTemplateColumns: "2fr 1fr 1fr 0.8fr 1fr", color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" }}
             >
               <div>Produkt</div>
               <div>Art</div>
@@ -224,53 +221,7 @@ export default async function AdminZahlungenPage() {
                 const courseId = (p.course_ids ?? [])[0] ?? null;
                 const courseTitle = courseId ? (courseTitleById.get(courseId) ?? "Kurs nicht gefunden") : "Kein verknüpfter Kurs";
                 return (
-                  <details key={p.id} className="group" style={{ borderBottom: "1px solid #F4F5FA" }}>
-                    <summary
-                      className="grid cursor-pointer list-none items-center gap-0 px-[28px] py-4 text-[15px]"
-                      style={{ gridTemplateColumns: "2fr 1fr 1fr 0.8fr 0.5fr" }}
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold">{p.title}</div>
-                        <div className="mt-0.5 truncate text-[13px]" style={{ color: "#A9AAC4" }}>
-                          {courseTitle}
-                        </div>
-                      </div>
-                      <div style={{ color: "#3E3F66" }}>{PRODUCT_KIND_LABELS[p.kind as ProductKind]}</div>
-                      <div className="font-semibold">{formatPrice(p.price_cents, p.currency)}</div>
-                      <div>
-                        <span
-                          className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
-                          style={
-                            p.active
-                              ? { color: "#1F8A5B", background: "#E3F2EA" }
-                              : { color: "#66679B", background: "#EEF0F7" }
-                          }
-                        >
-                          {p.active ? "Aktiv" : "Inaktiv"}
-                        </span>
-                      </div>
-                      <div className="flex justify-end">
-                        <PayLinkIcon productSlug={p.slug} productTitle={p.title} />
-                      </div>
-                    </summary>
-                    <div className="flex flex-col gap-4 px-[28px] pb-6" style={{ borderTop: "1px solid #F4F5FA" }}>
-                      <div className="pt-4">
-                        <ProductActiveToggle productId={p.id} active={p.active} />
-                      </div>
-                      <ProductForm
-                        courses={courseOptions}
-                        product={{
-                          id: p.id,
-                          title: p.title,
-                          slug: p.slug,
-                          kind: p.kind as ProductKind,
-                          priceCents: p.price_cents,
-                          active: p.active,
-                          courseId,
-                        }}
-                      />
-                    </div>
-                  </details>
+                  <ProductRow key={p.id} product={p} courseOptions={courseOptions} courseTitle={courseTitle} />
                 );
               })
             )}

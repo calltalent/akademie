@@ -7,7 +7,12 @@ import { blocksSchema } from "@/lib/courses/schema";
 import { slugify } from "@/lib/courses/slug";
 import { resolveUniqueCourseSlug } from "@/lib/courses/resolve-slug";
 import { questionInputSchema } from "@/lib/quiz/schema";
-import { courseDraftSchema, courseGenOutputSchema, type CourseDraft } from "@/lib/generator/schema";
+import {
+  courseDraftSchema,
+  courseGenInputSchema,
+  courseGenOutputSchema,
+  type CourseDraft,
+} from "@/lib/generator/schema";
 import { translateDbError } from "@/lib/errors/db";
 
 /**
@@ -44,7 +49,7 @@ export async function applyDraftAsCourse(jobId: string): Promise<ApplyResult> {
 
     const { data: job, error: jobError } = await supabase
       .from("ai_jobs")
-      .select("id, tenant_id, kind, status, output")
+      .select("id, tenant_id, kind, status, input, output")
       .eq("id", jobId)
       .eq("tenant_id", tenant.id)
       .eq("kind", "course_gen")
@@ -58,6 +63,11 @@ export async function applyDraftAsCourse(jobId: string): Promise<ApplyResult> {
     if (!parsedOutput.success || !parsedOutput.data.draft) {
       return { ok: false, error: "Kursentwurf ist beschädigt oder unvollständig." };
     }
+    if (parsedOutput.data.appliedCourseId) {
+      // Bereits übernommen (z. B. Doppelklick) — kein zweiter Kurs/keine
+      // doppelten Module, einfach den bestehenden Kurs zurückmelden.
+      return { ok: true, courseId: parsedOutput.data.appliedCourseId };
+    }
     const draftParsed = courseDraftSchema.safeParse(parsedOutput.data.draft);
     if (!draftParsed.success) {
       return {
@@ -67,26 +77,59 @@ export async function applyDraftAsCourse(jobId: string): Promise<ApplyResult> {
     }
     const draft: CourseDraft = draftParsed.data;
 
-    // Eindeutigen Slug ermitteln (unique(tenant_id, slug), 0001_init.sql).
-    const baseSlug = slugify(draft.title);
-    const slug = await resolveUniqueCourseSlug(supabase, tenant.id, baseSlug);
+    // "Zielkurs" (Design-Import AdminKiGenerator.dc.html, 19.07.2026):
+    // erneut gegen den Mandanten geprüft statt der beim Upload bereits
+    // geprüften ID blind zu vertrauen (dieselbe Eingabegrenzen-Regel wie
+    // beim `draft`-Reparse oben — auch "eigene" DB-Daten werden erneut
+    // validiert).
+    const parsedInput = courseGenInputSchema.safeParse(job.input ?? {});
+    const targetCourseId = parsedInput.success ? parsedInput.data.targetCourseId : undefined;
 
-    // Kurs immer als Entwurf anlegen (courses.status default 'draft').
-    const { data: course, error: courseError } = await supabase
-      .from("courses")
-      .insert({
-        tenant_id: tenant.id,
-        title: draft.title.slice(0, 300),
-        slug,
-        description: draft.description?.slice(0, 5000) ?? null,
-        created_by: user.id,
-      })
-      .select("id")
-      .single();
-    if (courseError || !course) {
-      return { ok: false, error: "Kurs konnte nicht angelegt werden: " + (courseError ? translateDbError(courseError) : "unbekannt") };
+    let courseId: string;
+    let moduleStartPosition = 0;
+
+    if (targetCourseId) {
+      const { data: existingCourse } = await supabase
+        .from("courses")
+        .select("id")
+        .eq("id", targetCourseId)
+        .eq("tenant_id", tenant.id)
+        .maybeSingle();
+      if (!existingCourse) {
+        return { ok: false, error: "Zielkurs nicht gefunden." };
+      }
+      courseId = existingCourse.id;
+
+      const { data: existingModules } = await supabase
+        .from("modules")
+        .select("position")
+        .eq("tenant_id", tenant.id)
+        .eq("course_id", courseId)
+        .order("position", { ascending: false })
+        .limit(1);
+      moduleStartPosition = (existingModules?.[0]?.position ?? -1) + 1;
+    } else {
+      // Eindeutigen Slug ermitteln (unique(tenant_id, slug), 0001_init.sql).
+      const baseSlug = slugify(draft.title);
+      const slug = await resolveUniqueCourseSlug(supabase, tenant.id, baseSlug);
+
+      // Kurs immer als Entwurf anlegen (courses.status default 'draft').
+      const { data: course, error: courseError } = await supabase
+        .from("courses")
+        .insert({
+          tenant_id: tenant.id,
+          title: draft.title.slice(0, 300),
+          slug,
+          description: draft.description?.slice(0, 5000) ?? null,
+          created_by: user.id,
+        })
+        .select("id")
+        .single();
+      if (courseError || !course) {
+        return { ok: false, error: "Kurs konnte nicht angelegt werden: " + (courseError ? translateDbError(courseError) : "unbekannt") };
+      }
+      courseId = course.id;
     }
-    const courseId: string = course.id;
 
     for (let moduleIndex = 0; moduleIndex < draft.modules.length; moduleIndex++) {
       const draftModule = draft.modules[moduleIndex];
@@ -97,7 +140,7 @@ export async function applyDraftAsCourse(jobId: string): Promise<ApplyResult> {
           tenant_id: tenant.id,
           course_id: courseId,
           title: draftModule.title.slice(0, 300),
-          position: moduleIndex,
+          position: moduleStartPosition + moduleIndex,
         })
         .select("id")
         .single();
@@ -140,7 +183,21 @@ export async function applyDraftAsCourse(jobId: string): Promise<ApplyResult> {
       }
     }
 
+    // Persistiert, dass dieser Entwurf übernommen wurde (Design-Import
+    // AdminKiGenerator.dc.html: die Entwürfe-Liste zeigt "Übernommen" statt
+    // "Zu prüfen" danach dauerhaft, nicht nur für die laufende Sitzung).
+    // Fail-soft: ein Fehler hier darf den bereits erfolgreich angelegten
+    // Kurs nicht ungeschehen machen — der Job zeigte im schlimmsten Fall
+    // fälschlich weiter "Zu prüfen", ein erneutes Übernehmen würde dank des
+    // `appliedCourseId`-Checks oben ohnehin früh abbrechen.
+    await supabase
+      .from("ai_jobs")
+      .update({ output: { ...parsedOutput.data, appliedCourseId: courseId } })
+      .eq("id", jobId)
+      .eq("tenant_id", tenant.id);
+
     revalidatePath("/admin/kurse");
+    revalidatePath("/admin/ki");
     return { ok: true, courseId };
   } catch (e) {
     console.error("[generator/apply] applyDraftAsCourse fehlgeschlagen:", e instanceof Error ? e.message : e);
