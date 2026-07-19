@@ -94,42 +94,35 @@ export default async function AdminKursePage({
   const tenantId = tenant.id;
   const supabase = await createClient();
 
-  const { data: courses } = await supabase
-    .from("courses")
-    .select("id, title, slug, status, cover_url")
-    .eq("tenant_id", tenantId)
-    .order("position", { ascending: true });
-
-  const { data: modules } = await supabase
-    .from("modules")
-    .select("id, course_id")
-    .eq("tenant_id", tenantId);
-
-  const { data: lessons } = await supabase
-    .from("lessons")
-    .select("id, module_id")
-    .eq("tenant_id", tenantId);
-
-  const { data: enrollments } = await supabase
-    .from("enrollments")
-    .select("course_id")
-    .eq("tenant_id", tenantId);
-
-  // Für den Lösch-Bestätigungsdialog: echte Zählungen, keine Schätzung —
-  // dieselbe Anforderung wie im Kurs-Editor ([id]/page.tsx). Hier bewusst EINE
-  // Abfrage über alle Kurse des Mandanten statt einer `count`-Abfrage pro
-  // Zeile (die Detailseite betrachtet genau einen Kurs und zählt deshalb
-  // dort per `head: true`).
-  const { data: certificates } = await supabase
-    .from("certificates")
-    .select("course_id")
-    .eq("tenant_id", tenantId);
-
-  // Rollen-Gate für den Papierkorb (siehe Kopfkommentar). Bewusst NACH den
-  // Datenabfragen und ohne eigenes Fehlerverhalten: schlägt die Prüfung fehl,
-  // ist `isAdmin` false und die Liste rendert ohne Löschknopf — der Zugriff
-  // auf die Seite selbst ist bereits über admin/layout.tsx gegated.
-  const adminAccess = await checkAdminAccess();
+  // Performance-Fix (19.07.2026, Josips Fund: "Löschen von Kursen" fühlt
+  // sich langsam an — tatsächlich ist es diese Seite, die nach dem Löschen
+  // neu lädt): die fünf Abfragen unten hängen ausschließlich an `tenantId`,
+  // nicht voneinander — liefen aber sequenziell hintereinander (5-6
+  // Rundläufe addiert statt parallel). `checkAdminAccess()` hängt ebenfalls
+  // nur an Tenant/Session, nicht an den Kursdaten — läuft jetzt mit im
+  // selben Promise.all statt danach.
+  const [{ data: courses }, { data: modules }, { data: lessons }, { data: enrollments }, { data: certificates }, adminAccess] =
+    await Promise.all([
+      supabase
+        .from("courses")
+        .select("id, title, slug, status, cover_url")
+        .eq("tenant_id", tenantId)
+        .order("position", { ascending: true }),
+      supabase.from("modules").select("id, course_id").eq("tenant_id", tenantId),
+      supabase.from("lessons").select("id, module_id").eq("tenant_id", tenantId),
+      supabase.from("enrollments").select("course_id").eq("tenant_id", tenantId),
+      // Für den Lösch-Bestätigungsdialog: echte Zählungen, keine Schätzung —
+      // dieselbe Anforderung wie im Kurs-Editor ([id]/page.tsx). Hier bewusst
+      // EINE Abfrage über alle Kurse des Mandanten statt einer
+      // `count`-Abfrage pro Zeile (die Detailseite betrachtet genau einen
+      // Kurs und zählt deshalb dort per `head: true`).
+      supabase.from("certificates").select("course_id").eq("tenant_id", tenantId),
+      // Rollen-Gate für den Papierkorb (siehe Kopfkommentar unten). Schlägt
+      // die Prüfung fehl, ist `isAdmin` false und die Liste rendert ohne
+      // Löschknopf — der Zugriff auf die Seite selbst ist bereits über
+      // admin/layout.tsx gegated.
+      checkAdminAccess(),
+    ]);
   const isAdmin = adminAccess.ok;
 
   const courseIdByModule = new Map((modules ?? []).map((m) => [m.id, m.course_id]));

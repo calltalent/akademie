@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
+import { getAuthUser } from "@/lib/auth/context";
 import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/compute";
 import { AppShell } from "@/components/learn/app-shell";
 
@@ -19,22 +20,28 @@ import { AppShell } from "@/components/learn/app-shell";
  */
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const tenant = await getTenant();
+  const [user, tenant] = await Promise.all([getAuthUser(), getTenant()]);
 
   // Kein Mandant (Dev-Root/localhost): der Hinweis lebt an `/` — dorthin
   // zurück. Nicht angemeldet → Login. Beide Fälle spiegeln app/page.tsx.
   if (!tenant) redirect("/");
   if (!user) redirect("/login");
 
-  const { data: courses } = await supabase
-    .from("courses")
-    .select("id, title, slug, status, cover_url")
-    .eq("tenant_id", tenant.id)
-    .eq("status", "published")
-    .order("position", { ascending: true });
+  // Performance-Fix (19.07.2026, Josips Fund: Login in den Lernbereich
+  // fühlt sich langsam an — `/dashboard` ist die erste Seite danach):
+  // `is_staff`/`profiles` hängen nur an `user.id`/`tenant.id`, nicht an den
+  // Kursdaten — liefen aber sequenziell NACH der courses-Abfrage statt
+  // parallel dazu.
+  const [{ data: courses }, { data: isStaff }, { data: profile }] = await Promise.all([
+    supabase
+      .from("courses")
+      .select("id, title, slug, status, cover_url")
+      .eq("tenant_id", tenant.id)
+      .eq("status", "published")
+      .order("position", { ascending: true }),
+    supabase.rpc("is_staff", { t: tenant.id }),
+    supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+  ]);
 
   const courseIds = (courses ?? []).map((c) => c.id);
 
@@ -68,15 +75,8 @@ export default async function DashboardPage() {
     (progressRows ?? []).map((p) => [p.lesson_id, p.updated_at as string]),
   );
 
-  const { data: isStaff } = await supabase.rpc("is_staff", { t: tenant.id });
-
   // Anzeigename: `profiles.full_name` ist optional (bei manchen Konten leer) —
   // Fallback auf den E-Mail-Namensteil statt einer leeren Begrüßung.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .maybeSingle();
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
     profile?.full_name?.trim() ||

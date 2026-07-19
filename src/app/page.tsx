@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
+import { getAuthUser } from "@/lib/auth/context";
 
 /**
  * Root-Route `/` — seit dem Dashboard-Umzug nach /dashboard (Folgeauftrag)
@@ -18,11 +18,7 @@ import { getTenant } from "@/lib/tenant/context";
  * Middleware-Rewrite auf /portal.
  */
 export default async function HomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const tenant = await getTenant();
+  const [user, tenant] = await Promise.all([getAuthUser(), getTenant()]);
 
   if (!tenant) {
     return (

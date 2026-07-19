@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
+import { getAuthUser } from "@/lib/auth/context";
 import type { PublicTenant } from "@/lib/tenant/types";
 
 /**
@@ -24,12 +25,10 @@ export async function checkStaffAccess(): Promise<StaffCheckResult> {
   const tenant = await getTenant();
   if (!tenant) return { ok: false, reason: "no-tenant" };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return { ok: false, reason: "not-authenticated" };
 
+  const supabase = await createClient();
   const { data: isStaff } = await supabase.rpc("is_staff", { t: tenant.id });
   if (!isStaff) return { ok: false, reason: "not-staff" };
 
@@ -62,12 +61,10 @@ export async function checkAdminAccess(): Promise<AdminCheckResult> {
   const tenant = await getTenant();
   if (!tenant) return { ok: false, reason: "no-tenant" };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return { ok: false, reason: "not-authenticated" };
 
+  const supabase = await createClient();
   const { data: role } = await supabase.rpc("member_role", { t: tenant.id });
   if (role !== "owner" && role !== "admin") return { ok: false, reason: "not-admin" };
 
