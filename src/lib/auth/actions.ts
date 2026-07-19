@@ -63,7 +63,18 @@ export async function signInWithPassword(
   }
 
   await ensureProfile(supabase, data.user.id, data.user.email ?? parsed.data.email);
-  redirect("/");
+
+  // Performance-Fix (19.07.2026, Josips Fund: Anmeldung immer noch langsam
+  // trotz getAuthUser()-Fix): redirect("/") lief für Mandanten-Logins immer
+  // über app/page.tsx, das seinerseits sofort auf /dashboard weiterleitet —
+  // ein zusätzlicher kompletter Request/Middleware/getUser()-Rundlauf für
+  // eine Zwischenseite, die nie etwas anzeigt. getTenant() liest hier bereits
+  // gecacht aus dem Middleware-Header (kein DB-Zugriff, s. tenant/context.ts)
+  // und entscheidet identisch zu app/page.tsx — auf dem Portal-Host bleibt
+  // `tenant` null (kein x-tenant-data-Header dort), redirect("/") also
+  // unverändert (Middleware schreibt "/" dort transparent auf /portal um).
+  const tenant = await getTenant();
+  redirect(tenant ? "/dashboard" : "/");
 }
 
 export async function signUpWithPassword(
