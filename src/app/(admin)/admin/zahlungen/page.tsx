@@ -3,6 +3,7 @@ import { getTenant } from "@/lib/tenant/context";
 import { ProductForm } from "@/components/admin/product-form";
 import { ProductActiveToggle } from "@/components/admin/product-active-toggle";
 import { OrdersTable, type OrderRow } from "@/components/admin/orders-table";
+import { PayLinkIcon } from "@/components/admin/pay-link-icon";
 import { PRODUCT_KIND_LABELS, type ProductKind } from "@/lib/stripe/schema";
 
 function formatPrice(cents: number, currency: string): string {
@@ -11,12 +12,50 @@ function formatPrice(cents: number, currency: string): string {
   );
 }
 
+/** Für die KPI-Summen oben — anders als `formatPrice()` je Zeile bewusst fest auf EUR: die App rechnet in der Praxis ausschließlich in Euro, ein Aufsummieren über potenziell verschiedene Währungen hinweg wäre ohnehin falsch. */
+function formatEuroCents(cents: number): string {
+  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
+}
+
+type DeltaTone = "up" | "down" | "neutral";
+
+function deltaColor(tone: DeltaTone): string {
+  return tone === "up" ? "#1F8A5B" : tone === "down" ? "#B24343" : "#A9AAC4";
+}
+
 /**
- * Admin/Zahlungen (SPEC 4.2, Auftrag Punkt 9) - Server Component, Staff-Gate
- * aus admin/layout.tsx. Zeigt Produktliste (mit Neues-Produkt-Formular) UND
- * Bestellübersicht. `.eq("tenant_id", …)` überall explizit (Defense-in-Depth,
- * gleiches Muster wie im restlichen Admin-Bereich), obwohl RLS
- * `products_staff_all`/`orders_staff_select` bereits mandantenscharf greift.
+ * Design-Block (19.07.2026, Claude-Design-Import AdminZahlungen.dc.html aus
+ * dem Design-Projekt „Calltalent-Akademie Studenten-Portal"). Ersetzt die
+ * schlichte Phase-2-Ansicht (reine Listen ohne Kennzahlen/Kartenoptik) durch
+ * das Marken-Layout: KPI-Reihe, zweispaltiges Grid (Produkte + Bestellungen
+ * links, „Neues Produkt" rechts sticky).
+ *
+ * KPIs sind ECHT berechnet (DESIGN-MASTERPROMPT.md §8.1, kein erfundener
+ * Zähler) — der Export zeigte hier Demo-Werte aus einem Script-Objekt:
+ * - Gesamtumsatz/Ø Bestellwert nur aus `status = 'paid'`-Bestellungen.
+ * - Die Vergleichswerte („+X diesen Monat", „vs. Vormonat") sind echte
+ *   Monats-/Wochenvergleiche; fehlt eine Vergleichsbasis (z. B. neuer
+ *   Mandant ohne Bestellungen im Vormonat), erscheint ein neutraler Hinweis
+ *   statt einer erfundenen/grünen Zahl.
+ * - Eine EIGENE, ungefilterte KPI-Abfrage (nur status/amount/created_at)
+ *   ergänzt `orderRows` (bleibt bei 200 Zeilen gedeckelt, s. u.): sonst wären
+ *   die Kennzahlen bei mehr als 200 Bestellungen falsch.
+ *
+ * Bewusste Abweichungen vom Export:
+ * - Bestellungen-Kopfzeile zeigt „neueste zuerst" statt der im Export
+ *   statischen „letzte 30 Tage" — die Tabelle zeigt tatsächlich die
+ *   neuesten (bis zu 200) Bestellungen, nicht auf 30 Tage gefiltert; eine
+ *   Beschriftung, die nicht zum echten Verhalten passt, wäre irreführend.
+ * - Die „Zahlungsseite ansehen"-Symbole führen auf die echte, bereits
+ *   bestehende Kaufseite `/kaufen/[productSlug]`, nicht auf einen
+ *   Mockup-Platzhalter.
+ * - Die bereits bestehende Bearbeiten-Funktion (aufklappbares Formular je
+ *   Produkt, `ProductForm`/`ProductActiveToggle`) bleibt erhalten, obwohl
+ *   der Export nur die Neuanlage zeigt — würde sonst eine vorhandene
+ *   Funktion ersatzlos verschwinden.
+ * - Die Kopf-Avatar-Kachel des Exports ("AK") fällt weg, wie bei allen
+ *   anderen bereits umgestellten Admin-Seiten (Kurse, Teilnehmer) — kein
+ *   Vorbild dafür in diesem Bereich, rein dekorativ ohne echte Daten.
  */
 export default async function AdminZahlungenPage() {
   const tenant = await getTenant();
@@ -36,10 +75,16 @@ export default async function AdminZahlungenPage() {
 
   const { data: orderRows } = await supabase
     .from("orders")
-    .select("id, status, amount_cents, currency, created_at, profiles(email, full_name), products(title)")
+    .select("id, status, amount_cents, currency, created_at, profiles(email, full_name), products(title, slug)")
     .eq("tenant_id", tenant!.id)
     .order("created_at", { ascending: false })
     .limit(200);
+
+  // Eigene, ungefilterte Abfrage nur für die KPI-Summen oben (siehe Kopfkommentar).
+  const { data: allOrdersForKpi } = await supabase
+    .from("orders")
+    .select("status, amount_cents, created_at")
+    .eq("tenant_id", tenant!.id);
 
   const orders: OrderRow[] = (orderRows ?? []).map((o) => {
     const profile = Array.isArray(o.profiles) ? o.profiles[0] : o.profiles;
@@ -53,73 +98,199 @@ export default async function AdminZahlungenPage() {
       userEmail: profile?.email ?? null,
       userName: profile?.full_name ?? null,
       productTitle: product?.title ?? "Unbekanntes Produkt",
+      productSlug: product?.slug ?? null,
     };
   });
 
   const courseOptions = courses ?? [];
+  const courseTitleById = new Map(courseOptions.map((c) => [c.id, c.title]));
+  const allProducts = products ?? [];
+
+  // --- KPIs ---
+  const allOrders = allOrdersForKpi ?? [];
+  const paidOrders = allOrders.filter((o) => o.status === "paid");
+
+  const now = new Date();
+  const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const totalRevenueCents = paidOrders.reduce((sum, o) => sum + (o.amount_cents ?? 0), 0);
+  const thisMonthRevenueCents = paidOrders
+    .filter((o) => new Date(o.created_at) >= startOfThisMonth)
+    .reduce((sum, o) => sum + (o.amount_cents ?? 0), 0);
+
+  const newOrdersThisWeek = allOrders.filter((o) => new Date(o.created_at) >= sevenDaysAgo).length;
+
+  const activeProductCount = allProducts.filter((p) => p.active).length;
+
+  function averageCents(rows: typeof paidOrders): number | null {
+    if (rows.length === 0) return null;
+    return rows.reduce((sum, o) => sum + (o.amount_cents ?? 0), 0) / rows.length;
+  }
+  const overallAvg = averageCents(paidOrders);
+  const thisMonthAvg = averageCents(paidOrders.filter((o) => new Date(o.created_at) >= startOfThisMonth));
+  const lastMonthAvg = averageCents(
+    paidOrders.filter(
+      (o) => new Date(o.created_at) >= startOfLastMonth && new Date(o.created_at) < startOfThisMonth,
+    ),
+  );
+
+  const kpis: { label: string; value: string; delta: string; tone: DeltaTone }[] = [
+    {
+      label: "Gesamtumsatz",
+      value: formatEuroCents(totalRevenueCents),
+      delta: thisMonthRevenueCents > 0 ? `+${formatEuroCents(thisMonthRevenueCents)} diesen Monat` : "Kein Umsatz diesen Monat",
+      tone: thisMonthRevenueCents > 0 ? "up" : "neutral",
+    },
+    {
+      label: "Bestellungen",
+      value: String(allOrders.length),
+      delta: newOrdersThisWeek > 0 ? `+${newOrdersThisWeek} diese Woche` : "Keine neuen diese Woche",
+      tone: newOrdersThisWeek > 0 ? "up" : "neutral",
+    },
+    {
+      label: "Aktive Produkte",
+      value: String(activeProductCount),
+      delta: `von ${allProducts.length} gesamt`,
+      tone: "neutral",
+    },
+    {
+      label: "Ø Bestellwert",
+      value: overallAvg !== null ? formatEuroCents(overallAvg) : "—",
+      delta:
+        thisMonthAvg !== null && lastMonthAvg !== null
+          ? `${thisMonthAvg >= lastMonthAvg ? "+" : "−"}${formatEuroCents(Math.abs(thisMonthAvg - lastMonthAvg))} vs. Vormonat`
+          : "Noch kein Vergleich möglich",
+      tone:
+        thisMonthAvg !== null && lastMonthAvg !== null ? (thisMonthAvg >= lastMonthAvg ? "up" : "down") : "neutral",
+    },
+  ];
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-10">
-      <div>
-        <h1 className="text-2xl font-semibold">Zahlungen</h1>
-        <p className="text-sm text-gray-500">Produkte, Preise und Bestellungen dieses Mandanten.</p>
+    <div className="flex flex-col gap-6">
+      <header className="flex items-center gap-[18px]">
+        <div className="flex-1">
+          <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
+            Auswertung · Zahlungen
+          </div>
+          <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
+            Zahlungen
+          </h1>
+        </div>
+      </header>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 gap-[22px] lg:grid-cols-4">
+        {kpis.map((k) => (
+          <div key={k.label} className="rounded-[14px] border bg-white p-[22px_24px]" style={{ borderColor: "#E7E8F2" }}>
+            <div className="mb-2.5 text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
+              {k.label}
+            </div>
+            <div className="text-[30px] font-extrabold" style={{ color: "#1A1A2E", letterSpacing: "-0.01em" }}>
+              {k.value}
+            </div>
+            <div className="mt-1.5 text-[13px] font-semibold" style={{ color: deltaColor(k.tone) }}>
+              {k.delta}
+            </div>
+          </div>
+        ))}
       </div>
 
-      <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-medium">Neues Produkt</h2>
-        <ProductForm courses={courseOptions} />
-      </section>
+      <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
+        {/* Linke Spalte */}
+        <div className="flex min-w-0 flex-col gap-6">
+          {/* Produkte */}
+          <div className="overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
+            <div className="p-[24px_28px_16px]">
+              <div className="text-[17px] font-bold">Produkte</div>
+            </div>
+            <div
+              className="grid items-center gap-0 px-[28px] pb-2.5 text-[13px] font-bold"
+              style={{ gridTemplateColumns: "2fr 1fr 1fr 0.8fr 0.5fr", color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" }}
+            >
+              <div>Produkt</div>
+              <div>Art</div>
+              <div>Preis</div>
+              <div>Status</div>
+              <div className="text-right">{allProducts.length} gesamt</div>
+            </div>
+            {allProducts.length === 0 ? (
+              <p className="px-[28px] py-6 text-sm" style={{ color: "#A9AAC4" }}>
+                Noch keine Produkte angelegt.
+              </p>
+            ) : (
+              allProducts.map((p) => {
+                const courseId = (p.course_ids ?? [])[0] ?? null;
+                const courseTitle = courseId ? (courseTitleById.get(courseId) ?? "Kurs nicht gefunden") : "Kein verknüpfter Kurs";
+                return (
+                  <details key={p.id} className="group" style={{ borderBottom: "1px solid #F4F5FA" }}>
+                    <summary
+                      className="grid cursor-pointer list-none items-center gap-0 px-[28px] py-4 text-[15px]"
+                      style={{ gridTemplateColumns: "2fr 1fr 1fr 0.8fr 0.5fr" }}
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold">{p.title}</div>
+                        <div className="mt-0.5 truncate text-[13px]" style={{ color: "#A9AAC4" }}>
+                          {courseTitle}
+                        </div>
+                      </div>
+                      <div style={{ color: "#3E3F66" }}>{PRODUCT_KIND_LABELS[p.kind as ProductKind]}</div>
+                      <div className="font-semibold">{formatPrice(p.price_cents, p.currency)}</div>
+                      <div>
+                        <span
+                          className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
+                          style={
+                            p.active
+                              ? { color: "#1F8A5B", background: "#E3F2EA" }
+                              : { color: "#66679B", background: "#EEF0F7" }
+                          }
+                        >
+                          {p.active ? "Aktiv" : "Inaktiv"}
+                        </span>
+                      </div>
+                      <div className="flex justify-end">
+                        <PayLinkIcon productSlug={p.slug} productTitle={p.title} />
+                      </div>
+                    </summary>
+                    <div className="flex flex-col gap-4 px-[28px] pb-6" style={{ borderTop: "1px solid #F4F5FA" }}>
+                      <div className="pt-4">
+                        <ProductActiveToggle productId={p.id} active={p.active} />
+                      </div>
+                      <ProductForm
+                        courses={courseOptions}
+                        product={{
+                          id: p.id,
+                          title: p.title,
+                          slug: p.slug,
+                          kind: p.kind as ProductKind,
+                          priceCents: p.price_cents,
+                          active: p.active,
+                          courseId,
+                        }}
+                      />
+                    </div>
+                  </details>
+                );
+              })
+            )}
+          </div>
 
-      <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-medium">Produkte</h2>
-        {(products ?? []).length === 0 && <p className="text-base text-gray-500">Noch keine Produkte angelegt.</p>}
-        <ul className="flex flex-col gap-3">
-          {(products ?? []).map((p) => (
-            <li key={p.id} className="rounded-md border p-4" style={{ borderRadius: "var(--radius)" }}>
-              <details>
-                <summary className="flex cursor-pointer items-center justify-between gap-4">
-                  <span>
-                    <span className="font-medium">{p.title}</span>{" "}
-                    <span className="text-sm text-gray-500">
-                      ({PRODUCT_KIND_LABELS[p.kind as ProductKind]}, {formatPrice(p.price_cents, p.currency)})
-                    </span>
-                  </span>
-                  <span
-                    className="shrink-0 rounded-md border px-2 py-1 text-xs font-medium"
-                    style={{
-                      borderRadius: "var(--radius)",
-                      borderColor: p.active ? "#15803d" : "#9ca3af",
-                      color: p.active ? "#15803d" : "#6b7280",
-                    }}
-                  >
-                    {p.active ? "Aktiv" : "Deaktiviert"}
-                  </span>
-                </summary>
-                <div className="mt-4 flex flex-col gap-4 border-t pt-4">
-                  <ProductActiveToggle productId={p.id} active={p.active} />
-                  <ProductForm
-                    courses={courseOptions}
-                    product={{
-                      id: p.id,
-                      title: p.title,
-                      slug: p.slug,
-                      kind: p.kind as ProductKind,
-                      priceCents: p.price_cents,
-                      active: p.active,
-                      courseId: (p.course_ids ?? [])[0] ?? null,
-                    }}
-                  />
-                </div>
-              </details>
-            </li>
-          ))}
-        </ul>
-      </section>
+          {/* Bestellungen */}
+          <div className="overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
+            <div className="p-[24px_28px_16px]">
+              <div className="text-[17px] font-bold">Bestellungen</div>
+            </div>
+            <OrdersTable orders={orders} />
+          </div>
+        </div>
 
-      <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-medium">Bestellungen</h2>
-        <OrdersTable orders={orders} />
-      </section>
+        {/* Rechte Spalte: Neues Produkt */}
+        <div className="sticky top-4 self-start rounded-[14px] border bg-white p-[26px_28px]" style={{ borderColor: "#E7E8F2" }}>
+          <div className="mb-5 text-[17px] font-bold">Neues Produkt</div>
+          <ProductForm courses={courseOptions} />
+        </div>
+      </div>
     </div>
   );
 }

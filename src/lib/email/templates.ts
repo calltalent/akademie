@@ -202,6 +202,121 @@ export function tutorEscalation({
   return renderLayout({ tenantName, accentColor, heading: "Tutor-Frage weitergeleitet", bodyHtml });
 }
 
+/**
+ * "Passwort vergessen" (19.07.2026, Josips Auftrag: "alle E-Mails diesem
+ * Layout anpassen"). Vorher verschickte `supabase.auth.resetPasswordForEmail()`
+ * DIREKT Supabases eigene, unmarkierte Standard-Vorlage — dieselbe Lücke wie
+ * beim Magic-Link (siehe `magicLinkEmail()` unten). `auth/actions.ts` erzeugt
+ * den Link jetzt selbst über `admin.auth.admin.generateLink({type:"recovery"})`
+ * (genau wie `buildSetPasswordLink()` in `users/import.ts`) und verschickt ihn
+ * über diese Vorlage statt über Supabases eigenen Mailversand.
+ */
+export function passwordReset({
+  tenantName,
+  recipientName,
+  resetUrl,
+  accentColor,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  resetUrl: string;
+  accentColor?: string;
+}): string {
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName)}</p>
+    <p style="margin:0 0 16px 0;">für dein Konto bei <strong>${escapeHtml(tenantName)}</strong> wurde ein neues Passwort angefordert. Klicke auf den Button, um ein neues Passwort festzulegen.</p>
+    ${actionButton(resetUrl, "Neues Passwort festlegen", accentColor)}
+    <p style="margin:0;font-size:13px;color:#6b7280;">Dieser Link ist nur einmal gültig und läuft nach einiger Zeit ab. Falls du das nicht angefordert hast, kannst du diese E-Mail einfach ignorieren.</p>
+  `;
+  return renderLayout({ tenantName, accentColor, heading: "Passwort zurücksetzen", bodyHtml });
+}
+
+/**
+ * Magic-Link-Anmeldung (19.07.2026, gleicher Auftrag). Ersetzt Supabases
+ * eigene Magic-Link-Mail (`supabase.auth.signInWithOtp()`) durch denselben
+ * `admin.auth.admin.generateLink({type:"magiclink"})` + eigener Versand wie
+ * bei `passwordReset()` oben — aus Nutzersicht identischer Effekt (Link führt
+ * über `/auth/callback` zu einer angemeldeten Session), nur im gebrandeten
+ * Layout statt Supabases generischer Standardmail.
+ */
+export function magicLinkEmail({
+  tenantName,
+  recipientName,
+  loginUrl,
+  accentColor,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  loginUrl: string;
+  accentColor?: string;
+}): string {
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName)}</p>
+    <p style="margin:0 0 16px 0;">klicke auf den Button, um dich bei <strong>${escapeHtml(tenantName)}</strong> anzumelden.</p>
+    ${actionButton(loginUrl, "Anmelden", accentColor)}
+    <p style="margin:0;font-size:13px;color:#6b7280;">Dieser Link ist nur einmal gültig und läuft nach einiger Zeit ab. Falls du diese Anmeldung nicht angefordert hast, kannst du diese E-Mail einfach ignorieren.</p>
+  `;
+  return renderLayout({ tenantName, accentColor, heading: "Dein Login-Link", bodyHtml });
+}
+
+/**
+ * Kontaktformular-Benachrichtigung an office@calltalent.ai (19.07.2026,
+ * gleicher Auftrag — `contact/actions.ts` baute bisher rohes, unformatiertes
+ * HTML ohne die gemeinsame Kartenoptik). Kein Mandant im eigentlichen Sinn
+ * (interne Calltalent-eigene Benachrichtigung) — `tenantName` fest auf
+ * "Calltalent", damit Kopf-/Fußzeile trotzdem zum gemeinsamen Layout passen.
+ */
+export function contactFormNotification({
+  firstName,
+  lastName,
+  email,
+  subject,
+  message,
+}: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  subject: string;
+  message: string;
+}): string {
+  const bodyHtml = `
+    <p style="margin:0 0 12px 0;"><strong>Von:</strong> ${escapeHtml(firstName)} ${escapeHtml(lastName)} (${escapeHtml(email)})</p>
+    <p style="margin:0 0 12px 0;"><strong>Betreff:</strong> ${escapeHtml(subject)}</p>
+    <p style="margin:0;white-space:pre-wrap;">${escapeHtml(message)}</p>
+  `;
+  return renderLayout({ tenantName: "Calltalent", heading: "Neue Kontaktanfrage", bodyHtml });
+}
+
+/**
+ * Registrierungsbestätigung (19.07.2026, gleicher Auftrag wie `passwordReset()`/
+ * `magicLinkEmail()`). Ersetzt Supabases eigene "Confirm signup"-Mail
+ * (`supabase.auth.signUp()`), die bisher direkt verschickt wurde — mit
+ * Supabases generischer Standardvorlage statt unseres gebrandeten Layouts.
+ * `auth/actions.ts` legt das Konto jetzt über
+ * `admin.auth.admin.generateLink({type:"signup"})` an (verschickt dabei KEINE
+ * Mail, erzeugt aber denselben Bestätigungslink) und verschickt ihn über
+ * diese Vorlage.
+ */
+export function confirmSignup({
+  tenantName,
+  recipientName,
+  confirmUrl,
+  accentColor,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  confirmUrl: string;
+  accentColor?: string;
+}): string {
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName)}</p>
+    <p style="margin:0 0 16px 0;">bitte bestätige deine E-Mail-Adresse, um dein Konto bei <strong>${escapeHtml(tenantName)}</strong> zu aktivieren.</p>
+    ${actionButton(confirmUrl, "E-Mail-Adresse bestätigen", accentColor)}
+    <p style="margin:0;font-size:13px;color:#6b7280;">Dieser Link ist nur einmal gültig und läuft nach einiger Zeit ab. Falls du dieses Konto nicht angelegt hast, kannst du diese E-Mail einfach ignorieren.</p>
+  `;
+  return renderLayout({ tenantName, accentColor, heading: "Bestätige deine E-Mail-Adresse", bodyHtml });
+}
+
 export function orderPaid({
   tenantName,
   recipientName,

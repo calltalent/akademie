@@ -3,11 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { InviteUserDialog } from "@/components/admin/invite-user-dialog";
+import { TeilnehmerRowActions } from "@/components/admin/teilnehmer-row-actions";
 
 /**
  * Client-Teil der Teilnehmer-Verwaltung (Referenz AdminTeilnehmer.dc.html):
  * Suchfeld mit client-seitigem Live-Filter (Name/E-Mail) + Tabelle. Die Daten
  * kommen als `rows` echt aus page.tsx; „Profil" führt auf die Detailseite.
+ *
+ * Aktionsspalte (19.07.2026, Josips Auftrag: "Link erneut senden" +
+ * "Löschen"): verbreitert von 0.6fr auf 1.4fr, damit neben „Profil" auch die
+ * beiden Icon-Buttons aus `teilnehmer-row-actions.tsx` Platz haben.
  */
 export type TeilnehmerRow = {
   userId: string;
@@ -18,7 +23,7 @@ export type TeilnehmerRow = {
   initials: string;
 };
 
-const COLS = "2fr 1.4fr 1fr 1fr 0.6fr";
+const COLS = "2fr 1.4fr 1fr 1fr 1.4fr";
 
 export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
   const [q, setQ] = useState("");
@@ -111,13 +116,19 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
               <div className="text-sm" style={{ color: "#66679B" }}>
                 {r.joined}
               </div>
-              <div>
+              <div className="flex items-center justify-end gap-3">
                 <Link
                   href={`/admin/teilnehmer/${r.userId}`}
                   className="text-sm font-semibold no-underline"
                 >
                   Profil
                 </Link>
+                <TeilnehmerRowActions
+                  userId={r.userId}
+                  name={r.fullName ?? r.email}
+                  email={r.email}
+                  courseCount={r.courseCount}
+                />
               </div>
             </div>
           ))

@@ -108,7 +108,12 @@ export default async function TeilnehmerDetailPage({
 
         {membership.role !== "owner" && (
           <div className="mt-6 border-t pt-5" style={{ borderColor: "#EEF0F7" }}>
-            <MembershipRowActions userId={membership.user_id} status={membership.status} />
+            <MembershipRowActions
+              userId={membership.user_id}
+              status={membership.status}
+              name={fullName ?? email}
+              email={email}
+            />
           </div>
         )}
       </div>

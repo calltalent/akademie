@@ -4,7 +4,7 @@ import { contactFormSchema } from "@/lib/contact/schema";
 import type { ContactActionState } from "@/lib/contact/state";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { sendEmail } from "@/lib/email/client";
-import { escapeHtml } from "@/lib/email/templates";
+import { contactFormNotification } from "@/lib/email/templates";
 
 /**
  * Design-Block 4 (12.07.2026) — Server Action für /kontakt (Kontakt.dc.html).
@@ -41,16 +41,10 @@ export async function submitContactForm(
 
   const { firstName, lastName, email, subject, message } = parsed.data;
 
-  const bodyHtml = `
-    <p style="margin:0 0 12px 0;"><strong>Von:</strong> ${escapeHtml(firstName)} ${escapeHtml(lastName)} (${escapeHtml(email)})</p>
-    <p style="margin:0 0 12px 0;"><strong>Betreff:</strong> ${escapeHtml(subject)}</p>
-    <p style="margin:0;white-space:pre-wrap;">${escapeHtml(message)}</p>
-  `;
-
   const result = await sendEmail({
     to: "office@calltalent.ai",
     subject: `Kontaktformular: ${subject} — ${firstName} ${lastName}`,
-    html: `<!DOCTYPE html><html lang="de"><body style="font-family:Arial,Helvetica,sans-serif;color:#1A1A2E;">${bodyHtml}</body></html>`,
+    html: contactFormNotification({ firstName, lastName, email, subject, message }),
   });
 
   // sendEmail() ist FAIL-SOFT (siehe email/client.ts) und wirft nie — bei

@@ -24,17 +24,18 @@ export function ProductActiveToggle({ productId, active }: { productId: string; 
   }
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       <button
         type="button"
         onClick={toggle}
         disabled={pending}
-        className="self-start rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
+        className="self-start rounded-[9px] border px-3.5 py-2 text-sm font-semibold disabled:opacity-50"
+        style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
       >
         {active ? "Deaktivieren (im Shop verbergen)" : "Wieder aktivieren"}
       </button>
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm font-semibold" style={{ color: "#B24343" }}>
           {error}
         </p>
       )}

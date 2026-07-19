@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   certificateIssued,
+  confirmSignup,
+  contactFormNotification,
   escapeHtml,
+  magicLinkEmail,
   orderPaid,
+  passwordReset,
   submissionGraded,
   welcomeInvite,
 } from "./templates";
@@ -100,6 +104,108 @@ describe("certificateIssued", () => {
       courseTitle: "<script>alert(1)</script>",
     });
     expect(html).not.toContain("<script>alert(1)</script>");
+  });
+});
+
+describe("passwordReset", () => {
+  it("enthält Mandantennamen, Empfängernamen und Reset-Link", () => {
+    const html = passwordReset({
+      tenantName: "Demo Akademie",
+      recipientName: "Max Mustermann",
+      resetUrl: "https://demo-blau.akademie.calltalent.ai/auth/callback?next=/passwort-setzen",
+    });
+    expect(html).toContain("Demo Akademie");
+    expect(html).toContain("Max Mustermann");
+    expect(html).toContain("https://demo-blau.akademie.calltalent.ai/auth/callback?next=/passwort-setzen");
+    expect(html).toContain("Passwort zurücksetzen");
+  });
+
+  it("escaped einen bösartigen Empfängernamen statt ihn auszuführen", () => {
+    const html = passwordReset({
+      tenantName: "Demo Akademie",
+      recipientName: "<script>alert(1)</script>",
+      resetUrl: "https://demo-blau.akademie.calltalent.ai/auth/callback",
+    });
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+});
+
+describe("magicLinkEmail", () => {
+  it("enthält Mandantennamen, Empfängernamen und Login-Link", () => {
+    const html = magicLinkEmail({
+      tenantName: "Demo Akademie",
+      recipientName: "Max Mustermann",
+      loginUrl: "https://demo-blau.akademie.calltalent.ai/auth/callback",
+    });
+    expect(html).toContain("Demo Akademie");
+    expect(html).toContain("Max Mustermann");
+    expect(html).toContain("https://demo-blau.akademie.calltalent.ai/auth/callback");
+    expect(html).toContain("Dein Login-Link");
+  });
+
+  it("escaped einen bösartigen Empfängernamen statt ihn auszuführen", () => {
+    const html = magicLinkEmail({
+      tenantName: "Demo Akademie",
+      recipientName: "<script>alert(1)</script>",
+      loginUrl: "https://demo-blau.akademie.calltalent.ai/auth/callback",
+    });
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+});
+
+describe("confirmSignup", () => {
+  it("enthält Mandantennamen, Empfängernamen und Bestätigungslink", () => {
+    const html = confirmSignup({
+      tenantName: "Demo Akademie",
+      recipientName: "Max Mustermann",
+      confirmUrl: "https://demo-blau.akademie.calltalent.ai/auth/callback",
+    });
+    expect(html).toContain("Demo Akademie");
+    expect(html).toContain("Max Mustermann");
+    expect(html).toContain("https://demo-blau.akademie.calltalent.ai/auth/callback");
+    expect(html).toContain("Bestätige deine E-Mail-Adresse");
+  });
+
+  it("escaped einen bösartigen Empfängernamen statt ihn auszuführen", () => {
+    const html = confirmSignup({
+      tenantName: "Demo Akademie",
+      recipientName: "<script>alert(1)</script>",
+      confirmUrl: "https://demo-blau.akademie.calltalent.ai/auth/callback",
+    });
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+});
+
+describe("contactFormNotification", () => {
+  it("enthält Absenderdaten, Betreff und Nachricht", () => {
+    const html = contactFormNotification({
+      firstName: "Max",
+      lastName: "Mustermann",
+      email: "max@example.com",
+      subject: "Frage zum Angebot",
+      message: "Wie viel kostet der Enterprise-Plan?",
+    });
+    expect(html).toContain("Max");
+    expect(html).toContain("Mustermann");
+    expect(html).toContain("max@example.com");
+    expect(html).toContain("Frage zum Angebot");
+    expect(html).toContain("Wie viel kostet der Enterprise-Plan?");
+    expect(html).toContain("Calltalent");
+  });
+
+  it("escaped eine bösartige Nachricht statt sie auszuführen", () => {
+    const html = contactFormNotification({
+      firstName: "Max",
+      lastName: "Mustermann",
+      email: "max@example.com",
+      subject: "Betreff",
+      message: "<img src=x onerror=alert(1)>",
+    });
+    expect(html).not.toContain("<img src=x onerror=alert(1)>");
+    expect(html).toContain("&lt;img");
   });
 });
 
