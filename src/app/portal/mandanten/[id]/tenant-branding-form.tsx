@@ -14,6 +14,13 @@ const initialState: PlatformActionState = { error: null };
  * Speichern (Vorschau reagiert sofort, wie im Export per Client-State),
  * „Zurücksetzen" wirft nur den lokalen State auf den zuletzt gespeicherten
  * Stand zurück (kein Server-Roundtrip nötig).
+ *
+ * Design-Update (19.07.2026, Claude-Design-Import MandantenDetail.dc.html):
+ * dunkles Karten-Layout im neuen Muster übernommen. Die Live-Vorschau bleibt
+ * bewusst die BESTEHENDE, reichhaltigere Kurskarten-Simulation (Fortschritts-
+ * balken + „Fortsetzen"-Button) statt auf das einfache Radius-Rechteck des
+ * frischen Exports zurückzufallen — realistischer für das, was ein Mandant
+ * tatsächlich in seiner eigenen Oberfläche sieht.
  */
 export function TenantBrandingForm({
   tenantId,
@@ -33,12 +40,25 @@ export function TenantBrandingForm({
   const initials = tenantName.trim().slice(0, 1).toUpperCase() || "?";
 
   return (
-    <form action={formAction} className="flex flex-col gap-5 rounded-md border border-slate-800 p-4">
+    <form
+      action={formAction}
+      className="flex flex-col gap-5 rounded-[14px] border p-7"
+      style={{ borderColor: "#1e293b", background: "#0f172a" }}
+    >
       <input type="hidden" name="colorPrimary" value={colorPrimary} />
       <input type="hidden" name="radius" value={radius} />
 
       <div>
-        <div className="mb-2.5 text-sm font-medium">Akzentfarbe · --color-primary</div>
+        <div className="text-[17px] font-bold text-slate-50">Branding &amp; Theming</div>
+        <div className="mt-1 text-[13px]" style={{ color: "#64748B" }}>
+          Akzentfarbe &amp; Radius der hellen Mandanten-Oberfläche (nicht dieses Portals).
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-2.5 text-[13px] font-semibold" style={{ color: "#94A3B8" }}>
+          Akzentfarbe
+        </div>
         <div className="flex gap-2.5">
           {TENANT_ACCENT_SWATCHES.map((hex) => (
             <button
@@ -58,10 +78,10 @@ export function TenantBrandingForm({
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium">Eckenradius · --radius</span>
-          <span className="text-sm font-semibold" style={{ color: "var(--color-primary)" }}>
-            {radius}px
+          <span className="text-[13px] font-semibold" style={{ color: "#94A3B8" }}>
+            Eckenradius
           </span>
+          <span className="text-[13px] font-bold text-slate-50">{radius}px</span>
         </div>
         <input
           type="range"
@@ -75,7 +95,9 @@ export function TenantBrandingForm({
       </div>
 
       <div>
-        <div className="mb-2.5 text-sm text-slate-400">Live-Vorschau</div>
+        <div className="mb-2.5 text-xs" style={{ color: "#64748B" }}>
+          Live-Vorschau
+        </div>
         <div className="overflow-hidden rounded-md border border-slate-800">
           <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: colorPrimary }}>
             <span
@@ -118,7 +140,7 @@ export function TenantBrandingForm({
         <button
           type="submit"
           disabled={pending}
-          className="flex-1 rounded-md px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          className="rounded-[10px] px-[18px] py-2.5 text-sm font-bold text-white disabled:opacity-50"
           style={{ background: "var(--color-primary)" }}
         >
           {pending ? "Speichert …" : "Speichern"}
@@ -129,7 +151,8 @@ export function TenantBrandingForm({
             setColorPrimary(initial.colorPrimary);
             setRadius(initial.radius);
           }}
-          className="rounded-md border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-300"
+          className="rounded-[10px] border px-[18px] py-2.5 text-sm font-semibold"
+          style={{ borderColor: "#1e293b", color: "#CBD5E1" }}
         >
           Zurücksetzen
         </button>

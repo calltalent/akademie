@@ -16,6 +16,12 @@ type TenantDomain = { id: string; domain: string };
  * wie components/admin/membership-row-actions.tsx) + ein Formular zum
  * Hinzufügen (useActionState-Muster wie MandantEditForm, wegen Validierungs-
  * Rückmeldung).
+ *
+ * Design-Update (19.07.2026, Claude-Design-Import MandantenDetail.dc.html):
+ * dunkles Karten-Layout, eigenständige Karte (nicht mehr in derselben
+ * Bearbeiten-Karte wie MandantEditForm) sowie ein Icon-Button (X) statt des
+ * Text-Links „Entfernen" je Zeile — `aria-label` ergänzt, da der Button
+ * jetzt kein sichtbares Label mehr trägt.
  */
 export function TenantDomainsSection({
   tenantId,
@@ -37,49 +43,57 @@ export function TenantDomainsSection({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-slate-800 p-4">
-      <h3 className="text-sm font-medium">Zusätzliche Domains</h3>
-      <p className="text-xs text-slate-500">
+    <div className="flex flex-col gap-[18px] rounded-[14px] border p-7" style={{ borderColor: "#1e293b", background: "#0f172a" }}>
+      <div className="text-[17px] font-bold text-slate-50">Zusätzliche Domains</div>
+      <p className="-mt-2.5 text-[13px]" style={{ color: "#64748B" }}>
         Weitere Domains, die auf denselben Mandanten zeigen sollen (z. B. eine zweite
         Marketing-Domain). Die primäre Domain oben bleibt davon unberührt.
       </p>
 
       {domains.length > 0 && (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {domains.map((d) => (
             <li
               key={d.id}
-              className="flex items-center justify-between gap-3 rounded-md border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm"
+              className="flex items-center justify-between gap-3 border-b py-2.5 text-sm"
+              style={{ borderColor: "#1e293b" }}
             >
-              <span>{d.domain}</span>
+              <span style={{ color: "#CBD5E1" }}>{d.domain}</span>
               <button
                 type="button"
                 onClick={() => handleRemove(d.id)}
                 disabled={removing}
-                className="text-red-300 underline-offset-2 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+                aria-label={`Domain ${d.domain} entfernen`}
+                className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border-none disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+                style={{ background: "#1e293b" }}
               >
-                Entfernen
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18"></path>
+                  <path d="M6 6l12 12"></path>
+                </svg>
               </button>
             </li>
           ))}
         </ul>
       )}
 
-      <form action={formAction} className="flex items-end gap-2">
-        <label className="flex flex-1 flex-col gap-1 text-sm" htmlFor="new-domain">
+      <form action={formAction} className="flex items-end gap-2.5">
+        <label className="flex flex-1 flex-col gap-1.5 text-[13px] font-semibold" htmlFor="new-domain" style={{ color: "#94A3B8" }}>
           Domain hinzufügen
           <input
             id="new-domain"
             name="domain"
             type="text"
-            placeholder="zweite-domain.beispiel.de"
-            className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-base text-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+            placeholder="weitere-domain.de"
+            className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+            style={{ borderColor: "#1e293b", background: "#020617", color: "#F8FAFC" }}
           />
         </label>
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md border border-slate-700 px-4 py-2 text-sm font-medium text-slate-50 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+          className="rounded-[10px] border px-4 py-2.5 text-sm font-semibold disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+          style={{ borderColor: "#1e293b", color: "#CBD5E1" }}
         >
           {pending ? "Speichert …" : "Hinzufügen"}
         </button>

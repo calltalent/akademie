@@ -57,9 +57,15 @@ const VARIANT_STYLES: Record<
     hoverBg: "rgba(0,0,0,0.03)",
   },
   dark: {
-    idle: "#cbd5e1", // slate-300
-    activeText: "#c7cdf0", // heller Periwinkle-Ton, lesbar auf dunklem Grund
-    activeBg: "rgba(86,99,174,0.22)", // Periwinkle bei ~22% Deckkraft
+    // Design-Update (19.07.2026, Claude-Design-Import PortalSidebar.dc.html):
+    // volle Periwinkle-Füllung statt der bisherigen 22%-Transparenz + linkem
+    // Rahmen — gleiche Pillen-Optik wie `indigo`/`white`/`admin`, damit alle
+    // Bereiche am aktiven Zustand konsistent wirken. Nur der Idle-Textton
+    // (`#94A3B8`, Slate-400) unterscheidet weiterhin vom helleren Slate-300
+    // der Vorgängerversion — passend zum dunkleren Portal-Seitenhintergrund.
+    idle: "#94A3B8", // slate-400
+    activeText: "#F8FAFC", // slate-50
+    activeBg: "#5663AE",
     hoverBg: "rgba(255,255,255,0.04)",
   },
   indigo: {
@@ -113,7 +119,7 @@ export function NavLink({
       className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors${collapsed ? " justify-center" : ""}`}
       style={
         active
-          ? variant === "indigo" || variant === "white" || variant === "admin"
+          ? variant === "indigo" || variant === "white" || variant === "admin" || variant === "dark"
             ? { background: styles.activeBg, color: styles.activeText, fontWeight: 500 }
             : {
                 background: styles.activeBg,

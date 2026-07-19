@@ -8,11 +8,18 @@
  * Export, siehe nav-link.tsx-Kommentar): eigener Rendering-Zweig mit
  * quadratischer "C"-Logomarke (Periwinkle-Kachel) links neben der
  * Wortmarke — im Export vorhanden, in den bisherigen Varianten fehlte die
- * Logomarke ganz. Bewusst nur für `white` ergänzt, damit light/dark/indigo
- * (admin-shell.tsx, portal-shell.tsx) optisch unverändert bleiben — reine
- * Design-Aufgabe für das Studenten-Portal, keine Änderung an Admin/Portal.
+ * Logomarke ganz. Bewusst nur für `white` ergänzt, damit light/indigo
+ * (admin-shell.tsx) optisch unverändert bleiben — reine Design-Aufgabe für
+ * das Studenten-Portal, keine Änderung an Admin/Portal.
  * `expanded=false` blendet nur den Text aus, die Logomarke bleibt sichtbar
  * (Wiedererkennung auch in der eingeklappten Sidebar).
+ *
+ * `dark` NEU (19.07.2026, Claude-Design-Import PortalSidebar.dc.html): die
+ * Logomarke jetzt auch fürs Betreiber-Portal — der frische Export zeigt sie
+ * dort ausdrücklich, anders als beim ursprünglichen 12.07.-Export. Nutzt
+ * denselben Rendering-Zweig wie `white`/`admin` (identische Kachel-Optik,
+ * nur der Wortmarken-/Sublabel-Farbwert unterscheidet sich weiterhin über
+ * `WORDMARK_COLOR`/`SUBLABEL_COLOR`).
  */
 type Variant = "light" | "dark" | "indigo" | "white" | "admin";
 
@@ -41,7 +48,7 @@ export function BrandLogo({
   variant?: Variant;
   expanded?: boolean;
 }) {
-  if (variant === "white" || variant === "admin") {
+  if (variant === "white" || variant === "admin" || variant === "dark") {
     return (
       <div className="mb-6 flex items-center gap-3 px-2">
         <span

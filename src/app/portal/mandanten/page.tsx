@@ -7,6 +7,7 @@ import {
   type TenantStatus,
 } from "@/lib/platform/schema";
 import { translateDbError } from "@/lib/errors/db";
+import { tenantOrigin } from "@/lib/tenant/url";
 
 /**
  * Mandantenliste (Betreiber-Portal, Phase 4 Block 2). Server Component,
@@ -15,26 +16,30 @@ import { translateDbError } from "@/lib/errors/db";
  * Platform-Admins sind keine. Das Layout (`portal/layout.tsx`) hat die
  * Platform-Admin-Zugriffsprüfung bereits vorher durchgeführt.
  *
- * Design-Block 6 (13.07.2026, Mandanten.dc.html): Kartenliste mit Avatar/
- * Teilnehmerzahl/Status-Badge statt der bisherigen schlichten Zeilenliste —
- * ABSICHTLICH weiterhin im dunklen Portal-Farbschema (Slate/`--color-primary`)
- * statt der hellen Export-Farben (`#F4F5FA`/weiße Karten): Design-Block 2
- * hat das dunkle Schema fürs Betreiber-Portal bewusst als Verwechslungsschutz
- * festgelegt ("darf nie wie eine normale Mandanten-Oberfläche aussehen",
- * siehe portal-shell.tsx-Kommentar) — dieser Export widerspricht dem, ohne
- * dass Josip die frühere Entscheidung revidiert hätte. Übernommen wird daher
- * nur die STRUKTUR (Avatar+Name+Domain, Teilnehmerzahl-Spalte, Status-Badge),
- * nicht die Farben.
+ * Design-Update (19.07.2026, Claude-Design-Import Mandanten.dc.html —
+ * zweiter Anlauf desselben Masterprompts, DESIGN-MASTERPROMPT-PORTAL-
+ * MANDANTEN.md): dieses Mal korrekt im dunklen Portal-Schema geliefert
+ * (der erste Export vom 13.07. nutzte fälschlich das helle Kunden-Schema,
+ * siehe Git-Historie dieser Datei) — deshalb jetzt direkt übernommen,
+ * inklusive Paket- und Angelegt-Spalte, die vorher fehlten.
  *
  * „Teilnehmer" = echte aktive Mitgliederzahl je Mandant (`memberships`,
- * `status='active'`), NICHT die im Export erfundenen Werte ("1.284", "212" …).
+ * `status='active'`), NICHT die im Export erfundenen Demo-Werte.
+ *
+ * Domain-Anzeige nutzt jetzt `tenantOrigin()` (lib/tenant/url.ts) statt der
+ * bisherigen fest verdrahteten `.localhost:3000`-Annahme — in Produktion
+ * war das schlicht falsch (zeigte nie die echte `.calltalent.ai`-Domain).
  */
 
-const STATUS_BADGE_CLASSES: Record<TenantStatus, string> = {
-  active: "bg-green-950 text-green-300",
-  trial: "bg-amber-950 text-amber-300",
-  suspended: "bg-red-950 text-red-300",
+const STATUS_BADGE_STYLE: Record<TenantStatus, { color: string; background: string }> = {
+  active: { color: "#4ADE80", background: "rgba(74,222,128,.12)" },
+  trial: { color: "#FBBF24", background: "rgba(251,191,36,.12)" },
+  suspended: { color: "#F87171", background: "rgba(248,113,113,.12)" },
 };
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
 
 export default async function MandantenPage() {
   const admin = createAdminClient();
@@ -55,15 +60,23 @@ export default async function MandantenPage() {
     <main className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Plattform · Mandanten</p>
-          <h1 className="text-2xl font-semibold text-slate-50">Mandanten</h1>
+          <p className="text-[13px] font-semibold" style={{ color: "#64748B" }}>
+            Portal · Mandanten
+          </p>
+          <h1 className="mt-0.5 text-[26px] font-extrabold text-slate-50" style={{ letterSpacing: "-0.01em" }}>
+            Mandanten
+          </h1>
         </div>
         <Link
           href="/portal/mandanten/neu"
-          className="w-fit rounded-md px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+          className="inline-flex w-fit items-center gap-2 rounded-[11px] px-[18px] py-3 text-[15px] font-bold text-white focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
           style={{ background: "var(--color-primary)" }}
         >
-          + Mandant anlegen
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+          </svg>
+          Neuer Mandant
         </Link>
       </div>
 
@@ -74,27 +87,42 @@ export default async function MandantenPage() {
       )}
 
       {!error && (tenants ?? []).length === 0 && (
-        <p className="text-base text-slate-300">Noch keine Mandanten angelegt.</p>
+        <div className="rounded-[14px] border p-14 text-center" style={{ borderColor: "#1e293b", background: "#0f172a", color: "#64748B" }}>
+          <div className="mb-1.5 text-base font-bold" style={{ color: "#CBD5E1" }}>
+            Noch keine Mandanten
+          </div>
+          <div className="text-sm">Lege den ersten Mandanten an, um loszulegen.</div>
+        </div>
       )}
 
       {!error && (tenants ?? []).length > 0 && (
-        <div className="overflow-hidden rounded-md border border-slate-800">
-          <div className="grid grid-cols-[2fr_1fr_1fr] gap-0 border-b border-slate-800 px-5 py-3 text-xs font-semibold text-slate-500">
+        <div className="overflow-hidden rounded-[14px] border" style={{ borderColor: "#1e293b", background: "#0f172a" }}>
+          <div
+            className="grid gap-0 px-6 pb-3 pt-[18px] text-[13px] font-bold"
+            style={{ gridTemplateColumns: "2.2fr 1fr 1fr 0.9fr 1fr", color: "#64748B", borderBottom: "1px solid #1e293b" }}
+          >
             <div>Mandant</div>
+            <div>Paket</div>
             <div>Teilnehmer</div>
             <div>Status</div>
+            <div>Angelegt</div>
           </div>
           <ul className="flex flex-col">
             {(tenants ?? []).map((tenant) => {
               const branding = (tenant.branding ?? {}) as { color_primary?: string };
               const accent = branding.color_primary || "#5663AE";
               const initial = tenant.name.trim().slice(0, 1).toUpperCase() || "?";
-              const domain = tenant.custom_domain || `${tenant.slug}.localhost:3000`;
+              const domain = tenantOrigin(tenant).replace(/^https?:\/\//, "");
+              const status = STATUS_BADGE_STYLE[tenant.status as TenantStatus] ?? {
+                color: "#CBD5E1",
+                background: "#1e293b",
+              };
               return (
-                <li key={tenant.id} className="border-b border-slate-900 last:border-b-0">
+                <li key={tenant.id} className="border-b last:border-b-0" style={{ borderColor: "#1e293b" }}>
                   <Link
                     href={`/portal/mandanten/${tenant.id}`}
-                    className="grid grid-cols-[2fr_1fr_1fr] items-center gap-0 px-5 py-3.5 text-base hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+                    className="grid items-center gap-0 px-6 py-4 text-base hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+                    style={{ gridTemplateColumns: "2.2fr 1fr 1fr 0.9fr 1fr" }}
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <span
@@ -106,20 +134,30 @@ export default async function MandantenPage() {
                       </span>
                       <div className="min-w-0">
                         <div className="truncate font-semibold text-slate-50">{tenant.name}</div>
-                        <div className="truncate text-xs text-slate-500">
-                          {domain} · {TENANT_PLAN_LABELS[tenant.plan as TenantPlan] ?? tenant.plan}
+                        <div className="truncate text-xs" style={{ color: "#64748B" }}>
+                          {domain}
                         </div>
                       </div>
+                    </div>
+                    <div>
+                      <span
+                        className="inline-flex rounded-lg px-3 py-1 text-xs font-bold"
+                        style={{ color: "#CBD5E1", background: "#1e293b" }}
+                      >
+                        {TENANT_PLAN_LABELS[tenant.plan as TenantPlan] ?? tenant.plan}
+                      </span>
                     </div>
                     <div className="text-slate-300">{memberCountByTenant.get(tenant.id) ?? 0}</div>
                     <div>
                       <span
-                        className={`inline-flex rounded-lg px-3 py-1 text-xs font-bold ${
-                          STATUS_BADGE_CLASSES[tenant.status as TenantStatus] ?? "bg-slate-800 text-slate-300"
-                        }`}
+                        className="inline-flex rounded-lg px-3 py-1 text-xs font-bold"
+                        style={{ color: status.color, background: status.background }}
                       >
                         {TENANT_STATUS_LABELS[tenant.status as TenantStatus] ?? tenant.status}
                       </span>
+                    </div>
+                    <div className="text-sm" style={{ color: "#64748B" }}>
+                      {formatDate(tenant.created_at)}
                     </div>
                   </Link>
                 </li>

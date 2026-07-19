@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   TENANT_PLAN_LABELS,
@@ -6,6 +7,7 @@ import {
   type TenantPlan,
   type TenantStatus,
 } from "@/lib/platform/schema";
+import { tenantOrigin } from "@/lib/tenant/url";
 import { MandantEditForm } from "./mandant-edit-form";
 import { MandantDeleteForm } from "./mandant-delete-form";
 import { TenantDomainsSection } from "./tenant-domains-section";
@@ -19,6 +21,17 @@ import { TENANT_ACCENT_SWATCHES } from "@/lib/platform/schema";
  * Aggregation in JS, keine neue SQL-Funktion, wie im architect-Plan
  * festgelegt). Alles ausschließlich über den Admin-Client (service_role),
  * exakt wie bereits in `mandanten/page.tsx` begründet.
+ *
+ * Design-Update (19.07.2026, Claude-Design-Import MandantenDetail.dc.html,
+ * DESIGN-MASTERPROMPT-PORTAL-MANDANTEN.md): Kopfbereich jetzt mit Breadcrumb
+ * "Mandanten / {Name}", Avatar-Kachel, Status-/Paket-Badge im Header statt
+ * im Fließtext. Jede Sektion (Bearbeiten, Domains, Branding, Gefahrenzone)
+ * trägt ihren Titel jetzt SELBST als Karten-Überschrift (siehe die jeweilige
+ * Komponente) — die bisherigen Seiten-`<h2>`-Wrapper entfallen, da sie sonst
+ * doppelt betitelt wären. Domain-Anzeige nutzt `tenantOrigin()` statt der
+ * bisherigen `.localhost:3000`-Annahme (siehe mandanten/page.tsx-Kommentar).
+ * Der DSGVO-Export-Link (Art. 28) ist im Export nicht abgebildet, bleibt
+ * aber erhalten — echte, bestehende Funktion, kein Mockup-Artefakt.
  */
 
 const AI_JOB_KIND_LABELS: Record<string, string> = {
@@ -127,115 +140,155 @@ export default async function MandantDetailPage({
   ]);
 
   const jobs = aiJobs ?? [];
-  const totalCost = jobs.reduce((sum, job) => sum + Number(job.cost_usd ?? 0), 0);
   const costByKind = new Map<string, number>();
   for (const job of jobs) {
     const current = costByKind.get(job.kind) ?? 0;
     costByKind.set(job.kind, current + Number(job.cost_usd ?? 0));
   }
+  const initial = tenant.name.trim().slice(0, 1).toUpperCase() || "?";
+  const domain = tenant.custom_domain || tenantOrigin(tenant).replace(/^https?:\/\//, "");
+  const statusStyle: Record<TenantStatus, { color: string; background: string }> = {
+    active: { color: "#4ADE80", background: "rgba(74,222,128,.12)" },
+    trial: { color: "#FBBF24", background: "rgba(251,191,36,.12)" },
+    suspended: { color: "#F87171", background: "rgba(248,113,113,.12)" },
+  };
+  const badge = statusStyle[tenant.status as TenantStatus] ?? { color: "#CBD5E1", background: "#1e293b" };
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">{tenant.name}</h1>
-        <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-          <a
-            href={`http://${tenant.slug}.localhost:3000`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+    <main className="flex flex-col gap-6" style={{ maxWidth: 920 }}>
+      <header>
+        <div>
+          <Link href="/portal/mandanten" className="text-[13px] font-semibold no-underline" style={{ color: "#64748B" }}>
+            Mandanten
+          </Link>
+          <span className="text-[13px] font-semibold" style={{ color: "#64748B" }}>
+            {" "}
+            / {tenant.name}
+          </span>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-3.5">
+          <span
+            aria-hidden="true"
+            className="flex h-11 w-11 flex-none items-center justify-center rounded-xl text-lg font-extrabold text-white"
+            style={{ background: "#5663AE" }}
           >
-            {tenant.slug}.localhost:3000
-          </a>
-          {tenant.custom_domain && <span>· {tenant.custom_domain}</span>}
-          <span>
-            {TENANT_PLAN_LABELS[tenant.plan as TenantPlan] ?? tenant.plan} ·{" "}
+            {initial}
+          </span>
+          <div>
+            <h1 className="text-2xl font-extrabold text-slate-50" style={{ letterSpacing: "-0.01em" }}>
+              {tenant.name}
+            </h1>
+            <div className="mt-0.5 text-[13px]" style={{ color: "#64748B" }}>
+              {domain}
+            </div>
+          </div>
+          <span className="inline-flex rounded-lg px-3 py-1 text-xs font-bold" style={{ color: badge.color, background: badge.background }}>
             {TENANT_STATUS_LABELS[tenant.status as TenantStatus] ?? tenant.status}
           </span>
-          <span className="text-slate-500">Erstellt am {formatDateTime(tenant.created_at)}</span>
+          <span className="inline-flex rounded-lg px-3 py-1 text-xs font-bold" style={{ color: "#CBD5E1", background: "#1e293b" }}>
+            {TENANT_PLAN_LABELS[tenant.plan as TenantPlan] ?? tenant.plan}
+          </span>
+          <div className="flex-1" />
+          <div className="text-[13px]" style={{ color: "#64748B" }}>
+            Angelegt am {formatDateTime(tenant.created_at)}
+          </div>
         </div>
         <a
           href={`/portal/mandanten/${tenant.id}/export`}
-          className="w-fit text-sm underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+          className="mt-2 inline-block w-fit text-sm underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+          style={{ color: "#94A3B8" }}
         >
           Mandanten-Daten exportieren (DSGVO, Art. 28)
         </a>
-      </div>
+      </header>
 
-      <section aria-labelledby="edit-heading" className="flex flex-col gap-3">
-        <h2 id="edit-heading" className="text-lg font-medium">
-          Bearbeiten
-        </h2>
-        <MandantEditForm
-          tenant={{
-            id: tenant.id,
-            name: tenant.name,
-            plan: tenant.plan as TenantPlan,
-            status: tenant.status as TenantStatus,
-            customDomain: tenant.custom_domain,
-          }}
-        />
-        <TenantDomainsSection tenantId={tenant.id} domains={tenantDomains ?? []} />
-      </section>
+      <MandantEditForm
+        tenant={{
+          id: tenant.id,
+          name: tenant.name,
+          plan: tenant.plan as TenantPlan,
+          status: tenant.status as TenantStatus,
+          customDomain: tenant.custom_domain,
+        }}
+      />
+      <TenantDomainsSection tenantId={tenant.id} domains={tenantDomains ?? []} />
+      <TenantBrandingForm tenantId={tenant.id} tenantName={tenant.name} initial={brandingInitial} />
 
-      <section aria-labelledby="branding-heading" className="flex flex-col gap-3">
-        <h2 id="branding-heading" className="text-lg font-medium">
-          Branding &amp; Theming
-        </h2>
-        <TenantBrandingForm tenantId={tenant.id} tenantName={tenant.name} initial={brandingInitial} />
-      </section>
-
-      <section aria-labelledby="usage-heading" className="flex flex-col gap-4">
-        <h2 id="usage-heading" className="text-lg font-medium">
+      <section aria-labelledby="usage-heading" className="flex flex-col gap-[26px] rounded-[14px] border p-7" style={{ borderColor: "#1e293b", background: "#0f172a" }}>
+        <h2 id="usage-heading" className="text-[17px] font-bold text-slate-50">
           Nutzungsübersicht
         </h2>
 
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-md border border-slate-800 p-4">
-            <dt className="text-sm text-slate-400">Mitglieder</dt>
-            <dd className="text-2xl font-semibold">{memberCount ?? 0}</dd>
+          <div className="flex flex-col rounded-xl border p-[18px]" style={{ borderColor: "#1e293b", background: "#020617" }}>
+            <dt className="text-xs font-semibold" style={{ color: "#64748B" }}>
+              Aktive Teilnehmer
+            </dt>
+            <dd className="mt-auto pt-2.5 text-[28px] font-extrabold text-slate-50" style={{ letterSpacing: "-0.01em" }}>
+              {memberCount ?? 0}
+            </dd>
           </div>
-          <div className="rounded-md border border-slate-800 p-4">
-            <dt className="text-sm text-slate-400">Kurse</dt>
-            <dd className="text-2xl font-semibold">{courseCount ?? 0}</dd>
+          <div className="flex flex-col rounded-xl border p-[18px]" style={{ borderColor: "#1e293b", background: "#020617" }}>
+            <dt className="text-xs font-semibold" style={{ color: "#64748B" }}>
+              Kurse gesamt
+            </dt>
+            <dd className="mt-auto pt-2.5 text-[28px] font-extrabold text-slate-50" style={{ letterSpacing: "-0.01em" }}>
+              {courseCount ?? 0}
+            </dd>
           </div>
-          <div className="rounded-md border border-slate-800 p-4">
-            <dt className="text-sm text-slate-400">Tutor-Antworten (Monat)</dt>
-            <dd className="text-2xl font-semibold">{usageRow?.tutor_answers ?? 0}</dd>
+          <div className="flex flex-col rounded-xl border p-[18px]" style={{ borderColor: "#1e293b", background: "#020617" }}>
+            <dt className="text-xs font-semibold leading-tight" style={{ color: "#64748B" }}>
+              Tutor-Antworten (Monat)
+            </dt>
+            <dd className="mt-auto pt-2.5 text-[28px] font-extrabold text-slate-50" style={{ letterSpacing: "-0.01em" }}>
+              {usageRow?.tutor_answers ?? 0}
+            </dd>
           </div>
-          <div className="rounded-md border border-slate-800 p-4">
-            <dt className="text-sm text-slate-400">Kurs-Generierungen (Monat)</dt>
-            <dd className="text-2xl font-semibold">{usageRow?.course_gens ?? 0}</dd>
+          <div className="flex flex-col rounded-xl border p-[18px]" style={{ borderColor: "#1e293b", background: "#020617" }}>
+            <dt className="text-xs font-semibold leading-tight" style={{ color: "#64748B" }}>
+              Kurs-Generierungen (Monat)
+            </dt>
+            <dd className="mt-auto pt-2.5 text-[28px] font-extrabold text-slate-50" style={{ letterSpacing: "-0.01em" }}>
+              {usageRow?.course_gens ?? 0}
+            </dd>
           </div>
         </dl>
 
-        <div className="rounded-md border border-slate-800 p-4">
-          <h3 className="text-base font-medium">KI-Kosten (letzte 90 Tage)</h3>
-          <p className="mt-1 text-2xl font-semibold">{formatUsd(totalCost)}</p>
-
-          {costByKind.size === 0 ? (
-            <p className="mt-2 text-sm text-slate-400">Keine KI-Aufrufe im Zeitraum.</p>
-          ) : (
-            <ul className="mt-3 flex flex-col gap-1">
-              {Array.from(costByKind.entries())
+        <div>
+          <div className="mb-3 text-sm font-bold" style={{ color: "#CBD5E1" }}>
+            KI-Kosten letzte 90 Tage
+          </div>
+          <div className="overflow-hidden rounded-xl border" style={{ borderColor: "#1e293b" }}>
+            <div
+              className="grid grid-cols-2 px-[18px] py-3 text-[13px] font-bold"
+              style={{ color: "#64748B", borderBottom: "1px solid #1e293b" }}
+            >
+              <div>Art</div>
+              <div className="text-right">Kosten (USD)</div>
+            </div>
+            {costByKind.size === 0 ? (
+              <p className="px-[18px] py-4 text-sm" style={{ color: "#64748B" }}>
+                Keine KI-Aufrufe im Zeitraum.
+              </p>
+            ) : (
+              Array.from(costByKind.entries())
                 .sort((a, b) => b[1] - a[1])
                 .map(([kind, cost]) => (
-                  <li key={kind} className="flex items-center justify-between text-sm">
-                    <span className="text-slate-300">{AI_JOB_KIND_LABELS[kind] ?? kind}</span>
-                    <span className="text-slate-50">{formatUsd(cost)}</span>
-                  </li>
-                ))}
-            </ul>
-          )}
+                  <div
+                    key={kind}
+                    className="grid grid-cols-2 px-[18px] py-2.5 text-sm"
+                    style={{ borderBottom: "1px solid #1e293b", color: "#CBD5E1" }}
+                  >
+                    <div>{AI_JOB_KIND_LABELS[kind] ?? kind}</div>
+                    <div className="text-right font-bold text-slate-50">{formatUsd(cost)}</div>
+                  </div>
+                ))
+            )}
+          </div>
         </div>
       </section>
 
-      <section aria-labelledby="delete-heading" className="flex flex-col gap-3">
-        <h2 id="delete-heading" className="text-lg font-medium text-red-300">
-          Gefahrenzone
-        </h2>
-        <MandantDeleteForm tenantId={tenant.id} slug={tenant.slug} />
-      </section>
+      <MandantDeleteForm tenantId={tenant.id} slug={tenant.slug} />
     </main>
   );
 }

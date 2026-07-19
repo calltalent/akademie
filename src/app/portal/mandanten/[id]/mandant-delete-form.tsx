@@ -25,20 +25,31 @@ const initialState: PlatformActionState = { error: null };
  * tritt praktisch nie ein (bei Erfolg leitet die Server Action um, bevor
  * ein Rückgabewert beim Client ankommt); es bleibt nur noch der
  * Fehler-Zweig zu behandeln.
+ *
+ * Design-Update (19.07.2026, Claude-Design-Import MandantenDetail.dc.html,
+ * „Gefahrenzone"): dunkles Karten-Layout mit rotem Rahmen statt Slate
+ * übernommen. BEWUSST NICHT übernommen: die Bestätigung per Mandantenname
+ * aus dem Export — Bestätigung per SUBDOMAIN bleibt bestehen (eindeutiger,
+ * technischer Bezeichner statt eines potenziell mehrdeutigen Anzeigenamens;
+ * bereits vor diesem Redesign so entschieden, siehe Kommentar oben).
  */
 export function MandantDeleteForm({ tenantId, slug }: { tenantId: string; slug: string }) {
   const boundDelete = deleteTenant.bind(null, tenantId, slug);
   const [state, formAction, pending] = useActionState(boundDelete, initialState);
   const [confirmValue, setConfirmValue] = useState("");
+  const canDelete = confirmValue.trim().toLowerCase() === slug;
 
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-4 rounded-md border border-red-900 bg-red-950/20 p-4"
+      className="flex flex-col gap-[18px] rounded-[14px] border p-7"
+      style={{ borderColor: "#7F1D1D", background: "rgba(127,29,29,.08)" }}
     >
-      <div className="text-sm text-red-200">
-        <p className="font-medium">Mandant unwiderruflich löschen</p>
-        <p className="mt-1 text-red-300/90">
+      <div>
+        <p className="text-[17px] font-bold" style={{ color: "#F87171" }}>
+          Gefahrenzone
+        </p>
+        <p className="mt-2 text-sm" style={{ color: "#CBD5E1" }}>
           Löscht den Mandanten und ALLE zugehörigen Daten (Mitglieder, Kurse, Bestellungen,
           Zertifikate, Fortschritt, u. a.) dauerhaft aus der Datenbank. NICHT automatisch
           mitgelöscht: hochgeladene Dateien im Storage (Branding, Kursmaterial, Zertifikate),
@@ -47,7 +58,7 @@ export function MandantDeleteForm({ tenantId, slug }: { tenantId: string; slug: 
         </p>
       </div>
 
-      <label className="flex flex-col gap-1 text-sm" htmlFor="confirmSlug">
+      <label className="flex flex-col gap-1.5 text-[13px] font-semibold" htmlFor="confirmSlug" style={{ color: "#94A3B8" }}>
         Zum Bestätigen Subdomain eingeben: <span className="font-mono">{slug}</span>
         <input
           id="confirmSlug"
@@ -57,7 +68,9 @@ export function MandantDeleteForm({ tenantId, slug }: { tenantId: string; slug: 
           autoComplete="off"
           value={confirmValue}
           onChange={(e) => setConfirmValue(e.target.value)}
-          className="rounded-md border border-red-800 bg-slate-900 px-3 py-2 text-base text-slate-50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+          placeholder={slug}
+          className="max-w-xs rounded-[10px] border px-3.5 py-2.5 text-base font-normal focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+          style={{ borderColor: "#7F1D1D", background: "#020617", color: "#F8FAFC" }}
         />
       </label>
 
@@ -67,13 +80,20 @@ export function MandantDeleteForm({ tenantId, slug }: { tenantId: string; slug: 
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={pending || confirmValue.trim().toLowerCase() !== slug}
-        className="w-fit rounded-md bg-red-700 px-4 py-2 text-base font-medium text-slate-50 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-950"
-      >
-        {pending ? "Wird gelöscht …" : "Mandant endgültig löschen"}
-      </button>
+      <div>
+        <button
+          type="submit"
+          disabled={pending || !canDelete}
+          className="rounded-[10px] px-5 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+          style={{
+            background: canDelete ? "#B91C1C" : "#3F1D1D",
+            color: canDelete ? "#fff" : "#7F1D1D",
+            cursor: canDelete ? "pointer" : "not-allowed",
+          }}
+        >
+          {pending ? "Wird gelöscht …" : "Mandant endgültig löschen"}
+        </button>
+      </div>
     </form>
   );
 }
