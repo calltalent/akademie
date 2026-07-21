@@ -3,7 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, HelpCircle, LayoutGrid, Bookmark, Settings, Bell, ShieldCheck, type LucideIcon } from "lucide-react";
+import {
+  Search,
+  HelpCircle,
+  LayoutGrid,
+  Bookmark,
+  Settings,
+  Bell,
+  ShieldCheck,
+  Building2,
+  type LucideIcon,
+} from "lucide-react";
 
 /**
  * Layout-Sidebar — 1:1-Portierung aus dem Referenzdesign
@@ -21,6 +31,25 @@ import { Search, HelpCircle, LayoutGrid, Bookmark, Settings, Bell, ShieldCheck, 
  * das bei Bedarf. `isStaff` blendet den Link zum Admin-Bereich ein (sonst
  * gäbe es aus der Lernansicht keinen Weg zu /admin). Das Ein-/Ausklappen
  * (`expanded`) ist lokaler State über den Such-Button, daher "use client".
+ *
+ * `prefetch={false}` NEU (21.07.2026, Josips Fund: Login/Navigation fühlt
+ * sich langsam an) — siehe ausführliche Begründung im Kopfkommentar von
+ * components/shell/nav-link.tsx: jeder im Viewport sichtbare `<Link>` löst
+ * standardmäßig einen Hintergrund-Request durch middleware.ts (inkl. echtem
+ * `getUser()`-Netzwerk-Rundlauf zu Supabase) aus — diese Sidebar hat 5-6
+ * gleichzeitig sichtbare Einträge, macht auf JEDER Seite also 5-6
+ * zusätzliche Auth-Rundläufe, ohne dass sie je geklickt werden.
+ *
+ * `isPlatformAdmin` NEU (19.07.2026, Josips Auftrag: "Direktlink zum
+ * Mandantenbereich unter dem Admin-Bereich-Link"): zweiter, unabhängiger
+ * Link direkt darunter, zum Betreiber-Portal (`/portal/mandanten`) — eigene
+ * Berechtigungsstufe (Plattform-Admin, geprüft in app-shell.tsx), NICHT
+ * dasselbe wie `isStaff`. Das Portal läuft auf einem ANDEREN Host
+ * (`NEXT_PUBLIC_PORTAL_HOST`, z. B. portal.calltalent.ai vs.
+ * academy.calltalent.ai) — ein normales `<a>` statt `next/link`, analog zum
+ * umgekehrten Link im Portal (portal-shell.tsx, "Zum Admin-Bereich").
+ * `NODE_ENV`/`NEXT_PUBLIC_*` sind zur Build-Zeit inlined, deshalb hier auch
+ * in dieser Client-Komponente sicher lesbar (kein Server-Only-Geheimnis).
  *
  * Bewusste, nicht-optische Abweichungen von der reinen Mockup-Datei:
  * - hrefs zeigen auf die echten App-Routen statt auf die *.dc.html-Dateien.
@@ -61,10 +90,24 @@ function activeFromPath(pathname: string): SidebarItemId | undefined {
   return undefined;
 }
 
-export function Sidebar({ active, isStaff = false }: { active?: SidebarItemId; isStaff?: boolean }) {
+export function Sidebar({
+  active,
+  isStaff = false,
+  isPlatformAdmin = false,
+}: {
+  active?: SidebarItemId;
+  isStaff?: boolean;
+  isPlatformAdmin?: boolean;
+}) {
   const [expanded, setExpanded] = useState(true);
   const pathname = usePathname();
   const activeId = active ?? activeFromPath(pathname);
+
+  const portalHost = process.env.NEXT_PUBLIC_PORTAL_HOST || "portal.localhost";
+  const portalMandantenUrl =
+    process.env.NODE_ENV !== "production"
+      ? `http://${portalHost}:3000/portal/mandanten`
+      : `https://${portalHost}/portal/mandanten`;
 
   function renderItem(item: NavItem) {
     const isActive = activeId === item.id;
@@ -73,6 +116,7 @@ export function Sidebar({ active, isStaff = false }: { active?: SidebarItemId; i
       <Link
         key={item.id}
         href={item.href}
+        prefetch={false}
         aria-current={isActive ? "page" : undefined}
         title={!expanded ? item.label : undefined}
         className={[
@@ -103,6 +147,7 @@ export function Sidebar({ active, isStaff = false }: { active?: SidebarItemId; i
       {/* Wortmarke + Logomarke */}
       <Link
         href="/dashboard"
+        prefetch={false}
         className="mb-[30px] flex min-h-[34px] items-center gap-3 px-[22px] no-underline"
       >
         <span
@@ -158,7 +203,7 @@ export function Sidebar({ active, isStaff = false }: { active?: SidebarItemId; i
         {KONTO.map(renderItem)}
       </nav>
 
-      {/* Footer: Admin-Zugang (nur Staff) + Hilfe & Kontakt */}
+      {/* Footer: Admin-Zugang (nur Staff) + Mandantenbereich (nur Plattform-Admin) + Hilfe & Kontakt */}
       <div className="mt-4 flex flex-col gap-1 border-t border-border-100 px-4 pt-4">
         {isStaff && (
           <a
@@ -170,6 +215,18 @@ export function Sidebar({ active, isStaff = false }: { active?: SidebarItemId; i
           >
             <ShieldCheck size={19} aria-hidden="true" className="flex-shrink-0" />
             {expanded && <span>Admin-Bereich</span>}
+          </a>
+        )}
+        {isPlatformAdmin && (
+          <a
+            href={portalMandantenUrl}
+            title={!expanded ? "Mandantenbereich" : undefined}
+            className={`flex items-center gap-3 rounded-sm px-3 py-[10px] text-[15px] font-medium text-muted-500 no-underline ${
+              expanded ? "" : "justify-center"
+            }`}
+          >
+            <Building2 size={19} aria-hidden="true" className="flex-shrink-0" />
+            {expanded && <span>Mandantenbereich</span>}
           </a>
         )}
         <a

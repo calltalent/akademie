@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { checkPlatformAccess } from "@/lib/platform/auth";
 
 /**
  * Design-Block (12.07.2026, Claude-Design-Export
@@ -28,8 +29,20 @@ import { TopBar } from "@/components/layout/TopBar";
  * §8.1), Staff-Admin-Link via `isStaff` erhalten, aktiver Menüpunkt aus der
  * Route abgeleitet. Die bisherigen learn/sidebar.tsx + learn/top-bar.tsx
  * wurden im Zuge dessen entfernt (nur diese Datei hatte sie importiert).
+ *
+ * `isPlatformAdmin` NEU (19.07.2026, Josips Auftrag: "Direktlink zum
+ * Mandantenbereich unter dem Admin-Bereich-Link"): wird HIER, nicht von
+ * jeder aufrufenden Seite, berechnet — AppShell wird von rund einem Dutzend
+ * Lernbereich-Seiten eingebunden (Dashboard, Kurskatalog, Lesezeichen,
+ * Kurs-/Lektionsansicht, Einstellungen); jede einzelne um eine zusätzliche
+ * Prop-Übergabe zu erweitern hätte unnötig viele Dateien angefasst. Nutzt
+ * `checkPlatformAccess()` (dieselbe Prüfung wie admin/layout.tsx für den
+ * "Mandanten"-Punkt der Admin-Sidebar) — eine zusätzliche, aber billige
+ * Abfrage pro Seitenaufruf, analog zur bereits bestehenden `isStaff`-Prüfung
+ * auf Aufrufer-Seite. `.ok` ist bei jedem Fehler/fehlender Anmeldung `false`
+ * (fail-closed), zeigt den Link also nie fälschlich an.
  */
-export function AppShell({
+export async function AppShell({
   children,
   isStaff,
   userName,
@@ -44,9 +57,11 @@ export function AppShell({
   breadcrumb?: string;
   title?: string;
 }) {
+  const platformAccess = await checkPlatformAccess();
+
   return (
     <div className="flex min-h-screen bg-bg">
-      <Sidebar isStaff={isStaff} />
+      <Sidebar isStaff={isStaff} isPlatformAdmin={platformAccess.ok} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           breadcrumb={breadcrumb}

@@ -218,6 +218,7 @@ export default async function AdminKursePage({
                   />
                   <Link
                     href={`/admin/kurse/${c.id}`}
+                    prefetch={false}
                     className="font-semibold no-underline hover:underline"
                     style={{ color: "inherit" }}
                   >
@@ -237,6 +238,7 @@ export default async function AdminKursePage({
                 <div className="flex items-center justify-end gap-2">
                   <Link
                     href={`/admin/kurse/${c.id}`}
+                    prefetch={false}
                     aria-label={`Kurs bearbeiten: ${c.title}`}
                     title="Bearbeiten"
                     className="inline-flex h-9 w-9 items-center justify-center rounded-[9px] border bg-white no-underline"

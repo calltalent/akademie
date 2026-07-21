@@ -175,6 +175,7 @@ export function TopBar({
             </div>
             <Link
               href="/einstellungen"
+              prefetch={false}
               className="flex items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-medium text-navy no-underline"
             >
               <span className="h-2 w-2 rounded-[2px] bg-accent" />
@@ -182,6 +183,7 @@ export function TopBar({
             </Link>
             <Link
               href="/einstellungen?tab=benachrichtigungen"
+              prefetch={false}
               className="flex items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-medium text-navy no-underline"
             >
               <span className="h-2 w-2 rounded-[2px] bg-accent" />

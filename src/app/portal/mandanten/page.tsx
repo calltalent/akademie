@@ -121,6 +121,7 @@ export default async function MandantenPage() {
                 <li key={tenant.id} className="border-b last:border-b-0" style={{ borderColor: "#1e293b" }}>
                   <Link
                     href={`/portal/mandanten/${tenant.id}`}
+                    prefetch={false}
                     className="grid items-center gap-0 px-6 py-4 text-base hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
                     style={{ gridTemplateColumns: "2.2fr 1fr 1fr 0.9fr 1fr" }}
                   >

@@ -119,6 +119,7 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
               <div className="flex items-center justify-end gap-3">
                 <Link
                   href={`/admin/teilnehmer/${r.userId}`}
+                  prefetch={false}
                   className="text-sm font-semibold no-underline"
                 >
                   Profil

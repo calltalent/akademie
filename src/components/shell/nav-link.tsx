@@ -16,6 +16,21 @@ import { usePathname } from "next/navigation";
  * aktiven Menüpunkt selbst herleitet, ohne dass jede Seite ihn manuell als
  * Prop reichen muss (Fehlerquelle bei neuen Unterseiten).
  *
+ * `prefetch={false}` NEU (21.07.2026, Josips Fund: Login/Navigation fühlt
+ * sich langsam an — Auth-Log-Analyse zeigte 20-30 `/user`-Aufrufe an
+ * Supabase Auth INNERHALB EINER SEKUNDE nach jedem Seitenwechsel). Ursache:
+ * Next.js prefetcht standardmäßig JEDEN im Viewport sichtbaren `<Link>` —
+ * eine Sidebar mit 5-10 Einträgen löst damit 5-10 zusätzliche Hintergrund-
+ * Requests aus, jeder läuft durch middleware.ts, das bei JEDER Anfrage
+ * (auch Prefetches) `supabase.auth.getUser()` aufruft (echter Netzwerk-
+ * Rundlauf, siehe middleware.ts-Kommentar). Einzeln sind diese Aufrufe
+ * schnell (Supabase braucht laut Auth-Log 2-9ms je Aufruf) — der BURST
+ * (mehrere Rundläufe gleichzeitig bei jedem Seitenaufbau, auf JEDER Seite,
+ * da die Sidebar überall eingebunden ist) erzeugt spürbare Zusatzlast genau
+ * dann, wenn der Nutzer selbst navigiert. Deaktiviert das automatische
+ * Viewport-Prefetching für alle Sidebar-Navigationspunkte — echte Klicks
+ * laden weiterhin normal, nur ohne den unsichtbaren Vorab-Rundlauf.
+ *
  * `variant` trägt den bewussten Hell/Dunkel-Unterschied aus portal/layout.tsx
  * weiter (dort dokumentiert: dunkles Schema, damit das Betreiber-Portal nie
  * mit einer Mandanten-Oberfläche verwechselt wird) — gleiche Struktur/
@@ -114,6 +129,7 @@ export function NavLink({
   return (
     <Link
       href={href}
+      prefetch={false}
       aria-current={active ? "page" : undefined}
       title={collapsed ? label : undefined}
       className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors${collapsed ? " justify-center" : ""}`}

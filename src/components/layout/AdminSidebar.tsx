@@ -38,6 +38,15 @@ import {
  * verlust bedeutet. „Abmelden" ist ebenfalls ergänzt (echte Funktion, im
  * Mockup nicht vorhanden).
  *
+ * `prefetch={false}` NEU (21.07.2026, Josips Fund: Login/Navigation fühlt
+ * sich langsam an — siehe ausführliche Begründung in components/shell/
+ * nav-link.tsx). Diese Sidebar hat mit bis zu 10 gleichzeitig sichtbaren
+ * Einträgen (Dashboard/Kurse/KI-Generator/Abgaben/Produkte/Reporting/
+ * Zahlungen/Teilnehmer/Import/Mandanten/Einstellungen) den größten
+ * Prefetch-Multiplikator im ganzen Projekt — 10 automatische Hintergrund-
+ * Requests (jeder mit echtem `getUser()`-Rundlauf zu Supabase) auf JEDER
+ * Admin-Seite, ohne dass sie je geklickt werden.
+ *
  * Zugriff/Rollen: Die Sidebar ist reines UI — der /admin-Bereich ist bereits
  * über `checkStaffAccess()` in admin/layout.tsx (owner/admin/trainer) gated,
  * die zugrundeliegenden Daten zusätzlich per RLS. „Mandanten" (Betreiber-
@@ -138,6 +147,7 @@ export function AdminSidebar({
       <Link
         key={item.id}
         href={item.href}
+        prefetch={false}
         aria-current={isActive ? "page" : undefined}
         className="mb-[3px] flex items-center gap-3 rounded-sm px-3 py-[11px] text-[15px] no-underline transition-colors"
         style={
@@ -169,7 +179,7 @@ export function AdminSidebar({
       aria-label="Verwaltungs-Navigation"
     >
       {/* Wortmarke */}
-      <Link href="/admin" className="mb-2 flex items-center gap-3 px-[22px] no-underline">
+      <Link href="/admin" prefetch={false} className="mb-2 flex items-center gap-3 px-[22px] no-underline">
         <span
           className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] bg-accent text-[18px] font-extrabold text-cream"
           aria-hidden="true"
@@ -217,6 +227,7 @@ export function AdminSidebar({
       >
         <Link
           href="/dashboard"
+          prefetch={false}
           className="flex items-center gap-3 rounded-sm px-3 py-[10px] text-sm font-medium no-underline"
           style={{ color: "#B9BBDA" }}
         >

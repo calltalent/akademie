@@ -131,7 +131,7 @@ export default async function TeilnehmerDetailPage({
           <ul className="mt-3 flex flex-col gap-2">
             {courseList.map((c) => (
               <li key={c.id}>
-                <Link href={`/admin/kurse/${c.id}`} className="text-base font-semibold no-underline">
+                <Link href={`/admin/kurse/${c.id}`} prefetch={false} className="text-base font-semibold no-underline">
                   {c.title}
                 </Link>
               </li>
