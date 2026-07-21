@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { LayoutDashboard, Building2, LogOut } from "lucide-react";
+import { LayoutDashboard, Building2, ShieldCheck, LogOut } from "lucide-react";
 import { NavLink } from "@/components/shell/nav-link";
 import { SectionLabel } from "@/components/shell/section-label";
 import { BrandLogo } from "@/components/shell/brand-logo";
@@ -13,8 +13,25 @@ import { BrandLogo } from "@/components/shell/brand-logo";
  * teamweit über ALLE Mandanten verwaltet, hohe Fehlerreichweite). Periwinkle
  * bleibt trotzdem die einzige Akzentfarbe (aktiver Menüpunkt), damit das
  * Design-Konzept trotz Hell/Dunkel-Unterschied erkennbar dasselbe bleibt.
+ *
+ * `ownAdminUrl` NEU (19.07.2026, Josips Auftrag): Link zurück in den
+ * Admin-Bereich des Calltalent-eigenen Mandanten, direkt über "Abmelden" —
+ * das Portal-Team pflegt seine eigenen Kurse dort genau wie jeder andere
+ * Mandant. Bewusst ein normales `<a>` statt `next/link`: das Ziel liegt auf
+ * einem ANDEREN Host (z. B. academy.calltalent.ai vs. portal.calltalent.ai),
+ * `next/link`s clientseitiges Prefetching/Routing greift über Hosts hinweg
+ * ohnehin nicht. `layout.tsx` berechnet die URL server-seitig über
+ * `tenantOrigin()` — hier nur Anzeige, keine eigene Logik. Fehlt der
+ * Mandant aus irgendeinem Grund (siehe layout.tsx), wird der Punkt still
+ * ausgeblendet statt auf einen kaputten Link zu zeigen.
  */
-export function PortalShell({ children }: { children: ReactNode }) {
+export function PortalShell({
+  children,
+  ownAdminUrl,
+}: {
+  children: ReactNode;
+  ownAdminUrl?: string;
+}) {
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl">
       <aside
@@ -38,15 +55,26 @@ export function PortalShell({ children }: { children: ReactNode }) {
           icon={<Building2 aria-hidden="true" size={18} />}
         />
 
-        <form action="/auth/signout" method="post" className="mt-auto pt-6">
-          <button
-            type="submit"
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-white/5"
-          >
-            <LogOut aria-hidden="true" size={18} />
-            Abmelden
-          </button>
-        </form>
+        <div className="mt-auto pt-6">
+          {ownAdminUrl && (
+            <a
+              href={ownAdminUrl}
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-white/5"
+            >
+              <ShieldCheck aria-hidden="true" size={18} />
+              Zum Admin-Bereich
+            </a>
+          )}
+          <form action="/auth/signout" method="post">
+            <button
+              type="submit"
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-white/5"
+            >
+              <LogOut aria-hidden="true" size={18} />
+              Abmelden
+            </button>
+          </form>
+        </div>
       </aside>
 
       <div className="min-w-0 flex-1 px-8 py-8">

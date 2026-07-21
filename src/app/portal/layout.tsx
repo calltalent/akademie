@@ -1,9 +1,13 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { checkPlatformAccess } from "@/lib/platform/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { tenantOrigin } from "@/lib/tenant/url";
 import { PortalShell } from "@/components/portal/portal-shell";
 
 const LOGIN_PATH = "/portal/login";
+/** Slug des Mandanten, den Calltalent selbst betreibt (siehe Kommentar bei ownAdminUrl unten). */
+const OWN_TENANT_SLUG = "calltalent";
 
 /**
  * Eigenes (verschachteltes) Layout für das Betreiber-Portal — bewusst KEIN
@@ -57,9 +61,25 @@ export default async function PortalLayout({
     );
   }
 
+  // NEU (19.07.2026, Josips Auftrag "Button zurück in den Admin-Bereich"):
+  // das Portal verwaltet ALLE Mandanten und hat selbst keinen eigenen
+  // Admin-Bereich (der ist immer pro Mandant unter `/admin`) — Ziel ist
+  // deshalb bewusst fest der EIGENE Mandant, den das Calltalent-Team selbst
+  // betreibt/nutzt (Slug "calltalent"), nicht irgendein beliebiger anderer
+  // Kunden-Mandant. `tenantOrigin()` statt eines fest verdrahteten
+  // "academy.calltalent.ai" — folgt automatisch, falls sich `custom_domain`
+  // dieses Mandanten je ändert, ohne Code-Änderung hier.
+  const admin = createAdminClient();
+  const { data: ownTenant } = await admin
+    .from("tenants")
+    .select("slug, custom_domain")
+    .eq("slug", OWN_TENANT_SLUG)
+    .maybeSingle();
+  const ownAdminUrl = ownTenant ? `${tenantOrigin(ownTenant)}/admin` : undefined;
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
-      <PortalShell>{children}</PortalShell>
+      <PortalShell ownAdminUrl={ownAdminUrl}>{children}</PortalShell>
     </div>
   );
 }
