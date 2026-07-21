@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireStaffTenant } from "@/lib/auth/staff";
 import { createStripeClient } from "@/lib/stripe/client";
@@ -30,6 +31,7 @@ function parseProductForm(formData: FormData) {
     currency: formData.get("currency"),
     active: formData.get("active") === "on",
     courseId: formData.get("courseId"),
+    description: formData.get("description"),
   });
 }
 
@@ -78,7 +80,8 @@ export async function createProduct(
       price_cents: parsed.data.priceCents,
       currency: parsed.data.currency,
       active: parsed.data.active,
-      course_ids: parsed.data.courseId ? [parsed.data.courseId] : [],
+      course_ids: [parsed.data.courseId],
+      description: parsed.data.description ?? null,
       stripe_product_id: stripeProductId,
       stripe_price_id: stripePriceId,
     });
@@ -86,7 +89,7 @@ export async function createProduct(
       return { error: "Anlegen fehlgeschlagen: " + translateDbError(error) };
     }
 
-    revalidatePath("/admin/zahlungen");
+    revalidatePath("/admin/produkte");
     return { error: null, success: true };
   } catch (e) {
     return errorState(e);
@@ -183,7 +186,8 @@ export async function updateProduct(
         price_cents: parsed.data.priceCents,
         currency: parsed.data.currency,
         active: parsed.data.active,
-        course_ids: parsed.data.courseId ? [parsed.data.courseId] : [],
+        course_ids: [parsed.data.courseId],
+        description: parsed.data.description ?? null,
         stripe_product_id: stripeProductId,
         stripe_price_id: stripePriceId,
       })
@@ -193,7 +197,37 @@ export async function updateProduct(
       return { error: "Aktualisieren fehlgeschlagen: " + translateDbError(updateError) };
     }
 
-    revalidatePath("/admin/zahlungen");
+    revalidatePath("/admin/produkte");
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
+ * Produktbild der Kaufseite (19.07.2026, Josips Auftrag "Unterseite
+ * Produkte" — Texte/Bilder der Kaufseite bearbeiten). Gleiches Muster wie
+ * `updateModuleCoverUrl`/`updateCourseCoverUrl` in lib/courses/actions.ts:
+ * die generische `ThumbnailUpload`-Komponente kennt nur diese
+ * `(url) => Promise<{error}>`-Signatur, kein Kurs-/Modul-/Produkt-Wissen.
+ */
+export async function updateProductImageUrl(
+  productId: string,
+  url: string,
+): Promise<ProductActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const parsed = z.string().url().safeParse(url);
+    if (!parsed.success) {
+      return { error: "Ungültige Bild-URL." };
+    }
+    const { error } = await supabase
+      .from("products")
+      .update({ image_url: parsed.data })
+      .eq("id", productId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+    revalidatePath("/admin/produkte");
     return { error: null, success: true };
   } catch (e) {
     return errorState(e);
@@ -240,7 +274,7 @@ async function setProductActive(productId: string, active: boolean): Promise<Pro
       return { error: translateDbError(error) };
     }
 
-    revalidatePath("/admin/zahlungen");
+    revalidatePath("/admin/produkte");
     return { error: null, success: true };
   } catch (e) {
     return errorState(e);
@@ -305,7 +339,7 @@ export async function deleteProduct(productId: string): Promise<ProductActionSta
       return { error: translateDbError(error) };
     }
 
-    revalidatePath("/admin/zahlungen");
+    revalidatePath("/admin/produkte");
     return { error: null, success: true };
   } catch (e) {
     return errorState(e);

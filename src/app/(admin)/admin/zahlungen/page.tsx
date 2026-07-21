@@ -1,7 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
-import { ProductForm } from "@/components/admin/product-form";
-import { ProductRow } from "@/components/admin/product-row";
 import { OrdersTable, type OrderRow } from "@/components/admin/orders-table";
 
 /** Für die KPI-Summen oben — bewusst fest auf EUR: die App rechnet in der Praxis ausschließlich in Euro, ein Aufsummieren über potenziell verschiedene Währungen hinweg wäre ohnehin falsch. */
@@ -19,8 +17,7 @@ function deltaColor(tone: DeltaTone): string {
  * Design-Block (19.07.2026, Claude-Design-Import AdminZahlungen.dc.html aus
  * dem Design-Projekt „Calltalent-Akademie Studenten-Portal"). Ersetzt die
  * schlichte Phase-2-Ansicht (reine Listen ohne Kennzahlen/Kartenoptik) durch
- * das Marken-Layout: KPI-Reihe, zweispaltiges Grid (Produkte + Bestellungen
- * links, „Neues Produkt" rechts sticky).
+ * das Marken-Layout: KPI-Reihe + Bestellungen-Tabelle.
  *
  * KPIs sind ECHT berechnet (DESIGN-MASTERPROMPT.md §8.1, kein erfundener
  * Zähler) — der Export zeigte hier Demo-Werte aus einem Script-Objekt:
@@ -33,23 +30,20 @@ function deltaColor(tone: DeltaTone): string {
  *   ergänzt `orderRows` (bleibt bei 200 Zeilen gedeckelt, s. u.): sonst wären
  *   die Kennzahlen bei mehr als 200 Bestellungen falsch.
  *
+ * FOLGEAUFTRAG (19.07.2026, Josip: "Unterseite Produkte" unter INHALTE):
+ * die komplette Produktverwaltung (Neuanlage/Bearbeiten/Löschen/Kurs-
+ * Verknüpfung, Kaufseiten-Text/-Bild) ist nach /admin/produkte umgezogen.
+ * Diese Seite zeigt jetzt AUSSCHLIESSLICH getätigte Zahlungen — die KPI
+ * „Aktive Produkte" ist deshalb entfallen (das ist eine Produktkennzahl,
+ * keine Zahlungskennzahl), die KPI-Reihe hat jetzt 3 statt 4 Spalten. Die
+ * `products`/`courses`-Abfragen für die Produktliste sind ebenfalls
+ * entfallen — nur noch die Bestellungen bleiben.
+ *
  * Bewusste Abweichungen vom Export:
  * - Bestellungen-Kopfzeile zeigt „neueste zuerst" statt der im Export
  *   statischen „letzte 30 Tage" — die Tabelle zeigt tatsächlich die
  *   neuesten (bis zu 200) Bestellungen, nicht auf 30 Tage gefiltert; eine
  *   Beschriftung, die nicht zum echten Verhalten passt, wäre irreführend.
- * - Die „Zahlungsseite ansehen"-Symbole führen auf die echte, bereits
- *   bestehende Kaufseite `/kaufen/[productSlug]`, nicht auf einen
- *   Mockup-Platzhalter.
- * - Die bereits bestehende Bearbeiten-Funktion (aufklappbares Formular je
- *   Produkt, `ProductForm`/`ProductActiveToggle`) bleibt erhalten, obwohl
- *   der Export nur die Neuanlage zeigt — würde sonst eine vorhandene
- *   Funktion ersatzlos verschwinden. Seit demselben Folgeauftrag als
- *   eigenständiges Bearbeiten-Symbol (Stift) statt einer klickbaren
- *   Gesamtzeile, plus ein Löschen-Symbol (`ProductRow`,
- *   `deleteProduct()` in stripe/products.ts) — "die Kaufseite bearbeiten"
- *   ist dasselbe wie "das Produkt bearbeiten", da `/kaufen/[productSlug]`
- *   kein eigenes Inhaltsmodell hat, siehe Kommentar dort.
  * - Die Kopf-Avatar-Kachel des Exports ("AK") fällt weg, wie bei allen
  *   anderen bereits umgestellten Admin-Seiten (Kurse, Teilnehmer) — kein
  *   Vorbild dafür in diesem Bereich, rein dekorativ ohne echte Daten.
@@ -57,18 +51,6 @@ function deltaColor(tone: DeltaTone): string {
 export default async function AdminZahlungenPage() {
   const tenant = await getTenant();
   const supabase = await createClient();
-
-  const { data: products } = await supabase
-    .from("products")
-    .select("id, title, slug, kind, price_cents, currency, active, course_ids")
-    .eq("tenant_id", tenant!.id)
-    .order("title", { ascending: true });
-
-  const { data: courses } = await supabase
-    .from("courses")
-    .select("id, title")
-    .eq("tenant_id", tenant!.id)
-    .order("title", { ascending: true });
 
   const { data: orderRows } = await supabase
     .from("orders")
@@ -99,10 +81,6 @@ export default async function AdminZahlungenPage() {
     };
   });
 
-  const courseOptions = courses ?? [];
-  const courseTitleById = new Map(courseOptions.map((c) => [c.id, c.title]));
-  const allProducts = products ?? [];
-
   // --- KPIs ---
   const allOrders = allOrdersForKpi ?? [];
   const paidOrders = allOrders.filter((o) => o.status === "paid");
@@ -118,8 +96,6 @@ export default async function AdminZahlungenPage() {
     .reduce((sum, o) => sum + (o.amount_cents ?? 0), 0);
 
   const newOrdersThisWeek = allOrders.filter((o) => new Date(o.created_at) >= sevenDaysAgo).length;
-
-  const activeProductCount = allProducts.filter((p) => p.active).length;
 
   function averageCents(rows: typeof paidOrders): number | null {
     if (rows.length === 0) return null;
@@ -147,12 +123,6 @@ export default async function AdminZahlungenPage() {
       tone: newOrdersThisWeek > 0 ? "up" : "neutral",
     },
     {
-      label: "Aktive Produkte",
-      value: String(activeProductCount),
-      delta: `von ${allProducts.length} gesamt`,
-      tone: "neutral",
-    },
-    {
       label: "Ø Bestellwert",
       value: overallAvg !== null ? formatEuroCents(overallAvg) : "—",
       delta:
@@ -178,7 +148,7 @@ export default async function AdminZahlungenPage() {
       </header>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-[22px] lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-[22px] sm:grid-cols-3">
         {kpis.map((k) => (
           <div key={k.label} className="rounded-[14px] border bg-white p-[22px_24px]" style={{ borderColor: "#E7E8F2" }}>
             <div className="mb-2.5 text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
@@ -194,53 +164,12 @@ export default async function AdminZahlungenPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
-        {/* Linke Spalte */}
-        <div className="flex min-w-0 flex-col gap-6">
-          {/* Produkte */}
-          <div className="overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
-            <div className="p-[24px_28px_16px]">
-              <div className="text-[17px] font-bold">Produkte</div>
-            </div>
-            <div
-              className="grid items-center gap-0 px-[28px] pb-2.5 text-[13px] font-bold"
-              style={{ gridTemplateColumns: "2fr 1fr 1fr 0.8fr 1fr", color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" }}
-            >
-              <div>Produkt</div>
-              <div>Art</div>
-              <div>Preis</div>
-              <div>Status</div>
-              <div className="text-right">{allProducts.length} gesamt</div>
-            </div>
-            {allProducts.length === 0 ? (
-              <p className="px-[28px] py-6 text-sm" style={{ color: "#A9AAC4" }}>
-                Noch keine Produkte angelegt.
-              </p>
-            ) : (
-              allProducts.map((p) => {
-                const courseId = (p.course_ids ?? [])[0] ?? null;
-                const courseTitle = courseId ? (courseTitleById.get(courseId) ?? "Kurs nicht gefunden") : "Kein verknüpfter Kurs";
-                return (
-                  <ProductRow key={p.id} product={p} courseOptions={courseOptions} courseTitle={courseTitle} />
-                );
-              })
-            )}
-          </div>
-
-          {/* Bestellungen */}
-          <div className="overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
-            <div className="p-[24px_28px_16px]">
-              <div className="text-[17px] font-bold">Bestellungen</div>
-            </div>
-            <OrdersTable orders={orders} />
-          </div>
+      {/* Bestellungen */}
+      <div className="overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
+        <div className="p-[24px_28px_16px]">
+          <div className="text-[17px] font-bold">Bestellungen</div>
         </div>
-
-        {/* Rechte Spalte: Neues Produkt */}
-        <div className="sticky top-4 self-start rounded-[14px] border bg-white p-[26px_28px]" style={{ borderColor: "#E7E8F2" }}>
-          <div className="mb-5 text-[17px] font-bold">Neues Produkt</div>
-          <ProductForm courses={courseOptions} />
-        </div>
+        <OrdersTable orders={orders} />
       </div>
     </div>
   );

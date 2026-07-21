@@ -80,9 +80,23 @@ export const productFormSchema = z
       z.string().length(3, "Währung als 3-stelliger ISO-Code, z. B. eur."),
     ),
     active: z.boolean(),
+    // Pflichtfeld (Josips Auftrag 19.07.2026: "es darf keine andere Option
+    // geben") — jedes Produkt MUSS mit einem bestehenden Kurs verknüpft
+    // sein, kein "Kein Kurs"-Fall mehr. `course_ids` in der DB bleibt ein
+    // Array (mehrere Kurse technisch möglich, siehe Kopfkommentar), das
+    // Formular liefert weiterhin genau ein Element hinein.
     courseId: z.preprocess(
       (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
-      z.string().uuid().optional(),
+      z.string({ required_error: "Bitte einen Kurs auswählen." }).uuid("Bitte einen Kurs auswählen."),
+    ),
+    // NEU (19.07.2026, Josips Auftrag "Unterseite Produkte"): Beschreibung
+    // der Kaufseite (/kaufen/[productSlug]) — bisher hatte die Kaufseite
+    // keinerlei eigenes Textfeld, nur aus title/kind/price/Kurs abgeleitete
+    // Anzeige. Optional, da eine leere Kaufseite (nur mit den automatisch
+    // berechneten Kurs-Eckdaten) weiterhin ein gültiger Zustand ist.
+    description: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+      z.string().trim().max(2000, "Beschreibung darf höchstens 2000 Zeichen haben.").optional(),
     ),
   })
   .transform(({ priceEuro, ...rest }) => ({ ...rest, priceCents: eurosToCents(priceEuro) }))

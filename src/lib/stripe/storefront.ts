@@ -30,13 +30,15 @@ export type PublicProduct = {
   kind: "one_time" | "subscription";
   priceCents: number;
   currency: string;
+  description: string | null;
+  imageUrl: string | null;
 };
 
 export async function getPublicProduct(tenantId: string, slug: string): Promise<PublicProduct | null> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("products")
-    .select("id, title, slug, kind, price_cents, currency")
+    .select("id, title, slug, kind, price_cents, currency, description, image_url")
     .eq("tenant_id", tenantId)
     .eq("slug", slug)
     .eq("active", true)
@@ -51,6 +53,8 @@ export async function getPublicProduct(tenantId: string, slug: string): Promise<
     kind: data.kind as "one_time" | "subscription",
     priceCents: data.price_cents,
     currency: data.currency,
+    description: data.description,
+    imageUrl: data.image_url,
   };
 }
 

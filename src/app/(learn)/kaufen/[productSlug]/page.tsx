@@ -55,6 +55,14 @@ function formatPrice(cents: number, currency: string): string {
  *   stattdessen aus den ueber product.course_ids verknuepften Kursen
  *   berechnet (getPublicProductFeatures()), nur sichtbar wenn ein Kurs
  *   zugeordnet ist.
+ *
+ * Beschreibung/Bild (19.07.2026, Josips Auftrag "Unterseite Produkte" —
+ * Texte/Bilder der Kaufseite bearbeiten, siehe admin/produkte/page.tsx):
+ * `product.description` erscheint nur, wenn im Admin gepflegt (kein Pflicht-
+ * feld). `product.imageUrl` ersetzt den bisherigen rein dekorativen
+ * Platzhalter-Kasten (schraffierte Flaeche + Play-Symbol) - ohne Bild bleibt
+ * genau dieser Platzhalter bestehen, damit die Karte nicht ploetzlich leer
+ * wirkt.
  */
 export default async function KaufenPage({
   params,
@@ -218,20 +226,35 @@ export default async function KaufenPage({
                 </div>
               )}
             </div>
-            <div
-              className="flex h-[150px] w-full flex-none items-center justify-center rounded-[12px] sm:w-[200px]"
-              style={{
-                backgroundColor: "#2C2D4A",
-                backgroundImage:
-                  "repeating-linear-gradient(45deg,#2C2D4A 0 12px, rgba(86,99,174,.35) 12px 24px)",
-              }}
-              aria-hidden="true"
-            >
-              <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full" style={{ background: ACCENT }}>
-                <Play size={22} color="#fff" fill="#fff" />
-              </span>
-            </div>
+            {product.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
+              <img
+                src={product.imageUrl}
+                alt=""
+                className="h-[150px] w-full flex-none rounded-[12px] object-cover object-center sm:w-[200px]"
+              />
+            ) : (
+              <div
+                className="flex h-[150px] w-full flex-none items-center justify-center rounded-[12px] sm:w-[200px]"
+                style={{
+                  backgroundColor: "#2C2D4A",
+                  backgroundImage:
+                    "repeating-linear-gradient(45deg,#2C2D4A 0 12px, rgba(86,99,174,.35) 12px 24px)",
+                }}
+                aria-hidden="true"
+              >
+                <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full" style={{ background: ACCENT }}>
+                  <Play size={22} color="#fff" fill="#fff" />
+                </span>
+              </div>
+            )}
           </div>
+
+          {product.description && (
+            <p className="mt-4 whitespace-pre-line text-sm" style={{ color: "#3E3F66" }}>
+              {product.description}
+            </p>
+          )}
 
           <div className="mt-4 rounded-xl border p-[14px_16px]" style={{ borderColor: "#EEF0F7" }}>
             <div className="mb-1 text-sm font-extrabold" style={{ color: "#1A1A2E" }}>

@@ -7,6 +7,7 @@ import {
   BookOpen,
   Sparkles,
   ClipboardCheck,
+  Package,
   BarChart3,
   CreditCard,
   Users,
@@ -49,6 +50,7 @@ export type AdminSidebarItemId =
   | "courses"
   | "ki"
   | "submissions"
+  | "products"
   | "reporting"
   | "payments"
   | "members"
@@ -73,6 +75,7 @@ const GROUPS: { title: string; items: AdminNavItem[] }[] = [
       { id: "courses", label: "Kurse", href: "/admin/kurse", icon: BookOpen },
       { id: "ki", label: "KI-Generator", href: "/admin/ki", icon: Sparkles },
       { id: "submissions", label: "Abgaben", href: "/admin/abgaben", icon: ClipboardCheck },
+      { id: "products", label: "Produkte", href: "/admin/produkte", icon: Package },
     ],
   },
   {
@@ -104,6 +107,7 @@ function activeFromPath(pathname: string): AdminSidebarItemId | undefined {
   if (pathname.startsWith("/admin/kurse")) return "courses";
   if (pathname.startsWith("/admin/ki")) return "ki";
   if (pathname.startsWith("/admin/abgaben")) return "submissions";
+  if (pathname.startsWith("/admin/produkte")) return "products";
   if (pathname.startsWith("/admin/reporting")) return "reporting";
   if (pathname.startsWith("/admin/zahlungen")) return "payments";
   if (pathname.startsWith("/admin/teilnehmer")) return "members";

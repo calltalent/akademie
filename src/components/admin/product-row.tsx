@@ -19,6 +19,8 @@ type Product = {
   currency: string;
   active: boolean;
   course_ids: string[] | null;
+  description: string | null;
+  image_url: string | null;
 };
 
 function formatPrice(cents: number, currency: string): string {
@@ -140,6 +142,8 @@ export function ProductRow({
               priceCents: p.price_cents,
               active: p.active,
               courseId: (p.course_ids ?? [])[0] ?? null,
+              description: p.description,
+              imageUrl: p.image_url,
             }}
           />
         </div>
