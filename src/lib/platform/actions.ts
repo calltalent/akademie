@@ -10,6 +10,7 @@ import {
   updateTenantSchema,
   tenantCustomDomainSchema,
   tenantBrandingSchema,
+  tenantLogoUrlSchema,
 } from "@/lib/platform/schema";
 import { buildSetPasswordLink, findUserByEmail, type ImportTenant } from "@/lib/users/import";
 import { sendEmail } from "@/lib/email/client";
@@ -430,6 +431,48 @@ export async function updateTenantBranding(
 
     revalidatePath(`/portal/mandanten/${tenantId}`);
     revalidatePath("/portal/mandanten");
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
+ * Mandanten-Logo (19.07.2026, Josips Auftrag: "Option für Logo-Upload des
+ * Mandanten"). Gleiches Merge-Patch-Muster wie `updateTenantBranding` (nur
+ * `logo_url` betroffen, `color_primary`/`radius` bleiben unangetastet) —
+ * eigene Funktion statt eines gemeinsamen Formulars, weil der Datei-Upload
+ * (siehe api/portal/tenant-logo/upload-url/route.ts + ThumbnailUpload)
+ * einen eigenen, sofortigen Schreib-Zyklus braucht, unabhängig vom
+ * Farbe/Radius-Formular.
+ */
+export async function updateTenantLogoUrl(
+  tenantId: string,
+  url: string,
+): Promise<PlatformActionState> {
+  try {
+    await requirePlatformAdmin();
+
+    const parsed = tenantLogoUrlSchema.safeParse(url);
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Ungültige Bild-URL." };
+    }
+
+    const admin = createAdminClient();
+    const { data: current } = await admin
+      .from("tenants")
+      .select("branding")
+      .eq("id", tenantId)
+      .maybeSingle();
+
+    const mergedBranding = { ...(current?.branding ?? {}), logo_url: parsed.data };
+
+    const { error } = await admin.from("tenants").update({ branding: mergedBranding }).eq("id", tenantId);
+    if (error) {
+      return { error: "Speichern fehlgeschlagen: " + translateDbError(error) };
+    }
+
+    revalidatePath(`/portal/mandanten/${tenantId}`);
     return { error: null, success: true };
   } catch (e) {
     return errorState(e);

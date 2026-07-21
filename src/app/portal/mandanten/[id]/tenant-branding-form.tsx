@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { updateTenantBranding, type PlatformActionState } from "@/lib/platform/actions";
+import { updateTenantBranding, updateTenantLogoUrl, type PlatformActionState } from "@/lib/platform/actions";
 import { TENANT_ACCENT_SWATCHES } from "@/lib/platform/schema";
+import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
 
 const initialState: PlatformActionState = { error: null };
 
@@ -21,6 +22,18 @@ const initialState: PlatformActionState = { error: null };
  * balken + „Fortsetzen"-Button) statt auf das einfache Radius-Rechteck des
  * frischen Exports zurückzufallen — realistischer für das, was ein Mandant
  * tatsächlich in seiner eigenen Oberfläche sieht.
+ *
+ * Freier Hex-Code + Logo-Upload (19.07.2026, Josips Auftrag): die Swatches
+ * bleiben als Schnellauswahl, ein Textfeld daneben erlaubt jetzt zusätzlich
+ * JEDEN Hex-Code (Schema in lib/platform/schema.ts entsprechend gelockert).
+ * Logo-Upload läuft über dieselbe `ThumbnailUpload`-Kachel wie Kurs-/Modul-/
+ * Produktbilder, aber mit eigenem Endpoint (`uploadUrlEndpoint`) — die
+ * generische `/api/course-assets/upload-url`-Route ist über
+ * `requireStaffTenant()` gegated (Mandanten-Mitgliedschaft), ein Platform-
+ * Admin im Portal ist aber i. A. kein Mitglied des bearbeiteten Mandanten
+ * (siehe api/portal/tenant-logo/upload-url/route.ts). Läuft als eigener,
+ * sofortiger Schreib-Zyklus (`updateTenantLogoUrl`) unabhängig vom
+ * Farbe/Radius-Formular, analog zum Kurs-/Modulbild.
  */
 export function TenantBrandingForm({
   tenantId,
@@ -28,7 +41,7 @@ export function TenantBrandingForm({
   tenantName,
 }: {
   tenantId: string;
-  initial: { colorPrimary: string; radius: number };
+  initial: { colorPrimary: string; radius: number; logoUrl: string | null };
   tenantName: string;
 }) {
   const boundUpdate = updateTenantBranding.bind(null, tenantId);
@@ -36,6 +49,7 @@ export function TenantBrandingForm({
 
   const [colorPrimary, setColorPrimary] = useState(initial.colorPrimary);
   const [radius, setRadius] = useState(initial.radius);
+  const [logoUrl, setLogoUrl] = useState(initial.logoUrl);
 
   const initials = tenantName.trim().slice(0, 1).toUpperCase() || "?";
 
@@ -59,20 +73,57 @@ export function TenantBrandingForm({
         <div className="mb-2.5 text-[13px] font-semibold" style={{ color: "#94A3B8" }}>
           Akzentfarbe
         </div>
-        <div className="flex gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           {TENANT_ACCENT_SWATCHES.map((hex) => (
             <button
               key={hex}
               type="button"
               title={hex}
               onClick={() => setColorPrimary(hex)}
-              className="h-10 w-10 rounded-[10px]"
+              className="h-10 w-10 flex-none rounded-[10px]"
               style={{
                 background: hex,
-                border: `3px solid ${colorPrimary === hex ? "#F8FAFC" : "transparent"}`,
+                border: `3px solid ${colorPrimary.toUpperCase() === hex ? "#F8FAFC" : "transparent"}`,
               }}
             />
           ))}
+          <label htmlFor="colorPrimaryHex" className="sr-only">
+            Eigener Hex-Farbcode
+          </label>
+          <input
+            id="colorPrimaryHex"
+            type="text"
+            inputMode="text"
+            placeholder="#5663AE"
+            pattern="#?[0-9a-fA-F]{6}"
+            value={colorPrimary}
+            onChange={(e) => setColorPrimary(e.target.value)}
+            className="h-10 w-[110px] rounded-[10px] border px-3 text-sm"
+            style={{ borderColor: "#1e293b", background: "#020617", color: "#F8FAFC" }}
+          />
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-2.5 text-[13px] font-semibold" style={{ color: "#94A3B8" }}>
+          Logo
+        </div>
+        <div className="flex items-center gap-3">
+          <ThumbnailUpload
+            initialUrl={logoUrl}
+            entityLabel="Mandanten-Logo"
+            entityTitle={tenantName}
+            uploadUrlEndpoint="/api/portal/tenant-logo/upload-url"
+            extraUploadFields={{ tenantId }}
+            onUpload={async (url) => {
+              const result = await updateTenantLogoUrl(tenantId, url);
+              if (!result.error) setLogoUrl(url);
+              return result;
+            }}
+          />
+          <span className="text-[13px]" style={{ color: "#64748B" }}>
+            Erscheint anstelle der Initiale in der Mandanten-Oberfläche.
+          </span>
         </div>
       </div>
 
@@ -100,12 +151,21 @@ export function TenantBrandingForm({
         </div>
         <div className="overflow-hidden rounded-md border border-slate-800">
           <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: colorPrimary }}>
-            <span
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[13px] font-bold text-white"
-              style={{ background: "rgba(255,255,255,.25)" }}
-            >
-              {initials}
-            </span>
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
+              <img
+                src={logoUrl}
+                alt=""
+                className="h-[26px] w-[26px] flex-none rounded-[7px] object-cover object-center"
+              />
+            ) : (
+              <span
+                className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-[13px] font-bold text-white"
+                style={{ background: "rgba(255,255,255,.25)" }}
+              >
+                {initials}
+              </span>
+            )}
             <span className="text-sm font-bold text-white">{tenantName}</span>
           </div>
           <div className="p-4">
@@ -148,6 +208,9 @@ export function TenantBrandingForm({
         <button
           type="button"
           onClick={() => {
+            // Nur Farbe/Radius, NICHT das Logo: der Logo-Upload speichert
+            // sofort (eigener Schreib-Zyklus, siehe Kopfkommentar), es gibt
+            // dafür keinen "ungespeicherten Entwurf" wie bei Farbe/Radius.
             setColorPrimary(initial.colorPrimary);
             setRadius(initial.radius);
           }}

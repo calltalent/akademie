@@ -108,14 +108,31 @@ export const updateTenantSchema = z.object({
 /**
  * NEU (Design-Block 6, 13.07.2026, Mandanten.dc.html "Branding & Theming").
  * `tenants.branding.color_primary`/`radius` waren bisher nur lesend genutzt
- * (Kurs-Editor-Vorschau, Zertifikate) — kein Schreibweg existierte. Farbe
- * bewusst auf die 4 im Export vorgegebenen Marken-Akzente beschränkt (kein
- * freier Hex-Eingeber), Radius auf den im Export nutzbaren Schieberegler-
- * Bereich (4–24px, wie dort `<input type="range" min="4" max="24">`).
+ * (Kurs-Editor-Vorschau, Zertifikate) — kein Schreibweg existierte. Radius
+ * auf den im Export nutzbaren Schieberegler-Bereich (4–24px, wie dort
+ * `<input type="range" min="4" max="24">`).
+ *
+ * Farbe (19.07.2026, Josips Auftrag: "hex Farbcode eintragen ODER direkt aus
+ * einer Farbpalette auswählen") — ursprünglich auf die 4 Export-Swatches
+ * beschränkt (`z.enum`), jetzt jeder gültige 6-stellige Hex-Code erlaubt.
+ * `TENANT_ACCENT_SWATCHES` bleibt als Schnellauswahl-Palette in der UI
+ * bestehen, ist aber keine harte Schema-Grenze mehr.
  */
 export const TENANT_ACCENT_SWATCHES = ["#5663AE", "#2A6FDB", "#1F8A5B", "#B4682A"] as const;
 
+const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+export const tenantAccentColorSchema = z
+  .string()
+  .trim()
+  .transform((v) => (v.startsWith("#") ? v : `#${v}`))
+  .refine((v) => HEX_COLOR_PATTERN.test(v), "Ungültiger Hex-Farbcode, z. B. #5663AE.")
+  .transform((v) => v.toUpperCase());
+
 export const tenantBrandingSchema = z.object({
-  colorPrimary: z.enum(TENANT_ACCENT_SWATCHES),
+  colorPrimary: tenantAccentColorSchema,
   radius: z.coerce.number().int().min(4).max(24),
 });
+
+/** Für updateTenantLogoUrl() — dieselbe URL-Prüfung wie bei Kurs-/Modul-/Produktbildern. */
+export const tenantLogoUrlSchema = z.string().url("Ungültige Bild-URL.");

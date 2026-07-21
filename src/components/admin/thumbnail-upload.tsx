@@ -23,18 +23,32 @@ type UploadState = { status: "idle" } | { status: "uploading" } | { status: "err
  * "Automatisch zugeschnitten und positioniert" ist bewusst über CSS gelöst
  * (`object-fit: cover; object-position: center`), nicht über einen manuellen
  * Zuschneide-Dialog — siehe ursprüngliche Begründung beim Kurs-Thumbnail.
+ *
+ * `uploadUrlEndpoint`/`extraUploadFields` NEU (19.07.2026, Mandanten-Logo-
+ * Upload im Betreiber-Portal): der bisher fest verdrahtete Endpoint
+ * `/api/course-assets/upload-url` prüft `requireStaffTenant()`
+ * (Mandanten-Mitgliedschaft) — ein Platform-Admin im Portal ist aber i. A.
+ * kein Mitglied des gerade bearbeiteten Mandanten. Beide Props sind
+ * optional mit demselben Default wie bisher, bestehende Aufrufer (Kurs-/
+ * Modul-/Produktbild) sind dadurch unverändert.
  */
 export function ThumbnailUpload({
   initialUrl,
   entityLabel,
   entityTitle,
   onUpload,
+  uploadUrlEndpoint = "/api/course-assets/upload-url",
+  extraUploadFields,
 }: {
   initialUrl: string | null;
   /** z. B. "Kursbild" oder "Modulbild" — für das aria-label. */
   entityLabel: string;
   entityTitle: string;
   onUpload: (url: string) => Promise<{ error: string | null }>;
+  /** z. B. "/api/portal/tenant-logo/upload-url" für Aufrufer außerhalb des Mandanten-Kontexts. */
+  uploadUrlEndpoint?: string;
+  /** Zusätzliche Felder im Upload-URL-Request-Body, z. B. `{ tenantId }`. */
+  extraUploadFields?: Record<string, string>;
 }) {
   const [url, setUrl] = useState(initialUrl);
   const [state, setState] = useState<UploadState>({ status: "idle" });
@@ -53,10 +67,15 @@ export function ThumbnailUpload({
     }
 
     setState({ status: "uploading" });
-    const res = await fetch("/api/course-assets/upload-url", {
+    const res = await fetch(uploadUrlEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileName: file.name, fileSize: file.size, mimeType: file.type }),
+      body: JSON.stringify({
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+        ...extraUploadFields,
+      }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));

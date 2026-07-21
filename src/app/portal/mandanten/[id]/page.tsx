@@ -12,7 +12,6 @@ import { MandantEditForm } from "./mandant-edit-form";
 import { MandantDeleteForm } from "./mandant-delete-form";
 import { TenantDomainsSection } from "./tenant-domains-section";
 import { TenantBrandingForm } from "./tenant-branding-form";
-import { TENANT_ACCENT_SWATCHES } from "@/lib/platform/schema";
 
 /**
  * Mandanten-Detailseite (Betreiber-Portal, Phase 4 Block 2): Kopfbereich +
@@ -85,16 +84,21 @@ export default async function MandantDetailPage({
     notFound();
   }
 
-  const branding = (tenant.branding ?? {}) as { color_primary?: string; radius?: string };
+  const branding = (tenant.branding ?? {}) as {
+    color_primary?: string;
+    radius?: string;
+    logo_url?: string | null;
+  };
+  // Freier Hex-Code (19.07.2026, Josips Auftrag) — TENANT_ACCENT_SWATCHES
+  // sind seitdem nur noch die Schnellauswahl in der UI, keine Schema-Grenze
+  // mehr; ein bereits gesetzter Wert wird deshalb 1:1 angezeigt, nur ein
+  // fehlender/unbrauchbarer Wert fällt auf den Marken-Standard zurück.
   const brandingInitial = {
-    // Editor bietet bewusst nur die 4 Marken-Akzente aus dem Export an
-    // (siehe TENANT_ACCENT_SWATCHES) — ein bereits gesetzter, davon
-    // abweichender Wert fällt hier auf den Standard zurück (Anzeige only,
-    // nicht automatisch überschrieben, solange nicht gespeichert wird).
-    colorPrimary: (TENANT_ACCENT_SWATCHES as readonly string[]).includes(branding.color_primary ?? "")
+    colorPrimary: /^#[0-9a-fA-F]{6}$/.test(branding.color_primary ?? "")
       ? (branding.color_primary as string)
       : "#5663AE",
     radius: Number.parseInt(branding.radius ?? "14", 10) || 14,
+    logoUrl: branding.logo_url ?? null,
   };
 
   // Korrektur (Josips Lint-Lauf, 12.07.2026): react-hooks/purity moniert
