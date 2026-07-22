@@ -136,3 +136,23 @@ export const tenantBrandingSchema = z.object({
 
 /** Für updateTenantLogoUrl() — dieselbe URL-Prüfung wie bei Kurs-/Modul-/Produktbildern. */
 export const tenantLogoUrlSchema = z.string().url("Ungültige Bild-URL.");
+
+/**
+ * NEU (22.07.2026, Josips Auftrag: "Login-Bildschirm anpassbar machen" —
+ * Hintergrund-Transparenz des Marken-Panels, Überschrift/Beschreibung,
+ * Copyright-Zeile). Leeres Feld -> `undefined` -> Seite fällt auf den
+ * Calltalent-Standardtext zurück (login/login-form.tsx), genau wie ein
+ * Mandant ohne gesetztes `branding.*` auf DEFAULT_BRANDING zurückfällt.
+ */
+const optionalTrimmedText = (max: number) =>
+  z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().trim().max(max, `Höchstens ${max} Zeichen.`).optional(),
+  );
+
+export const tenantLoginContentSchema = z.object({
+  loginBgOpacity: z.coerce.number().int().min(0).max(100),
+  loginHeading: optionalTrimmedText(200),
+  loginSubheading: optionalTrimmedText(500),
+  loginCopyright: optionalTrimmedText(200),
+});

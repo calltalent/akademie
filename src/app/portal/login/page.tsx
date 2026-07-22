@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { signInWithPassword, signInWithMagicLink } from "@/lib/auth/actions";
 import type { AuthActionState } from "@/lib/auth/actions";
 
@@ -9,9 +9,18 @@ const initialState: AuthActionState = { error: null };
 /**
  * Vereinfachte Portal-Variante von src/app/(auth)/login/page.tsx — nutzt
  * dieselben Server Actions (kein neues Auth-System, keine neuen Actions).
- * signInWithPassword redirect("/") funktioniert hier korrekt: der Browser
- * bleibt auf dem Portal-Host, src/middleware.ts schreibt "/" dort intern auf
- * /portal um (siehe checkPlatformAccess()-Gate in portal/layout.tsx).
+ * signInWithPassword redirect("/") funktionierte hier ursprünglich korrekt:
+ * der Browser bleibt auf dem Portal-Host, src/middleware.ts schreibt "/"
+ * dort intern auf /portal um (siehe checkPlatformAccess()-Gate in
+ * portal/layout.tsx).
+ *
+ * BUGFIX (22.07.2026): signInWithPassword() ruft seit dem Login-Performance-
+ * Fix (siehe lib/auth/actions.ts) kein redirect() mehr auf, sondern gibt das
+ * Ziel nur noch als `redirectTo` zurück — diese Datei nutzt dieselbe Action,
+ * wurde beim ursprünglichen Fix aber übersehen, wodurch die Portal-Anmeldung
+ * nach erfolgreichem Login stillschweigend auf der Login-Seite hängen blieb
+ * (gefunden beim Testen der Mandanten-Branding-Erweiterung). Gleicher Fix
+ * wie in login/login-form.tsx: Navigation im Client übernehmen.
  */
 export default function PortalLoginPage() {
   const [pwState, pwAction, pwPending] = useActionState(
@@ -22,6 +31,10 @@ export default function PortalLoginPage() {
     signInWithMagicLink,
     initialState,
   );
+
+  useEffect(() => {
+    if (pwState.redirectTo) window.location.href = pwState.redirectTo;
+  }, [pwState.redirectTo]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-8 px-6">

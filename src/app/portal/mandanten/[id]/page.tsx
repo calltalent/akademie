@@ -12,6 +12,7 @@ import { MandantEditForm } from "./mandant-edit-form";
 import { MandantDeleteForm } from "./mandant-delete-form";
 import { TenantDomainsSection } from "./tenant-domains-section";
 import { TenantBrandingForm } from "./tenant-branding-form";
+import { TenantLoginContentForm } from "./tenant-login-content-form";
 
 /**
  * Mandanten-Detailseite (Betreiber-Portal, Phase 4 Block 2): Kopfbereich +
@@ -88,6 +89,10 @@ export default async function MandantDetailPage({
     color_primary?: string;
     radius?: string;
     logo_url?: string | null;
+    login_bg_opacity?: number;
+    login_heading?: string;
+    login_subheading?: string;
+    login_copyright?: string;
   };
   // Freier Hex-Code (19.07.2026, Josips Auftrag) — TENANT_ACCENT_SWATCHES
   // sind seitdem nur noch die Schnellauswahl in der UI, keine Schema-Grenze
@@ -99,6 +104,13 @@ export default async function MandantDetailPage({
       : "#5663AE",
     radius: Number.parseInt(branding.radius ?? "14", 10) || 14,
     logoUrl: branding.logo_url ?? null,
+  };
+
+  const loginContentInitial = {
+    bgOpacity: typeof branding.login_bg_opacity === "number" ? branding.login_bg_opacity : 100,
+    heading: branding.login_heading ?? null,
+    subheading: branding.login_subheading ?? null,
+    copyright: branding.login_copyright ?? null,
   };
 
   // Korrektur (Josips Lint-Lauf, 12.07.2026): react-hooks/purity moniert
@@ -217,6 +229,7 @@ export default async function MandantDetailPage({
       />
       <TenantDomainsSection tenantId={tenant.id} domains={tenantDomains ?? []} />
       <TenantBrandingForm tenantId={tenant.id} tenantName={tenant.name} initial={brandingInitial} />
+      <TenantLoginContentForm tenantId={tenant.id} initial={loginContentInitial} />
 
       <section aria-labelledby="usage-heading" className="flex flex-col gap-[26px] rounded-[14px] border p-7" style={{ borderColor: "#1e293b", background: "#0f172a" }}>
         <h2 id="usage-heading" className="text-[17px] font-bold text-slate-50">

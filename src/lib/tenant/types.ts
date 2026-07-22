@@ -30,6 +30,17 @@ export type PublicTenant = {
     color_bg?: string;
     font?: string;
     radius?: string;
+    /**
+     * NEU (22.07.2026, Josips Auftrag): Marken-Panel der Login-Seite
+     * ((auth)/login/login-form.tsx) — Transparenz des Streifenmusters
+     * (0–100, 100 = wie bisher voll sichtbar), Überschrift/Beschreibung und
+     * Copyright-Zeile. Alle optional, fehlender Wert -> Calltalent-Standard-
+     * text (siehe DEFAULT_LOGIN_CONTENT in login-form.tsx).
+     */
+    login_bg_opacity?: number;
+    login_heading?: string;
+    login_subheading?: string;
+    login_copyright?: string;
   };
   legal: {
     impressum_url?: string;

@@ -11,6 +11,7 @@ import {
   tenantCustomDomainSchema,
   tenantBrandingSchema,
   tenantLogoUrlSchema,
+  tenantLoginContentSchema,
 } from "@/lib/platform/schema";
 import { buildSetPasswordLink, findUserByEmail, type ImportTenant } from "@/lib/users/import";
 import { sendEmail } from "@/lib/email/client";
@@ -466,6 +467,58 @@ export async function updateTenantLogoUrl(
       .maybeSingle();
 
     const mergedBranding = { ...(current?.branding ?? {}), logo_url: parsed.data };
+
+    const { error } = await admin.from("tenants").update({ branding: mergedBranding }).eq("id", tenantId);
+    if (error) {
+      return { error: "Speichern fehlgeschlagen: " + translateDbError(error) };
+    }
+
+    revalidatePath(`/portal/mandanten/${tenantId}`);
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
+ * Login-Marken-Panel (22.07.2026, Josips Auftrag: "Hintergrund-Transparenz,
+ * Überschrift/Beschreibung und Copyright anpassbar machen"). Gleiches
+ * Merge-Patch-Muster wie `updateTenantBranding`/`updateTenantLogoUrl` —
+ * eigene Funktion, weil diese Felder eine eigene Karte im Portal bekommen
+ * (siehe tenant-login-content-form.tsx), unabhängig von Farbe/Radius/Logo.
+ */
+export async function updateTenantLoginContent(
+  tenantId: string,
+  _prevState: PlatformActionState,
+  formData: FormData,
+): Promise<PlatformActionState> {
+  try {
+    await requirePlatformAdmin();
+
+    const parsed = tenantLoginContentSchema.safeParse({
+      loginBgOpacity: formData.get("loginBgOpacity"),
+      loginHeading: formData.get("loginHeading"),
+      loginSubheading: formData.get("loginSubheading"),
+      loginCopyright: formData.get("loginCopyright"),
+    });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+
+    const admin = createAdminClient();
+    const { data: current } = await admin
+      .from("tenants")
+      .select("branding")
+      .eq("id", tenantId)
+      .maybeSingle();
+
+    const mergedBranding = {
+      ...(current?.branding ?? {}),
+      login_bg_opacity: parsed.data.loginBgOpacity,
+      login_heading: parsed.data.loginHeading ?? null,
+      login_subheading: parsed.data.loginSubheading ?? null,
+      login_copyright: parsed.data.loginCopyright ?? null,
+    };
 
     const { error } = await admin.from("tenants").update({ branding: mergedBranding }).eq("id", tenantId);
     if (error) {
