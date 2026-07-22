@@ -77,7 +77,12 @@ export function TenantDomainsSection({
         </ul>
       )}
 
-      <form action={formAction} className="flex items-end gap-2.5">
+      {/* BUGFIX (22.07.2026, Josips Auftrag "Mandantenbereich für Mobile
+          optimieren"): `flex items-end` ohne Umbruch lief auf schmalen
+          Bildschirmen (live gemessen bei 390px) 15px über den Viewport
+          hinaus, weil Eingabefeld + Button nebeneinander nicht mehr passten.
+          `flex-col` unter `sm`, danach wie bisher nebeneinander. */}
+      <form action={formAction} className="flex flex-col gap-2.5 sm:flex-row sm:items-end">
         <label className="flex flex-1 flex-col gap-1.5 text-[13px] font-semibold" htmlFor="new-domain" style={{ color: "#94A3B8" }}>
           Domain hinzufügen
           <input
@@ -85,7 +90,7 @@ export function TenantDomainsSection({
             name="domain"
             type="text"
             placeholder="weitere-domain.de"
-            className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+            className="w-full rounded-[10px] border px-3.5 py-2.5 text-base font-normal focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
             style={{ borderColor: "#1e293b", background: "#020617", color: "#F8FAFC" }}
           />
         </label>

@@ -60,10 +60,29 @@ export default function PasswortVergessenPage() {
       </div>
 
       {/* Formular-Panel */}
-      <div
-        className="flex flex-1 flex-col items-center justify-center px-8 py-12"
-        style={{ background: "#F4F5FA" }}
-      >
+      <div className="flex flex-1 flex-col" style={{ background: "#F4F5FA" }}>
+        {/* Mobile-Kopfzeile (22.07.2026, Josips Auftrag "Login-Bereich für
+            Mobile optimieren") — gleiches Muster wie login/login-form.tsx,
+            siehe dortigen Kommentar für die Begründung. */}
+        <div className="flex items-center gap-3 border-b px-6 py-4 lg:hidden" style={{ borderColor: "#E7E8F2" }}>
+          <div
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-[9px] text-base font-extrabold"
+            style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
+            aria-hidden="true"
+          >
+            C
+          </div>
+          <div className="leading-tight">
+            <div className="text-sm font-extrabold tracking-tight" style={{ color: "#1A1A2E" }}>
+              CALLTALENT
+            </div>
+            <div className="text-[10px] font-semibold" style={{ color: "#66679B", letterSpacing: "0.28em" }}>
+              AKADEMIE
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 lg:px-8 lg:py-12">
         <div className="flex w-full max-w-[400px] flex-col">
           <a
             href="/login"
@@ -154,6 +173,7 @@ export default function PasswortVergessenPage() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

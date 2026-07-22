@@ -3,6 +3,7 @@ import { LayoutDashboard, Building2, ShieldCheck, LogOut } from "lucide-react";
 import { NavLink } from "@/components/shell/nav-link";
 import { SectionLabel } from "@/components/shell/section-label";
 import { BrandLogo } from "@/components/shell/brand-logo";
+import { PortalMobileNav } from "@/components/portal/portal-mobile-nav";
 
 /**
  * Design-Block (12.07.2026, Folgeauftrag "durch das ganze Projekt ziehen"):
@@ -24,6 +25,13 @@ import { BrandLogo } from "@/components/shell/brand-logo";
  * `tenantOrigin()` — hier nur Anzeige, keine eigene Logik. Fehlt der
  * Mandant aus irgendeinem Grund (siehe layout.tsx), wird der Punkt still
  * ausgeblendet statt auf einen kaputten Link zu zeigen.
+ *
+ * Mobile Top-Bar (22.07.2026, Josips Auftrag "Mandantenbereich für Mobile
+ * optimieren"): `<aside>` ist jetzt `hidden lg:flex` — unter `lg` übernimmt
+ * `PortalMobileNav` (eigene Datei, "use client" wegen Auf/Zu-State) dieselbe
+ * Navigation als Kopfzeile mit Ausklapp-Panel. Siehe dortigen Kopfkommentar
+ * für die volle Begründung (live gemessen: Sidebar nahm auf 375px Breite
+ * ~60% des Viewports ein, Inhalt brach wortweise um).
  */
 export function PortalShell({
   children,
@@ -33,56 +41,59 @@ export function PortalShell({
   ownAdminUrl?: string;
 }) {
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl">
-      <aside
-        className="flex w-56 flex-shrink-0 flex-col gap-1 border-r border-slate-800 px-3 py-6"
-        aria-label="Hauptnavigation"
-      >
-        <BrandLogo subLabel="PORTAL" variant="dark" />
+    <>
+      <PortalMobileNav ownAdminUrl={ownAdminUrl} />
+      <div className="mx-auto flex min-h-screen max-w-6xl">
+        <aside
+          className="hidden w-56 flex-shrink-0 flex-col gap-1 border-r border-slate-800 px-3 py-6 lg:flex"
+          aria-label="Hauptnavigation"
+        >
+          <BrandLogo subLabel="PORTAL" variant="dark" />
 
-        <SectionLabel variant="dark">Verwaltung</SectionLabel>
-        <NavLink
-          href="/portal"
-          label="Übersicht"
-          exact
-          variant="dark"
-          icon={<LayoutDashboard aria-hidden="true" size={18} />}
-        />
-        <NavLink
-          href="/portal/mandanten"
-          label="Mandanten"
-          variant="dark"
-          icon={<Building2 aria-hidden="true" size={18} />}
-        />
+          <SectionLabel variant="dark">Verwaltung</SectionLabel>
+          <NavLink
+            href="/portal"
+            label="Übersicht"
+            exact
+            variant="dark"
+            icon={<LayoutDashboard aria-hidden="true" size={18} />}
+          />
+          <NavLink
+            href="/portal/mandanten"
+            label="Mandanten"
+            variant="dark"
+            icon={<Building2 aria-hidden="true" size={18} />}
+          />
 
-        <div className="mt-auto pt-6">
-          {ownAdminUrl && (
-            <a
-              href={ownAdminUrl}
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-white/5"
-            >
-              <ShieldCheck aria-hidden="true" size={18} />
-              Zum Admin-Bereich
-            </a>
-          )}
-          <form action="/auth/signout" method="post">
-            <button
-              type="submit"
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-white/5"
-            >
-              <LogOut aria-hidden="true" size={18} />
-              Abmelden
-            </button>
-          </form>
+          <div className="mt-auto pt-6">
+            {ownAdminUrl && (
+              <a
+                href={ownAdminUrl}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-white/5"
+              >
+                <ShieldCheck aria-hidden="true" size={18} />
+                Zum Admin-Bereich
+              </a>
+            )}
+            <form action="/auth/signout" method="post">
+              <button
+                type="submit"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-white/5"
+              >
+                <LogOut aria-hidden="true" size={18} />
+                Abmelden
+              </button>
+            </form>
+          </div>
+        </aside>
+
+        <div className="min-w-0 flex-1 px-4 py-6 lg:px-8 lg:py-8">
+          <p className="mb-6 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-primary)" }}>
+            Betreiber-Portal — nur für das Calltalent-Team
+          </p>
+          {children}
         </div>
-      </aside>
-
-      <div className="min-w-0 flex-1 px-8 py-8">
-        <p className="mb-6 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-primary)" }}>
-          Betreiber-Portal — nur für das Calltalent-Team
-        </p>
-        {children}
       </div>
-    </div>
+    </>
   );
 }

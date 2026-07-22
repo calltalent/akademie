@@ -111,19 +111,44 @@ export function LoginForm({
       </div>
 
       {/* Formular-Panel */}
-      <div
-        className="flex flex-1 flex-col items-center justify-center px-8 py-12"
-        style={{ background: "#F4F5FA" }}
-      >
-        <div className="flex w-full max-w-[400px] flex-col gap-6">
-          <div>
-            <h1 className="mb-1.5 text-[28px] font-extrabold" style={{ color: "#1A1A2E" }}>
-              Anmelden
-            </h1>
-            <p className="text-base" style={{ color: "#66679B" }}>
-              Melde dich mit deinem Konto an.
-            </p>
+      <div className="flex flex-1 flex-col" style={{ background: "#F4F5FA" }}>
+        {/* Mobile-Kopfzeile (22.07.2026, Josips Auftrag "Login-Bereich für
+            Mobile optimieren"): das Marken-Panel links ist unter `lg` komplett
+            ausgeblendet — ohne Ersatz gäbe es auf einem Smartphone (Mehrheit
+            der echten Logins) gar keine Markenidentität mehr, nur ein leeres
+            weißes Formular. Bewusst NUR Logo/Wortmarke, keine Überschrift/
+            Beschreibung/Copyright — auf kleinen Bildschirmen hat das Formular
+            selbst Vorrang vor Marketing-Text (Login.dc.html-Vorbild zeigt das
+            ohnehin nur im breiten Marken-Panel, nicht als eigenständigen
+            Baustein). */}
+        <div className="flex items-center gap-3 border-b px-6 py-4 lg:hidden" style={{ borderColor: "#E7E8F2" }}>
+          <div
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-[9px] text-base font-extrabold"
+            style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
+            aria-hidden="true"
+          >
+            C
           </div>
+          <div className="leading-tight">
+            <div className="text-sm font-extrabold tracking-tight" style={{ color: "#1A1A2E" }}>
+              CALLTALENT
+            </div>
+            <div className="text-[10px] font-semibold" style={{ color: "#66679B", letterSpacing: "0.28em" }}>
+              AKADEMIE
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 lg:px-8 lg:py-12">
+          <div className="flex w-full max-w-[400px] flex-col gap-6">
+            <div>
+              <h1 className="mb-1.5 text-[28px] font-extrabold" style={{ color: "#1A1A2E" }}>
+                Anmelden
+              </h1>
+              <p className="text-base" style={{ color: "#66679B" }}>
+                Melde dich mit deinem Konto an.
+              </p>
+            </div>
 
           <form action={pwAction} className="flex flex-col gap-4" aria-label="Mit Passwort anmelden">
             <label className="flex flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
@@ -229,6 +254,7 @@ export function LoginForm({
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

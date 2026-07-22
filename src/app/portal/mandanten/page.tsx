@@ -98,7 +98,7 @@ export default async function MandantenPage() {
       {!error && (tenants ?? []).length > 0 && (
         <div className="overflow-hidden rounded-[14px] border" style={{ borderColor: "#1e293b", background: "#0f172a" }}>
           <div
-            className="grid gap-0 px-6 pb-3 pt-[18px] text-[13px] font-bold"
+            className="hidden gap-0 px-6 pb-3 pt-[18px] text-[13px] font-bold lg:grid"
             style={{ gridTemplateColumns: "2.2fr 1fr 1fr 0.9fr 1fr", color: "#64748B", borderBottom: "1px solid #1e293b" }}
           >
             <div>Mandant</div>
@@ -122,10 +122,51 @@ export default async function MandantenPage() {
                   <Link
                     href={`/portal/mandanten/${tenant.id}`}
                     prefetch={false}
-                    className="grid items-center gap-0 px-6 py-4 text-base hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+                    className="block px-5 py-4 text-base hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950 lg:grid lg:items-center lg:gap-0 lg:px-6"
                     style={{ gridTemplateColumns: "2.2fr 1fr 1fr 0.9fr 1fr" }}
                   >
-                    <div className="flex min-w-0 items-center gap-3">
+                    {/* Mobile-Karte (22.07.2026, Josips Auftrag "Mandantenbereich für
+                        Mobile optimieren"): die 5-spaltige Desktop-Tabelle (feste
+                        fr-Verhältnisse für eine breite Fläche gedacht) quetschte auf
+                        375px Breite Wörter einzeln um. Eigene, gestapelte Darstellung
+                        unter `lg` statt die Tabelle nur zu verschmälern — dieselben
+                        Daten, andere Anordnung. */}
+                    <div className="flex min-w-0 items-center gap-3 lg:hidden">
+                      <span
+                        aria-hidden="true"
+                        className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] text-[15px] font-bold text-white"
+                        style={{ background: accent }}
+                      >
+                        {initial}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold text-slate-50">{tenant.name}</div>
+                        <div className="truncate text-xs" style={{ color: "#64748B" }}>
+                          {domain}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs lg:hidden">
+                      <span
+                        className="inline-flex rounded-lg px-3 py-1 font-bold"
+                        style={{ color: "#CBD5E1", background: "#1e293b" }}
+                      >
+                        {TENANT_PLAN_LABELS[tenant.plan as TenantPlan] ?? tenant.plan}
+                      </span>
+                      <span
+                        className="inline-flex rounded-lg px-3 py-1 font-bold"
+                        style={{ color: status.color, background: status.background }}
+                      >
+                        {TENANT_STATUS_LABELS[tenant.status as TenantStatus] ?? tenant.status}
+                      </span>
+                      <span style={{ color: "#64748B" }}>
+                        {memberCountByTenant.get(tenant.id) ?? 0} Teilnehmer
+                      </span>
+                      <span style={{ color: "#64748B" }}>· {formatDate(tenant.created_at)}</span>
+                    </div>
+
+                    {/* Desktop-Tabelle (unverändert) */}
+                    <div className="hidden min-w-0 items-center gap-3 lg:flex">
                       <span
                         aria-hidden="true"
                         className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] text-[15px] font-bold text-white"
@@ -140,7 +181,7 @@ export default async function MandantenPage() {
                         </div>
                       </div>
                     </div>
-                    <div>
+                    <div className="hidden lg:block">
                       <span
                         className="inline-flex rounded-lg px-3 py-1 text-xs font-bold"
                         style={{ color: "#CBD5E1", background: "#1e293b" }}
@@ -148,8 +189,8 @@ export default async function MandantenPage() {
                         {TENANT_PLAN_LABELS[tenant.plan as TenantPlan] ?? tenant.plan}
                       </span>
                     </div>
-                    <div className="text-slate-300">{memberCountByTenant.get(tenant.id) ?? 0}</div>
-                    <div>
+                    <div className="hidden text-slate-300 lg:block">{memberCountByTenant.get(tenant.id) ?? 0}</div>
+                    <div className="hidden lg:block">
                       <span
                         className="inline-flex rounded-lg px-3 py-1 text-xs font-bold"
                         style={{ color: status.color, background: status.background }}
@@ -157,7 +198,7 @@ export default async function MandantenPage() {
                         {TENANT_STATUS_LABELS[tenant.status as TenantStatus] ?? tenant.status}
                       </span>
                     </div>
-                    <div className="text-sm" style={{ color: "#64748B" }}>
+                    <div className="hidden text-sm lg:block" style={{ color: "#64748B" }}>
                       {formatDate(tenant.created_at)}
                     </div>
                   </Link>
