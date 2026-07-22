@@ -4,7 +4,7 @@ import { ArrowRight, ArrowLeft, Check, Play, ListVideo, ChevronRight, MessageSqu
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
-import { flattenLessonIds, findAdjacentLessonIds } from "@/lib/progress/compute";
+import { computeLessonBoundary, flattenLessonIds, findAdjacentLessonIds } from "@/lib/progress/compute";
 import { BlockRenderer } from "@/components/learn/block-renderer";
 import { CompleteLessonButton } from "@/components/learn/complete-lesson-button";
 import { TutorPanel } from "@/components/learn/tutor-panel";
@@ -75,7 +75,7 @@ export default async function LessonPage({
 
   const { data: lessons } = await supabase
     .from("lessons")
-    .select("id, title, module_id, blocks, status, position, transcript, summary, chapters, video_duration_s")
+    .select("id, title, module_id, section_id, blocks, status, position, transcript, summary, chapters, video_duration_s")
     .in("module_id", (modules ?? []).map((m) => m.id))
     .eq("status", "published")
     .order("position", { ascending: true });
@@ -107,6 +107,30 @@ export default async function LessonPage({
   const flatIds = flattenLessonIds(flatModules);
   const { prevId, nextId } = findAdjacentLessonIds(flatIds, lessonId);
   const nextLessonObj = nextId ? (lessons ?? []).find((l) => l.id === nextId) ?? null : null;
+
+  // Sektions-/Modul-Abschluss-Bildschirm (Josips Auftrag, 22.07.2026): ist
+  // diese Lektion die letzte ihrer Sektion bzw. ihres Moduls, führt
+  // "Lektion abschließen" auf einen Zwischenbildschirm statt direkt zur
+  // nächsten Lektion. Die "Nächste Lektion"-Vorschaukarte weiter unten bleibt
+  // bewusst unverändert (zeigt weiter die flache nächste Lektion als
+  // Kontext) — nur das tatsächliche Abschließen greift hier ein.
+  const lessonPositions = (lessons ?? []).map((l) => ({
+    id: l.id,
+    moduleId: l.module_id as string,
+    sectionId: (l.section_id as string | null) ?? null,
+    position: l.position as number,
+  }));
+  const boundary = computeLessonBoundary(lessonPositions, lessonId);
+  const completeHref =
+    boundary.kind === "module"
+      ? `/kurs/${slug}/m/${boundary.moduleId}/abgeschlossen`
+      : boundary.kind === "section"
+        ? `/kurs/${slug}/s/${boundary.sectionId}/abgeschlossen`
+        : nextId
+          ? `/kurs/${slug}/l/${nextId}`
+          : null;
+  const completeLabel =
+    boundary.kind === "module" ? "Modul ansehen →" : boundary.kind === "section" ? "Sektion ansehen →" : undefined;
 
   // Aktuelles Modul + Modul-Fortschritt für die Kopf-Leiste; „nächste Sektion"
   // = das nachfolgende Modul (Rechte Spalte zeigt nur das aktuelle Modul).
@@ -237,7 +261,8 @@ export default async function LessonPage({
                 lessonId={lessonId}
                 courseSlug={slug}
                 alreadyCompleted={progressRow?.status === "completed"}
-                nextHref={nextId ? `/kurs/${slug}/l/${nextId}` : null}
+                nextHref={completeHref}
+                nextLabel={completeLabel}
               />
             </div>
           </div>

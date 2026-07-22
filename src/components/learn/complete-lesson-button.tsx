@@ -8,11 +8,21 @@ export function CompleteLessonButton({
   courseSlug,
   alreadyCompleted,
   nextHref,
+  nextLabel = "Weiter zur nächsten Lektion →",
 }: {
   lessonId: string;
   courseSlug: string;
   alreadyCompleted: boolean;
   nextHref: string | null;
+  /**
+   * Josips Auftrag (22.07.2026, Sektion-/Modul-Abschluss-Bildschirm): `nextHref`
+   * zeigt bei einer Grenz-Lektion (letzte einer Sektion/eines Moduls) jetzt auf
+   * den neuen Zwischenbildschirm statt auf die nächste Lektion — der Standard-
+   * Linktext „Weiter zur nächsten Lektion" wäre dort irreführend, wenn man eine
+   * bereits abgeschlossene Grenz-Lektion erneut aufruft. Aufrufer übergeben dann
+   * einen passenden Text (siehe l/[lessonId]/page.tsx).
+   */
+  nextLabel?: string;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -22,7 +32,7 @@ export function CompleteLessonButton({
         <span className="text-base text-green-700">✓ Abgeschlossen</span>
         {nextHref && (
           <a href={nextHref} className="text-sm underline">
-            Weiter zur nächsten Lektion →
+            {nextLabel}
           </a>
         )}
       </div>
