@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { ArrowRight } from "lucide-react";
 import { signInWithPassword, signInWithMagicLink } from "@/lib/auth/actions";
 import type { AuthActionState } from "@/lib/auth/actions";
@@ -29,6 +29,16 @@ export default function LoginPage() {
     signInWithMagicLink,
     initialState,
   );
+
+  // BUGFIX (22.07.2026, Josips Fund: Login dauert 20+ Sekunden): siehe
+  // ausführliche Begründung in lib/auth/actions.ts (signInWithPassword) —
+  // ein redirect() innerhalb der Server Action selbst lief auf dieser
+  // Plattform reproduzierbar über 20 Sekunden statt unter 1,5 Sekunden.
+  // Navigation deshalb hier im Client, außerhalb von Next' eigener
+  // Redirect-Sonderbehandlung für Server Actions.
+  useEffect(() => {
+    if (pwState.redirectTo) window.location.href = pwState.redirectTo;
+  }, [pwState.redirectTo]);
 
   return (
     <div

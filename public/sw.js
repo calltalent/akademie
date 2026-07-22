@@ -11,7 +11,7 @@
 //   2. Web-Push-Anzeige — reiner Empfänger, zeigt an, was der Server über
 //      sendPushNotification() (src/lib/push/send.ts) schickt.
 
-const CACHE_NAME = "akademie-shell-v1";
+const CACHE_NAME = "akademie-shell-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -39,9 +39,20 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // Nur GET-Navigations-Requests behandeln — alles andere (API, POST,
-  // personalisierte/Admin-/Portal-Routen) unangetastet durchreichen.
+  // BUGFIX (22.07.2026, Josips Fund: Login dauert 20+ Sekunden): dieser
+  // Handler fing bisher JEDE Navigation im gesamten Projekt ab (Dashboard,
+  // /admin/*, /portal/*, Kurs-/Lektionsseiten, der Redirect-Sprung direkt
+  // nach dem Login) — im Widerspruch zum Kommentar oben ("NUR eine kleine,
+  // feste Liste"). Live-Messung: derselbe Login-Redirect brauchte per
+  // fetch() (nicht vom Service Worker abgefangen, da mode!=="navigate")
+  // 1,3 Sekunden, per echter Browser-Navigation (vom Service Worker
+  // abgefangen) über 20 Sekunden — reproduzierbar, zweimal mit
+  // unterschiedlichen Test-Konten bestätigt. Jetzt exakt auf APP_SHELL
+  // begrenzt, wie ursprünglich beschrieben; alle anderen Navigationen
+  // (insbesondere /dashboard nach dem Login) laufen unangetastet direkt
+  // zum Netzwerk, ohne Service-Worker-Umweg.
   if (request.method !== "GET" || request.mode !== "navigate") return;
+  if (!APP_SHELL.includes(new URL(request.url).pathname)) return;
 
   event.respondWith(
     fetch(request)

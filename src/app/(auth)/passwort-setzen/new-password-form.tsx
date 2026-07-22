@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { setNewPassword } from "@/lib/auth/actions";
 import type { AuthActionState } from "@/lib/auth/actions";
 
@@ -8,6 +8,12 @@ const initialState: AuthActionState = { error: null };
 
 export function NewPasswordForm() {
   const [state, action, pending] = useActionState(setNewPassword, initialState);
+
+  // BUGFIX (22.07.2026): siehe lib/auth/actions.ts (signInWithPassword) —
+  // redirect() aus der Server Action heraus war der langsame Pfad.
+  useEffect(() => {
+    if (state.redirectTo) window.location.href = state.redirectTo;
+  }, [state.redirectTo]);
 
   return (
     <form action={action} className="flex flex-col gap-3">

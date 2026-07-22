@@ -17,7 +17,7 @@ import { translateAuthError } from "@/lib/auth/errors";
 import { sendEmail } from "@/lib/email/client";
 import { passwordReset, magicLinkEmail, confirmSignup } from "@/lib/email/templates";
 
-export type AuthActionState = { error: string | null; success?: boolean };
+export type AuthActionState = { error: string | null; success?: boolean; redirectTo?: string };
 
 /**
  * Legt bei Erstanmeldung die profiles-Zeile an, falls sie fehlt.
@@ -73,8 +73,24 @@ export async function signInWithPassword(
   // und entscheidet identisch zu app/page.tsx — auf dem Portal-Host bleibt
   // `tenant` null (kein x-tenant-data-Header dort), redirect("/") also
   // unverändert (Middleware schreibt "/" dort transparent auf /portal um).
+  //
+  // BUGFIX (22.07.2026, Josips Fund: Login dauert 20+ Sekunden): ein direkter
+  // redirect() HIER, in einer per useActionState/<form action={fn}> JS-
+  // gebundenen Server Action, lief serverseitig immer in unter 1,5 Sekunden
+  // (per fetch() UND per rohem, React-losem <form>-POST in einem isolierten
+  // iframe verifiziert — 873 ms bzw. 1,3 s bis zur fertigen Dashboard-
+  // Antwort). Die exakt gleiche Anmeldung über das echte, React-gebundene
+  // Formular auf der Login-Seite brauchte reproduzierbar 20+ Sekunden — der
+  // Server war also nie das Problem. Next.js' Client-Runtime behandelt einen
+  // während einer Server Action geworfenen redirect() offenbar über einen
+  // Pfad, der auf dieser (Cloudflare/OpenNext-)Plattform sehr langsam wird
+  // (der End-Redirect landete beim finalen Dokument sogar mit
+  // `redirectCount: 0` statt 1 — kein sauberer Redirect-Follow). Umgangen,
+  // indem die Aktion das Ziel nur als Daten zurückgibt; die Navigation
+  // übernimmt die Client-Komponente selbst (siehe login/page.tsx), außerhalb
+  // von Next' eigener Redirect-Sonderbehandlung für Server Actions.
   const tenant = await getTenant();
-  redirect(tenant ? "/dashboard" : "/");
+  return { error: null, redirectTo: tenant ? "/dashboard" : "/" };
 }
 
 export async function signUpWithPassword(
@@ -353,7 +369,11 @@ export async function setNewPassword(
   }
 
   await ensureProfile(supabase, user.id, user.email ?? "");
-  redirect("/");
+  // BUGFIX (22.07.2026): gleicher Grund wie bei signInWithPassword() oben —
+  // redirect() direkt aus einer JS-gebundenen Server Action heraus ist auf
+  // dieser Plattform der langsame Pfad. Ziel als Daten zurückgeben, Client
+  // navigiert selbst (new-password-form.tsx).
+  return { error: null, redirectTo: "/" };
 }
 
 export async function signOut() {
