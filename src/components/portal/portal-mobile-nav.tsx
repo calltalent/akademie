@@ -43,7 +43,7 @@ export function PortalMobileNav({ ownAdminUrl }: { ownAdminUrl?: string }) {
   return (
     <div className="border-b border-slate-800 lg:hidden">
       <div className="flex items-center justify-between px-4 py-3">
-        <BrandLogo subLabel="PORTAL" variant="dark" />
+        <BrandLogo subLabel="PORTAL" variant="dark" compact />
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
