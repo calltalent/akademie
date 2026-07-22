@@ -3,15 +3,26 @@
 import { useActionState, useEffect } from "react";
 import { createCourse } from "@/lib/courses/actions";
 import { initialCourseActionState } from "@/lib/courses/state";
-import { COURSE_CATEGORIES } from "@/lib/courses/categories";
+import type { CourseCategoryRow } from "@/lib/courses/categories";
 
 /**
  * Design-Block 6 (13.07.2026): optionales `onSuccess` ergänzt, damit dieses
  * Formular jetzt auch in einem <dialog>-Modal (new-course-dialog.tsx)
  * verwendet werden kann und sich nach erfolgreichem Anlegen selbst schließt.
  * Ohne Prop unverändertes Verhalten (rein optional, kein Breaking Change).
+ *
+ * `categories` (22.07.2026, Migration course_categories): ersetzt den
+ * früheren globalen `COURSE_CATEGORIES`-Const — die Liste kommt jetzt
+ * mandantenspezifisch vom Aufrufer (admin/kurse/page.tsx), Optionswert ist
+ * die Kategorie-ID statt des Namens.
  */
-export function CreateCourseForm({ onSuccess }: { onSuccess?: () => void } = {}) {
+export function CreateCourseForm({
+  categories,
+  onSuccess,
+}: {
+  categories: CourseCategoryRow[];
+  onSuccess?: () => void;
+}) {
   const [state, action, pending] = useActionState(
     createCourse,
     initialCourseActionState,
@@ -52,9 +63,9 @@ export function CreateCourseForm({ onSuccess }: { onSuccess?: () => void } = {})
         Kategorie (optional, für den Kurskatalog-Filter)
         <select name="category" className="rounded-md border px-3 py-2 text-base">
           <option value="">— keine —</option>
-          {COURSE_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
             </option>
           ))}
         </select>

@@ -6,6 +6,7 @@ import { checkAdminAccess } from "@/lib/auth/staff";
 import { NewCourseDialog } from "@/components/admin/new-course-dialog";
 import { DeleteCourseIconButton } from "@/components/admin/delete-course-icon-button";
 import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
+import { CourseCategoryManager } from "@/components/admin/course-category-manager";
 import { updateCourseCoverUrl } from "@/lib/courses/actions";
 
 /**
@@ -101,11 +102,11 @@ export default async function AdminKursePage({
   // Rundläufe addiert statt parallel). `checkAdminAccess()` hängt ebenfalls
   // nur an Tenant/Session, nicht an den Kursdaten — läuft jetzt mit im
   // selben Promise.all statt danach.
-  const [{ data: courses }, { data: modules }, { data: lessons }, { data: enrollments }, { data: certificates }, adminAccess] =
+  const [{ data: courses }, { data: modules }, { data: lessons }, { data: enrollments }, { data: certificates }, { data: categories }, adminAccess] =
     await Promise.all([
       supabase
         .from("courses")
-        .select("id, title, slug, status, cover_url")
+        .select("id, title, slug, status, cover_url, category_id")
         .eq("tenant_id", tenantId)
         .order("position", { ascending: true }),
       supabase.from("modules").select("id, course_id").eq("tenant_id", tenantId),
@@ -117,6 +118,14 @@ export default async function AdminKursePage({
       // `count`-Abfrage pro Zeile (die Detailseite betrachtet genau einen
       // Kurs und zählt deshalb dort per `head: true`).
       supabase.from("certificates").select("course_id").eq("tenant_id", tenantId),
+      // Kurskategorien (Migration 20260722180000_course_categories.sql,
+      // Josips Auftrag: Kategorien im Admin-Bereich verwalten) — für
+      // CourseCategoryManager und die Kategorie-Auswahl im "Neuer Kurs"-Modal.
+      supabase
+        .from("course_categories")
+        .select("id, name")
+        .eq("tenant_id", tenantId)
+        .order("position", { ascending: true }),
       // Rollen-Gate für den Papierkorb (siehe Kopfkommentar unten). Schlägt
       // die Prüfung fehl, ist `isAdmin` false und die Liste rendert ohne
       // Löschknopf — der Zugriff auf die Seite selbst ist bereits über
@@ -124,6 +133,17 @@ export default async function AdminKursePage({
       checkAdminAccess(),
     ]);
   const isAdmin = adminAccess.ok;
+  const allCategories = categories ?? [];
+  const courseCountByCategory = new Map<string, number>();
+  for (const c of courses ?? []) {
+    if (!c.category_id) continue;
+    courseCountByCategory.set(c.category_id, (courseCountByCategory.get(c.category_id) ?? 0) + 1);
+  }
+  const managedCategories = allCategories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    courseCount: courseCountByCategory.get(c.id) ?? 0,
+  }));
 
   const courseIdByModule = new Map((modules ?? []).map((m) => [m.id, m.course_id]));
   const lessonCountByCourse = new Map<string, number>();
@@ -158,7 +178,10 @@ export default async function AdminKursePage({
             Kurse
           </h1>
         </div>
-        <NewCourseDialog />
+        <div className="flex flex-none items-center gap-2.5">
+          <CourseCategoryManager categories={managedCategories} />
+          <NewCourseDialog categories={allCategories} />
+        </div>
       </header>
 
       <div className="flex gap-2.5">

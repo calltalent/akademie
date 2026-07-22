@@ -171,7 +171,13 @@ export const lessonSchema = z.object({
   title: z.string().min(1, "Titel erforderlich.").max(300),
 });
 
+/** Kurskategorie (Migration 20260722180000_course_categories.sql) — Name, mandantenweit eindeutig (DB-Constraint). */
+export const courseCategorySchema = z.object({
+  name: z.string().trim().min(1, "Name erforderlich.").max(60),
+});
+
 export type CourseInput = z.infer<typeof courseSchema>;
 export type ModuleInput = z.infer<typeof moduleSchema>;
 export type SectionInput = z.infer<typeof sectionSchema>;
 export type LessonInput = z.infer<typeof lessonSchema>;
+export type CourseCategoryInput = z.infer<typeof courseCategorySchema>;

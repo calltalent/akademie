@@ -29,12 +29,24 @@ export default async function KurskatalogPage() {
   const tenant = await getTenant();
   if (!tenant) redirect("/");
 
+  // `course_categories(name)` (Migration 20260722180000_course_categories.sql)
+  // — der Join liefert den aktuellen Kategorienamen live, ohne dass ein
+  // Umbenennen im Admin-Bereich hier separat nachgezogen werden müsste.
   const { data: courses } = await supabase
     .from("courses")
-    .select("id, title, slug, status, category, cover_url")
+    .select("id, title, slug, status, category_id, course_categories(name), cover_url")
     .eq("tenant_id", tenant.id)
     .eq("status", "published")
     .order("position", { ascending: true });
+
+  // Für die Filter-Chips: die aktuelle, mandantenspezifische Kategorienliste
+  // statt des früheren globalen `COURSE_CATEGORIES`-Consts.
+  const { data: categoryRows } = await supabase
+    .from("course_categories")
+    .select("name")
+    .eq("tenant_id", tenant.id)
+    .order("position", { ascending: true });
+  const categoryNames = (categoryRows ?? []).map((c) => c.name as string);
 
   const courseIds = (courses ?? []).map((c) => c.id);
   const noneId = "00000000-0000-0000-0000-000000000000";
@@ -99,7 +111,11 @@ export default async function KurskatalogPage() {
       eyebrow: courseModules[0]?.title ? String(courseModules[0].title).toUpperCase() : null,
       meta,
       enrolled: enrolledIds.has(course.id),
-      category: (course.category as string | null) ?? null,
+      // Laufzeit-Form ist ein einzelnes Objekt (many-to-one via category_id,
+      // PostgREST embedded ohne Array), der generische, ungetypte
+      // Supabase-Client kennt die FK-Kardinalität aber nicht und nimmt ein
+      // Array an — Cast über `unknown`, da die Typen sonst nicht überlappen.
+      category: (course.course_categories as unknown as { name: string } | null)?.name ?? null,
       coverUrl: (course.cover_url as string | null) ?? null,
       tint: THUMB_TINTS[index % THUMB_TINTS.length],
     };
@@ -113,7 +129,7 @@ export default async function KurskatalogPage() {
       breadcrumb="Lernen · Kurskatalog"
       title="Kurskatalog"
     >
-      <KurskatalogGrid items={items} />
+      <KurskatalogGrid items={items} categories={categoryNames} />
     </AppShell>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { COURSE_CATEGORIES } from "@/lib/courses/categories";
 
 /**
  * Client-Teil des Kurskatalogs (Referenz: Kurskatalog.dc.html): Filter-Chips
@@ -27,10 +26,21 @@ export type CatalogItem = {
 
 const ALL = "Alle Kurse";
 
-export function KurskatalogGrid({ items }: { items: CatalogItem[] }) {
+/**
+ * `categories` (22.07.2026, Migration course_categories): ersetzt den
+ * früheren globalen `COURSE_CATEGORIES`-Const — die Filter-Chips zeigen
+ * jetzt die aktuelle, mandantenspezifische Kategorienliste (page.tsx).
+ */
+export function KurskatalogGrid({
+  items,
+  categories,
+}: {
+  items: CatalogItem[];
+  categories: string[];
+}) {
   const [active, setActive] = useState<string>(ALL);
 
-  const filters = [ALL, ...COURSE_CATEGORIES];
+  const filters = [ALL, ...categories];
   const filtered = active === ALL ? items : items.filter((i) => i.category === active);
 
   return (

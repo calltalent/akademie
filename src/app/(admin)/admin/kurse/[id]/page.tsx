@@ -48,7 +48,7 @@ export default async function CourseEditorPage({
 
   const { data: course } = await supabase
     .from("courses")
-    .select("id, title, slug, status, category")
+    .select("id, title, slug, status, category_id")
     .eq("id", courseId)
     .eq("tenant_id", tenant!.id)
     .maybeSingle();
@@ -60,6 +60,13 @@ export default async function CourseEditorPage({
       </div>
     );
   }
+
+  // Kurskategorien des Mandanten (Migration 20260722180000_course_categories.sql) für CourseCategorySelect.
+  const { data: categories } = await supabase
+    .from("course_categories")
+    .select("id, name")
+    .eq("tenant_id", tenant!.id)
+    .order("position", { ascending: true });
 
   const { data: modules } = await supabase
     .from("modules")
@@ -133,7 +140,11 @@ export default async function CourseEditorPage({
         <CourseTitleEditor courseId={courseId} initialTitle={course.title} initialSlug={course.slug} />
         <div className="flex flex-wrap items-end gap-4">
           <CourseStatusSelect courseId={courseId} status={course.status} />
-          <CourseCategorySelect courseId={courseId} category={course.category ?? null} />
+          <CourseCategorySelect
+            courseId={courseId}
+            categoryId={course.category_id ?? null}
+            categories={categories ?? []}
+          />
           <ReembedCourseButton courseId={courseId} />
           <Link
             href="/admin/kurse"

@@ -1,11 +1,14 @@
 /**
- * Standard-Kurskategorien für den Kurskatalog-Filter (Referenz:
- * Kurskatalog.dc.html). Genutzt von der Filter-Leiste (kurskatalog-grid.tsx)
- * und der Kategorie-Auswahl im Admin (create-course-form.tsx,
- * CourseCategorySelect). Die DB-Spalte `courses.category` ist freier Text —
- * ein Kurs kann null (keine Kategorie → nur unter „Alle Kurse") oder einen
- * dieser Werte haben.
+ * Kurskategorien (Migration 20260722180000_course_categories.sql, Josips
+ * Auftrag: "Kategorien hinzufügen, bearbeiten, löschen können"). Keine
+ * geschlossene, fest codierte Liste mehr (vorher `COURSE_CATEGORIES`-Const,
+ * global für alle Mandanten) — jeder Mandant pflegt seine eigenen Zeilen in
+ * `course_categories`. Dieser Typ ist die gemeinsame Form, die Server-
+ * Komponenten nach dem Laden an die Auswahl-/Verwaltungs-Client-Komponenten
+ * durchreichen (create-course-form.tsx, publish-toggle.tsx,
+ * course-category-manager.tsx, kurskatalog-grid.tsx).
  */
-export const COURSE_CATEGORIES = ["Vertrieb", "Telefonie", "Abschluss", "Mindset"] as const;
-
-export type CourseCategory = (typeof COURSE_CATEGORIES)[number];
+export type CourseCategoryRow = {
+  id: string;
+  name: string;
+};

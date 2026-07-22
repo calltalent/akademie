@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Plus } from "lucide-react";
 import { CreateCourseForm } from "@/components/admin/create-course-form";
+import type { CourseCategoryRow } from "@/lib/courses/categories";
 
 /**
  * Design-Block 6 (13.07.2026, AdminKurse.dc.html): der Export zeigt "Neuer
@@ -12,7 +13,7 @@ import { CreateCourseForm } from "@/components/admin/create-course-form";
  * Modale verwendet (natives <dialog>, siehe api-key-created-dialog.tsx /
  * CLAUDE.md §3.4) statt eine neue Seite anzulegen.
  */
-export function NewCourseDialog() {
+export function NewCourseDialog({ categories }: { categories: CourseCategoryRow[] }) {
   const ref = useRef<HTMLDialogElement>(null);
 
   return (
@@ -35,7 +36,7 @@ export function NewCourseDialog() {
         <h2 id="new-course-title" className="sr-only">
           Neuer Kurs
         </h2>
-        <CreateCourseForm onSuccess={() => ref.current?.close()} />
+        <CreateCourseForm categories={categories} onSuccess={() => ref.current?.close()} />
         <button
           type="button"
           onClick={() => ref.current?.close()}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockSchema, blocksSchema, createEmptyBlock, courseSchema } from "./schema";
+import { blockSchema, blocksSchema, courseCategorySchema, createEmptyBlock, courseSchema } from "./schema";
 
 describe("blockSchema", () => {
   it("akzeptiert einen gültigen Text-Block", () => {
@@ -52,5 +52,22 @@ describe("courseSchema", () => {
     expect(
       courseSchema.safeParse({ title: "Test", slug: "mein-kurs-1" }).success,
     ).toBe(true);
+  });
+});
+
+describe("courseCategorySchema", () => {
+  it("lehnt leeren Namen ab", () => {
+    expect(courseCategorySchema.safeParse({ name: "" }).success).toBe(false);
+    expect(courseCategorySchema.safeParse({ name: "   " }).success).toBe(false);
+  });
+
+  it("trimmt Whitespace", () => {
+    const result = courseCategorySchema.safeParse({ name: "  Vertrieb  " });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.name).toBe("Vertrieb");
+  });
+
+  it("lehnt Namen über 60 Zeichen ab", () => {
+    expect(courseCategorySchema.safeParse({ name: "a".repeat(61) }).success).toBe(false);
   });
 });

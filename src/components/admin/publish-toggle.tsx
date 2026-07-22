@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { Check } from "lucide-react";
 import { updateCourseStatus, updateCourseCategory, updateLessonStatus } from "@/lib/courses/actions";
-import { COURSE_CATEGORIES } from "@/lib/courses/categories";
+import type { CourseCategoryRow } from "@/lib/courses/categories";
 
 /**
  * Design-Block 6 (13.07.2026): ersetzt den früheren CoursePublishToggle
@@ -56,14 +56,18 @@ export function CourseStatusSelect({
  * Kategorie eines Kurses setzen (für den Kurskatalog-Filter). Analog
  * CourseStatusSelect — Änderung sofort per Server-Action, kein Speichern-
  * Button. „Keine Kategorie" → null (Kurs erscheint im Katalog nur unter
- * „Alle Kurse").
+ * „Alle Kurse"). `categories` (22.07.2026, Migration course_categories)
+ * ersetzt den früheren globalen `COURSE_CATEGORIES`-Const, `categoryId`
+ * ersetzt den früheren Namen-String als Wert.
  */
 export function CourseCategorySelect({
   courseId,
-  category,
+  categoryId,
+  categories,
 }: {
   courseId: string;
-  category: string | null;
+  categoryId: string | null;
+  categories: CourseCategoryRow[];
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -71,7 +75,7 @@ export function CourseCategorySelect({
     <label className="flex flex-col gap-1.5 text-[13px] font-bold" style={{ color: "#3E3F66" }}>
       Kategorie
       <select
-        value={category ?? ""}
+        value={categoryId ?? ""}
         disabled={pending}
         onChange={(e) => {
           const next = e.target.value || null;
@@ -83,9 +87,9 @@ export function CourseCategorySelect({
         style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
       >
         <option value="">Keine Kategorie</option>
-        {COURSE_CATEGORIES.map((c) => (
-          <option key={c} value={c}>
-            {c}
+        {categories.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
           </option>
         ))}
       </select>

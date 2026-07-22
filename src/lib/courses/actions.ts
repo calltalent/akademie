@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireStaffTenant, requireAdminTenant } from "@/lib/auth/staff";
 import {
   blocksSchema,
+  courseCategorySchema,
   courseSchema,
   lessonSchema,
   moduleSchema,
@@ -16,13 +17,31 @@ import { resolveUniqueCourseSlug } from "@/lib/courses/resolve-slug";
 import type { CourseActionState } from "@/lib/courses/state";
 import { translateDbError } from "@/lib/errors/db";
 import { genericErrorMessage } from "@/lib/errors/generic";
-import { COURSE_CATEGORIES } from "@/lib/courses/categories";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** Nur eine der Standard-Kategorien (oder null) zulassen. */
-function normalizeCategory(raw: FormDataEntryValue | string | null): string | null {
-  return typeof raw === "string" && (COURSE_CATEGORIES as readonly string[]).includes(raw)
-    ? raw
-    : null;
+/**
+ * Prüft, dass die übergebene Kategorie-ID (falls gesetzt) wirklich zu DIESEM
+ * Mandanten gehört, bevor sie in `courses.category_id` geschrieben wird —
+ * ohne diesen Check könnte ein manipulierter Aufruf die Kategorie-ID eines
+ * FREMDEN Mandanten eintragen (die DB-FK selbst erlaubt das, sie kennt keine
+ * Mandantengrenze). Gleiches Prinzip wie der bunny_videos-Eigentümer-Check in
+ * `saveLessonBlocks` weiter unten.
+ */
+async function resolveCategoryId(
+  supabase: SupabaseClient,
+  tenantId: string,
+  raw: FormDataEntryValue | string | null,
+): Promise<{ ok: true; categoryId: string | null } | { ok: false; error: string }> {
+  if (typeof raw !== "string" || raw === "") return { ok: true, categoryId: null };
+  const { data, error } = await supabase
+    .from("course_categories")
+    .select("id")
+    .eq("id", raw)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (error) return { ok: false, error: translateDbError(error) };
+  if (!data) return { ok: false, error: "Kategorie nicht gefunden." };
+  return { ok: true, categoryId: data.id };
 }
 
 function errorState(e: unknown): CourseActionState {
@@ -46,12 +65,15 @@ export async function createCourse(
       return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
     }
 
+    const categoryResult = await resolveCategoryId(supabase, tenant.id, formData.get("category"));
+    if (!categoryResult.ok) return { error: categoryResult.error };
+
     const { error } = await supabase.from("courses").insert({
       tenant_id: tenant.id,
       title: parsed.data.title,
       slug: parsed.data.slug,
       description: parsed.data.description ?? null,
-      category: normalizeCategory(formData.get("category")),
+      category_id: categoryResult.categoryId,
       created_by: user.id,
     });
     if (error) {
@@ -67,14 +89,97 @@ export async function createCourse(
 
 export async function updateCourseCategory(
   courseId: string,
-  category: string | null,
+  categoryId: string | null,
 ): Promise<CourseActionState> {
   try {
     const { tenant, supabase } = await requireStaffTenant();
+    const categoryResult = await resolveCategoryId(supabase, tenant.id, categoryId);
+    if (!categoryResult.ok) return { error: categoryResult.error };
     const { error } = await supabase
       .from("courses")
-      .update({ category: normalizeCategory(category) })
+      .update({ category_id: categoryResult.categoryId })
       .eq("id", courseId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+    revalidatePath("/admin/kurse");
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+// --- Kategorien ---
+
+export async function createCourseCategory(
+  _prevState: CourseActionState,
+  formData: FormData,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const parsed = courseCategorySchema.safeParse({ name: formData.get("name") });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+
+    const { count } = await supabase
+      .from("course_categories")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id);
+
+    const { error } = await supabase.from("course_categories").insert({
+      tenant_id: tenant.id,
+      name: parsed.data.name,
+      position: count ?? 0,
+    });
+    if (error) return { error: translateDbError(error) };
+
+    revalidatePath("/admin/kurse");
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+export async function renameCourseCategory(
+  categoryId: string,
+  name: string,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const parsed = courseCategorySchema.safeParse({ name });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Ungültiger Name." };
+    }
+    const { error } = await supabase
+      .from("course_categories")
+      .update({ name: parsed.data.name })
+      .eq("id", categoryId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+    revalidatePath("/admin/kurse");
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
+ * Löscht nur die Kategorie-Zeile selbst — Kurse, die sie trugen, verlieren
+ * ihre Zuordnung automatisch über die FK-Regel `on delete set null`
+ * (Migration 20260722180000_course_categories.sql), kein manueller
+ * Vorab-Schritt nötig. Bewusst `requireStaffTenant()` statt
+ * `requireAdminTenant()` wie bei `deleteCourse` — anders als eine
+ * Kurslöschung reißt das hier keine Lerninhalte/Zertifikate mit, sondern
+ * setzt lediglich ein Tag zurück (gleiche Stufe wie `deleteModule`/
+ * `deleteSection`).
+ */
+export async function deleteCourseCategory(categoryId: string): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const { error } = await supabase
+      .from("course_categories")
+      .delete()
+      .eq("id", categoryId)
       .eq("tenant_id", tenant.id);
     if (error) return { error: translateDbError(error) };
     revalidatePath("/admin/kurse");
