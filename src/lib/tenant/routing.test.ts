@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideRouting, isApiPath } from "./routing";
+import { decideRouting, isApiPath, isAuthPath } from "./routing";
 
 const PORTAL_HOST = "portal.calltalent.ai";
 
@@ -73,6 +73,19 @@ describe("decideRouting — Mandanten-Host", () => {
   });
 });
 
+describe("isAuthPath", () => {
+  it("erkennt /auth und /auth/...", () => {
+    expect(isAuthPath("/auth")).toBe(true);
+    expect(isAuthPath("/auth/signout")).toBe(true);
+    expect(isAuthPath("/auth/callback")).toBe(true);
+  });
+
+  it("verwechselt ähnlich beginnende Pfade nicht mit Auth-Pfaden", () => {
+    expect(isAuthPath("/authentifizierung")).toBe(false);
+    expect(isAuthPath("/")).toBe(false);
+  });
+});
+
 describe("decideRouting — Portal-Host", () => {
   // REGRESSIONSSCHUTZ für den Stripe-Fix vom 12.07.2026: Der Webhook ist auf
   // dem Portal-Host registriert und leitet alles aus session.metadata ab. Ein
@@ -86,6 +99,19 @@ describe("decideRouting — Portal-Host", () => {
         portalHost: PORTAL_HOST,
       }),
     ).toEqual({ servedPath: "/api/stripe/webhook", resolveTenant: false, rewrite: false });
+  });
+
+  // REGRESSIONSSCHUTZ (22.07.2026, Josips Fund "Abmelden im Portal führt zu
+  // einem weißen, leeren Fenster"): /auth/signout liegt wie /api/... außerhalb
+  // von src/app/portal/... — ein Rewrite auf /portal/auth/signout träfe eine
+  // nicht existierende Route (404), supabase.auth.signOut() liefe nie.
+  it("schreibt /auth/... NIEMALS auf /portal/auth/... um", () => {
+    expect(
+      decideRouting({ host: PORTAL_HOST, pathname: "/auth/signout", portalHost: PORTAL_HOST }),
+    ).toEqual({ servedPath: "/auth/signout", resolveTenant: false, rewrite: false });
+    expect(
+      decideRouting({ host: PORTAL_HOST, pathname: "/auth/callback", portalHost: PORTAL_HOST }),
+    ).toEqual({ servedPath: "/auth/callback", resolveTenant: false, rewrite: false });
   });
 
   it("versucht auf dem Portal-Host keine Mandanten-Auflösung", () => {

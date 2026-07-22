@@ -47,6 +47,25 @@ export function isApiPath(pathname: string): boolean {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
+/**
+ * BUGFIX (22.07.2026, Josips Fund: "Abmelden im Portal führt zu einem
+ * weißen, leeren Fenster"): `/auth/signout` (Formular in portal-shell.tsx)
+ * und `/auth/callback` (Magic-Link-/Passwort-Rücksprung) sind wie `/api/...`
+ * host-unabhängige Routen — sie leben unter `src/app/auth/...`, NICHT unter
+ * `src/app/portal/...`. Ohne diesen Ausschluss griff auf dem Portal-Host
+ * dieselbe Pauschal-Regel wie bei jeder normalen Seite: `/auth/signout`
+ * wurde zu `/portal/auth/signout` umgeschrieben — eine nicht existierende
+ * Route (404). Der Request erreichte den echten Route-Handler
+ * (auth/signout/route.ts) dadurch nie, `supabase.auth.signOut()` lief nie,
+ * und der Browser landete auf der 404-Seite (weiß, leer) statt auf
+ * `/portal/login`. Exakt dieselbe Fehlerklasse wie der Stripe-Webhook-Fix
+ * vom 12.07.2026 (siehe Kopfkommentar), nur für `/auth/...` statt `/api/...`
+ * nie nachgezogen.
+ */
+export function isAuthPath(pathname: string): boolean {
+  return pathname === "/auth" || pathname.startsWith("/auth/");
+}
+
 export function decideRouting(params: {
   /** Host-Header der Anfrage, mit oder ohne Port. */
   host: string;
@@ -61,7 +80,10 @@ export function decideRouting(params: {
   // Betreiber-Portal-Host: hat per Definition keinen Mandanten.
   if (isPortalHost) {
     // API bleibt unangetastet (Regel 1) — kein Rewrite, keine Auflösung.
-    if (api) {
+    // /auth/... ebenso (siehe isAuthPath()-Kommentar) — beide liegen
+    // außerhalb von src/app/portal/..., ein Rewrite auf /portal/... träfe
+    // in beiden Fällen eine nicht existierende Route.
+    if (api || isAuthPath(pathname)) {
       return { servedPath: pathname, resolveTenant: false, rewrite: false };
     }
     // Doppel-Rewrite vermeiden, falls der Pfad bereits mit /portal beginnt
