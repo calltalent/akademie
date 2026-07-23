@@ -1,3 +1,4 @@
+import { ExternalLink, File as FileIcon } from "lucide-react";
 import type { Block } from "@/lib/courses/schema";
 import { getBunnyVideo, getPlayerConfig } from "@/lib/bunny/client";
 import { BunnyPlayer } from "@/components/player/bunny-player";
@@ -179,9 +180,43 @@ async function BlockView({
           <div className="rounded-md border p-6 text-center text-base text-gray-500">Keine Datei ausgewählt.</div>
         );
       }
+      // Karten-Darstellung statt nacktem Textlink (Josips Auftrag,
+      // 23.07.2026) — eigenständiges Design (CLAUDE.md §3.1: kein
+      // Übernehmen von Fremd-Assets/-Branding), nur die allgemeine Form
+      // (Icon + Titel + Aktion) orientiert sich am üblichen Muster für
+      // Download-Materialien. `target="_blank"` statt Inline-Download: die
+      // Datei kann jeder erlaubte Typ sein (PDF, Word, ZIP …), der Browser
+      // entscheidet selbst zwischen Anzeigen und Herunterladen.
       return (
-        <a href={block.url} className="text-base underline" style={{ color: "var(--color-primary)" }}>
-          Datei herunterladen: {block.filename}
+        <a
+          href={block.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-4 rounded-2xl border bg-white p-5 no-underline transition-colors hover:bg-gray-50"
+          style={{ borderColor: "#E7E8F2" }}
+        >
+          <span
+            className="flex h-12 w-12 flex-none items-center justify-center rounded-xl"
+            style={{ background: "#EDEEF7" }}
+            aria-hidden="true"
+          >
+            <FileIcon size={22} style={{ color: "var(--color-primary)" }} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-base font-bold" style={{ color: "#1A1A2E" }}>
+              {block.filename || "Datei herunterladen"}
+            </span>
+            <span className="block text-sm" style={{ color: "#66679B" }}>
+              Zum Öffnen oder Herunterladen klicken
+            </span>
+          </span>
+          <span
+            className="inline-flex flex-none items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white"
+            style={{ background: "var(--color-primary)" }}
+          >
+            <ExternalLink size={15} aria-hidden="true" />
+            Link öffnen
+          </span>
         </a>
       );
 

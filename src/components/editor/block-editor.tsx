@@ -44,15 +44,6 @@ const BLOCK_TYPE_ICONS: Record<BlockType, LucideIcon> = {
 };
 
 /**
- * Die vier häufigsten Block-Typen zuerst in der Block-Leiste (Design-Vorgabe,
- * AdminKursEditor.dc.html: "neun gleichwertige Buttons sind zu viel
- * Suchaufwand"), der Rest hinter „Weitere Blöcke". Nur die AUSWAHL ist hier
- * fest verdrahtet — die Beschriftungen selbst kommen weiterhin aus
- * `BLOCK_TYPE_LABELS` (schema.ts), nicht hart codiert.
- */
-const PRIMARY_BLOCK_TYPES: BlockType[] = ["text", "video", "image", "quiz"];
-
-/**
  * Block 3: Autosave mit 1s-Debounce nach jeder Änderung. Bewusst kein
  * Drag & Drop (Phase-1-Vereinfachung, siehe PHASENSTATUS.md) — Reihenfolge
  * per Auf/Ab-Pfeil. Validierung läuft doppelt: hier (UI-Feedback) und
@@ -273,10 +264,14 @@ function SaveIndicator({ status, errorMessage }: { status: SaveStatus; errorMess
   );
 }
 
+/**
+ * Alle Block-Typen als gleichwertige, direkt sichtbare Buttons (Josips
+ * Auftrag, 23.07.2026 — löst die vorherige Aufteilung "vier Haupttypen +
+ * Weitere Blöcke"-Aufklapper ab). Reihenfolge kommt aus `BLOCK_TYPE_LABELS`
+ * (schema.ts), nicht hart codiert.
+ */
 function AddBlockBar({ onAdd }: { onAdd: (type: BlockType) => void }) {
-  const secondaryTypes = (Object.keys(BLOCK_TYPE_LABELS) as BlockType[]).filter(
-    (type) => !PRIMARY_BLOCK_TYPES.includes(type),
-  );
+  const allTypes = Object.keys(BLOCK_TYPE_LABELS) as BlockType[];
 
   return (
     <div className="mt-5 pt-[18px]" style={{ borderTop: "1px solid #EEF0F7" }}>
@@ -284,7 +279,7 @@ function AddBlockBar({ onAdd }: { onAdd: (type: BlockType) => void }) {
         Block hinzufügen
       </div>
       <div className="flex flex-wrap items-start gap-2.5">
-        {PRIMARY_BLOCK_TYPES.map((type) => (
+        {allTypes.map((type) => (
           <button
             key={type}
             type="button"
@@ -296,32 +291,6 @@ function AddBlockBar({ onAdd }: { onAdd: (type: BlockType) => void }) {
             {BLOCK_TYPE_LABELS[type]}
           </button>
         ))}
-        <details className="relative">
-          <summary
-            className="flex cursor-pointer list-none items-center gap-1.5 rounded-[11px] border bg-white px-4 py-2.5 text-sm font-bold"
-            style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
-          >
-            <ChevronDown size={14} aria-hidden="true" style={{ color: "#5663AE" }} />
-            Weitere Blöcke
-          </summary>
-          <div
-            className="absolute z-10 mt-2 flex w-max flex-col gap-1 rounded-xl border bg-white p-2"
-            style={{ borderColor: "#E7E8F2" }}
-          >
-            {secondaryTypes.map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => onAdd(type)}
-                className="inline-flex items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-semibold"
-                style={{ color: "#1A1A2E" }}
-              >
-                <Plus size={13} aria-hidden="true" style={{ color: "#5663AE" }} />
-                {BLOCK_TYPE_LABELS[type]}
-              </button>
-            ))}
-          </div>
-        </details>
       </div>
     </div>
   );

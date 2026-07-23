@@ -216,7 +216,12 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-hidden px-4">
+      {/* min-h-0: gleicher Fix wie AdminSidebar.tsx (Josips Fund "Footer der
+          Sidebar abgeschnitten") — ohne das wächst dieses Flex-Kind bei
+          vielen admin-verwaltbaren Zusatzlinks (customLinks) über die feste
+          h-screen-Höhe des <aside> hinaus und drückt den Footer darunter aus
+          dem sichtbaren Bereich. */}
+      <nav className="min-h-0 flex-1 overflow-hidden px-4">
         {expanded && (
           <p className="mb-[9px] px-3 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-400">
             Lernen

@@ -202,7 +202,14 @@ export function AdminSidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-4">
+      {/* BUGFIX (23.07.2026, Josips Fund: "Footer der Sidebar abgeschnitten"):
+          `min-h-0` fehlte — ohne das ignoriert ein Flex-Kind mit `flex-1` +
+          `overflow-y-auto` sein `overflow` und wächst über die feste
+          `h-screen`-Höhe des <aside> hinaus (Flexbox-Standard: `min-height`
+          eines Flex-Kinds ist `auto`, nicht `0`), drückt dadurch den darunter
+          liegenden Footer ("Zur Lernansicht"/"Abmelden") aus dem sichtbaren
+          Bereich, statt selbst intern zu scrollen. */}
+      <nav className="min-h-0 flex-1 overflow-y-auto px-4">
         {GROUPS.map((group) => {
           const items = group.items.filter((i) => !i.platformOnly || isPlatformAdmin);
           if (items.length === 0) return null;
