@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { checkPlatformAccess } from "@/lib/platform/auth";
+import { getTenant } from "@/lib/tenant/context";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Design-Block (12.07.2026, Claude-Design-Export
@@ -59,9 +61,29 @@ export async function AppShell({
 }) {
   const platformAccess = await checkPlatformAccess();
 
+  // NEU (23.07.2026, Josips Auftrag: admin-verwaltbarer "LINKS"-Bereich in
+  // der Sidebar) — gehört hierher aus demselben Grund wie `isPlatformAdmin`
+  // oben: AppShell wird von rund einem Dutzend Lernbereich-Seiten
+  // eingebunden, jede einzelne um eine zusätzliche Prop zu erweitern wäre
+  // unnötig aufwendig. `getTenant()` ist bereits `cache()`-gewrappt (liest
+  // nur den `x-tenant-data`-Header, keine eigene DB-Anfrage) — nur die
+  // `sidebar_links`-Abfrage selbst ist neu, eine einzelne indexierte SELECT
+  // pro Seitenaufruf.
+  const tenant = await getTenant();
+  let customLinks: { id: string; label: string; url: string }[] = [];
+  if (tenant) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("sidebar_links")
+      .select("id, label, url")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: true });
+    customLinks = data ?? [];
+  }
+
   return (
     <div className="flex min-h-screen bg-bg">
-      <Sidebar isStaff={isStaff} isPlatformAdmin={platformAccess.ok} />
+      <Sidebar isStaff={isStaff} isPlatformAdmin={platformAccess.ok} customLinks={customLinks} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           breadcrumb={breadcrumb}

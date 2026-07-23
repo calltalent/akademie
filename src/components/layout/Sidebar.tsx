@@ -12,6 +12,7 @@ import {
   Bell,
   ShieldCheck,
   Building2,
+  ExternalLink,
   type LucideIcon,
 } from "lucide-react";
 
@@ -60,6 +61,14 @@ import {
  *   (noch) keine notifications-Tabelle; ein Badge erscheint nur, wenn ein
  *   echter Wert übergeben wird (DESIGN-MASTERPROMPT.md §8.1, keine erfundenen
  *   Zahlen).
+ *
+ * `customLinks` NEU (23.07.2026, Josips Auftrag: admin-verwaltbarer "LINKS"-
+ * Bereich, z. B. YouTube-Kanal/Terminbuchung) — Verwaltung in
+ * `/admin/einstellungen` (sidebar-links-panel.tsx), Daten kommen aus
+ * app-shell.tsx (dort geladen, nicht hier — Sidebar bleibt tenant-agnostisch/
+ * reine Darstellungskomponente). Plain `<a target="_blank">` statt `next/link`,
+ * da Ziele immer externe URLs sind, nie interne Routen. Abschnitt inkl.
+ * Überschrift erscheint nur, wenn mindestens ein Link existiert.
  */
 export type SidebarItemId =
   | "dashboard"
@@ -69,6 +78,9 @@ export type SidebarItemId =
   | "notif";
 
 type NavItem = { id: SidebarItemId; label: string; href: string; badge?: string; icon: LucideIcon };
+
+/** Admin-verwaltbarer "LINKS"-Bereich (Josips Auftrag, 23.07.2026) — siehe app-shell.tsx/sidebar-links-panel.tsx. */
+export type SidebarLink = { id: string; label: string; url: string };
 
 const LERNEN: NavItem[] = [
   { id: "dashboard", label: "Meine Kurse", href: "/dashboard", icon: LayoutGrid },
@@ -94,10 +106,12 @@ export function Sidebar({
   active,
   isStaff = false,
   isPlatformAdmin = false,
+  customLinks = [],
 }: {
   active?: SidebarItemId;
   isStaff?: boolean;
   isPlatformAdmin?: boolean;
+  customLinks?: SidebarLink[];
 }) {
   const [expanded, setExpanded] = useState(true);
   const pathname = usePathname();
@@ -135,6 +149,26 @@ export function Sidebar({
           </span>
         )}
       </Link>
+    );
+  }
+
+  /** Externe Links (YouTube, Terminbuchung, …) — kein `next/link`, da Ziel nie eine interne Route ist. */
+  function renderCustomLink(link: SidebarLink) {
+    return (
+      <a
+        key={link.id}
+        href={link.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={!expanded ? link.label : undefined}
+        className={[
+          "mb-[3px] flex items-center gap-3 rounded-sm px-3 py-[11px] text-[15px] font-medium text-navy no-underline transition-colors hover:bg-[rgba(62,63,102,0.06)]",
+          !expanded ? "justify-center" : "",
+        ].join(" ")}
+      >
+        <ExternalLink size={20} aria-hidden="true" className="flex-shrink-0" />
+        {expanded && <span className="flex-1">{link.label}</span>}
+      </a>
     );
   }
 
@@ -192,6 +226,18 @@ export function Sidebar({
           </p>
         )}
         {LERNEN.map(renderItem)}
+
+        {customLinks.length > 0 && (
+          <>
+            <div className="h-5" />
+            {expanded && (
+              <p className="mb-[9px] px-3 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-400">
+                Links
+              </p>
+            )}
+            {customLinks.map(renderCustomLink)}
+          </>
+        )}
 
         <div className="h-5" />
 
