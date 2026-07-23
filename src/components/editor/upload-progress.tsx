@@ -64,13 +64,23 @@ export function UploadProgress({ state }: { state: BunnyUploadState }) {
   }
 
   return (
-    <p
-      role="status"
-      className="inline-flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold"
-      style={{ borderColor: "#E7E8F2", color: "#1F8A5B" }}
-    >
-      <Check size={16} aria-hidden="true" />
-      Upload abgeschlossen.
-    </p>
+    <div role="status" className="flex flex-col gap-2 rounded-xl border p-4" style={{ borderColor: "#E7E8F2" }}>
+      <p className="inline-flex items-center gap-2 text-sm font-bold" style={{ color: "#1F8A5B" }}>
+        <Check size={16} aria-hidden="true" />
+        Upload abgeschlossen.
+      </p>
+      {/* Josips Meldung (23.07.2026): direkt nach "Verwenden" in der
+          Lernansicht geprüft und dort nur "Processing video" gesehen — das
+          Video war NICHT hängengeblieben (Bunny-Check bestätigt: fertig
+          verarbeitet, keine Fehler), es lief nur noch bei Bunny im
+          Encoding. Bunny meldet "fertig hochgeladen" (dieser Text) sofort,
+          das serverseitige Verarbeiten dauert danach noch etwas — ohne
+          diesen Hinweis wirkt das wie ein Fehler. */}
+      <p className="text-sm" style={{ color: "#66679B" }}>
+        Bunny verarbeitet das Video jetzt noch im Hintergrund — das dauert normalerweise ein bis zwei Minuten.
+        Erscheint in der Lernansicht zunächst „Processing video&quot;, ist das normal: Seite dort nach kurzer
+        Wartezeit neu laden.
+      </p>
+    </div>
   );
 }

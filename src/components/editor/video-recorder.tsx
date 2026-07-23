@@ -211,6 +211,27 @@ export function VideoRecorder({
     };
   }, []);
 
+  // BUGFIX (Josips Fund, 23.07.2026 — "mein Bild flimmert in der Kamera"):
+  // srcObject wurde vorher über einen INLINE Callback-Ref gesetzt
+  // (`ref={(el) => {...}}`). React ruft einen Callback-Ref bei jedem
+  // Re-Render neu auf, sobald die Funktionsreferenz wechselt — und die war
+  // inline definiert, wechselte also bei JEDEM Render. Während "recording"
+  // rendert die Komponente per Mikrofon-Pegel alle 150ms neu (siehe
+  // levelIntervalRef unten) — jede der resultierenden `srcObject`-
+  // Neuzuweisungen ließ den Videoframe kurz neu laden, sichtbar als
+  // Flackern im Takt der Pegelanzeige. Ein stabiler Ref + dieser Effekt
+  // (abhängig NUR von mode/phase.kind, nicht von micLevels/elapsedS) weist
+  // srcObject nur bei einem echten Phasenwechsel zu.
+  useEffect(() => {
+    if (mode !== "webcam") return;
+    if (phase.kind !== "ready" && phase.kind !== "recording") return;
+    const video = liveVideoRef.current;
+    const stream = streamRef.current;
+    if (video && stream && video.srcObject !== stream) {
+      video.srcObject = stream;
+    }
+  }, [mode, phase.kind]);
+
   // Mikrofon-Pegelanzeige (Teil C, Plan-Risiko R2): eigener AudioContext auf
   // dem Mikrofon-Track des laufenden Streams, nur während "recording" (deckt
   // sich mit der Design-Platzierung im "Aufnahme läuft"-Panel). Schließt den
@@ -667,10 +688,7 @@ export function VideoRecorder({
             {mode === "webcam" ? (
               // Muted: sonst Mikrofon-Rückkopplung durch die Live-Vorschau (Lautsprecher → Mikrofon).
               <video
-                ref={(el) => {
-                  liveVideoRef.current = el;
-                  if (el && streamRef.current) el.srcObject = streamRef.current;
-                }}
+                ref={liveVideoRef}
                 muted
                 playsInline
                 autoPlay
