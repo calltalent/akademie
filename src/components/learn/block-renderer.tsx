@@ -1,11 +1,27 @@
 import type { Block } from "@/lib/courses/schema";
-import { getPlayerConfig } from "@/lib/bunny/client";
+import { getBunnyVideo, getPlayerConfig } from "@/lib/bunny/client";
 import { BunnyPlayer } from "@/components/player/bunny-player";
+import { VideoProcessingStatus } from "@/components/learn/video-processing-status";
 import { loadQuizForLearner } from "@/lib/quiz/load";
 import { QuizRunner } from "@/components/learn/quiz-runner";
 import { createClient } from "@/lib/supabase/server";
 import { SubmissionForm, type LastSubmission } from "@/components/learn/submission-form";
 import type { SubmissionKind, SubmissionStatus } from "@/lib/submissions/schema";
+
+/**
+ * Fenster, innerhalb dessen `BlockView` den zusätzlichen Bunny-Statusaufruf
+ * für ein Video-Block macht (Josips Meldung 23.07.2026: "Processing video"
+ * bleibt in der Lernansicht stehen, obwohl Bunny längst fertig ist — Bunnys
+ * iframe-Player aktualisiert sich nie von selbst). Bewusst NICHT bei jedem
+ * Lektionsaufruf: Performance-Budget CLAUDE.md §3.3 (Player-Start < 500 ms)
+ * verbietet einen externen Bunny-Roundtrip auf JEDER Seitenanfrage einer
+ * längst fertigen, monatealten Lektion. `lessons.video_bunny_id` wird nur
+ * beim Speichern der Lektion geändert (courses/actions.ts) und der
+ * `updated_at`-Trigger (0001_init.sql) läuft bei JEDER Speicherung — eine
+ * kürzlich gespeicherte Lektion ist also ein zuverlässiger, kostenloser
+ * Hinweis "hier könnte noch ein frisches Video verarbeitet werden".
+ */
+const RECENT_EDIT_WINDOW_MS = 30 * 60 * 1000;
 
 /**
  * Read-only-Darstellung der Blöcke in der Lernansicht.
@@ -22,11 +38,19 @@ import type { SubmissionKind, SubmissionStatus } from "@/lib/submissions/schema"
  * BunnyPlayer/getPlayerConfig weiter unten; der submission-Fall (Block 3)
  * folgt demselben Muster für die letzte eigene Abgabe des Nutzers).
  */
-export function BlockRenderer({ blocks, lessonId }: { blocks: Block[]; lessonId: string }) {
+export function BlockRenderer({
+  blocks,
+  lessonId,
+  lessonUpdatedAt,
+}: {
+  blocks: Block[];
+  lessonId: string;
+  lessonUpdatedAt?: string | null;
+}) {
   return (
     <div className="flex flex-col gap-4">
       {blocks.map((block) => (
-        <BlockView key={block.id} block={block} lessonId={lessonId} />
+        <BlockView key={block.id} block={block} lessonId={lessonId} lessonUpdatedAt={lessonUpdatedAt} />
       ))}
       {blocks.length === 0 && (
         <p className="text-base text-gray-500">Diese Lektion hat noch keinen Inhalt.</p>
@@ -35,7 +59,15 @@ export function BlockRenderer({ blocks, lessonId }: { blocks: Block[]; lessonId:
   );
 }
 
-async function BlockView({ block, lessonId }: { block: Block; lessonId: string }) {
+async function BlockView({
+  block,
+  lessonId,
+  lessonUpdatedAt,
+}: {
+  block: Block;
+  lessonId: string;
+  lessonUpdatedAt?: string | null;
+}) {
   switch (block.type) {
     case "text":
       // Inhalt stammt nur von Staff (RLS lessons_staff_write), kein
@@ -83,6 +115,42 @@ async function BlockView({ block, lessonId }: { block: Block; lessonId: string }
           </div>
         );
       }
+
+      // Siehe RECENT_EDIT_WINDOW_MS-Kommentar oben: nur bei kürzlich
+      // gespeicherten Lektionen lohnt sich der zusätzliche Bunny-Aufruf.
+      const editedAt = lessonUpdatedAt ? new Date(lessonUpdatedAt).getTime() : NaN;
+      // eslint-disable-next-line react-hooks/purity -- async Server Component, läuft pro Request einmal (kein Re-Render/Memoization-Fall), siehe gleiches Muster in app/portal/mandanten/[id]/page.tsx
+      const recentlyEdited = Number.isFinite(editedAt) && Date.now() - editedAt < RECENT_EDIT_WINDOW_MS;
+
+      // Wie beim libraryId-Fix oben: Bunny-Aufruf + Auswertung nur im try,
+      // JSX erst danach außerhalb gebaut (react-hooks/error-boundaries
+      // erlaubt keine JSX-Konstruktion innerhalb von try/catch).
+      let videoStatus: number | null = null;
+      if (recentlyEdited) {
+        try {
+          videoStatus = (await getBunnyVideo(block.bunnyVideoId)).status;
+        } catch {
+          // Bunny-Statusabfrage fehlgeschlagen -> Player trotzdem anzeigen,
+          // statt eine gesunde Lektion durch unseren eigenen Fehler zu blockieren.
+          videoStatus = null;
+        }
+      }
+
+      if (videoStatus === 5 || videoStatus === 6) {
+        return (
+          <div
+            role="alert"
+            className="rounded-md border p-6 text-center text-base"
+            style={{ borderColor: "#E9CFCF", background: "#FBEAEA", color: "#B14A4A" }}
+          >
+            Video konnte nicht verarbeitet werden. Bitte im Kurs-Editor erneut hochladen.
+          </div>
+        );
+      }
+      if (videoStatus !== null && videoStatus !== 4) {
+        return <VideoProcessingStatus lessonId={lessonId} />;
+      }
+
       return <BunnyPlayer libraryId={libraryId} videoId={block.bunnyVideoId} />;
     }
 

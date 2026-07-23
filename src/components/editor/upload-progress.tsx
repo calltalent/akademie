@@ -73,13 +73,15 @@ export function UploadProgress({ state }: { state: BunnyUploadState }) {
           Lernansicht geprüft und dort nur "Processing video" gesehen — das
           Video war NICHT hängengeblieben (Bunny-Check bestätigt: fertig
           verarbeitet, keine Fehler), es lief nur noch bei Bunny im
-          Encoding. Bunny meldet "fertig hochgeladen" (dieser Text) sofort,
-          das serverseitige Verarbeiten dauert danach noch etwas — ohne
-          diesen Hinweis wirkt das wie ein Fehler. */}
+          Encoding (bei den beobachteten Testvideos 1 bis ca. 5 Minuten,
+          abhängig von Bunnys Warteschlange). Die Lernansicht aktualisiert
+          sich seitdem selbst automatisch (VideoProcessingStatus, siehe
+          block-renderer.tsx) — dieser Hinweis bleibt trotzdem, damit die
+          Wartezeit direkt nach dem Hochladen nicht wie ein Fehler wirkt. */}
       <p className="text-sm" style={{ color: "#66679B" }}>
-        Bunny verarbeitet das Video jetzt noch im Hintergrund — das dauert normalerweise ein bis zwei Minuten.
-        Erscheint in der Lernansicht zunächst „Processing video&quot;, ist das normal: Seite dort nach kurzer
-        Wartezeit neu laden.
+        Bunny verarbeitet das Video jetzt noch im Hintergrund — das kann je nach Auslastung einige Minuten dauern.
+        Die Lernansicht zeigt in der Zwischenzeit „Video wird noch verarbeitet&quot; und aktualisiert sich von
+        selbst, sobald es fertig ist.
       </p>
     </div>
   );

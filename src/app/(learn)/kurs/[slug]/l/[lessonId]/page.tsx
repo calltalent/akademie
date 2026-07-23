@@ -75,7 +75,9 @@ export default async function LessonPage({
 
   const { data: lessons } = await supabase
     .from("lessons")
-    .select("id, title, module_id, section_id, blocks, status, position, transcript, summary, chapters, video_duration_s")
+    .select(
+      "id, title, module_id, section_id, blocks, status, position, transcript, summary, chapters, video_duration_s, updated_at",
+    )
     .in("module_id", (modules ?? []).map((m) => m.id))
     .eq("status", "published")
     .order("position", { ascending: true });
@@ -238,7 +240,7 @@ export default async function LessonPage({
             </div>
 
             <div className="px-[26px] pb-2 pt-4">
-              <BlockRenderer blocks={blocks} lessonId={lessonId} />
+              <BlockRenderer blocks={blocks} lessonId={lessonId} lessonUpdatedAt={lesson.updated_at as string | null} />
             </div>
 
             {/* Fußzeile */}

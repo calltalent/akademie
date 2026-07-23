@@ -3,6 +3,7 @@
 import { requireStaffTenant } from "@/lib/auth/staff";
 import { getBunnyVideo, triggerTranscription } from "@/lib/bunny/client";
 import { processVideoTranscript } from "@/lib/video/transcript";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Phase 3, Block 6 (Auto-Transkript). Manueller Ersatzweg für den lokal
@@ -71,5 +72,44 @@ export async function refreshLessonTranscript(lessonId: string): Promise<Refresh
     const message = e instanceof Error ? e.message : "Unbekannter Fehler.";
     console.error("[video/actions] refreshLessonTranscript fehlgeschlagen:", message);
     return { ok: false, message: "Aktualisierung fehlgeschlagen. Bitte später erneut versuchen." };
+  }
+}
+
+export type LessonVideoStatus = { ready: boolean; failed: boolean };
+
+/**
+ * Von `VideoProcessingStatus` (components/learn) client-seitig gepollt,
+ * solange `block-renderer.tsx` eine kürzlich bearbeitete Lektion noch nicht
+ * als fertig verarbeitet einstuft (siehe dortiger Kommentar) — Josips
+ * Meldung 23.07.2026: Bunnys iframe-Player zeigt "Processing video" ohne
+ * jede Selbstaktualisierung an, sobald die Verarbeitung fertig ist.
+ *
+ * Bewusst OHNE `requireStaffTenant()` — anders als `refreshLessonTranscript`
+ * oben brauchen auch Kursteilnehmer diesen Aufruf (sie sehen frisch
+ * hochgeladene Videos genauso). Autorisierung läuft stattdessen über RLS auf
+ * `lessons` (derselbe `createClient()`-Client wie in block-renderer.tsx für
+ * den submission-Fall): kann der aufrufende Nutzer die Zeile nicht lesen,
+ * kommt `lesson` als `null` zurück, kein zusätzlicher App-seitiger Check
+ * nötig.
+ *
+ * Fehler beim Bunny-Aufruf (Netzwerk, Rate-Limit) melden bewusst
+ * `ready:false, failed:false` — "weiterpollen" statt fälschlich einen
+ * Fehlerzustand zu zeigen (Plan-Philosophie "nie eine Sackgasse").
+ */
+export async function checkLessonVideoStatus(lessonId: string): Promise<LessonVideoStatus> {
+  try {
+    const supabase = await createClient();
+    const { data: lesson } = await supabase
+      .from("lessons")
+      .select("video_bunny_id")
+      .eq("id", lessonId)
+      .maybeSingle();
+    if (!lesson?.video_bunny_id) return { ready: true, failed: false };
+
+    const { status } = await getBunnyVideo(lesson.video_bunny_id);
+    return { ready: status === 4, failed: status === 5 || status === 6 };
+  } catch (e) {
+    console.error("[video/actions] checkLessonVideoStatus fehlgeschlagen:", e);
+    return { ready: false, failed: false };
   }
 }

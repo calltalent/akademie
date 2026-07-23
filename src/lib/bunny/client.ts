@@ -111,13 +111,21 @@ export async function triggerTranscription(
 
 export type BunnyChapter = { title: string; start: number; end: number };
 export type BunnyCaption = { srclang: string; label: string };
+/**
+ * Bunny-Encoding-Status (Get-Video-API): 0 Created, 1 Uploaded, 2 Processing,
+ * 3 Transcoding, 4 Finished, 5 Error, 6 UploadFailed. Genutzt vom Lernbereich
+ * (`checkLessonVideoStatus` in video/actions.ts), um "Processing video" im
+ * Bunny-iframe nicht kommentarlos hängen zu lassen (Josips Meldung,
+ * 23.07.2026) — Bunny selbst pollt/aktualisiert diesen Overlay-Text nicht.
+ */
 export type BunnyVideoDetails = {
+  status: number;
   length: number;
   chapters: BunnyChapter[];
   captions: BunnyCaption[];
 };
 
-/** Liefert u. a. `length` (Sekunden), `chapters`, `captions` — genutzt von src/lib/video/transcript.ts. */
+/** Liefert u. a. `status`, `length` (Sekunden), `chapters`, `captions` — genutzt von src/lib/video/transcript.ts und src/lib/video/actions.ts. */
 export async function getBunnyVideo(videoId: string): Promise<BunnyVideoDetails> {
   const { libraryId, apiKey } = bunnyConfig();
 
@@ -129,12 +137,14 @@ export async function getBunnyVideo(videoId: string): Promise<BunnyVideoDetails>
     throw new Error(`Bunny „Get Video" fehlgeschlagen: ${text}`);
   }
   const data = (await response.json()) as {
+    status?: number;
     length?: number;
     chapters?: BunnyChapter[];
     captions?: BunnyCaption[];
   };
 
   return {
+    status: typeof data.status === "number" ? data.status : 4,
     length: typeof data.length === "number" ? data.length : 0,
     chapters: Array.isArray(data.chapters) ? data.chapters : [],
     captions: Array.isArray(data.captions) ? data.captions : [],
