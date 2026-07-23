@@ -220,12 +220,13 @@ export default async function AdminKursePage({
         <div
           className="grid gap-0 px-[26px] pb-3 pt-[18px] text-[13px] font-bold"
           style={{
-            gridTemplateColumns: "2.2fr 1fr 1fr 1fr 1.3fr",
+            gridTemplateColumns: "1.7fr 1.1fr 0.7fr 0.8fr 0.8fr 1.3fr",
             color: "#A9AAC4",
             borderBottom: "1px solid #EEF0F7",
           }}
         >
           <div>Kurs</div>
+          <div>Kategorie</div>
           <div>Lektionen</div>
           <div>Teilnehmer</div>
           <div>Status</div>
@@ -247,33 +248,33 @@ export default async function AdminKursePage({
                 key={c.id}
                 className="grid items-center gap-0 px-[26px] py-4 text-[15px]"
                 style={{
-                  gridTemplateColumns: "2.2fr 1fr 1fr 1fr 1.3fr",
+                  gridTemplateColumns: "1.7fr 1.1fr 0.7fr 0.8fr 0.8fr 1.3fr",
                   borderBottom: "1px solid #F4F5FA",
                 }}
               >
-                <div className="flex items-start gap-3.5">
+                <div className="flex items-center gap-3.5">
                   <ThumbnailUpload
                     initialUrl={c.cover_url}
                     entityLabel="Kursbild"
                     entityTitle={c.title}
                     onUpload={updateCourseCoverUrl.bind(null, c.id)}
                   />
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <Link
-                      href={`/admin/kurse/${c.id}`}
-                      prefetch={false}
-                      className="font-semibold no-underline hover:underline"
-                      style={{ color: "inherit" }}
-                    >
-                      {c.title}
-                    </Link>
-                    <CourseCategorySelect
-                      courseId={c.id}
-                      categoryId={c.category_id}
-                      categories={allCategories}
-                      compact
-                    />
-                  </div>
+                  <Link
+                    href={`/admin/kurse/${c.id}`}
+                    prefetch={false}
+                    className="min-w-0 truncate font-semibold no-underline hover:underline"
+                    style={{ color: "inherit" }}
+                  >
+                    {c.title}
+                  </Link>
+                </div>
+                <div>
+                  <CourseCategorySelect
+                    courseId={c.id}
+                    categoryId={c.category_id}
+                    categories={allCategories}
+                    compact
+                  />
                 </div>
                 <div style={{ color: "#3E3F66" }}>{lessonCountByCourse.get(c.id) ?? 0}</div>
                 <div style={{ color: "#3E3F66" }}>{memberCountByCourse.get(c.id) ?? 0}</div>
