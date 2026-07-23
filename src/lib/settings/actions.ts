@@ -231,3 +231,40 @@ export async function deleteSidebarLink(id: string): Promise<{ ok: true } | { ok
     return { ok: false, error: genericErrorMessage(e) };
   }
 }
+
+/**
+ * Reihenfolge per Auf/Ab (Josips Auftrag, 23.07.2026: "per Drag and Drop
+ * verschieben"). Bewusst kein echtes Drag-and-Drop — gleiche Entscheidung wie
+ * bei `moveCourse()` (src/lib/courses/actions.ts) und den seit Phase 1
+ * bestehenden Modul-/Sektion-Reorder-Pfeilen: diese Codebase sortiert
+ * überall ausschließlich per Auf/Ab-Button, weil der Auftraggeber selbst
+ * sehbehindert ist und reines Maus-Ziehen für ihn nicht bedienbar wäre
+ * (CLAUDE.md §3.4). Gleiches Swap-Muster wie `moveModule`.
+ */
+export async function moveSidebarLink(id: string, direction: "up" | "down"): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const { data: links, error: listError } = await supabase
+      .from("sidebar_links")
+      .select("id, position")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: true });
+    if (listError || !links) return { ok: false, error: listError ? translateDbError(listError) : "Fehler." };
+
+    const idx = links.findIndex((l) => l.id === id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= links.length) {
+      return { ok: true }; // Rand erreicht, kein Fehler
+    }
+
+    const a = links[idx];
+    const b = links[swapIdx];
+    await supabase.from("sidebar_links").update({ position: b.position }).eq("id", a.id).eq("tenant_id", tenant.id);
+    await supabase.from("sidebar_links").update({ position: a.position }).eq("id", b.id).eq("tenant_id", tenant.id);
+
+    revalidatePath("/admin/einstellungen");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
