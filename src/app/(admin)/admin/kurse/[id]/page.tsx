@@ -81,7 +81,7 @@ export default async function CourseEditorPage({
 
   const { data: course } = await supabase
     .from("courses")
-    .select("id, title, slug, status, category_id")
+    .select("id, title, slug, description, status, category_id")
     .eq("id", courseId)
     .eq("tenant_id", tenant!.id)
     .maybeSingle();
@@ -172,7 +172,12 @@ export default async function CourseEditorPage({
   return (
     <div className="flex flex-col gap-2">
       <header className="flex flex-wrap items-start gap-5">
-        <CourseTitleEditor courseId={courseId} initialTitle={course.title} initialSlug={course.slug} />
+        <CourseTitleEditor
+          courseId={courseId}
+          initialTitle={course.title}
+          initialSlug={course.slug}
+          initialDescription={course.description ?? ""}
+        />
         <div className="flex flex-wrap items-end gap-4">
           <CourseStatusSelect courseId={courseId} status={course.status} />
           <CourseCategorySelect

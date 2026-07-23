@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 
+type CourseSettings = { certificate_enabled?: boolean };
+type TenantSettings = { certificates_enabled?: boolean };
+
 /**
  * Zertifikatsstatus in der Kursübersicht (SPEC 4.1: "Zertifikatsstatus").
  * Async Server Component — nutzt bewusst den normalen Nutzer-Client (NICHT
@@ -10,6 +13,16 @@ import { createClient } from "@/lib/supabase/server";
  * über eine kurzlebige signierte URL (10 Min. TTL) statt einer dauerhaften
  * URL — der Bucket `certificates` ist privat, analog zu
  * `getSubmissionDownloadUrl()` aus Block 3.
+ *
+ * "Wird ausgestellt"-Falle (23.07.2026, Josips Fund): fehlt das Zertifikat
+ * bei abgeschlossenem Kurs, zeigte diese Komponente unabhängig vom Grund
+ * IMMER "wird ausgestellt — bitte in Kürze neu laden" an — auch wenn
+ * `issueCertificateIfEligible()` (certificates/issue.ts) das Zertifikat gar
+ * nicht erst ausstellt, weil Kurs- ODER Mandanten-Schalter auf "aus" steht.
+ * Diese Meldung war dann dauerhaft falsch (nichts lädt je nach). Beide
+ * Schalter werden jetzt hier ZUSÄTZLICH geprüft (gleiche Felder/Logik wie
+ * issue.ts), damit die Meldung ehrlich zwischen "kommt noch" und "gibt es
+ * für diesen Kurs nicht" unterscheidet.
  */
 export async function CertificateBadge({
   tenantId,
@@ -36,6 +49,24 @@ export async function CertificateBadge({
 
   if (!certificate) {
     if (!isComplete) return null;
+
+    const [{ data: course }, { data: tenantRow }] = await Promise.all([
+      supabase.from("courses").select("settings").eq("id", courseId).maybeSingle(),
+      supabase.from("tenants").select("settings").eq("id", tenantId).maybeSingle(),
+    ]);
+    const courseSettings = (course?.settings ?? {}) as CourseSettings;
+    const tenantSettings = (tenantRow?.settings ?? {}) as TenantSettings;
+    const certificatesDisabled =
+      courseSettings.certificate_enabled === false || tenantSettings.certificates_enabled === false;
+
+    if (certificatesDisabled) {
+      return (
+        <p className="text-sm text-gray-500" role="status">
+          Für diesen Kurs werden keine Zertifikate ausgestellt.
+        </p>
+      );
+    }
+
     return (
       <p className="text-sm text-gray-500" role="status">
         Zertifikat wird ausgestellt — bitte die Seite in Kürze neu laden.

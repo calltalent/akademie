@@ -71,6 +71,7 @@ export function ThumbnailUpload({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        kind: "image",
         fileName: file.name,
         fileSize: file.size,
         mimeType: file.type,

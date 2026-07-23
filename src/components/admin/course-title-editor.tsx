@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateCourseTitle } from "@/lib/courses/actions";
+import { updateCourseTitle, updateCourseDescription } from "@/lib/courses/actions";
 
 /**
  * Kurs umbenennen (Josips Entscheidung, siehe PHASENSTATUS.md — ändert
@@ -16,22 +16,34 @@ import { updateCourseTitle } from "@/lib/courses/actions";
  * Änderung) und bekommt nach einer tatsächlichen Slug-Änderung einmalig
  * einen `role="status"`-Hinweis, dass bereits geteilte alte Links nicht
  * mehr funktionieren — ehrlich benannt statt versteckt.
+ *
+ * Kursbeschreibung (23.07.2026, Josips Auftrag "siehe Baulig"): direkt
+ * unter dem Titel editierbar, gleiches Speichern-bei-`onBlur`-Muster wie
+ * der Titel selbst. Erscheint auf der Lern-Übersichtsseite unter dem
+ * Kurstitel (`(learn)/kurs/[slug]/page.tsx`), optional — leeres Feld zeigt
+ * dort nichts an.
  */
 export function CourseTitleEditor({
   courseId,
   initialTitle,
   initialSlug,
+  initialDescription,
 }: {
   courseId: string;
   initialTitle: string;
   initialSlug: string;
+  initialDescription: string;
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [savedTitle, setSavedTitle] = useState(initialTitle);
   const [slug, setSlug] = useState(initialSlug);
   const [slugChanged, setSlugChanged] = useState(false);
+  const [description, setDescription] = useState(initialDescription);
+  const [savedDescription, setSavedDescription] = useState(initialDescription);
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [descriptionPending, startDescriptionTransition] = useTransition();
 
   function handleBlur() {
     if (title === savedTitle) return; // nur speichern, wenn geändert
@@ -47,6 +59,19 @@ export function CourseTitleEditor({
         setSlug(result.slug);
         setSlugChanged(true);
       }
+    });
+  }
+
+  function saveDescription() {
+    if (description === savedDescription) return; // nur speichern, wenn geändert
+    startDescriptionTransition(async () => {
+      const result = await updateCourseDescription(courseId, description);
+      if (result.error) {
+        setDescriptionError(result.error);
+        return;
+      }
+      setDescriptionError(null);
+      setSavedDescription(description);
     });
   }
 
@@ -66,6 +91,41 @@ export function CourseTitleEditor({
           style={{ borderColor: "#D8DAEA", color: "#1A1A2E", letterSpacing: "-0.01em" }}
         />
       </label>
+      <label className="mt-2.5 flex flex-col gap-1.5 text-sm font-bold" style={{ color: "#3E3F66" }}>
+        Kursbeschreibung (optional)
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onBlur={saveDescription}
+          disabled={descriptionPending}
+          rows={2}
+          maxLength={5000}
+          placeholder="Kurzer Text, der Kursteilnehmern auf der Lern-Übersichtsseite unter dem Titel angezeigt wird."
+          className="w-full max-w-xl resize-y rounded-xl border px-4 py-2.5 text-[15px] font-normal disabled:opacity-60"
+          style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
+        />
+      </label>
+      <div className="mt-1.5 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={saveDescription}
+          disabled={descriptionPending || description === savedDescription}
+          className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          style={{ background: "#5663AE" }}
+        >
+          {descriptionPending ? "Speichert…" : "Beschreibung speichern"}
+        </button>
+        {!descriptionPending && description === savedDescription && savedDescription && (
+          <span role="status" className="text-sm font-semibold" style={{ color: "#3E8F5C" }}>
+            Gespeichert
+          </span>
+        )}
+      </div>
+      {descriptionError && (
+        <p role="alert" className="mt-1.5 text-sm font-semibold" style={{ color: "#B14A4A" }}>
+          {descriptionError}
+        </p>
+      )}
       <p className="mt-1.5 text-sm" style={{ color: "#66679B" }}>
         Lern-URL: <span className="font-mono">/kurs/{slug}</span>
       </p>

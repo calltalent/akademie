@@ -413,6 +413,44 @@ export async function updateCourseTitle(
 }
 
 /**
+ * Kursbeschreibung (23.07.2026, Josips Auftrag): erscheint auf der
+ * Lern-Übersichtsseite direkt unter dem Kurstitel (`(learn)/kurs/[slug]/
+ * page.tsx`, Zeile ~200 — `courses.description` existiert dort und in der
+ * DB seit Migration 0001_init.sql, war bisher aber nirgends im Admin-
+ * Bereich editierbar). Gleiches Speicher-Muster wie `updateSectionDescription`
+ * (leer -> null statt leerem String, `revalidatePath("/kurs")` für die
+ * öffentliche Lernseite).
+ */
+export async function updateCourseDescription(
+  courseId: string,
+  description: string,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const parsed = courseSchema.pick({ description: true }).safeParse({
+      description: description || undefined,
+    });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Ungültige Beschreibung." };
+    }
+
+    const { error } = await supabase
+      .from("courses")
+      .update({ description: parsed.data.description?.trim() || null })
+      .eq("id", courseId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+
+    revalidatePath("/admin/kurse");
+    revalidatePath(`/admin/kurse/${courseId}`);
+    revalidatePath(`/kurs`);
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
  * SICHERHEITSHÄRTUNG (Josips Entscheidung, siehe PHASENSTATUS.md): Löschen
  * kaskadiert per FK `on delete cascade` (0001_init.sql) auf certificates,
  * progress, submissions, enrollments, bookmarks, embeddings,
