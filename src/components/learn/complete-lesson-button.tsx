@@ -19,9 +19,9 @@ export function CompleteLessonButton({
    * zeigt bei einer Grenz-Lektion (letzte einer Sektion/eines Moduls) jetzt auf
    * den neuen Zwischenbildschirm statt auf die nächste Lektion. Aufrufer
    * übergeben dann einen passenden Text (siehe l/[lessonId]/page.tsx) — Default
-   * "Nächste Lektion" gilt für den Normalfall (kein Grenzfall), "Modul" für
-   * die letzte Lektion eines Moduls, "Sektion ansehen →" für die letzte
-   * Lektion einer Sektion (Josips Auftrag 23.07.2026).
+   * "Nächste Lektion" gilt für den Normalfall (kein Grenzfall), "Nächstes
+   * Modul" für die letzte Lektion eines Moduls, "Sektion ansehen →" für die
+   * letzte Lektion einer Sektion (Josips Auftrag 23.07.2026).
    */
   nextLabel?: string;
 }) {
