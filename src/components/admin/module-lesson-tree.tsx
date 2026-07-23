@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useActionState, useState } from "react";
-import { ChevronDown, ChevronUp, ImageIcon, Plus, Trash2, Video } from "lucide-react";
+import { ChevronDown, ChevronUp, ImageIcon, Plus, Save, Trash2, Video } from "lucide-react";
 import {
   createModule,
   createSection,
@@ -266,9 +266,17 @@ function SectionBlock({
  * Beschreibungsfeld unter Modul-/Sektionstitel (Josips Auftrag, 23.07.2026 —
  * eigenständige Umsetzung nach dem allgemeinen Muster "Überschrift + kurzer
  * Untertext", kein übernommenes Fremd-Design/-Text, siehe CLAUDE.md §3.1).
- * Speichert per `onBlur` (gleiches Muster wie der Lektionstitel in
- * block-editor.tsx) statt bei jedem Tastendruck — unkontrolliertes Feld mit
- * lokalem State, `initialValue` wirkt nur beim ersten Mount (wie `defaultValue`).
+ *
+ * BUGFIX (Josips Fund, 23.07.2026: "es fehlt ein Button zum Abspeichern der
+ * Beschreibungen"): speicherte vorher nur per `onBlur` (Klick woanders hin,
+ * gleiches Muster wie der Lektionstitel in block-editor.tsx) — ohne
+ * sichtbaren Knopf und ohne Rückmeldung war unklar, ob/wann gespeichert
+ * wurde. Jetzt ein expliziter "Speichern"-Knopf, erscheint nur bei
+ * ungespeicherten Änderungen (`dirty`), mit Zustand "Speichert …"/
+ * "Gespeichert"/Fehler. `savedValue` (statt direkt `initialValue`) als
+ * Vergleichsbasis für `dirty` — unabhängig davon, wann/ob die Props durch
+ * `revalidatePath` in der Elternkomponente neu ankommen, weiß dieses Feld
+ * selbst sofort nach einem erfolgreichen Speichern, dass nichts mehr offen ist.
  */
 function DescriptionField({
   initialValue,
@@ -277,19 +285,62 @@ function DescriptionField({
 }: {
   initialValue: string | null;
   placeholder: string;
-  onSave: (value: string) => void;
+  onSave: (value: string) => Promise<{ error: string | null }>;
 }) {
   const [value, setValue] = useState(initialValue ?? "");
+  const [savedValue, setSavedValue] = useState(initialValue ?? "");
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const dirty = value !== savedValue;
+
+  async function handleSave() {
+    setStatus("saving");
+    const result = await onSave(value);
+    if (result.error) {
+      setStatus("error");
+    } else {
+      setSavedValue(value);
+      setStatus("saved");
+    }
+  }
+
   return (
-    <textarea
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={() => onSave(value)}
-      rows={2}
-      placeholder={placeholder}
-      className="mt-2 w-full resize-none rounded-[8px] border px-2.5 py-1.5 text-[13px]"
-      style={{ borderColor: "#E7E8F2", color: "#66679B" }}
-    />
+    <div className="mt-2 flex flex-col gap-1.5">
+      <textarea
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value);
+          if (status !== "idle") setStatus("idle");
+        }}
+        rows={2}
+        placeholder={placeholder}
+        className="w-full resize-none rounded-[8px] border px-2.5 py-1.5 text-[13px]"
+        style={{ borderColor: "#E7E8F2", color: "#66679B" }}
+      />
+      {(dirty || status === "saving" || status === "saved" || status === "error") && (
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!dirty || status === "saving"}
+            className="inline-flex items-center gap-1.5 rounded-[8px] border bg-white px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+            style={{ borderColor: "#D8DAEA", color: "#5663AE" }}
+          >
+            <Save size={12} aria-hidden="true" />
+            {status === "saving" ? "Speichert …" : "Speichern"}
+          </button>
+          {status === "saved" && !dirty && (
+            <span className="text-xs font-semibold" style={{ color: "#1F8A5B" }}>
+              Gespeichert
+            </span>
+          )}
+          {status === "error" && (
+            <span role="alert" className="text-xs font-semibold" style={{ color: "#B14A4A" }}>
+              Fehler beim Speichern
+            </span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
