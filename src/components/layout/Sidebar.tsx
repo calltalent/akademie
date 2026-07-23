@@ -87,8 +87,8 @@ export type SidebarLink = { id: string; label: string; url: string };
 
 const LERNEN: NavItem[] = [
   { id: "dashboard", label: "Meine Kurse", href: "/dashboard", icon: LayoutGrid },
-  { id: "catalog", label: "Kurskatalog", href: "/kurskatalog", icon: Search },
   { id: "bookmarks", label: "Lesezeichen", href: "/lesezeichen", icon: Bookmark },
+  { id: "catalog", label: "Kurskatalog", href: "/kurskatalog", icon: Search },
 ];
 
 /** Leitet den aktiven Menüpunkt aus der Route ab (Semantik wie shell/nav-link.tsx). */
