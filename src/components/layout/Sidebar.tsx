@@ -8,8 +8,6 @@ import {
   HelpCircle,
   LayoutGrid,
   Bookmark,
-  Settings,
-  Bell,
   ShieldCheck,
   Building2,
   ExternalLink,
@@ -69,13 +67,18 @@ import {
  * reine Darstellungskomponente). Plain `<a target="_blank">` statt `next/link`,
  * da Ziele immer externe URLs sind, nie interne Routen. Abschnitt inkl.
  * Überschrift erscheint nur, wenn mindestens ein Link existiert.
+ *
+ * KONTO-Umbau (23.07.2026, Josips Folgeauftrag): "Einstellungen" und
+ * "Benachrichtigungen" gibt es jetzt NICHT mehr als eigene Haupt-Nav-Punkte
+ * hier — "Einstellungen" ist ins Profil-Dropdown gewandert (TopBar.tsx,
+ * unter "Profil ansehen"), "Benachrichtigungen" ist ganz entfallen (bereits
+ * im selben Profil-Dropdown vorhanden, hier redundant). Die "Konto"-
+ * Überschrift sitzt jetzt stattdessen im Footer über Admin-Bereich/
+ * Mandantenbereich — erscheint nur, wenn mindestens einer der beiden
+ * sichtbar ist (sonst stünde eine leere Überschrift über "Hilfe & Kontakt",
+ * das bewusst NICHT zu "Konto" zählt und für alle Rollen sichtbar bleibt).
  */
-export type SidebarItemId =
-  | "dashboard"
-  | "catalog"
-  | "bookmarks"
-  | "settings"
-  | "notif";
+export type SidebarItemId = "dashboard" | "catalog" | "bookmarks";
 
 type NavItem = { id: SidebarItemId; label: string; href: string; badge?: string; icon: LucideIcon };
 
@@ -88,17 +91,11 @@ const LERNEN: NavItem[] = [
   { id: "bookmarks", label: "Lesezeichen", href: "/lesezeichen", icon: Bookmark },
 ];
 
-const KONTO: NavItem[] = [
-  { id: "settings", label: "Einstellungen", href: "/einstellungen", icon: Settings },
-  { id: "notif", label: "Benachrichtigungen", href: "/einstellungen?tab=benachrichtigungen", icon: Bell },
-];
-
 /** Leitet den aktiven Menüpunkt aus der Route ab (Semantik wie shell/nav-link.tsx). */
 function activeFromPath(pathname: string): SidebarItemId | undefined {
   if (pathname === "/dashboard") return "dashboard";
   if (pathname === "/kurskatalog" || pathname.startsWith("/kurskatalog/")) return "catalog";
   if (pathname === "/lesezeichen" || pathname.startsWith("/lesezeichen/")) return "bookmarks";
-  if (pathname === "/einstellungen" || pathname.startsWith("/einstellungen/")) return "settings";
   return undefined;
 }
 
@@ -238,42 +235,42 @@ export function Sidebar({
             {customLinks.map(renderCustomLink)}
           </>
         )}
-
-        <div className="h-5" />
-
-        {expanded && (
-          <p className="mb-[9px] px-3 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-400">
-            Konto
-          </p>
-        )}
-        {KONTO.map(renderItem)}
       </nav>
 
-      {/* Footer: Admin-Zugang (nur Staff) + Mandantenbereich (nur Plattform-Admin) + Hilfe & Kontakt */}
+      {/* Footer: "Konto" (Admin-Zugang nur Staff + Mandantenbereich nur Plattform-Admin) + Hilfe & Kontakt */}
       <div className="mt-4 flex flex-col gap-1 border-t border-border-100 px-4 pt-4">
-        {isStaff && (
-          <a
-            href="/admin"
-            title={!expanded ? "Admin-Bereich" : undefined}
-            className={`flex items-center gap-3 rounded-sm px-3 py-[10px] text-[15px] font-medium text-muted-500 no-underline ${
-              expanded ? "" : "justify-center"
-            }`}
-          >
-            <ShieldCheck size={19} aria-hidden="true" className="flex-shrink-0" />
-            {expanded && <span>Admin-Bereich</span>}
-          </a>
-        )}
-        {isPlatformAdmin && (
-          <a
-            href={portalMandantenUrl}
-            title={!expanded ? "Mandantenbereich" : undefined}
-            className={`flex items-center gap-3 rounded-sm px-3 py-[10px] text-[15px] font-medium text-muted-500 no-underline ${
-              expanded ? "" : "justify-center"
-            }`}
-          >
-            <Building2 size={19} aria-hidden="true" className="flex-shrink-0" />
-            {expanded && <span>Mandantenbereich</span>}
-          </a>
+        {(isStaff || isPlatformAdmin) && (
+          <>
+            {expanded && (
+              <p className="mb-[9px] px-3 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-400">
+                Konto
+              </p>
+            )}
+            {isStaff && (
+              <a
+                href="/admin"
+                title={!expanded ? "Admin-Bereich" : undefined}
+                className={`flex items-center gap-3 rounded-sm px-3 py-[10px] text-[15px] font-medium text-muted-500 no-underline ${
+                  expanded ? "" : "justify-center"
+                }`}
+              >
+                <ShieldCheck size={19} aria-hidden="true" className="flex-shrink-0" />
+                {expanded && <span>Admin-Bereich</span>}
+              </a>
+            )}
+            {isPlatformAdmin && (
+              <a
+                href={portalMandantenUrl}
+                title={!expanded ? "Mandantenbereich" : undefined}
+                className={`flex items-center gap-3 rounded-sm px-3 py-[10px] text-[15px] font-medium text-muted-500 no-underline ${
+                  expanded ? "" : "justify-center"
+                }`}
+              >
+                <Building2 size={19} aria-hidden="true" className="flex-shrink-0" />
+                {expanded && <span>Mandantenbereich</span>}
+              </a>
+            )}
+          </>
         )}
         <a
           href="mailto:support@calltalent.ai"
