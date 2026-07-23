@@ -24,6 +24,15 @@ import { safeAccentColor } from "@/lib/email/templates";
  * würde eine Font-Datei als Workers-Static-Asset + `@pdf-lib/fontkit`
  * einführen, für ein einzelnes PDF-Layout unverhältnismäßig; Helvetica/
  * Helvetica-Bold (bereits eingebettet) bleiben die Schrift.
+ *
+ * Nachsync (22.07.2026, gleicher Tag): Josip hat `Zertifikat.dc.html` im
+ * Editor überarbeitet, bevor der erste Import überhaupt gesichtet werden
+ * konnte — Eyebrow jetzt größer/fett, Titel kleiner (fester Wert statt
+ * responsiv bis 46px), Name deutlich kleiner (fester Wert statt responsiv bis
+ * 50px) und Kurstitel größer (jetzt genauso groß wie der Titel). Das DREHT
+ * die bisherige Hierarchie um: der Name war zuvor das größte Element, jetzt
+ * sind Titel und Kurstitel die größten, der Name ist das kleinste der drei —
+ * unverändert nachvollzogen, nicht als Fehler im Design behandelt.
  */
 
 const A4_LANDSCAPE: [number, number] = [841.89, 595.28];
@@ -260,11 +269,11 @@ export async function generateCertificatePdf({
     sx += fontBold.widthOfTextAtSize(c, sublabelSize) + sublabelTracking;
   }
 
-  // --- Eyebrow ---
-  drawTrackedTextCentered(page, "TEILNAHMEZERTIFIKAT", centerX, 440, fontRegular, 10, GRAY_LABEL, 10 * 0.18);
+  // --- Eyebrow (Design-Update 22.07.2026: jetzt fett + größer, 11px -> 15px) ---
+  drawTrackedTextCentered(page, "TEILNAHMEZERTIFIKAT", centerX, 440, fontBold, 12, GRAY_LABEL, 12 * 0.18);
 
-  // --- Titel ---
-  centerText(page, "Zertifikat des Abschlusses", centerX, 405, fontBold, 32, DARK);
+  // --- Titel (Design-Update: fester Wert 30px statt bisher responsiv bis 46px -> zurückhaltender) ---
+  centerText(page, "Zertifikat des Abschlusses", centerX, 405, fontBold, 27, DARK);
 
   // --- Trenner (Strich – Raute – Strich) ---
   const dividerY = 383;
@@ -289,9 +298,12 @@ export async function generateCertificatePdf({
   // --- "verliehen an" ---
   centerText(page, "verliehen an", centerX, 360, fontRegular, 13, GRAY_TEXT);
 
-  // --- Name (Empfänger:in) ---
+  // --- Name (Empfänger:in) — Design-Update: fester Wert 25px statt bisher
+  // responsiv bis 50px. Dreht die vorherige Hierarchie um: der Name ist jetzt
+  // das KLEINSTE der drei Kopfelemente (Titel/Name/Kurstitel), nicht mehr das
+  // größte — bewusst so übernommen, nicht als Fehler behandelt. ---
   const nameText = truncate(safeRecipientName, 55);
-  const nameSize = fitSize(fontBold, nameText, maxTextWidth, 34, 20);
+  const nameSize = fitSize(fontBold, nameText, maxTextWidth, 24, 16);
   centerText(page, nameText, centerX, 320, fontBold, nameSize, NAVY);
 
   // --- Unterstrich ---
@@ -301,9 +313,10 @@ export async function generateCertificatePdf({
   // --- "für den erfolgreichen Abschluss des Kurses" ---
   centerText(page, "für den erfolgreichen Abschluss des Kurses", centerX, 282, fontRegular, 13, GRAY_TEXT);
 
-  // --- Kurstitel ---
+  // --- Kurstitel — Design-Update: fester Wert 30px statt bisher responsiv bis
+  // 28px, jetzt genauso groß wie der Titel oben (statt kleiner). ---
   const courseText = truncate(safeCourseTitle, 65);
-  const courseSize = fitSize(fontBold, courseText, maxTextWidth, 20, 13);
+  const courseSize = fitSize(fontBold, courseText, maxTextWidth, 27, 18);
   centerText(page, courseText, centerX, 250, fontBold, courseSize, accent);
 
   // --- Fußzeile: Trennlinie + Datum / Haken-Abzeichen / Seriennummer ---
