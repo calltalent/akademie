@@ -4,6 +4,29 @@ import { getTenant } from "@/lib/tenant/context";
 import { AppShell } from "@/components/learn/app-shell";
 
 /**
+ * BUGFIX (23.07.2026, Josips Fund: "in Lesezeichen gespeichert, erscheint
+ * aber nicht in der Lesezeichen-Liste"). Per Service-Role-Direktabfrage
+ * gegen die Live-DB bestätigt: Der Bookmark-Datensatz existierte korrekt,
+ * `lessons(...)` kam als EINZELNES OBJEKT zurück — nicht als Array. Die
+ * bisherige Annahme (`b.lessons?.[0]`, Kommentar unten im alten Code)
+ * ging vom Gegenteil aus: postgrest-js' eingebaute Typinferenz (ohne
+ * generierte Supabase-Types in diesem Projekt) typisiert JEDE eingebettete
+ * Relation generisch als Array, unabhängig von der tatsächlichen n:1-
+ * Kardinalität der FK-Beziehung (bookmarks.lesson_id -> lessons.id, genau
+ * eine Zeile) — TYP und LAUFZEITWERT liefen hier auseinander. `[0]` auf
+ * einem echten Objekt ist `undefined`, dadurch wurde JEDES Lesezeichen
+ * lautlos herausgefiltert (`if (!lesson) return null`).
+ *
+ * `embeddedOne()` behandelt defensiv BEIDE Formen (Array ODER Einzelobjekt)
+ * — sicher gegen genau diese Klasse Bug, falls sich das Laufzeitverhalten
+ * je nach Supabase-Version/Query wieder ändert.
+ */
+function embeddedOne<T>(value: T[] | T | null | undefined): T | null {
+  if (value == null) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+/**
  * Design-Block (12.07.2026, Claude-Design-Export Teil 2, Lesezeichen.dc.html
  * — von Josip als verbindlich bestätigt, siehe PHASENSTATUS.md "Design-
  * Update Teil 2"). Löst die bisherige ehrliche Platzhalterseite ab, jetzt
@@ -26,15 +49,8 @@ export default async function LesezeichenPage() {
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  // Korrektur (Josips Build-Lauf, 12.07.2026): Supabase generiert für
-  // eingebettete Relationen (hier "lessons(...)"/"courses(...)") durchweg
-  // Array-Typen, auch bei einer klassischen n:1-Fremdschlüsselbeziehung
-  // (ohne "!inner"-Modifikator). Die vorherige Array.isArray-Verzweigung
-  // ging defensiv von einem möglichen Einzelobjekt aus — TypeScript kann
-  // aber beweisen, dass der else-Zweig nie eintritt ("never"), das bricht
-  // den Build ab. Deshalb hier direkt konsequent als Array behandelt.
   const lessonIds = (bookmarks ?? [])
-    .map((b) => b.lessons?.[0]?.id)
+    .map((b) => embeddedOne(b.lessons)?.id)
     .filter((id): id is string => Boolean(id));
 
   const { data: modules } = await supabase
@@ -43,7 +59,7 @@ export default async function LesezeichenPage() {
     .in(
       "id",
       (bookmarks ?? [])
-        .map((b) => b.lessons?.[0]?.module_id)
+        .map((b) => embeddedOne(b.lessons)?.module_id)
         .filter((id): id is string => Boolean(id)),
     );
 
@@ -56,10 +72,10 @@ export default async function LesezeichenPage() {
 
   const items = (bookmarks ?? [])
     .map((b) => {
-      const lesson = b.lessons?.[0];
+      const lesson = embeddedOne(b.lessons);
       if (!lesson) return null;
       const mod = (modules ?? []).find((m) => m.id === lesson.module_id);
-      const course = mod?.courses?.[0] ?? null;
+      const course = embeddedOne(mod?.courses);
       return {
         id: b.id,
         lessonId: lesson.id,
