@@ -1,8 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useActionState } from "react";
-import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { useActionState, useState } from "react";
+import { ChevronDown, ChevronUp, ImageIcon, Plus, Trash2, Video } from "lucide-react";
 import {
   createModule,
   createSection,
@@ -17,7 +17,14 @@ import {
 import { initialCourseActionState } from "@/lib/courses/state";
 import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
 
-type LessonRow = { id: string; title: string; status: string };
+type LessonRow = {
+  id: string;
+  title: string;
+  status: string;
+  /** Erster Video-/Bild-Block der Lektion (siehe getLessonMedia() in page.tsx) — null ohne Medien-Block. */
+  kind: "video" | "image" | null;
+  thumbnailUrl: string | null;
+};
 type SectionRow = { id: string; title: string; lessons: LessonRow[] };
 type ModuleRow = {
   id: string;
@@ -238,6 +245,42 @@ function SectionBlock({
   );
 }
 
+/**
+ * Vorschaukachel links neben dem Lektionstitel (Josips Auftrag 23.07.2026).
+ * `thumbnailUrl` kann bei Videos auf eine Bunny-Datei zeigen, die (frisch
+ * hochgeladen, noch nicht verarbeitet) unter Umständen noch gar nicht
+ * existiert — `onError` fängt das ab und lässt das Fallback-Icon
+ * (Video/Bild-Symbol) stehen, statt ein kaputtes Bild anzuzeigen. Ohne
+ * Medien-Block bleibt die Kachel leer (kein Icon), damit "hat noch kein
+ * Video/Bild" auf einen Blick vom "hat eins, nur noch kein Vorschaubild"
+ * unterscheidbar bleibt.
+ */
+function LessonThumb({ kind, thumbnailUrl }: { kind: "video" | "image" | null; thumbnailUrl: string | null }) {
+  const [broken, setBroken] = useState(false);
+  if (!kind) {
+    return <span className="h-9 w-9 flex-none rounded-[8px]" style={{ background: "#F4F5FA" }} aria-hidden="true" />;
+  }
+  const FallbackIcon = kind === "video" ? Video : ImageIcon;
+  return (
+    <span
+      className="relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-[8px]"
+      style={{ background: "#EDEEF7" }}
+      aria-hidden="true"
+    >
+      <FallbackIcon size={14} style={{ color: "#A9AAC4" }} />
+      {thumbnailUrl && !broken && (
+        // eslint-disable-next-line @next/next/no-img-element -- externe Bunny-/Storage-URL, kein next/image-Loader konfiguriert (gleiches Muster wie block-renderer.tsx)
+        <img
+          src={thumbnailUrl}
+          alt=""
+          onError={() => setBroken(true)}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
+    </span>
+  );
+}
+
 function LessonList({
   courseId,
   lessons,
@@ -265,6 +308,7 @@ function LessonList({
                 background: isActive ? "#F6F7FC" : "transparent",
               }}
             >
+              <LessonThumb kind={lesson.kind} thumbnailUrl={lesson.thumbnailUrl} />
               <span className="min-w-0 flex-1 truncate" style={{ fontWeight: isActive ? 800 : 600, color: "#1A1A2E" }}>
                 {lesson.title}
               </span>

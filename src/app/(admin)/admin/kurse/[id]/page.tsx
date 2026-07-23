@@ -10,6 +10,39 @@ import { RefreshTranscriptButton } from "@/components/admin/refresh-transcript-b
 import { CourseTitleEditor } from "@/components/admin/course-title-editor";
 import { DeleteCourseButton } from "@/components/admin/delete-course-button";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
+import { getVideoThumbnailUrl } from "@/lib/bunny/client";
+
+/**
+ * Josips Auftrag (23.07.2026): direkt nach dem Hochladen eines Video- oder
+ * Bild-Blocks soll die Lektion links im Baum ein Vorschaubild zeigen, ohne
+ * dass man erst hineinklicken muss. `saveLessonBlocks()` (courses/actions.ts)
+ * ruft nach jedem Autosave bereits `revalidatePath(/admin/kurse/${courseId})`
+ * — diese Server Component bekommt die frischen `blocks` also automatisch,
+ * ohne zusätzliche Polling-Infrastruktur.
+ *
+ * Nimmt den ERSTEN video- ODER image-Block der Lektion (gleiche
+ * "ein Medien-Block pro Lektion ist der Editor-Regelfall"-Annahme wie
+ * `saveLessonBlocks()`s `video_bunny_id`-Sync). Bei Video: Bunnys
+ * automatisches Vorschaubild (siehe `getVideoThumbnailUrl`-Kommentar in
+ * bunny/client.ts — existiert als Datei bei Bunny ggf. noch nicht, solange
+ * das Video frisch hochgeladen und noch nicht verarbeitet ist; die
+ * Baum-Kachel fängt ein fehlgeschlagenes Laden client-seitig ab und zeigt
+ * dann ein Platzhalter-Icon statt eines kaputten Bildes, siehe
+ * module-lesson-tree.tsx).
+ */
+function getLessonMedia(blocksJson: unknown): { kind: "video" | "image" | null; thumbnailUrl: string | null } {
+  const parsed = blocksSchema.safeParse(blocksJson);
+  if (!parsed.success) return { kind: null, thumbnailUrl: null };
+  for (const block of parsed.data as Block[]) {
+    if (block.type === "video" && block.bunnyVideoId) {
+      return { kind: "video", thumbnailUrl: getVideoThumbnailUrl(block.bunnyVideoId) };
+    }
+    if (block.type === "image" && block.url) {
+      return { kind: "image", thumbnailUrl: block.url };
+    }
+  }
+  return { kind: null, thumbnailUrl: null };
+}
 
 /**
  * Design-Update (AdminKursEditor.dc.html, Übergabebericht siehe
@@ -117,14 +150,14 @@ export default async function CourseEditorPage({
         title: s.title,
         lessons: (lessons ?? [])
           .filter((l) => l.section_id === s.id)
-          .map((l) => ({ id: l.id, title: l.title, status: l.status })),
+          .map((l) => ({ id: l.id, title: l.title, status: l.status, ...getLessonMedia(l.blocks) })),
       })),
     // Lektionen ohne Sektion (vor der Migration angelegt, oder über
     // KI-Generator/CSV-Import entstanden — beide schreiben module_id ohne
     // section_id) bleiben im Baum sichtbar statt zu verschwinden.
     looseLessons: (lessons ?? [])
       .filter((l) => l.module_id === m.id && !l.section_id)
-      .map((l) => ({ id: l.id, title: l.title, status: l.status })),
+      .map((l) => ({ id: l.id, title: l.title, status: l.status, ...getLessonMedia(l.blocks) })),
   }));
 
   const activeLesson = (lessons ?? []).find((l) => l.id === activeLessonId);
