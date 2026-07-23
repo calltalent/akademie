@@ -13,6 +13,8 @@ import {
   moveModule,
   moveSection,
   updateModuleCoverUrl,
+  updateModuleDescription,
+  updateSectionDescription,
 } from "@/lib/courses/actions";
 import { initialCourseActionState } from "@/lib/courses/state";
 import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
@@ -25,10 +27,11 @@ type LessonRow = {
   kind: "video" | "image" | null;
   thumbnailUrl: string | null;
 };
-type SectionRow = { id: string; title: string; lessons: LessonRow[] };
+type SectionRow = { id: string; title: string; description: string | null; lessons: LessonRow[] };
 type ModuleRow = {
   id: string;
   title: string;
+  description: string | null;
   coverUrl: string | null;
   sections: SectionRow[];
   /** Lektionen mit `section_id = null` — vor Migration 20260718150000
@@ -142,7 +145,13 @@ function ModuleBlock({
         </IconButton>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <DescriptionField
+        initialValue={mod.description}
+        placeholder="Kurze Beschreibung unter dem Modultitel (optional) …"
+        onSave={(value) => updateModuleDescription(mod.id, courseId, value)}
+      />
+
+      <div className="mt-3 flex flex-col gap-3">
         {mod.sections.map((section, sIdx) => (
           <SectionBlock
             key={section.id}
@@ -236,12 +245,51 @@ function SectionBlock({
         </IconButton>
       </div>
 
-      <LessonList courseId={courseId} lessons={section.lessons} activeLessonId={activeLessonId} />
+      <DescriptionField
+        initialValue={section.description}
+        placeholder="Kurze Beschreibung unter der Sektionsüberschrift (optional) …"
+        onSave={(value) => updateSectionDescription(section.id, courseId, value)}
+      />
+
+      <div className="mt-2">
+        <LessonList courseId={courseId} lessons={section.lessons} activeLessonId={activeLessonId} />
+      </div>
 
       <div className="mt-2">
         <NewLessonForm courseId={courseId} sectionId={section.id} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Beschreibungsfeld unter Modul-/Sektionstitel (Josips Auftrag, 23.07.2026 —
+ * eigenständige Umsetzung nach dem allgemeinen Muster "Überschrift + kurzer
+ * Untertext", kein übernommenes Fremd-Design/-Text, siehe CLAUDE.md §3.1).
+ * Speichert per `onBlur` (gleiches Muster wie der Lektionstitel in
+ * block-editor.tsx) statt bei jedem Tastendruck — unkontrolliertes Feld mit
+ * lokalem State, `initialValue` wirkt nur beim ersten Mount (wie `defaultValue`).
+ */
+function DescriptionField({
+  initialValue,
+  placeholder,
+  onSave,
+}: {
+  initialValue: string | null;
+  placeholder: string;
+  onSave: (value: string) => void;
+}) {
+  const [value, setValue] = useState(initialValue ?? "");
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={() => onSave(value)}
+      rows={2}
+      placeholder={placeholder}
+      className="mt-2 w-full resize-none rounded-[8px] border px-2.5 py-1.5 text-[13px]"
+      style={{ borderColor: "#E7E8F2", color: "#66679B" }}
+    />
   );
 }
 

@@ -72,7 +72,7 @@ export default async function ModulePage({
 
   const { data: modules } = await supabase
     .from("modules")
-    .select("id, title, position, cover_url")
+    .select("id, title, description, position, cover_url")
     .eq("course_id", course.id)
     .order("position", { ascending: true });
 
@@ -98,7 +98,7 @@ export default async function ModulePage({
   // Sektionen dieses Moduls (Migration 20260718150000_sections.sql).
   const { data: sections } = await supabase
     .from("sections")
-    .select("id, title, position")
+    .select("id, title, description, position")
     .eq("module_id", mod.id)
     .order("position", { ascending: true });
 
@@ -141,13 +141,21 @@ export default async function ModulePage({
   const sectionsWithLessons = (sections ?? []).map((s) => ({
     key: s.id,
     title: s.title,
+    description: (s.description as string | null) ?? null,
     lessons: lessonList.filter((l) => l.section_id === s.id),
   }));
   const looseLessons = lessonList.filter((l) => !l.section_id);
   const lessonCards = [
     ...sectionsWithLessons,
     ...(looseLessons.length > 0
-      ? [{ key: "loose", title: sectionsWithLessons.length > 0 ? "Weitere Lektionen" : mod.title, lessons: looseLessons }]
+      ? [
+          {
+            key: "loose",
+            title: sectionsWithLessons.length > 0 ? "Weitere Lektionen" : mod.title,
+            description: null as string | null,
+            lessons: looseLessons,
+          },
+        ]
       : []),
   ].filter((card) => card.lessons.length > 0);
 
@@ -204,6 +212,11 @@ export default async function ModulePage({
             )}
             <div className="min-w-0 flex-1">
               <h1 className="mb-2 text-2xl font-extrabold text-white">{mod.title}</h1>
+              {mod.description && (
+                <p className="mb-2 text-sm leading-relaxed" style={{ color: "#C9CBE6" }}>
+                  {mod.description}
+                </p>
+              )}
               <div className="text-sm font-semibold" style={{ letterSpacing: "0.04em", color: "#C9CBE6" }}>
                 {heroMeta}
               </div>
@@ -229,7 +242,7 @@ export default async function ModulePage({
                     className="rounded-[16px] border bg-white p-[20px_22px]"
                     style={{ borderColor: "#E7E8F2" }}
                   >
-                    <div className="mb-4 flex items-center gap-3.5">
+                    <div className="mb-4 flex items-start gap-3.5">
                       <span
                         className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px]"
                         style={{ background: "#EDEEF7" }}
@@ -237,15 +250,27 @@ export default async function ModulePage({
                       >
                         <ListVideo size={18} color={ACCENT} strokeWidth={2} />
                       </span>
-                      <div className="flex-1 text-lg font-extrabold" style={{ color: "#1A1A2E" }}>
-                        {card.title}
-                      </div>
-                      {cardMinutes > 0 && (
-                        <div className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
-                          <Clock size={14} strokeWidth={2} aria-hidden="true" />
-                          {cardMinutes} Min.
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-3.5">
+                          <div className="flex-1 text-lg font-extrabold" style={{ color: "#1A1A2E" }}>
+                            {card.title}
+                          </div>
+                          {cardMinutes > 0 && (
+                            <div
+                              className="flex flex-none items-center gap-1.5 text-[13px] font-semibold"
+                              style={{ color: "#A9AAC4" }}
+                            >
+                              <Clock size={14} strokeWidth={2} aria-hidden="true" />
+                              {cardMinutes} Min.
+                            </div>
+                          )}
                         </div>
-                      )}
+                        {card.description && (
+                          <p className="mt-1 text-sm leading-relaxed" style={{ color: "#66679B" }}>
+                            {card.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <div className="flex flex-col gap-2.5">
                       {card.lessons.map((l) => {

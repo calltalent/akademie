@@ -10,6 +10,7 @@ import {
   courseSchema,
   lessonSchema,
   moduleSchema,
+  moduleSectionDescriptionSchema,
   sectionSchema,
 } from "@/lib/courses/schema";
 import { slugify } from "@/lib/courses/slug";
@@ -250,6 +251,63 @@ export async function updateModuleCoverUrl(
       .eq("tenant_id", tenant.id);
     if (error) return { error: translateDbError(error) };
     revalidatePath(`/admin/kurse/${courseId}`);
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
+ * Modul-/Sektions-Beschreibung (23.07.2026, Josips Auftrag: Karten sollen
+ * wie im LearningSuite-Referenzbeispiel eine kurze Beschreibung unter der
+ * Überschrift zeigen können — eigenständige Umsetzung, Migration
+ * 20260723190000). Leerer String löscht die Beschreibung wieder (auf
+ * `null` normalisiert, damit die Lernansicht sauber zwischen "keine
+ * Beschreibung" und einer leeren Zeile unterscheiden kann).
+ */
+export async function updateModuleDescription(
+  moduleId: string,
+  courseId: string,
+  description: string,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const parsed = moduleSectionDescriptionSchema.safeParse(description);
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Ungültige Beschreibung." };
+    }
+    const { error } = await supabase
+      .from("modules")
+      .update({ description: parsed.data.trim() || null })
+      .eq("id", moduleId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+    revalidatePath(`/admin/kurse/${courseId}`);
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+export async function updateSectionDescription(
+  sectionId: string,
+  courseId: string,
+  description: string,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const parsed = moduleSectionDescriptionSchema.safeParse(description);
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Ungültige Beschreibung." };
+    }
+    const { error } = await supabase
+      .from("sections")
+      .update({ description: parsed.data.trim() || null })
+      .eq("id", sectionId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+    revalidatePath(`/admin/kurse/${courseId}`);
+    revalidatePath(`/kurs`);
     return { error: null, success: true };
   } catch (e) {
     return errorState(e);

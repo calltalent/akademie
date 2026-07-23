@@ -103,14 +103,14 @@ export default async function CourseEditorPage({
 
   const { data: modules } = await supabase
     .from("modules")
-    .select("id, title, position, cover_url")
+    .select("id, title, description, position, cover_url")
     .eq("course_id", courseId)
     .order("position", { ascending: true });
 
   // Sektionen (Modul -> Sektion -> Lektion, Migration 20260718150000).
   const { data: sections } = await supabase
     .from("sections")
-    .select("id, title, module_id, position")
+    .select("id, title, description, module_id, position")
     .in("module_id", (modules ?? []).map((m) => m.id))
     .order("position", { ascending: true });
 
@@ -142,12 +142,14 @@ export default async function CourseEditorPage({
   const modulesWithLessons = (modules ?? []).map((m) => ({
     id: m.id,
     title: m.title,
+    description: (m.description as string | null) ?? null,
     coverUrl: (m.cover_url as string | null) ?? null,
     sections: (sections ?? [])
       .filter((s) => s.module_id === m.id)
       .map((s) => ({
         id: s.id,
         title: s.title,
+        description: (s.description as string | null) ?? null,
         lessons: (lessons ?? [])
           .filter((l) => l.section_id === s.id)
           .map((l) => ({ id: l.id, title: l.title, status: l.status, ...getLessonMedia(l.blocks) })),

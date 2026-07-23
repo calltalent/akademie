@@ -185,13 +185,18 @@ export const courseSchema = z.object({
   description: z.string().max(5000).optional(),
 });
 
+/** Kurze Beschreibung unter Modul-/Sektions-Überschrift (23.07.2026, Migration 20260723190000) — optional, leer = keine Beschreibung. */
+export const moduleSectionDescriptionSchema = z.string().max(500, "Max. 500 Zeichen.");
+
 export const moduleSchema = z.object({
   title: z.string().min(1, "Titel erforderlich.").max(300),
+  description: moduleSectionDescriptionSchema.optional(),
 });
 
 /** Sektion (Modul -> Sektion -> Lektion, Migration 20260718150000_sections.sql) — gleiche Form wie moduleSchema, eigener Typ für Klarheit an den Aufrufstellen. */
 export const sectionSchema = z.object({
   title: z.string().min(1, "Titel erforderlich.").max(300),
+  description: moduleSectionDescriptionSchema.optional(),
 });
 
 export const lessonSchema = z.object({
