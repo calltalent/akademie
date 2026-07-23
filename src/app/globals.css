@@ -63,6 +63,27 @@
   --radius-xl: 16px;
 }
 
+/*
+ * BUGFIX (23.07.2026, Josips Fund: "weißer Balken im Footer" auf der
+ * Kurs-Editor-Seite): <html> hatte gar keinen Hintergrund gesetzt (geprüft
+ * per DevTools auf der Live-Seite: getComputedStyle(document.documentElement)
+ * .backgroundColor -> "rgba(0, 0, 0, 0)", also transparent). Scrollt der
+ * Browser per Mausrad kurz über das Seitenende hinaus (Windows-Chrome-
+ * Overscroll/"Rubber-Band"-Effekt), wird für einen Moment die Fläche HINTER
+ * <body> sichtbar — bei transparentem <html> ist das der reine, nicht
+ * gestylte Browser-Canvas (weiß), unabhängig davon, welche Hintergrundfarbe
+ * die jeweilige Seite (App-Shell, Mandanten-Branding) sonst verwendet.
+ * `--color-background` statt `--background`: layout.tsx setzt <body> darüber
+ * (`style={{ background: "var(--color-background)" }}`), UND theme-style.tsx
+ * überschreibt genau diese Variable pro Mandant (`branding.color_bg`) — nur
+ * so bleibt <html> bei Mandanten-Branding synchron mit <body>, statt bei
+ * einem eigenen, nie überschriebenen Fallback (`--background`) hängen zu
+ * bleiben.
+ */
+html {
+  background: var(--color-background);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

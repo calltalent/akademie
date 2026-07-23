@@ -4,6 +4,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { checkPlatformAccess } from "@/lib/platform/auth";
 import { getTenant } from "@/lib/tenant/context";
 import { createClient } from "@/lib/supabase/server";
+import { HtmlBackgroundSync } from "@/components/shell/html-background-sync";
 
 /**
  * Design-Block (12.07.2026, Claude-Design-Export
@@ -83,6 +84,7 @@ export async function AppShell({
 
   return (
     <div className="flex min-h-screen bg-bg">
+      <HtmlBackgroundSync color="#F4F5FA" />
       <Sidebar isStaff={isStaff} isPlatformAdmin={platformAccess.ok} customLinks={customLinks} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar

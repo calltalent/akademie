@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
+import { HtmlBackgroundSync } from "@/components/shell/html-background-sync";
 
 /**
  * Verwaltungs-Shell für den /admin-Bereich. Die Sidebar ist seit dem
@@ -27,6 +28,7 @@ export function AdminShell({
 }) {
   return (
     <div className="flex min-h-screen" style={{ background: "#F4F5FA" }}>
+      <HtmlBackgroundSync color="#F4F5FA" />
       <AdminSidebar isPlatformAdmin={isPlatformAdmin} pendingSubmissions={pendingSubmissions} />
 
       <div className="min-w-0 flex-1 px-10 py-8">
