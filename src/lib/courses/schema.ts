@@ -79,10 +79,21 @@ export const audioBlockSchema = baseBlock.extend({
   url: emptyOrUrl,
 });
 
+/** Standardtext unter dem Dateinamen (Karten-Darstellung, block-renderer.tsx) — vorbelegt bei neuen Blöcken, Fallback für ältere Blöcke ohne `description`. */
+export const DEFAULT_FILE_BLOCK_DESCRIPTION = "Zum Öffnen oder Herunterladen klicken";
+
 export const fileBlockSchema = baseBlock.extend({
   type: z.literal("file"),
   url: emptyOrUrl,
   filename: z.string().max(300),
+  // NEU (23.07.2026, Josips Auftrag): Beschreibungstext unter dem Dateinamen
+  // editierbar statt fest im Renderer verdrahtet. `.optional()`, nicht
+  // Pflichtfeld — ältere, bereits gespeicherte Datei-Blöcke haben dieses
+  // Feld noch nicht; ein Pflichtfeld hätte ihr Parsing (blocksSchema.parse
+  // in block-renderer.tsx) rückwirkend zum Scheitern gebracht.
+  // block-renderer.tsx fällt bei "" oder fehlendem Feld auf
+  // DEFAULT_FILE_BLOCK_DESCRIPTION zurück.
+  description: z.string().max(300).optional(),
 });
 
 export const quizBlockSchema = baseBlock.extend({
@@ -148,7 +159,7 @@ export function createEmptyBlock(type: BlockType): Block {
     case "audio":
       return { id, type, url: "" };
     case "file":
-      return { id, type, url: "", filename: "" };
+      return { id, type, url: "", filename: "", description: DEFAULT_FILE_BLOCK_DESCRIPTION };
     case "quiz":
       return { id, type, quizId: null, title: "" };
     case "submission":

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { Bold, Italic, Underline } from "lucide-react";
-import type { Block } from "@/lib/courses/schema";
+import { DEFAULT_FILE_BLOCK_DESCRIPTION, type Block } from "@/lib/courses/schema";
 import { VideoSourceSwitch } from "@/components/editor/video-source-switch";
 import { ImageUpload } from "@/components/editor/image-upload";
 import { AudioUpload } from "@/components/editor/audio-upload";
@@ -153,6 +153,16 @@ export function BlockForm({
             <input
               value={block.filename}
               onChange={(e) => onChange({ ...block, filename: e.target.value })}
+              className={fieldClass}
+              style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+            />
+          </label>
+          <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+            Beschreibung (unter dem Dateinamen in der Lernansicht)
+            <input
+              value={block.description ?? ""}
+              onChange={(e) => onChange({ ...block, description: e.target.value })}
+              placeholder={DEFAULT_FILE_BLOCK_DESCRIPTION}
               className={fieldClass}
               style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
             />

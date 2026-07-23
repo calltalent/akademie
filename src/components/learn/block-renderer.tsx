@@ -1,5 +1,5 @@
 import { ExternalLink, File as FileIcon } from "lucide-react";
-import type { Block } from "@/lib/courses/schema";
+import { DEFAULT_FILE_BLOCK_DESCRIPTION, type Block } from "@/lib/courses/schema";
 import { getBunnyVideo, getPlayerConfig } from "@/lib/bunny/client";
 import { BunnyPlayer } from "@/components/player/bunny-player";
 import { VideoProcessingStatus } from "@/components/learn/video-processing-status";
@@ -192,12 +192,17 @@ async function BlockView({
           href={block.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-4 rounded-2xl border bg-white p-5 no-underline transition-colors hover:bg-gray-50"
-          style={{ borderColor: "#E7E8F2" }}
+          // Sichtbar abgesetzt vom übrigen Fließtext (Josips Auftrag,
+          // 23.07.2026: "besser sichtbar und erkennbar") — kräftigerer
+          // Rahmen + lavendelfarbener Grund statt der üblichen weißen
+          // Standardkarte, damit ein Download-Block auf einen Blick als
+          // eigenständiges Element erkennbar ist. Beide Farbtöne sind
+          // bestehende App-Tokens (kein neuer Wert erfunden).
+          className="flex items-center gap-4 rounded-2xl border-2 p-5 no-underline shadow-sm transition-all hover:bg-[#EDEEF7] hover:shadow-md"
+          style={{ borderColor: "#D8DAEA", background: "#F6F7FC" }}
         >
           <span
-            className="flex h-12 w-12 flex-none items-center justify-center rounded-xl"
-            style={{ background: "#EDEEF7" }}
+            className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-white"
             aria-hidden="true"
           >
             <FileIcon size={22} style={{ color: "var(--color-primary)" }} />
@@ -207,7 +212,7 @@ async function BlockView({
               {block.filename || "Datei herunterladen"}
             </span>
             <span className="block text-sm" style={{ color: "#66679B" }}>
-              Zum Öffnen oder Herunterladen klicken
+              {block.description || DEFAULT_FILE_BLOCK_DESCRIPTION}
             </span>
           </span>
           <span
