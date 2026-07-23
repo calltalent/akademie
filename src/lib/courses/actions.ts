@@ -68,12 +68,21 @@ export async function createCourse(
     const categoryResult = await resolveCategoryId(supabase, tenant.id, formData.get("category"));
     if (!categoryResult.ok) return { error: categoryResult.error };
 
+    // Position ans Ende anhängen (Josips Auftrag 23.07.2026, Kursreihenfolge
+    // per Auf/Ab) — bisher fehlte das hier komplett, jeder neue Kurs blieb auf
+    // dem Spalten-Default 0 stehen. Gleiches Zähl-Muster wie createSection.
+    const { count } = await supabase
+      .from("courses")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id);
+
     const { error } = await supabase.from("courses").insert({
       tenant_id: tenant.id,
       title: parsed.data.title,
       slug: parsed.data.slug,
       description: parsed.data.description ?? null,
       category_id: categoryResult.categoryId,
+      position: count ?? 0,
       created_by: user.id,
     });
     if (error) {
@@ -259,6 +268,44 @@ export async function updateCourseStatus(
       .eq("id", courseId)
       .eq("tenant_id", tenant.id);
     if (error) return { error: translateDbError(error) };
+    revalidatePath("/admin/kurse");
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
+ * Kursreihenfolge per Auf/Ab (Josips Auftrag, 23.07.2026 — bewusst kein
+ * echtes Drag-and-Drop, siehe course-position-buttons.tsx-Kopfkommentar).
+ * Gleiches Swap-Muster wie `moveModule`/`moveSection` oben — über ALLE Kurse
+ * des Mandanten hinweg (nicht nur die im aktuell gefilterten Status-Tab
+ * sichtbaren), damit sich ein archivierter Kurs nicht unsichtbar zwischen
+ * zwei sichtbaren verschiebt. Staff-Ebene wie `updateCourseStatus`/
+ * `updateCourseCategory` — Umsortieren ist nicht destruktiver als eine
+ * Statusänderung, anders als `deleteCourse` (dort `requireAdminTenant()`).
+ */
+export async function moveCourse(courseId: string, direction: "up" | "down"): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const { data: courses, error: listError } = await supabase
+      .from("courses")
+      .select("id, position")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: true });
+    if (listError || !courses) return { error: listError ? translateDbError(listError) : "Fehler." };
+
+    const idx = courses.findIndex((c) => c.id === courseId);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= courses.length) {
+      return { error: null, success: true }; // Rand erreicht, kein Fehler
+    }
+
+    const a = courses[idx];
+    const b = courses[swapIdx];
+    await supabase.from("courses").update({ position: b.position }).eq("id", a.id).eq("tenant_id", tenant.id);
+    await supabase.from("courses").update({ position: a.position }).eq("id", b.id).eq("tenant_id", tenant.id);
+
     revalidatePath("/admin/kurse");
     return { error: null, success: true };
   } catch (e) {

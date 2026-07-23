@@ -7,6 +7,8 @@ import { NewCourseDialog } from "@/components/admin/new-course-dialog";
 import { DeleteCourseIconButton } from "@/components/admin/delete-course-icon-button";
 import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
 import { CourseCategoryManager } from "@/components/admin/course-category-manager";
+import { CourseCategorySelect } from "@/components/admin/publish-toggle";
+import { CoursePositionButtons } from "@/components/admin/course-position-buttons";
 import { updateCourseCoverUrl } from "@/lib/courses/actions";
 
 /**
@@ -64,6 +66,19 @@ import { updateCourseCoverUrl } from "@/lib/courses/actions";
  * für alle Staff sichtbar (Bearbeiten verlangt nur `is_staff()`). Das ist die
  * zweite Verteidigungslinie in der UI-Schicht, nicht die Absicherung selbst —
  * die liegt weiterhin in RLS + Server Action (siehe lib/auth/staff.ts).
+ *
+ * Kategorie inline (23.07.2026, Josips Auftrag) — bewusste EINZIGE Ausnahme
+ * von der obigen "Statusänderung nicht inline"-Entscheidung: Josip wollte
+ * die Kategorie hier ausdrücklich direkt änderbar, ohne in den Editor zu
+ * wechseln (`CourseCategorySelect`, gleiche Komponente wie im Editor, mit
+ * neuer `compact`-Prop für die dichte Zeile). Status bleibt bewusst NUR im
+ * Editor steuerbar (kein Auftrag, das zu ändern).
+ *
+ * Reihenfolge per Auf/Ab (23.07.2026, Josips Auftrag: "Kursposition nach oben
+ * oder unten korrigieren") — `CoursePositionButtons`, gleiches Auf/Ab-Muster
+ * wie Module/Sektionen im Kurs-Editor (kein Drag-and-Drop, siehe dortiger
+ * Kopfkommentar). Bestimmt zugleich die Reihenfolge unter "Meine Kurse"
+ * (`dashboard/page.tsx`, sortiert ebenfalls nach `courses.position`).
  */
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -205,7 +220,7 @@ export default async function AdminKursePage({
         <div
           className="grid gap-0 px-[26px] pb-3 pt-[18px] text-[13px] font-bold"
           style={{
-            gridTemplateColumns: "2.6fr 1fr 1fr 1fr 0.6fr",
+            gridTemplateColumns: "2.2fr 1fr 1fr 1fr 1.3fr",
             color: "#A9AAC4",
             borderBottom: "1px solid #EEF0F7",
           }}
@@ -223,30 +238,42 @@ export default async function AdminKursePage({
         ) : (
           visibleCourses.map((c) => {
             const meta = STATUS_META[c.status] ?? STATUS_META.draft;
+            // Auf/Ab bezieht sich auf ALLE Kurse des Mandanten (nicht nur die
+            // im aktuell gefilterten Status-Tab sichtbaren) — siehe
+            // moveCourse()-Kommentar und CoursePositionButtons-Kopfkommentar.
+            const overallIndex = allCourses.findIndex((ac) => ac.id === c.id);
             return (
               <div
                 key={c.id}
                 className="grid items-center gap-0 px-[26px] py-4 text-[15px]"
                 style={{
-                  gridTemplateColumns: "2.6fr 1fr 1fr 1fr 0.6fr",
+                  gridTemplateColumns: "2.2fr 1fr 1fr 1fr 1.3fr",
                   borderBottom: "1px solid #F4F5FA",
                 }}
               >
-                <div className="flex items-center gap-3.5">
+                <div className="flex items-start gap-3.5">
                   <ThumbnailUpload
                     initialUrl={c.cover_url}
                     entityLabel="Kursbild"
                     entityTitle={c.title}
                     onUpload={updateCourseCoverUrl.bind(null, c.id)}
                   />
-                  <Link
-                    href={`/admin/kurse/${c.id}`}
-                    prefetch={false}
-                    className="font-semibold no-underline hover:underline"
-                    style={{ color: "inherit" }}
-                  >
-                    {c.title}
-                  </Link>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <Link
+                      href={`/admin/kurse/${c.id}`}
+                      prefetch={false}
+                      className="font-semibold no-underline hover:underline"
+                      style={{ color: "inherit" }}
+                    >
+                      {c.title}
+                    </Link>
+                    <CourseCategorySelect
+                      courseId={c.id}
+                      categoryId={c.category_id}
+                      categories={allCategories}
+                      compact
+                    />
+                  </div>
                 </div>
                 <div style={{ color: "#3E3F66" }}>{lessonCountByCourse.get(c.id) ?? 0}</div>
                 <div style={{ color: "#3E3F66" }}>{memberCountByCourse.get(c.id) ?? 0}</div>
@@ -269,6 +296,12 @@ export default async function AdminKursePage({
                   >
                     <Pencil size={16} aria-hidden="true" />
                   </Link>
+                  <CoursePositionButtons
+                    courseId={c.id}
+                    title={c.title}
+                    isFirst={overallIndex <= 0}
+                    isLast={overallIndex === -1 || overallIndex >= allCourses.length - 1}
+                  />
                   {isAdmin && (
                     <DeleteCourseIconButton
                       courseId={c.id}
