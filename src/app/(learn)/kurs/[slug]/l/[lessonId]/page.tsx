@@ -132,7 +132,7 @@ export default async function LessonPage({
           ? `/kurs/${slug}/l/${nextId}`
           : null;
   const completeLabel =
-    boundary.kind === "module" ? "Modul ansehen →" : boundary.kind === "section" ? "Sektion ansehen →" : undefined;
+    boundary.kind === "module" ? "Modul" : boundary.kind === "section" ? "Sektion ansehen →" : undefined;
 
   // Aktuelles Modul + Modul-Fortschritt für die Kopf-Leiste; „nächste Sektion"
   // = das nachfolgende Modul (Rechte Spalte zeigt nur das aktuelle Modul).

@@ -8,7 +8,7 @@ export function CompleteLessonButton({
   courseSlug,
   alreadyCompleted,
   nextHref,
-  nextLabel = "Lektion abschließen",
+  nextLabel = "Nächste Lektion",
 }: {
   lessonId: string;
   courseSlug: string;
@@ -18,8 +18,10 @@ export function CompleteLessonButton({
    * Josips Auftrag (22.07.2026, Sektion-/Modul-Abschluss-Bildschirm): `nextHref`
    * zeigt bei einer Grenz-Lektion (letzte einer Sektion/eines Moduls) jetzt auf
    * den neuen Zwischenbildschirm statt auf die nächste Lektion. Aufrufer
-   * übergeben dann einen passenden Text (siehe l/[lessonId]/page.tsx, z. B.
-   * „Modul ansehen →").
+   * übergeben dann einen passenden Text (siehe l/[lessonId]/page.tsx) — Default
+   * "Nächste Lektion" gilt für den Normalfall (kein Grenzfall), "Modul" für
+   * die letzte Lektion eines Moduls, "Sektion ansehen →" für die letzte
+   * Lektion einer Sektion (Josips Auftrag 23.07.2026).
    */
   nextLabel?: string;
 }) {
@@ -32,7 +34,10 @@ export function CompleteLessonButton({
         {/* Josips Auftrag (23.07.2026): war ein kleiner unterstrichener
             Text-Link ("Weiter zur nächsten Lektion") — als richtiger Button
             ersetzt, gleiche Optik wie der "Lektion abschließen"-Button
-            unten (größere Tapfläche, konsistente Primäraktion). */}
+            unten (größere Tapfläche, konsistente Primäraktion). Text zeigt
+            NICHT "Lektion abschließen" (die Lektion ist ja bereits fertig),
+            sondern das eigentliche Ziel des Klicks — siehe nextLabel-Kommentar
+            oben. */}
         {nextHref && (
           <a
             href={nextHref}
