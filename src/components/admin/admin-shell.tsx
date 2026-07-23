@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
+import { AdminMobileNav } from "@/components/layout/AdminMobileNav";
 import { HtmlBackgroundSync } from "@/components/shell/html-background-sync";
 
 /**
@@ -14,6 +15,11 @@ import { HtmlBackgroundSync } from "@/components/shell/html-background-sync";
  * `pendingSubmissions`-Zahl (Abgaben-Badge) kommen aus admin/layout.tsx. Der
  * Zugriff auf den ganzen Bereich ist dort über `checkStaffAccess()`
  * (owner/admin/trainer) gated, die Daten zusätzlich per RLS.
+ *
+ * Mobile Kopfzeile (23.07.2026, Mobile-Umbau) — `AdminMobileNav` ersetzt
+ * unter `lg` die feste Schiene (siehe deren Kopfkommentar + `AdminSidebar.tsx`
+ * `variant`-Prop). Gutter `px-10 py-8` gilt jetzt erst ab `lg`, mobil
+ * `px-4 py-6` — auf 375px blieben sonst nur ~215px Inhaltsbreite übrig.
  */
 export function AdminShell({
   children,
@@ -27,21 +33,24 @@ export function AdminShell({
   pendingSubmissions?: number;
 }) {
   return (
-    <div className="flex min-h-screen" style={{ background: "#F4F5FA" }}>
-      <HtmlBackgroundSync color="#F4F5FA" />
-      <AdminSidebar isPlatformAdmin={isPlatformAdmin} pendingSubmissions={pendingSubmissions} />
+    <>
+      <AdminMobileNav isPlatformAdmin={isPlatformAdmin} pendingSubmissions={pendingSubmissions} />
+      <div className="flex min-h-screen" style={{ background: "#F4F5FA" }}>
+        <HtmlBackgroundSync color="#F4F5FA" />
+        <AdminSidebar isPlatformAdmin={isPlatformAdmin} pendingSubmissions={pendingSubmissions} />
 
-      <div className="min-w-0 flex-1 px-10 py-8">
-        <div className="mb-6">
-          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-primary)" }}>
-            Administration
-          </p>
-          <h1 className="text-2xl font-semibold" style={{ color: "var(--foreground)" }}>
-            {tenantName}
-          </h1>
+        <div className="min-w-0 flex-1 px-4 py-6 lg:px-10 lg:py-8">
+          <div className="mb-6">
+            <p className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-primary)" }}>
+              Administration
+            </p>
+            <h1 className="text-2xl font-semibold" style={{ color: "var(--foreground)" }}>
+              {tenantName}
+            </h1>
+          </div>
+          {children}
         </div>
-        {children}
       </div>
-    </div>
+    </>
   );
 }

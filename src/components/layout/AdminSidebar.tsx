@@ -53,6 +53,15 @@ import {
  * Portal) erscheint nur bei `isPlatformAdmin` — die Mandanten-Verwaltung
  * bleibt exklusiv Plattform-Admins (Sicherheitsgrenze, wie in admin-shell.tsx
  * dokumentiert). Das Abgaben-Badge zeigt die echte Zahl offener Abgaben.
+ *
+ * `variant` NEU (23.07.2026, Mobile-Umbau Admin-Bereich, Josips Auftrag):
+ * "rail" (Standard) ist die bisherige feste Desktop-Schiene, jetzt zusätzlich
+ * `hidden lg:flex` — unter `lg` (1024px) unsichtbar, weil `AdminMobileNav`
+ * (neue Datei, Kopfzeile mit Hamburger) diesen Platz übernimmt. "panel"
+ * rendert dieselbe Komponente (identische Gruppen/Badges/Aktiv-Logik, keine
+ * zweite Nav-Datenquelle) als normalen Block statt fixer Schiene, für das
+ * Ausklapp-Panel von `AdminMobileNav` — Wortmarke/"VERWALTUNG"-Label
+ * entfallen dort, weil die mobile Kopfzeile ihr eigenes kompaktes Logo zeigt.
  */
 export type AdminSidebarItemId =
   | "overview"
@@ -130,10 +139,12 @@ export function AdminSidebar({
   active,
   isPlatformAdmin = false,
   pendingSubmissions = 0,
+  variant = "rail",
 }: {
   active?: AdminSidebarItemId;
   isPlatformAdmin?: boolean;
   pendingSubmissions?: number;
+  variant?: "rail" | "panel";
 }) {
   const pathname = usePathname();
   const activeId = active ?? activeFromPath(pathname);
@@ -174,32 +185,40 @@ export function AdminSidebar({
 
   return (
     <aside
-      className="sticky top-0 flex h-screen w-[264px] flex-shrink-0 flex-col py-[26px] font-sans"
+      className={
+        variant === "panel"
+          ? "flex w-full flex-shrink-0 flex-col py-[10px] font-sans"
+          : "hidden flex-shrink-0 flex-col py-[26px] font-sans lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[264px]"
+      }
       style={{ background: "#3E3F66" }}
       aria-label="Verwaltungs-Navigation"
     >
-      {/* Wortmarke */}
-      <Link href="/admin" prefetch={false} className="mb-2 flex items-center gap-3 px-[22px] no-underline">
-        <span
-          className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] bg-accent text-[18px] font-extrabold text-cream"
-          aria-hidden="true"
-        >
-          C
-        </span>
-        <span className="leading-[1.15]">
-          <span className="block text-[15px] font-extrabold tracking-[0.02em] text-white">CALLTALENT</span>
-          <span className="block text-[11px] font-semibold" style={{ color: "#B9BBDA", letterSpacing: "0.24em" }}>
-            ADMIN
-          </span>
-        </span>
-      </Link>
+      {variant === "rail" && (
+        <>
+          {/* Wortmarke */}
+          <Link href="/admin" prefetch={false} className="mb-2 flex items-center gap-3 px-[22px] no-underline">
+            <span
+              className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] bg-accent text-[18px] font-extrabold text-cream"
+              aria-hidden="true"
+            >
+              C
+            </span>
+            <span className="leading-[1.15]">
+              <span className="block text-[15px] font-extrabold tracking-[0.02em] text-white">CALLTALENT</span>
+              <span className="block text-[11px] font-semibold" style={{ color: "#B9BBDA", letterSpacing: "0.24em" }}>
+                ADMIN
+              </span>
+            </span>
+          </Link>
 
-      <div
-        className="mx-[22px] mb-6 inline-block self-start rounded-[8px] px-2.5 py-1.5 text-[11px] font-bold"
-        style={{ letterSpacing: "0.14em", color: "#8688B8", background: "rgba(255,255,255,0.08)" }}
-      >
-        VERWALTUNG
-      </div>
+          <div
+            className="mx-[22px] mb-6 inline-block self-start rounded-[8px] px-2.5 py-1.5 text-[11px] font-bold"
+            style={{ letterSpacing: "0.14em", color: "#8688B8", background: "rgba(255,255,255,0.08)" }}
+          >
+            VERWALTUNG
+          </div>
+        </>
+      )}
 
       {/* Navigation */}
       {/* BUGFIX (23.07.2026, Josips Fund: "Footer der Sidebar abgeschnitten"):

@@ -79,8 +79,8 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
 
       <div className="overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
         <div
-          className="grid gap-0 px-[26px] pb-3 pt-[18px] text-[13px] font-bold"
-          style={{ gridTemplateColumns: COLS, color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" }}
+          className="rgrid-header px-[26px] pb-3 pt-[18px] text-[13px] font-bold"
+          style={{ "--rgrid-cols": COLS, color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" } as React.CSSProperties}
         >
           <div>Name</div>
           <div>E-Mail</div>
@@ -96,8 +96,8 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
           visible.map((r) => (
             <div
               key={r.userId}
-              className="grid items-center gap-0 px-[26px] py-[15px] text-[15px]"
-              style={{ gridTemplateColumns: COLS, borderBottom: "1px solid #F4F5FA" }}
+              className="rgrid-row px-[18px] py-[15px] text-[15px] lg:px-[26px]"
+              style={{ "--rgrid-cols": COLS, borderBottom: "1px solid #F4F5FA" } as React.CSSProperties}
             >
               <div className="flex items-center gap-3.5">
                 <span
@@ -112,11 +112,15 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
               <div className="truncate text-sm" style={{ color: "#66679B" }}>
                 {r.email}
               </div>
-              <div style={{ color: "#3E3F66" }}>{r.courseCount}</div>
+              <div>
+                <span className="rgrid-label">Kurse</span>
+                <span style={{ color: "#3E3F66" }}>{r.courseCount}</span>
+              </div>
               <div className="text-sm" style={{ color: "#66679B" }}>
+                <span className="rgrid-label">Beigetreten</span>
                 {r.joined}
               </div>
-              <div className="flex items-center justify-end gap-3">
+              <div className="flex items-center gap-3 lg:justify-end">
                 <Link
                   href={`/admin/teilnehmer/${r.userId}`}
                   prefetch={false}

@@ -23,6 +23,9 @@ type Product = {
   image_url: string | null;
 };
 
+/** Geteilt mit admin/produkte/page.tsx (Kopfzeile) — muss identisch bleiben, sonst laufen Spalten auseinander. */
+export const PRODUCT_LIST_COLS = "2fr 1fr 1fr 0.8fr 1fr";
+
 function formatPrice(cents: number, currency: string): string {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: currency.toUpperCase() }).format(
     cents / 100,
@@ -75,8 +78,8 @@ export function ProductRow({
   return (
     <div style={{ borderBottom: "1px solid #F4F5FA" }}>
       <div
-        className="grid items-center gap-0 px-[28px] py-4 text-[15px]"
-        style={{ gridTemplateColumns: "2fr 1fr 1fr 0.8fr 1fr" }}
+        className="rgrid-row px-[18px] py-4 text-[15px] lg:px-[28px]"
+        style={{ "--rgrid-cols": PRODUCT_LIST_COLS } as React.CSSProperties}
       >
         <div className="min-w-0">
           <div className="truncate font-semibold">{p.title}</div>
@@ -84,8 +87,14 @@ export function ProductRow({
             {courseTitle}
           </div>
         </div>
-        <div style={{ color: "#3E3F66" }}>{PRODUCT_KIND_LABELS[p.kind as ProductKind]}</div>
-        <div className="font-semibold">{formatPrice(p.price_cents, p.currency)}</div>
+        <div>
+          <span className="rgrid-label">Art</span>
+          <span style={{ color: "#3E3F66" }}>{PRODUCT_KIND_LABELS[p.kind as ProductKind]}</span>
+        </div>
+        <div>
+          <span className="rgrid-label">Preis</span>
+          <span className="font-semibold">{formatPrice(p.price_cents, p.currency)}</span>
+        </div>
         <div>
           <span
             className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
@@ -94,7 +103,7 @@ export function ProductRow({
             {p.active ? "Aktiv" : "Inaktiv"}
           </span>
         </div>
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center gap-2 lg:justify-end">
           <PayLinkIcon productSlug={p.slug} productTitle={p.title} />
           <button
             type="button"

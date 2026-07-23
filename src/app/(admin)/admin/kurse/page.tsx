@@ -87,6 +87,8 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   archived: { label: "Archiviert", color: "#66679B", bg: "#EEF0F7" },
 };
 
+const COURSE_LIST_COLS = "1.7fr 1.1fr 0.7fr 0.8fr 0.8fr 1.3fr";
+
 const TABS: { key: string; label: string; status: string | null }[] = [
   { key: "alle", label: "Alle", status: null },
   { key: "live", label: "Live", status: "published" },
@@ -218,12 +220,12 @@ export default async function AdminKursePage({
 
       <div className="overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
         <div
-          className="grid gap-0 px-[26px] pb-3 pt-[18px] text-[13px] font-bold"
+          className="rgrid-header px-[26px] pb-3 pt-[18px] text-[13px] font-bold"
           style={{
-            gridTemplateColumns: "1.7fr 1.1fr 0.7fr 0.8fr 0.8fr 1.3fr",
+            "--rgrid-cols": COURSE_LIST_COLS,
             color: "#A9AAC4",
             borderBottom: "1px solid #EEF0F7",
-          }}
+          } as React.CSSProperties}
         >
           <div>Kurs</div>
           <div>Kategorie</div>
@@ -246,11 +248,11 @@ export default async function AdminKursePage({
             return (
               <div
                 key={c.id}
-                className="grid items-center gap-0 px-[26px] py-4 text-[15px]"
+                className="rgrid-row px-[18px] py-4 text-[15px] lg:px-[26px]"
                 style={{
-                  gridTemplateColumns: "1.7fr 1.1fr 0.7fr 0.8fr 0.8fr 1.3fr",
+                  "--rgrid-cols": COURSE_LIST_COLS,
                   borderBottom: "1px solid #F4F5FA",
-                }}
+                } as React.CSSProperties}
               >
                 <div className="flex items-center gap-3.5">
                   <ThumbnailUpload
@@ -269,6 +271,7 @@ export default async function AdminKursePage({
                   </Link>
                 </div>
                 <div>
+                  <span className="rgrid-label">Kategorie</span>
                   <CourseCategorySelect
                     courseId={c.id}
                     categoryId={c.category_id}
@@ -277,8 +280,14 @@ export default async function AdminKursePage({
                     compact
                   />
                 </div>
-                <div style={{ color: "#3E3F66" }}>{lessonCountByCourse.get(c.id) ?? 0}</div>
-                <div style={{ color: "#3E3F66" }}>{memberCountByCourse.get(c.id) ?? 0}</div>
+                <div>
+                  <span className="rgrid-label">Lektionen</span>
+                  <span style={{ color: "#3E3F66" }}>{lessonCountByCourse.get(c.id) ?? 0}</span>
+                </div>
+                <div>
+                  <span className="rgrid-label">Teilnehmer</span>
+                  <span style={{ color: "#3E3F66" }}>{memberCountByCourse.get(c.id) ?? 0}</span>
+                </div>
                 <div>
                   <span
                     className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
@@ -287,7 +296,7 @@ export default async function AdminKursePage({
                     {meta.label}
                   </span>
                 </div>
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center gap-2 lg:justify-end">
                   <Link
                     href={`/admin/kurse/${c.id}`}
                     prefetch={false}

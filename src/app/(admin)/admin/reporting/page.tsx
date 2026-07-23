@@ -4,6 +4,10 @@ import { getCourseReport, getUserReport, getQuizReport } from "@/lib/reporting/q
 import { resetCourseReport, resetUserReport, resetQuizReport } from "@/lib/reporting/actions";
 import { ReportResetButton } from "@/components/admin/report-reset-button";
 
+const COURSE_REPORT_COLS = "2fr 1fr 1fr 1.2fr 0.5fr";
+const USER_REPORT_COLS = "1.6fr 1.6fr 1fr 1fr 0.5fr";
+const QUIZ_REPORT_COLS = "1.8fr 1.4fr 1fr 1fr 0.5fr";
+
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   completed: { label: "Abgeschlossen", color: "#1F8A5B", bg: "#E3F2EA" },
   active: { label: "Aktiv", color: "#5663AE", bg: "#EAEBF7" },
@@ -80,8 +84,8 @@ export default async function AdminReportingPage() {
           <CsvExportLink href="/api/admin/reporting/csv?type=courses" />
         </div>
         <div
-          className="grid items-center gap-0 px-[28px] pb-2.5 text-[13px] font-bold"
-          style={{ gridTemplateColumns: "2fr 1fr 1fr 1.2fr 0.5fr", color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" }}
+          className="rgrid-header px-[28px] pb-2.5 text-[13px] font-bold"
+          style={{ "--rgrid-cols": COURSE_REPORT_COLS, color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" } as React.CSSProperties}
         >
           <div>Kurs</div>
           <div>Eingeschrieben</div>
@@ -97,12 +101,18 @@ export default async function AdminReportingPage() {
           courseReport.map((r) => (
             <div
               key={r.courseId}
-              className="grid items-center gap-0 px-[28px] py-4 text-[15px]"
-              style={{ gridTemplateColumns: "2fr 1fr 1fr 1.2fr 0.5fr", borderBottom: "1px solid #F4F5FA" }}
+              className="rgrid-row px-[18px] py-4 text-[15px] lg:px-[28px]"
+              style={{ "--rgrid-cols": COURSE_REPORT_COLS, borderBottom: "1px solid #F4F5FA" } as React.CSSProperties}
             >
               <div className="truncate font-semibold">{r.courseTitle}</div>
-              <div style={{ color: "#66679B" }}>{r.enrolledCount}</div>
-              <div style={{ color: "#66679B" }}>{r.activeCount}</div>
+              <div>
+                <span className="rgrid-label">Eingeschrieben</span>
+                <span style={{ color: "#66679B" }}>{r.enrolledCount}</span>
+              </div>
+              <div>
+                <span className="rgrid-label">Aktiv</span>
+                <span style={{ color: "#66679B" }}>{r.activeCount}</span>
+              </div>
               <div className="flex items-center gap-2.5 pr-4">
                 <div
                   className="h-[7px] max-w-[120px] flex-1 overflow-hidden rounded-[4px]"
@@ -116,7 +126,7 @@ export default async function AdminReportingPage() {
                   {r.completionRatePct}%
                 </span>
               </div>
-              <div className="text-right">
+              <div className="lg:text-right">
                 <ReportResetButton
                   label={`Kursbericht zurücksetzen: ${r.courseTitle}`}
                   confirmMessage={`Kursbericht für „${r.courseTitle}“ zurücksetzen? Der Fortschritt ALLER eingeschriebenen Lernenden in diesem Kurs wird gelöscht (Einschreibungen selbst bleiben erhalten). Dieser Vorgang kann nicht rückgängig gemacht werden.`}
@@ -144,8 +154,8 @@ export default async function AdminReportingPage() {
         ) : (
           <>
             <div
-              className="grid items-center gap-0 px-[28px] pb-2.5 text-[13px] font-bold"
-              style={{ gridTemplateColumns: "1.6fr 1.6fr 1fr 1fr 0.5fr", color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" }}
+              className="rgrid-header px-[28px] pb-2.5 text-[13px] font-bold"
+              style={{ "--rgrid-cols": USER_REPORT_COLS, color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" } as React.CSSProperties}
             >
               <div>Nutzer</div>
               <div>Kurs</div>
@@ -158,14 +168,17 @@ export default async function AdminReportingPage() {
               return (
                 <div
                   key={`${u.userId}-${u.courseId}`}
-                  className="grid items-center gap-0 px-[28px] py-3.5 text-sm"
-                  style={{ gridTemplateColumns: "1.6fr 1.6fr 1fr 1fr 0.5fr", borderBottom: "1px solid #F4F5FA" }}
+                  className="rgrid-row px-[18px] py-3.5 text-sm lg:px-[28px]"
+                  style={{ "--rgrid-cols": USER_REPORT_COLS, borderBottom: "1px solid #F4F5FA" } as React.CSSProperties}
                 >
                   <div className="truncate font-semibold">{u.userName}</div>
                   <div className="truncate" style={{ color: "#3E3F66" }}>
                     {u.courseTitle}
                   </div>
-                  <div style={{ color: "#66679B" }}>{u.progressPct}%</div>
+                  <div>
+                    <span className="rgrid-label">Fortschritt</span>
+                    <span style={{ color: "#66679B" }}>{u.progressPct}%</span>
+                  </div>
                   <div>
                     <span
                       className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
@@ -174,7 +187,7 @@ export default async function AdminReportingPage() {
                       {meta.label}
                     </span>
                   </div>
-                  <div className="text-right">
+                  <div className="lg:text-right">
                     <ReportResetButton
                       label={`Nutzerbericht zurücksetzen: ${u.userName} – ${u.courseTitle}`}
                       confirmMessage={`Nutzerbericht für „${u.userName} – ${u.courseTitle}“ zurücksetzen? Der Fortschritt dieses Lernenden in diesem Kurs wird gelöscht (Einschreibung selbst bleibt erhalten). Dieser Vorgang kann nicht rückgängig gemacht werden.`}
@@ -201,8 +214,8 @@ export default async function AdminReportingPage() {
         ) : (
           <>
             <div
-              className="grid items-center gap-0 px-[28px] pb-2.5 pt-4 text-[13px] font-bold"
-              style={{ gridTemplateColumns: "1.8fr 1.4fr 1fr 1fr 0.5fr", color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" }}
+              className="rgrid-header px-[28px] pb-2.5 pt-4 text-[13px] font-bold"
+              style={{ "--rgrid-cols": QUIZ_REPORT_COLS, color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" } as React.CSSProperties}
             >
               <div>Quiz</div>
               <div>Nutzer</div>
@@ -213,16 +226,22 @@ export default async function AdminReportingPage() {
             {quizReport.map((q) => (
               <div
                 key={`${q.quizId}-${q.userId}`}
-                className="grid items-center gap-0 px-[28px] py-3.5 text-sm"
-                style={{ gridTemplateColumns: "1.8fr 1.4fr 1fr 1fr 0.5fr", borderBottom: "1px solid #F4F5FA" }}
+                className="rgrid-row px-[18px] py-3.5 text-sm lg:px-[28px]"
+                style={{ "--rgrid-cols": QUIZ_REPORT_COLS, borderBottom: "1px solid #F4F5FA" } as React.CSSProperties}
               >
                 <div className="truncate font-semibold">{q.quizTitle}</div>
                 <div className="truncate" style={{ color: "#3E3F66" }}>
                   {q.userName}
                 </div>
-                <div style={{ color: "#66679B" }}>{q.attemptsCount}</div>
-                <div className="font-bold">{q.bestScorePct ?? "—"}{q.bestScorePct !== null ? "%" : ""}</div>
-                <div className="text-right">
+                <div>
+                  <span className="rgrid-label">Versuche</span>
+                  <span style={{ color: "#66679B" }}>{q.attemptsCount}</span>
+                </div>
+                <div>
+                  <span className="rgrid-label">Bestes Ergebnis</span>
+                  <span className="font-bold">{q.bestScorePct ?? "—"}{q.bestScorePct !== null ? "%" : ""}</span>
+                </div>
+                <div className="lg:text-right">
                   <ReportResetButton
                     label={`Quiz-Auswertung zurücksetzen: ${q.quizTitle} – ${q.userName}`}
                     confirmMessage={`Quiz-Auswertung für „${q.quizTitle} – ${q.userName}“ zurücksetzen? Alle Versuche dieses Nutzers für dieses Quiz werden gelöscht. Dieser Vorgang kann nicht rückgängig gemacht werden.`}

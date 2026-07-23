@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { LearnMobileNav } from "@/components/layout/LearnMobileNav";
 import { checkPlatformAccess } from "@/lib/platform/auth";
 import { getTenant } from "@/lib/tenant/context";
 import { createClient } from "@/lib/supabase/server";
@@ -83,18 +84,21 @@ export async function AppShell({
   }
 
   return (
-    <div className="flex min-h-screen bg-bg">
-      <HtmlBackgroundSync color="#F4F5FA" />
-      <Sidebar isStaff={isStaff} isPlatformAdmin={platformAccess.ok} customLinks={customLinks} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar
-          breadcrumb={breadcrumb}
-          title={title ?? `Willkommen zurück, ${userName}`}
-          user={{ name: userName, email: userEmail, role: "Kursteilnehmer" }}
-          notifications={[]}
-        />
-        <main className="flex-1 px-10 pb-14 pt-4">{children}</main>
+    <>
+      <LearnMobileNav isStaff={isStaff} isPlatformAdmin={platformAccess.ok} customLinks={customLinks} />
+      <div className="flex min-h-screen bg-bg">
+        <HtmlBackgroundSync color="#F4F5FA" />
+        <Sidebar isStaff={isStaff} isPlatformAdmin={platformAccess.ok} customLinks={customLinks} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopBar
+            breadcrumb={breadcrumb}
+            title={title ?? `Willkommen zurück, ${userName}`}
+            user={{ name: userName, email: userEmail, role: "Kursteilnehmer" }}
+            notifications={[]}
+          />
+          <main className="flex-1 px-4 pb-8 pt-3 lg:px-10 lg:pb-14 lg:pt-4">{children}</main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

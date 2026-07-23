@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell, ChevronDown } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /**
  * Layout-Kopfzeile — 1:1-Portierung aus dem Referenzdesign
@@ -25,6 +26,29 @@ import { Bell, ChevronDown } from "lucide-react";
  *
  * Bewusste, nicht-optische Abweichung: „Abmelden" nutzt das echte
  * Signout-Form (/auth/signout) statt des Mock-Links auf Login.dc.html.
+ *
+ * Mobile-Umbau (23.07.2026, Josips Auftrag): Gutter `px-10 py-5` gilt jetzt
+ * erst ab `lg`, mobil `px-4 py-4`. Die beiden Dropdown-Panels waren fest
+ * `absolute right-0 w-[360px]`/`w-[250px]` — relativ zum jeweiligen (kleinen)
+ * Trigger-Button positioniert. Beim Benachrichtigungen-Button (NICHT das
+ * äußerste rechte Element, das Profil-Icon sitzt weiter rechts daneben)
+ * führte eine einfache Breitenkappung (`w-[calc(100vw-2rem)]`) dazu, dass
+ * das Panel über den LINKEN Rand hinausragte (live geprüft: `right:0`
+ * relativ zu einem Anker, der selbst schon links der Viewport-Kante sitzt,
+ * plus fast Viewport-Breite = negativer `left`-Wert).
+ *
+ * Fix: unter `lg` `fixed inset-x-4` (Panel-Breite hängt vom VIEWPORT ab,
+ * nicht vom Trigger-Button — kein Overflow in keine Richtung mehr) UND ein
+ * per `ResizeObserver` gemessenes `headerHeight` für die `top`-Position
+ * (`useIsMobile()`-gated Inline-Style, NUR unter `lg` gesetzt, sonst
+ * `undefined` und die `lg:top-14`-Klasse greift unverändert). Ein fester
+ * `top-16`-Wert reichte NICHT: die Kopfzeile ist je nach Seite/Namenslänge
+ * unterschiedlich hoch (live geprüft: "Willkommen zurück, …" kann auf
+ * schmalen Bildschirmen mehrzeilig umbrechen, Header dann bis zu 192px statt
+ * der angenommenen ~64px) — ein statischer Wert hätte das Panel auf manchen
+ * Seiten über den unteren Header-Rand hinweg gezeichnet. Ab `lg` bleibt exakt
+ * das ursprüngliche `absolute right-0 w-[...]`-Verhalten (keine optische
+ * Änderung am Desktop).
  */
 type NotificationItem = { text: string; time: string };
 
@@ -55,6 +79,9 @@ export function TopBar({
   const [profileOpen, setProfileOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -65,14 +92,39 @@ export function TopBar({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
+  // Header-Position für die mobile Dropdown-Platzierung wird ERST beim
+  // Öffnen gemessen (in den beiden onClick-Handlern unten).
+  //
+  // BUGFIX 1 (live geprüft): `entries[0].contentRect.height` (ResizeObserver)
+  // misst die CONTENT-Box ohne Padding — der Header hat `py-4` (32px),
+  // `getBoundingClientRect()` liefert dagegen die tatsächlich sichtbare
+  // Border-Box-Höhe.
+  //
+  // BUGFIX 2 (live geprüft, der eigentliche Fund): `.height` allein reicht
+  // NICHT — unter `lg` steht `LearnMobileNav`/`AdminMobileNav` (Logo +
+  // Hamburger, eigene ~65px hohe Leiste) VOR diesem Header im normalen
+  // Fluss, der Header selbst beginnt also nicht bei `y=0`. Ein `fixed`
+  // positioniertes Panel braucht die Position relativ zum VIEWPORT —
+  // `.bottom` (= tatsächliche Y-Position des Header-Endes im Viewport)
+  // statt `.height` (das die vorangehende Leiste komplett ignoriert und das
+  // Panel dadurch permanent zu weit oben platzierte, mitten im Header).
+  function measureHeaderHeight(): number {
+    return (headerRef.current?.getBoundingClientRect().bottom ?? 0) + 8;
+  }
+
+  const mobileDropdownTop = isMobile ? headerHeight : undefined;
+
   const unread = notifications.length;
 
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-[18px] bg-bg px-10 py-5 font-sans">
+    <header
+      ref={headerRef}
+      className="sticky top-0 z-20 flex items-center gap-[18px] bg-bg px-4 py-4 font-sans lg:px-10 lg:py-5"
+    >
       {/* Breadcrumb + Titel */}
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-semibold tracking-[0.02em] text-muted-400">{breadcrumb}</p>
-        <h1 className="mt-0.5 text-[26px] font-extrabold tracking-[-0.01em] text-ink">{title}</h1>
+        <h1 className="mt-0.5 text-[20px] font-extrabold tracking-[-0.01em] text-ink lg:text-[26px]">{title}</h1>
       </div>
 
       {/* Benachrichtigungen */}
@@ -80,6 +132,7 @@ export function TopBar({
         <button
           type="button"
           onClick={() => {
+            if (!notifOpen) setHeaderHeight(measureHeaderHeight());
             setNotifOpen((v) => !v);
             setProfileOpen(false);
           }}
@@ -97,7 +150,8 @@ export function TopBar({
         </button>
         {notifOpen && (
           <div
-            className="absolute right-0 top-14 z-30 w-[360px] overflow-hidden rounded-xl border border-border-100 bg-white shadow-[0_18px_44px_rgba(26,26,46,0.16)]"
+            className="fixed inset-x-4 z-30 overflow-hidden rounded-xl border border-border-100 bg-white shadow-[0_18px_44px_rgba(26,26,46,0.16)] lg:absolute lg:inset-x-auto lg:right-0 lg:top-14 lg:w-[360px]"
+            style={{ top: mobileDropdownTop }}
             role="menu"
           >
             <div className="flex items-center justify-between px-[18px] pb-3 pt-4">
@@ -145,6 +199,7 @@ export function TopBar({
         <button
           type="button"
           onClick={() => {
+            if (!profileOpen) setHeaderHeight(measureHeaderHeight());
             setProfileOpen((v) => !v);
             setNotifOpen(false);
           }}
@@ -166,7 +221,8 @@ export function TopBar({
         </button>
         {profileOpen && (
           <div
-            className="absolute right-0 top-14 z-30 w-[250px] overflow-hidden rounded-xl border border-border-100 bg-white p-2 shadow-[0_18px_44px_rgba(26,26,46,0.16)]"
+            className="fixed inset-x-4 z-30 overflow-hidden rounded-xl border border-border-100 bg-white p-2 shadow-[0_18px_44px_rgba(26,26,46,0.16)] lg:absolute lg:inset-x-auto lg:right-0 lg:top-14 lg:w-[250px]"
+            style={{ top: mobileDropdownTop }}
             role="menu"
           >
             <div className="px-3 pb-[14px] pt-3">

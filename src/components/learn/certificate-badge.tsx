@@ -59,12 +59,11 @@ export async function CertificateBadge({
     const certificatesDisabled =
       courseSettings.certificate_enabled === false || tenantSettings.certificates_enabled === false;
 
+    // Josips Auftrag (23.07.2026): keine Meldung an dieser Stelle, wenn
+    // Zertifikate für Kurs/Mandant deaktiviert sind — die Kachel entfällt
+    // dann komplett statt eines Hinweistexts.
     if (certificatesDisabled) {
-      return (
-        <p className="text-sm text-gray-500" role="status">
-          Für diesen Kurs werden keine Zertifikate ausgestellt.
-        </p>
-      );
+      return null;
     }
 
     return (

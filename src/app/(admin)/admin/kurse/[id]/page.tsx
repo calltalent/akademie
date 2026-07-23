@@ -197,7 +197,11 @@ export default async function CourseEditorPage({
         </div>
       </header>
 
-      <main className="mt-1.5 grid items-start gap-[26px]" style={{ gridTemplateColumns: "300px 1fr" }}>
+      {/* Mobile-Umbau (23.07.2026): Baum + Editor stapeln sich unter `lg`
+          (Baum zuerst, Editor darunter) statt der festen 300px/1fr-Spalten —
+          bewusst ohne neuen Auf-/Zuklapp-Zustand für den Baum, hält den
+          Umfang bei einer reinen Layout-Passage (siehe Plan-Kommentar). */}
+      <main className="mt-1.5 flex flex-col gap-[18px] lg:grid lg:items-start lg:gap-[26px] lg:grid-cols-[300px_1fr]">
         <ModuleLessonTree
           courseId={courseId}
           modules={modulesWithLessons}

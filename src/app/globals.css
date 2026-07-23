@@ -91,3 +91,56 @@ body {
   font-size: 18px;
   line-height: 1.6;
 }
+
+/*
+ * Responsive Daten-Grids (23.07.2026, Mobile-Umbau Admin-Bereich, Josips
+ * Auftrag) — für die handgebauten div-Tabellenersätze in admin/kurse,
+ * teilnehmer-liste, admin/produkte (+product-row), admin/reporting und
+ * portal/mandanten. Die Spaltenbreiten kommen dort aus einer JS-Variable
+ * (const/Prop), nicht aus einem Literal im JSX — eine zur Laufzeit
+ * zusammengesetzte Tailwind-Klasse wie `` `lg:grid-cols-[${cols}]` `` würde
+ * KEIN CSS erzeugen (Tailwind v4 ist ein Static-Analysis-Compiler, sieht den
+ * Literal-String nie im Quellcode). Deshalb reines CSS + eine Custom
+ * Property (`--rgrid-cols`, je Aufrufer per `style` gesetzt) statt einer
+ * Tailwind-Arbitrary-Value-Klasse. Gleicher `lg`-Breakpoint (1024px) wie die
+ * Navigations-Shells (AdminSidebar/Sidebar) — unter `lg` ist ohnehin schon
+ * die feste Sidebar durch die mobile Kopfzeile ersetzt, ein einheitlicher
+ * Umschaltpunkt hält das Verhalten vorhersehbar.
+ */
+.rgrid-header {
+  display: none;
+}
+.rgrid-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+@media (min-width: 1024px) {
+  .rgrid-header {
+    display: grid;
+    grid-template-columns: var(--rgrid-cols);
+  }
+  .rgrid-row {
+    display: grid;
+    grid-template-columns: var(--rgrid-cols);
+    align-items: center;
+    gap: 0;
+  }
+}
+/* Mikro-Label vor Zellen, deren Wert gestapelt ohne Spaltenüberschrift
+   unklar wäre (z. B. eine bloße Zahl oder ein bloßes Datum) — nur an den
+   mehrdeutigen Zellen eingesetzt, nicht überall. */
+.rgrid-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #a9aac4;
+  margin-bottom: 2px;
+}
+@media (min-width: 1024px) {
+  .rgrid-label {
+    display: none;
+  }
+}

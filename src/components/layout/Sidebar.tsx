@@ -77,6 +77,17 @@ import {
  * Mandantenbereich — erscheint nur, wenn mindestens einer der beiden
  * sichtbar ist (sonst stünde eine leere Überschrift über "Hilfe & Kontakt",
  * das bewusst NICHT zu "Konto" zählt und für alle Rollen sichtbar bleibt).
+ *
+ * `variant` NEU (23.07.2026, Mobile-Umbau Lernansicht, Josips Auftrag) —
+ * gleiches Muster wie `AdminSidebar.tsx`: "rail" (Standard) ist die
+ * bisherige Schiene, jetzt zusätzlich `hidden lg:flex` (unter `lg` übernimmt
+ * `LearnMobileNav` den Platz). "panel" rendert dieselbe Komponente
+ * (identische Nav-Items/Badges/customLinks, keine zweite Datenquelle) als
+ * Block fürs mobile Ausklapp-Panel: Wortmarke entfällt (die mobile
+ * Kopfzeile zeigt ihr eigenes kompaktes Logo), der Ein-/Ausklapp-Button
+ * entfällt (im Panel ergibt "einklappen" keinen Sinn), Labels sind IMMER
+ * sichtbar unabhängig vom gespeicherten `expanded`-Zustand der Desktop-
+ * Schiene (`showLabels`, ersetzt die bisherigen `expanded &&`-Stellen).
  */
 export type SidebarItemId = "dashboard" | "catalog" | "bookmarks";
 
@@ -104,15 +115,21 @@ export function Sidebar({
   isStaff = false,
   isPlatformAdmin = false,
   customLinks = [],
+  variant = "rail",
 }: {
   active?: SidebarItemId;
   isStaff?: boolean;
   isPlatformAdmin?: boolean;
   customLinks?: SidebarLink[];
+  variant?: "rail" | "panel";
 }) {
   const [expanded, setExpanded] = useState(true);
   const pathname = usePathname();
   const activeId = active ?? activeFromPath(pathname);
+  const isPanel = variant === "panel";
+  // Im Panel (mobiles Ausklapp-Menü) sind Labels immer sichtbar — der
+  // Ein-/Ausklapp-Zustand der Desktop-Schiene ist dort irrelevant.
+  const showLabels = isPanel || expanded;
 
   const portalHost = process.env.NEXT_PUBLIC_PORTAL_HOST || "portal.localhost";
   const portalMandantenUrl =
@@ -129,18 +146,18 @@ export function Sidebar({
         href={item.href}
         prefetch={false}
         aria-current={isActive ? "page" : undefined}
-        title={!expanded ? item.label : undefined}
+        title={!showLabels ? item.label : undefined}
         className={[
           "mb-[3px] flex items-center gap-3 rounded-sm px-3 py-[11px] text-[15px] no-underline transition-colors",
-          !expanded ? "justify-center" : "",
+          !showLabels ? "justify-center" : "",
           isActive
             ? "bg-accent font-bold text-white"
             : "font-medium text-navy hover:bg-[rgba(62,63,102,0.06)]",
         ].join(" ")}
       >
         <Icon size={20} aria-hidden="true" className="flex-shrink-0" />
-        {expanded && <span className="flex-1">{item.label}</span>}
-        {expanded && item.badge && (
+        {showLabels && <span className="flex-1">{item.label}</span>}
+        {showLabels && item.badge && (
           <span className="flex h-5 min-w-5 items-center justify-center rounded-[10px] bg-accent px-1.5 text-[11px] font-bold text-white">
             {item.badge}
           </span>
@@ -157,72 +174,82 @@ export function Sidebar({
         href={link.url}
         target="_blank"
         rel="noopener noreferrer"
-        title={!expanded ? link.label : undefined}
+        title={!showLabels ? link.label : undefined}
         className={[
           "mb-[3px] flex items-center gap-3 rounded-sm px-3 py-[11px] text-[15px] font-medium text-navy no-underline transition-colors hover:bg-[rgba(62,63,102,0.06)]",
-          !expanded ? "justify-center" : "",
+          !showLabels ? "justify-center" : "",
         ].join(" ")}
       >
         <ExternalLink size={20} aria-hidden="true" className="flex-shrink-0" />
-        {expanded && <span className="flex-1">{link.label}</span>}
+        {showLabels && <span className="flex-1">{link.label}</span>}
       </a>
     );
   }
 
   return (
     <aside
-      className="sticky top-0 flex h-screen flex-shrink-0 flex-col border-r border-border-100 bg-white py-[26px] font-sans transition-[width] duration-[180ms] ease-out"
-      style={{ width: expanded ? "264px" : "84px" }}
+      className={
+        isPanel
+          ? "flex w-full flex-shrink-0 flex-col bg-white py-[14px] font-sans"
+          : "hidden flex-shrink-0 flex-col border-r border-border-100 bg-white py-[26px] font-sans transition-[width] duration-[180ms] ease-out lg:sticky lg:top-0 lg:flex lg:h-screen"
+      }
+      style={{ width: isPanel ? "100%" : expanded ? "264px" : "84px" }}
       aria-label="Hauptnavigation"
     >
-      {/* Wortmarke + Logomarke */}
-      <Link
-        href="/dashboard"
-        prefetch={false}
-        className="mb-[30px] flex min-h-[34px] items-center gap-3 px-[22px] no-underline"
-      >
-        <span
-          className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] bg-accent text-[18px] font-extrabold text-cream"
-          aria-hidden="true"
-        >
-          C
-        </span>
-        {expanded && (
-          <span className="leading-[1.15]">
-            <span className="block text-[15px] font-extrabold tracking-[0.02em] text-ink">
-              CALLTALENT
+      {!isPanel && (
+        <>
+          {/* Wortmarke + Logomarke */}
+          <Link
+            href="/dashboard"
+            prefetch={false}
+            className="mb-[30px] flex min-h-[34px] items-center gap-3 px-[22px] no-underline"
+          >
+            <span
+              className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] bg-accent text-[18px] font-extrabold text-cream"
+              aria-hidden="true"
+            >
+              C
             </span>
-            <span className="block text-[11px] font-semibold tracking-[0.28em] text-muted-500">
-              AKADEMIE
-            </span>
-          </span>
-        )}
-      </Link>
+            {expanded && (
+              <span className="leading-[1.15]">
+                <span className="block text-[15px] font-extrabold tracking-[0.02em] text-ink">
+                  CALLTALENT
+                </span>
+                <span className="block text-[11px] font-semibold tracking-[0.28em] text-muted-500">
+                  AKADEMIE
+                </span>
+              </span>
+            )}
+          </Link>
 
-      {/* Such-Button = Ein-/Ausklappen (wie in der Referenz) */}
-      <div className="mb-[26px] px-4">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          aria-label={expanded ? "Sidebar einklappen" : "Sidebar ausklappen"}
-          className={`flex w-full items-center gap-3 rounded-sm border border-border-100 bg-bg px-[13px] py-[11px] text-[15px] text-muted-500 ${
-            expanded ? "" : "justify-center"
-          }`}
-        >
-          <Search size={19} aria-hidden="true" className="flex-shrink-0 text-accent" />
-          {expanded && <span>Suchen …</span>}
-        </button>
-      </div>
+          {/* Such-Button = Ein-/Ausklappen (wie in der Referenz) — nur auf der
+              Desktop-Schiene, im mobilen Panel ergibt Einklappen keinen Sinn. */}
+          <div className="mb-[26px] px-4">
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              aria-label={expanded ? "Sidebar einklappen" : "Sidebar ausklappen"}
+              className={`flex w-full items-center gap-3 rounded-sm border border-border-100 bg-bg px-[13px] py-[11px] text-[15px] text-muted-500 ${
+                expanded ? "" : "justify-center"
+              }`}
+            >
+              <Search size={19} aria-hidden="true" className="flex-shrink-0 text-accent" />
+              {expanded && <span>Suchen …</span>}
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Navigation */}
       {/* min-h-0: gleicher Fix wie AdminSidebar.tsx (Josips Fund "Footer der
           Sidebar abgeschnitten") — ohne das wächst dieses Flex-Kind bei
           vielen admin-verwaltbaren Zusatzlinks (customLinks) über die feste
           h-screen-Höhe des <aside> hinaus und drückt den Footer darunter aus
-          dem sichtbaren Bereich. */}
-      <nav className="min-h-0 flex-1 overflow-hidden px-4">
-        {expanded && (
+          dem sichtbaren Bereich. Im Panel gibt es keine feste Höhe (der
+          Aufrufer begrenzt stattdessen per `max-h-[..vh] overflow-y-auto`). */}
+      <nav className={isPanel ? "px-4" : "min-h-0 flex-1 overflow-hidden px-4"}>
+        {showLabels && (
           <p className="mb-[9px] px-3 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-400">
             Lernen
           </p>
@@ -232,7 +259,7 @@ export function Sidebar({
         {customLinks.length > 0 && (
           <>
             <div className="h-5" />
-            {expanded && (
+            {showLabels && (
               <p className="mb-[9px] px-3 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-400">
                 Links
               </p>
@@ -246,7 +273,7 @@ export function Sidebar({
       <div className="mt-4 flex flex-col gap-1 border-t border-border-100 px-4 pt-4">
         {(isStaff || isPlatformAdmin) && (
           <>
-            {expanded && (
+            {showLabels && (
               <p className="mb-[9px] px-3 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-400">
                 Konto
               </p>
@@ -254,38 +281,38 @@ export function Sidebar({
             {isStaff && (
               <a
                 href="/admin"
-                title={!expanded ? "Admin-Bereich" : undefined}
+                title={!showLabels ? "Admin-Bereich" : undefined}
                 className={`flex items-center gap-3 rounded-sm px-3 py-[10px] text-[15px] font-medium text-muted-500 no-underline ${
-                  expanded ? "" : "justify-center"
+                  showLabels ? "" : "justify-center"
                 }`}
               >
                 <ShieldCheck size={19} aria-hidden="true" className="flex-shrink-0" />
-                {expanded && <span>Admin-Bereich</span>}
+                {showLabels && <span>Admin-Bereich</span>}
               </a>
             )}
             {isPlatformAdmin && (
               <a
                 href={portalMandantenUrl}
-                title={!expanded ? "Mandantenbereich" : undefined}
+                title={!showLabels ? "Mandantenbereich" : undefined}
                 className={`flex items-center gap-3 rounded-sm px-3 py-[10px] text-[15px] font-medium text-muted-500 no-underline ${
-                  expanded ? "" : "justify-center"
+                  showLabels ? "" : "justify-center"
                 }`}
               >
                 <Building2 size={19} aria-hidden="true" className="flex-shrink-0" />
-                {expanded && <span>Mandantenbereich</span>}
+                {showLabels && <span>Mandantenbereich</span>}
               </a>
             )}
           </>
         )}
         <a
           href="mailto:support@calltalent.ai"
-          title={!expanded ? "Hilfe & Kontakt" : undefined}
+          title={!showLabels ? "Hilfe & Kontakt" : undefined}
           className={`flex items-center gap-3 rounded-sm px-3 py-[10px] text-[15px] font-medium text-muted-500 no-underline ${
-            expanded ? "" : "justify-center"
+            showLabels ? "" : "justify-center"
           }`}
         >
           <HelpCircle size={19} aria-hidden="true" className="flex-shrink-0" />
-          {expanded && <span>Hilfe &amp; Kontakt</span>}
+          {showLabels && <span>Hilfe &amp; Kontakt</span>}
         </a>
       </div>
     </aside>

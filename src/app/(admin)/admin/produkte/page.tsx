@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { ProductForm } from "@/components/admin/product-form";
-import { ProductRow } from "@/components/admin/product-row";
+import { ProductRow, PRODUCT_LIST_COLS } from "@/components/admin/product-row";
 
 /**
  * Produkte (Josips Auftrag 19.07.2026: "Unterseite für Produkte" unter
@@ -56,8 +56,8 @@ export default async function AdminProdukePage() {
             <div className="text-[17px] font-bold">Produkte</div>
           </div>
           <div
-            className="grid items-center gap-0 px-[28px] pb-2.5 text-[13px] font-bold"
-            style={{ gridTemplateColumns: "2fr 1fr 1fr 0.8fr 1fr", color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" }}
+            className="rgrid-header px-[28px] pb-2.5 text-[13px] font-bold"
+            style={{ "--rgrid-cols": PRODUCT_LIST_COLS, color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" } as React.CSSProperties}
           >
             <div>Produkt</div>
             <div>Art</div>
