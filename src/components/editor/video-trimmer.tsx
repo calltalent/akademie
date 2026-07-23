@@ -738,13 +738,20 @@ export function VideoTrimmer({
     }
     setAlertMessage("");
 
-    if (normalized.length === 1 && coversFullDuration(normalized, durationS)) {
-      // Abkürzung (Plan): keine echte Änderung -> ffmpeg wird nicht geladen
-      // (kein `setBusy`/ffmpeg-Import in diesem Zweig), das Original-Blob
-      // geht unverändert nach oben.
-      onConfirm(blob, durationS);
-      return;
-    }
+    // BUGFIX (23.07.2026, Josips Meldung "Lektion zeigt nur Processing"): die
+    // alte Abkürzung ließ bei "keine echte Änderung" das Original-Blob
+    // KOMPLETT an ffmpeg vorbei nach oben laufen. Genau dieses rohe
+    // MediaRecorder-Webm (Blocker B7, keine Duration/Cues im Header) blieb
+    // bei Bunny teils dauerhaft im Encoding hängen. remuxFix() läuft deshalb
+    // jetzt IMMER — auch ohne echten Schnitt —, nur cutAndConcat() wird für
+    // diesen Fall übersprungen. Das unterläuft die alte, oben im Dateikopf
+    // dokumentierte Verifikationsvorgabe ("Null-Edit lädt ffmpeg NICHT"),
+    // aber Korrektheit des Uploads wiegt hier schwerer als der vermiedene
+    // ffmpeg-Ladevorgang. Gilt NUR für diesen Zweig (blob ist hier laut
+    // `tooLargeToTrim`-Gate oben immer ≤ TRIM_SIZE_LIMIT_BYTES) — der
+    // separate "zu groß zum Zuschneiden"-Weg (`handleUseWithoutTrim`) bleibt
+    // bewusst unverändert, siehe Kommentar dort.
+    const noRealChange = normalized.length === 1 && coversFullDuration(normalized, durationS);
 
     setBusy(true);
     setProgressPercent(0);
@@ -752,6 +759,12 @@ export function VideoTrimmer({
       setStatusMessage("Video wird vorbereitet …");
       const { remuxFix, cutAndConcat } = await import("@/lib/video/ffmpeg-client");
       const fixed = await remuxFix(blob, setProgressPercent);
+
+      if (noRealChange) {
+        onConfirm(fixed, durationS);
+        return;
+      }
+
       setStatusMessage("Abschnitte werden geschnitten …");
       const { blob: outBlob, segmentResults } = await cutAndConcat(fixed, normalized, setProgressPercent);
       const requestedTotal = segmentResults.reduce((sum, r) => sum + r.requestedDurationS, 0);
@@ -766,6 +779,15 @@ export function VideoTrimmer({
     }
   }
 
+  // Bewusst OHNE remuxFix() (anders als der "keine echte Änderung"-Zweig in
+  // handleApply, siehe Kommentar dort): `blob` ist hier per `tooLargeToTrim`
+  // > TRIM_SIZE_LIMIT_BYTES (300 MB) — genau die Größe, ab der ffmpeg.wasm
+  // (single-threaded, Hauptspeicher, Plan-Risiko R6) beim Laden der Datei in
+  // MEMFS den Tab zum Absturz bringen kann. Das rohe Webm geht hier also
+  // weiterhin ungefixt hoch; das Restrisiko "bleibt bei Bunny im Encoding
+  // hängen" ist bei diesen Größen (in der Praxis kaum erreichbar, siehe
+  // HARD_LIMIT_S × VIDEO_BITS_PER_SECOND in recorder.ts) bewusst in Kauf
+  // genommen statt eines Browser-Absturzes.
   function handleUseWithoutTrim() {
     onConfirm(blob, durationS);
   }

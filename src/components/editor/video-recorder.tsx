@@ -95,6 +95,13 @@ type Phase =
   | { kind: "ready" }
   | { kind: "recording" }
   | { kind: "stopped"; blob: Blob; durationS: number }
+  // Zwischen "Verwenden" und "confirmed" — repariert das rohe MediaRecorder-
+  // Webm (Blocker B7: keine Duration/Cues im Header) per remuxFix(), BEVOR
+  // Bunny das Blob sieht. Ohne diesen Schritt bleibt die Aufnahme bei Bunny
+  // teils dauerhaft in "Processing" hängen (Josips Meldung, 23.07.2026) — der
+  // Trimmer machte das schon für den Zuschnitt-Weg, der direkte "Verwenden"-
+  // Weg umging remuxFix() bisher komplett.
+  | { kind: "preparing"; blob: Blob; durationS: number }
   | { kind: "trimming"; blob: Blob; durationS: number }
   // "Verwenden" wurde geklickt — ab hier bestimmt `uploadState` (Prop) die Anzeige.
   | { kind: "confirmed" }
@@ -144,6 +151,11 @@ export function VideoRecorder({
   const prevElapsedRef = useRef(0);
   const prevUploadPercentRef = useRef(0);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Schützt den setPhase()-Aufruf in prepareAndConfirm() nach einem await
+  // (ffmpeg-Import + remuxFix) davor, nach einem Unmount (Block entfernt,
+  // Seite verlassen während "preparing") noch auf einer entfernten
+  // Komponente zu feuern.
+  const unmountedRef = useRef(false);
   // Für einen "Erneut versuchen"-Knopf nach einem Upload-Fehler — das Blob
   // bleibt erhalten, damit eine 20-Minuten-Aufnahme nicht bei einem
   // Netzwerkfehler verloren geht.
@@ -187,6 +199,7 @@ export function VideoRecorder({
   // Chromes Freigabeleiste stehen) + Timer stoppen.
   useEffect(() => {
     return () => {
+      unmountedRef.current = true;
       clearTickInterval();
       stopAllTracks();
       const recorder = recorderRef.current;
@@ -522,9 +535,34 @@ export function VideoRecorder({
     onConfirm(blob, filename);
   }
 
+  // Repariert das rohe MediaRecorder-Webm per remuxFix() (Blocker B7 — keine
+  // Duration/Cues im Header), BEVOR es an confirmBlob()/Bunny geht. Läuft
+  // NIE ins Leere (Plan-Vorgabe "nie eine Sackgasse"): schlägt die Reparatur
+  // fehl (z. B. ffmpeg.wasm lädt nicht), geht das UNVERÄNDERTE Original-Blob
+  // hoch statt den Upload zu blockieren — das war exakt das bisherige
+  // Verhalten, nur ohne den Fix-Versuch davor. ffmpeg-client wird bewusst
+  // per Laufzeit-Import nachgeladen (siehe Dateikopf-Kommentar dort zum
+  // Admin-Erst-Bundle) statt als Modul-Top-Level-Import.
+  async function prepareAndConfirm(blob: Blob, durationS: number) {
+    setAlertMessage("");
+    setStatusMessage("Aufnahme wird für den Upload vorbereitet …");
+    setPhase({ kind: "preparing", blob, durationS });
+
+    let fixedBlob = blob;
+    try {
+      const { remuxFix } = await import("@/lib/video/ffmpeg-client");
+      fixedBlob = await remuxFix(blob);
+    } catch (e) {
+      console.error("[video-recorder] Reparatur vor Upload fehlgeschlagen, nutze Rohaufnahme.", e);
+    }
+
+    if (unmountedRef.current) return;
+    confirmBlob(fixedBlob);
+  }
+
   function handleUseRecording() {
     if (phase.kind !== "stopped") return;
-    confirmBlob(phase.blob);
+    void prepareAndConfirm(phase.blob, phase.durationS);
   }
 
   function handleStartTrim() {
@@ -867,6 +905,12 @@ export function VideoRecorder({
             </p>
           )}
         </div>
+      )}
+
+      {phase.kind === "preparing" && (
+        <p className="text-sm" style={{ color: "#66679B" }}>
+          Aufnahme wird für den Upload vorbereitet …
+        </p>
       )}
 
       {phase.kind === "trimming" && (
