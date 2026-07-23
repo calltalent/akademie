@@ -80,6 +80,11 @@ export function BlockEditor({
   const [title, setTitle] = useState(initialTitle);
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [status, setStatus] = useState<SaveStatus>("idle");
+  // BUGFIX (23.07.2026, Block-Audit auf Josips Anfrage): "Fehler beim
+  // Speichern" allein sagt nicht, WELCHER Block betroffen ist oder warum —
+  // bei mehreren Blöcken in einer Lektion praktisch unauffindbar. Trägt jetzt
+  // die zod-/Server-Fehlermeldung mit, angezeigt in SaveIndicator unten.
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -93,15 +98,25 @@ export function BlockEditor({
     // die blocks-Änderung ausgelösten Render). Über setTimeout(…, 0) in
     // einen eigenen Callback verschoben, Verhalten für Nutzer unverändert
     // (unter 1ms Verzögerung, unterhalb der Wahrnehmungsschwelle).
-    const pendingTimer = setTimeout(() => setStatus("pending"), 0);
+    const pendingTimer = setTimeout(() => {
+      setStatus("pending");
+      setErrorMessage(null);
+    }, 0);
     debounceRef.current = setTimeout(async () => {
       const parsed = blocksSchema.safeParse(blocks);
       if (!parsed.success) {
         setStatus("error");
+        setErrorMessage(parsed.error.issues[0]?.message ?? "Ungültige Eingabe.");
         return;
       }
       const result = await saveLessonBlocks(lessonId, courseId, parsed.data);
-      setStatus(result.error ? "error" : "saved");
+      if (result.error) {
+        setStatus("error");
+        setErrorMessage(result.error);
+      } else {
+        setStatus("saved");
+        setErrorMessage(null);
+      }
     }, 1000);
 
     return () => {
@@ -149,7 +164,7 @@ export function BlockEditor({
             style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
           />
         </label>
-        <SaveIndicator status={status} />
+        <SaveIndicator status={status} errorMessage={errorMessage} />
       </div>
 
       <ul className="mt-5 flex flex-col gap-4">
@@ -228,7 +243,7 @@ function BlockIconButton({
   );
 }
 
-function SaveIndicator({ status }: { status: SaveStatus }) {
+function SaveIndicator({ status, errorMessage }: { status: SaveStatus; errorMessage: string | null }) {
   if (status === "idle") {
     return <span role="status" className="sr-only" />;
   }
@@ -248,11 +263,12 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
   return (
     <span
       role="status"
-      className="inline-flex flex-none items-center gap-1.5 rounded-[10px] px-3.5 py-2.5 text-sm font-bold"
+      className="inline-flex flex-none flex-wrap items-center gap-1.5 rounded-[10px] px-3.5 py-2.5 text-sm font-bold"
       style={{ color, background: bg }}
     >
       {status === "saved" && <Check size={15} aria-hidden="true" />}
       {text[status]}
+      {status === "error" && errorMessage && <span className="font-semibold">— {errorMessage}</span>}
     </span>
   );
 }

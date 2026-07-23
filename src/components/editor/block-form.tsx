@@ -5,6 +5,8 @@ import { Bold, Italic, Underline } from "lucide-react";
 import type { Block } from "@/lib/courses/schema";
 import { VideoSourceSwitch } from "@/components/editor/video-source-switch";
 import { ImageUpload } from "@/components/editor/image-upload";
+import { AudioUpload } from "@/components/editor/audio-upload";
+import { FileUpload } from "@/components/editor/file-upload";
 import { createQuiz } from "@/lib/quiz/actions";
 
 export type CourseQuizOption = { id: string; title: string };
@@ -114,23 +116,30 @@ export function BlockForm({
 
     case "audio":
       return (
-        <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
-          Audio-URL
-          <input
-            value={block.url}
-            onChange={(e) => onChange({ ...block, url: e.target.value })}
-            placeholder="https://…"
-            className={fieldClass}
-            style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
-          />
-        </label>
+        <div className="flex flex-col gap-3">
+          <AudioUpload currentUrl={block.url} onUploaded={(url) => onChange({ ...block, url })} />
+          <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
+            Audio-URL (oder direkt eine bereits gehostete Adresse eintragen)
+            <input
+              value={block.url}
+              onChange={(e) => onChange({ ...block, url: e.target.value })}
+              placeholder="https://…"
+              className={fieldClass}
+              style={{ borderColor: FIELD_BORDER, color: FIELD_TEXT_COLOR }}
+            />
+          </label>
+        </div>
       );
 
     case "file":
       return (
         <div className="flex flex-col gap-3">
+          <FileUpload
+            currentUrl={block.url}
+            onUploaded={(url, filename) => onChange({ ...block, url, filename })}
+          />
           <label className={labelClass} style={{ color: FIELD_LABEL_COLOR }}>
-            Datei-URL
+            Datei-URL (oder direkt eine bereits gehostete Adresse eintragen)
             <input
               value={block.url}
               onChange={(e) => onChange({ ...block, url: e.target.value })}

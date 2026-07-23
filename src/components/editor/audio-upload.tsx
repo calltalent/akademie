@@ -1,41 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Image as ImageIcon } from "lucide-react";
+import { Music } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
-import {
-  ALLOWED_IMAGE_MIME_TYPES,
-  MAX_IMAGE_FILE_SIZE_BYTES,
-} from "@/lib/courses/asset-upload-schema";
+import { ALLOWED_AUDIO_MIME_TYPES, MAX_AUDIO_FILE_SIZE_BYTES } from "@/lib/courses/asset-upload-schema";
 
 type UploadState = { status: "idle" } | { status: "uploading" } | { status: "error"; message: string };
 
 /**
- * Drag&Drop-/Dateiauswahl-Upload für den `+Bild`-Block (Josips Wunsch,
- * 17.07.2026: "per drag and drop ein Bild hinzufügen oder eins vom PC
- * auswählen"). Ergänzt das bestehende manuelle Bild-URL-Feld in
- * `block-form.tsx` — ersetzt es NICHT: ein Trainer kann weiterhin eine
- * bereits gehostete externe Bild-URL eintragen, dieser Weg ist nur eine
- * zweite, schnellere Option.
+ * Drag&Drop-/Dateiauswahl-Upload für den `+Audio`-Block (Josips Auftrag,
+ * 23.07.2026: "bei Audio, Datei immer die Option ermöglichen Dateien vom PC
+ * auszuwählen"). Gleiches Muster wie `image-upload.tsx` — ergänzt das
+ * manuelle Audio-URL-Feld in `block-form.tsx`, ersetzt es nicht (eine bereits
+ * gehostete externe Audio-URL bleibt weiterhin eintragbar).
  *
- * Dieselbe Dropzone-Optik/Interaktion wie `video-source-switch.tsx`
- * (gestrichelter Rahmen, Hervorhebung beim Drag-Over, `sr-only`
- * Datei-Input) — Konsistenz im Editor, kein neues Muster.
- *
- * Ablauf (Muster wie `submission-form.tsx`): signierte Upload-URL vom
- * Server holen (`/api/course-assets/upload-url`, staff-gated,
- * RLS-Schreibpolicy `course_assets_staff_write`), Datei direkt vom Browser
- * zu Supabase Storage hochladen, danach `getPublicUrl()` — der Bucket ist
- * öffentlich lesbar (siehe `imageBlockSchema`/`block-renderer.tsx`, reines
- * `<img src=…>`), die URL trägt also keine Autorisierung und kann direkt in
- * den Block geschrieben werden.
- *
- * Kein Fortschrittsbalken (anders als `UploadProgress`/`BunnyUploadState`):
- * Bilder sind auf 8 MB begrenzt und laufen in einem einzigen Request statt
- * eines TUS-Resumable-Uploads — ein knapper "Wird hochgeladen …"-Status
- * reicht, ein Prozentwert wäre hier nur Schein-Genauigkeit.
+ * Läuft über dieselbe Route wie der Bild-Upload (`/api/course-assets/
+ * upload-url`, jetzt mit `kind: "audio"` — siehe asset-upload-schema.ts):
+ * signierte Upload-URL holen, Datei direkt vom Browser zu Supabase Storage
+ * hochladen, danach `getPublicUrl()`.
  */
-export function ImageUpload({
+export function AudioUpload({
   currentUrl,
   onUploaded,
 }: {
@@ -46,15 +30,15 @@ export function ImageUpload({
   const [isDragOver, setIsDragOver] = useState(false);
 
   async function handleFile(file: File) {
-    if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.type as (typeof ALLOWED_IMAGE_MIME_TYPES)[number])) {
+    if (!ALLOWED_AUDIO_MIME_TYPES.includes(file.type as (typeof ALLOWED_AUDIO_MIME_TYPES)[number])) {
       setState({
         status: "error",
-        message: `Dateityp „${file.type || "unbekannt"}" nicht erlaubt. Erlaubt: PNG, JPG, WebP, GIF.`,
+        message: `Dateityp „${file.type || "unbekannt"}" nicht erlaubt. Erlaubt: MP3, WAV, OGG, M4A, WebM.`,
       });
       return;
     }
-    if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
-      setState({ status: "error", message: "Datei zu groß (max. 8 MB)." });
+    if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
+      setState({ status: "error", message: "Datei zu groß (max. 50 MB)." });
       return;
     }
 
@@ -62,7 +46,7 @@ export function ImageUpload({
     const res = await fetch("/api/course-assets/upload-url", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "image", fileName: file.name, fileSize: file.size, mimeType: file.type }),
+      body: JSON.stringify({ kind: "audio", fileName: file.name, fileSize: file.size, mimeType: file.type }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
@@ -76,10 +60,7 @@ export function ImageUpload({
       .from("course-assets")
       .uploadToSignedUrl(path, token, file);
     if (uploadError) {
-      // uploadError.message kommt von der Supabase-Storage-Bibliothek
-      // (technisch/englisch) — Detail nur in der Konsole, Nutzer bekommt
-      // einen klaren deutschen Satz.
-      console.error("[image-upload] Datei-Upload fehlgeschlagen.", uploadError);
+      console.error("[audio-upload] Datei-Upload fehlgeschlagen.", uploadError);
       setState({ status: "error", message: "Datei-Upload fehlgeschlagen. Bitte versuche es erneut." });
       return;
     }
@@ -93,15 +74,7 @@ export function ImageUpload({
 
   return (
     <div className="flex flex-col gap-2.5">
-      {currentUrl && (
-        // eslint-disable-next-line @next/next/no-img-element -- Storage-/externe URL, kein next/image-Loader konfiguriert (gleiche Begründung wie block-renderer.tsx)
-        <img
-          src={currentUrl}
-          alt=""
-          className="h-28 w-auto max-w-full rounded-lg border object-contain"
-          style={{ borderColor: "#E7E8F2" }}
-        />
-      )}
+      {currentUrl && <audio controls src={currentUrl} className="w-full" />}
 
       <label
         onDragOver={(e) => {
@@ -119,17 +92,17 @@ export function ImageUpload({
         style={{ borderColor: isDragOver ? "#5663AE" : "#C9CBE6", background: "#DFE2F4" }}
       >
         <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white">
-          <ImageIcon size={19} aria-hidden="true" style={{ color: "#5663AE" }} />
+          <Music size={19} aria-hidden="true" style={{ color: "#5663AE" }} />
         </span>
         <span className="text-sm font-bold" style={{ color: "#1A1A2E" }}>
-          Bild auswählen oder hierher ziehen
+          Audiodatei auswählen oder hierher ziehen
         </span>
         <span className="text-[13px] font-semibold" style={{ color: "#3E3F66" }}>
-          PNG, JPG, WebP oder GIF · bis 8 MB
+          MP3, WAV, OGG, M4A oder WebM · bis 50 MB
         </span>
         <input
           type="file"
-          accept={ALLOWED_IMAGE_MIME_TYPES.join(",")}
+          accept={ALLOWED_AUDIO_MIME_TYPES.join(",")}
           disabled={pending}
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -141,7 +114,7 @@ export function ImageUpload({
       </label>
 
       <p aria-live="polite" className="text-sm">
-        {state.status === "uploading" && <span style={{ color: "#66679B" }}>Bild wird hochgeladen …</span>}
+        {state.status === "uploading" && <span style={{ color: "#66679B" }}>Audiodatei wird hochgeladen …</span>}
         {state.status === "error" && (
           <span role="alert" className="font-semibold" style={{ color: "#B14A4A" }}>
             {state.message}

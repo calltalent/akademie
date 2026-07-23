@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireStaffTenant } from "@/lib/auth/staff";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
-import { imageUploadUrlRequestSchema } from "@/lib/courses/asset-upload-schema";
+import { courseAssetUploadUrlRequestSchema } from "@/lib/courses/asset-upload-schema";
 
 /** Nur druckbare, dateisystemsichere Zeichen — Rest wird durch "_" ersetzt. */
 function sanitizeFileName(name: string): string {
@@ -10,7 +10,7 @@ function sanitizeFileName(name: string): string {
 }
 
 /**
- * Signierte Upload-URL für Kurs-Bilder (öffentlicher Bucket `course-assets`,
+ * Signierte Upload-URL für Kurs-Medien (öffentlicher Bucket `course-assets`,
  * Migration 20260710214020: Pfadkonvention {tenant_id}/..., RLS-Policy
  * `course_assets_staff_write` bindet Schreiben an
  * `member_role(...) in ('owner','admin','trainer')` — exakt der Kreis, den
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   }
 
   const json = await request.json().catch(() => null);
-  const parsed = imageUploadUrlRequestSchema.safeParse(json);
+  const parsed = courseAssetUploadUrlRequestSchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." },

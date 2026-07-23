@@ -88,6 +88,14 @@ async function BlockView({
     }
 
     case "image":
+      // BUGFIX (23.07.2026, Block-Audit): url kann seit dem Schema-Fix
+      // (courses/schema.ts, emptyOrUrl) leer sein — ein frisch angelegter,
+      // noch nicht befüllter Block. Ohne diese Prüfung: kaputtes <img>.
+      if (!block.url) {
+        return (
+          <div className="rounded-md border p-6 text-center text-base text-gray-500">Kein Bild ausgewählt.</div>
+        );
+      }
       // eslint-disable-next-line @next/next/no-img-element -- externe/Storage-URLs, kein next/image-Loader konfiguriert
       return <img src={block.url} alt={block.alt} className="w-full rounded-md" />;
 
@@ -155,9 +163,22 @@ async function BlockView({
     }
 
     case "audio":
+      // BUGFIX (23.07.2026, Block-Audit): s. Kommentar im "image"-Fall oben.
+      if (!block.url) {
+        return (
+          <div className="rounded-md border p-6 text-center text-base text-gray-500">
+            Keine Audiodatei ausgewählt.
+          </div>
+        );
+      }
       return <audio controls src={block.url} className="w-full" />;
 
     case "file":
+      if (!block.url) {
+        return (
+          <div className="rounded-md border p-6 text-center text-base text-gray-500">Keine Datei ausgewählt.</div>
+        );
+      }
       return (
         <a href={block.url} className="text-base underline" style={{ color: "var(--color-primary)" }}>
           Datei herunterladen: {block.filename}
@@ -165,6 +186,13 @@ async function BlockView({
       );
 
     case "embed":
+      if (!block.url) {
+        return (
+          <div className="rounded-md border p-6 text-center text-base text-gray-500">
+            Keine Einbettungs-URL angegeben.
+          </div>
+        );
+      }
       return (
         <iframe
           src={block.url}

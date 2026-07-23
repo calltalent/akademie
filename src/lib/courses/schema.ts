@@ -14,6 +14,22 @@ const baseBlock = z.object({
 });
 
 /**
+ * BUGFIX (23.07.2026, Block-Audit auf Josips Anfrage): `z.string().url()`
+ * allein lehnt einen leeren String ab — genau der Zustand eines frisch per
+ * "+Bild"/"+Audio"/"+Datei"/"+Einbettung" angelegten, noch nicht befüllten
+ * Blocks (`createEmptyBlock()` unten setzt `url: ""`). Der 1s-Autosave in
+ * block-editor.tsx parst das GESAMTE `blocks`-Array auf einmal — ein
+ * einzelner ungültiger Block ließ dadurch die Lektion komplett nicht mehr
+ * speichern (auch unabhängige Text-/Bearbeitungen anderer Blöcke), mit einem
+ * unspezifischen "Fehler beim Speichern" ohne Hinweis, welcher Block
+ * betroffen ist. Erlaubt jetzt zusätzlich den leeren String ("noch nicht
+ * befüllt") — `block-renderer.tsx` zeigt für diesen Zustand in der
+ * Lernansicht einen eigenen Platzhaltertext statt eines kaputten
+ * `<img>`/`<audio>`/Downloads/iframes.
+ */
+const emptyOrUrl = z.union([z.literal(""), z.string().url()]);
+
+/**
  * Sicherheits-Fix (security-reviewer-Audit 11.07.2026, HOCH — blockierte
  * Phase-1-Abschluss): Text-Block-HTML wurde ungeprüft über
  * dangerouslySetInnerHTML gerendert (src/components/learn/block-renderer.tsx).
@@ -49,7 +65,7 @@ export const textBlockSchema = baseBlock.extend({
 
 export const imageBlockSchema = baseBlock.extend({
   type: z.literal("image"),
-  url: z.string().url(),
+  url: emptyOrUrl,
   alt: z.string().max(300),
 });
 
@@ -60,12 +76,12 @@ export const videoBlockSchema = baseBlock.extend({
 
 export const audioBlockSchema = baseBlock.extend({
   type: z.literal("audio"),
-  url: z.string().url(),
+  url: emptyOrUrl,
 });
 
 export const fileBlockSchema = baseBlock.extend({
   type: z.literal("file"),
-  url: z.string().url(),
+  url: emptyOrUrl,
   filename: z.string().max(300),
 });
 
@@ -88,7 +104,7 @@ export const calloutBlockSchema = baseBlock.extend({
 
 export const embedBlockSchema = baseBlock.extend({
   type: z.literal("embed"),
-  url: z.string().url(),
+  url: emptyOrUrl,
 });
 
 export const blockSchema = z.discriminatedUnion("type", [
