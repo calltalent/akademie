@@ -273,6 +273,7 @@ export default async function AdminKursePage({
                     courseId={c.id}
                     categoryId={c.category_id}
                     categories={allCategories}
+                    title={c.title}
                     compact
                   />
                 </div>

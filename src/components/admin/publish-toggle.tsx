@@ -63,52 +63,69 @@ export function CourseStatusSelect({
  * `compact` NEU (23.07.2026, Josips Auftrag: Kategorie direkt in der
  * Kursliste ändern können, `admin/kurse/page.tsx`) — kleineres Padding/
  * Schrift/`min-w` für die dichte Listenzeile, analog zum `compact`-Prop von
- * `BrandLogo` (brand-logo.tsx). Das sichtbare Label bleibt IMMER erhalten
- * (CLAUDE.md §3.4 verlangt sichtbare Labels, keine reinen ARIA-Attribute) —
- * `compact` verkleinert es nur, blendet es nie aus.
+ * `BrandLogo` (brand-logo.tsx).
+ *
+ * Josips Folgeauftrag (23.07.2026, nach Live-Ansicht): die Kategorie hat in
+ * der Kursliste jetzt eine EIGENE Spalten-Überschrift ("Kategorie", siehe
+ * admin/kurse/page.tsx) — das wiederholte Text-Label über jedem einzelnen
+ * Dropdown war dort redundant und wurde entfernt. Bewusste, vom Auftraggeber
+ * selbst (sehbehindert) getroffene Ausnahme von der sonst geltenden Regel
+ * "sichtbares Label, kein reines ARIA" (CLAUDE.md §3.4, siehe Kommentar
+ * oben) — NUR im `compact`-Fall: `title` liefert stattdessen einen
+ * zeilenspezifischen `aria-label` (Kursname statt generischem "Kategorie"),
+ * damit Screenreader-Nutzer trotzdem eine eindeutige Zeile hören. Die NICHT
+ * kompakte Nutzung (Kurs-Editor-Kopf, `[id]/page.tsx`) bleibt unverändert
+ * mit sichtbarem Label.
  */
 export function CourseCategorySelect({
   courseId,
   categoryId,
   categories,
   compact = false,
+  title,
 }: {
   courseId: string;
   categoryId: string | null;
   categories: CourseCategoryRow[];
   compact?: boolean;
+  /** Kurstitel, nur für den `aria-label` im `compact`-Fall genutzt. */
+  title?: string;
 }) {
   const [pending, startTransition] = useTransition();
 
-  return (
-    <label
-      className={`flex flex-col font-bold ${compact ? "gap-0.5 text-[10px]" : "gap-1.5 text-[13px]"}`}
-      style={{ color: "#3E3F66" }}
+  const select = (
+    <select
+      value={categoryId ?? ""}
+      disabled={pending}
+      aria-label={compact ? `Kategorie: ${title ?? ""}` : undefined}
+      onChange={(e) => {
+        const next = e.target.value || null;
+        startTransition(() => {
+          updateCourseCategory(courseId, next);
+        });
+      }}
+      className={
+        compact
+          ? "rounded-[8px] border bg-white px-2 py-1 text-[13px] font-semibold disabled:opacity-50"
+          : "min-w-[150px] rounded-[11px] border bg-white px-3 py-2.5 text-[15px] font-semibold disabled:opacity-50"
+      }
+      style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
     >
+      <option value="">Keine Kategorie</option>
+      {categories.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.name}
+        </option>
+      ))}
+    </select>
+  );
+
+  if (compact) return select;
+
+  return (
+    <label className="flex flex-col gap-1.5 text-[13px] font-bold" style={{ color: "#3E3F66" }}>
       Kategorie
-      <select
-        value={categoryId ?? ""}
-        disabled={pending}
-        onChange={(e) => {
-          const next = e.target.value || null;
-          startTransition(() => {
-            updateCourseCategory(courseId, next);
-          });
-        }}
-        className={
-          compact
-            ? "rounded-[8px] border bg-white px-2 py-1 text-[13px] font-semibold disabled:opacity-50"
-            : "min-w-[150px] rounded-[11px] border bg-white px-3 py-2.5 text-[15px] font-semibold disabled:opacity-50"
-        }
-        style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
-      >
-        <option value="">Keine Kategorie</option>
-        {categories.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
+      {select}
     </label>
   );
 }
