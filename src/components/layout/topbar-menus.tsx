@@ -153,6 +153,7 @@ export function ProfileMenu({
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const signOutFormRef = useRef<HTMLFormElement>(null);
   const [panelTop, setPanelTop] = useState<number>();
 
   useEffect(() => {
@@ -238,9 +239,23 @@ export function ProfileMenu({
             Benachrichtigungen
           </Link>
           <div className="mx-1 my-1.5 h-px bg-[#EEF0F7]" />
-          <form action="/auth/signout" method="post">
+          <form ref={signOutFormRef} action="/auth/signout" method="post">
+            {/* `onPointerDown` statt `type="submit"`/`onClick` (24.07.2026,
+                Josips Fund über eine Konsolen-Mitschrift): auf seinem Gerät
+                feuert bei diesem Button zuverlässig `mousedown`, aber NIE das
+                anschließende `click` — der native Submit-Auslöser (der an
+                `click` hängt) greift dadurch nie, obwohl derselbe Ablauf in
+                jedem hier getesteten Browser fehlerfrei lief. Statt die genaue
+                Ursache (vermutlich eine Renderer-/Eingabegeräte-Eigenheit
+                seines Systems, nicht reproduzierbar) weiter zu jagen: der
+                Button hängt jetzt direkt am zuverlässig feuernden
+                `pointerdown` (deckt Maus UND Touch ab) und löst das Formular
+                selbst aus — unabhängig davon, ob `click` je ankommt.
+                `type="button"` verhindert einen doppelten Absende-Versuch,
+                falls `click` bei anderen Nutzern doch normal feuert. */}
             <button
-              type="submit"
+              type="button"
+              onPointerDown={() => signOutFormRef.current?.requestSubmit()}
               className="flex w-full items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-semibold text-[#B24343]"
             >
               <span className="h-2 w-2 rounded-[2px] bg-[#B24343]" />
