@@ -71,6 +71,12 @@
     // Alle 2 Minuten - ein ai_jobs-Schritt braucht typischerweise wenige
     // Sekunden bis niedrige zweistellige Sekunden (ein Claude-Sonnet-Aufruf),
     // ein Kursentwurf (3 Schritte) ist damit binnen weniger Minuten fertig.
+    //
+    // Kurzzeitig testweise ausgeschaltet (24.07.2026, Verdacht: haengt mit
+    // langsamen Kurs-Loeschungen zusammen) — Test negativ: die Verzoegerung
+    // trat auch ohne gleichzeitig laufenden Cron auf. Deshalb hier wieder
+    // aktiv, tatsaechliche Ursache/Behebung siehe deleteCourse()-Kommentar
+    // in src/lib/courses/actions.ts.
     "crons": ["*/2 * * * *"]
   },
   // Service Binding auf sich selbst (24.07.2026, Josips Fund: wiederholte

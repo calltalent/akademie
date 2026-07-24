@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { deleteCourse } from "@/lib/courses/actions";
 
@@ -53,6 +54,7 @@ export function CourseDeleteConfirm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -60,11 +62,17 @@ export function CourseDeleteConfirm({
 
   function handleDelete() {
     startTransition(async () => {
-      // Bei Erfolg leitet deleteCourse() serverseitig per redirect() zur
-      // Kursliste weiter (next/navigation) — dieser Code läuft dann nicht
-      // mehr zu Ende. Nur der Fehlerfall liefert hier ein Ergebnis.
+      // `deleteCourse()` leitet NICHT mehr serverseitig weiter (24.07.2026,
+      // Josips Fund: ein `redirect()` innerhalb dieser Server Action dauerte
+      // auf dieser Plattform >20s, siehe Kopfkommentar dort) — bei Erfolg
+      // navigiert stattdessen dieser Client selbst per `router.push()`,
+      // eine gewöhnliche, durchgehend schnelle Navigation.
       const result = await deleteCourse(courseId, confirmValue);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.push("/admin/kurse");
     });
   }
 

@@ -2,7 +2,6 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { requireStaffTenant, requireAdminTenant } from "@/lib/auth/staff";
 import {
   blocksSchema,
@@ -536,16 +535,23 @@ export async function updateCourseAuthor(
  * übereinstimmen — frisch aus der DB nachgeladen, NICHT dem Client vertraut
  * (eine reine Client-seitige Prüfung wäre umgehbar).
  *
- * `redirect()` bewusst AUSSERHALB des try/catch (gleiches Muster wie
- * `deleteTenant()`, src/lib/platform/actions.ts): Next.js implementiert
- * Redirects über eine interne Kontrollfluss-Exception, die ein umgebendes
- * try/catch sonst fälschlich als regulären Fehler abfangen würde.
+ * KEIN server-seitiges `redirect()` mehr (24.07.2026, Josips Fund: Kurs-
+ * Löschung dauert >20s) — per Zeitmessung eingegrenzt: `requireAdminTenant()`,
+ * beide DB-Zugriffe und `revalidatePath()` liefen zusammen konstant unter
+ * 400ms, sowohl mit als auch ohne `revalidatePath()`, sowohl mit als auch
+ * ohne gleichzeitig laufenden Cron-Trigger. Die Verzögerung lag jedes Mal
+ * ausschließlich NACH dem (vorherigen) `redirect()`-Aufruf — also innerhalb
+ * von Next.js'/OpenNexts eigener Behandlung eines `redirect()` INNERHALB
+ * einer Server Action auf dieser Cloudflare-Workers-Plattform, nicht in
+ * dieser Funktion selbst. Umgehung statt Ursachensuche in Framework-Interna:
+ * die Funktion meldet nur noch Erfolg, `course-delete-confirm.tsx` navigiert
+ * per `router.push()` selbst weiter — eine gewöhnliche Client-Navigation,
+ * die in jedem eigenen Test durchgehend unter 700ms lag.
  */
 export async function deleteCourse(
   courseId: string,
   confirmTitle: string,
 ): Promise<CourseActionState> {
-  let deleted = false;
   try {
     const { tenant, supabase } = await requireAdminTenant();
 
@@ -568,16 +574,11 @@ export async function deleteCourse(
       .eq("tenant_id", tenant.id);
     if (error) return { error: translateDbError(error) };
 
-    deleted = true;
+    revalidatePath("/admin/kurse");
+    return { error: null, success: true };
   } catch (e) {
     return errorState(e);
   }
-
-  if (deleted) {
-    revalidatePath("/admin/kurse");
-    redirect("/admin/kurse");
-  }
-  return { error: "Unbekannter Fehler beim Löschen." };
 }
 
 // --- Module ---
