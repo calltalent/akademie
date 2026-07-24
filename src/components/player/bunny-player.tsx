@@ -72,15 +72,22 @@ export function BunnyPlayer({
     };
   }, []);
 
-  // `disableIosPlayer=true` + `playsinline=true` (24.07.2026, Josips Fund:
-  // Video laedt auf dem iPhone in unserer App endlos, direkt bei Bunny
-  // geoeffnet spielt es sofort — Bunnys Dokumentation nennt den nativen
-  // iOS-Player "typischerweise fuer die Vollbild-Behandlung auf iOS",
-  // bekannter Problemfall bei cross-origin-verschachtelten iframes (unsere
-  // App auf academy.calltalent.ai rahmt iframe.mediadelivery.net). Erzwingt
-  // stattdessen die Standard-Fullscreen-API, exakt die, auf die
-  // `handleFullscreenChange` oben bereits lauscht.
-  const src = `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?autoplay=false&preload=true&disableIosPlayer=true&playsinline=true`;
+  // `disableIosPlayer=true` (24.07.2026, Josips Fund: Video haengt auf dem
+  // iPhone in unserer App bei 00:00, direkt bei Bunny geoeffnet spielt es
+  // sofort — Bunnys Dokumentation nennt den nativen iOS-Player
+  // "typischerweise fuer die Vollbild-Behandlung auf iOS", bekannter
+  // Problemfall bei cross-origin-verschachtelten iframes (unsere App auf
+  // academy.calltalent.ai rahmt iframe.mediadelivery.net).
+  //
+  // BEWUSST OHNE `playsinline=true` (Josips Folgemeldung: Vollbild geht
+  // danach bei KEINEM Video mehr, obwohl der direkte Bunny-Link auch dort
+  // Vollbild kann) — `playsinline` weist Player typischerweise an, NIE
+  // echtes Vollbild anzufordern, sondern nur eine CSS-Pseudo-Vollansicht zu
+  // zeigen; genau das würde vom `overflow-hidden` des Wrapper-`div` unten
+  // verdeckt (echtes Fullscreen-API-Element ignoriert `overflow-hidden` der
+  // Vorfahren, eine CSS-Pseudo-Vollansicht nicht). Test mit nur
+  // `disableIosPlayer`, ohne `playsinline` — isoliert, ob DAS die Ursache war.
+  const src = `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?autoplay=false&preload=true&disableIosPlayer=true`;
 
   return (
     <div className="aspect-video w-full overflow-hidden rounded-md border">
