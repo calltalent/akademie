@@ -72,22 +72,22 @@ export function BunnyPlayer({
     };
   }, []);
 
-  // `disableIosPlayer=true` (24.07.2026, Josips Fund: Video haengt auf dem
-  // iPhone in unserer App bei 00:00, direkt bei Bunny geoeffnet spielt es
-  // sofort — Bunnys Dokumentation nennt den nativen iOS-Player
-  // "typischerweise fuer die Vollbild-Behandlung auf iOS", bekannter
-  // Problemfall bei cross-origin-verschachtelten iframes (unsere App auf
-  // academy.calltalent.ai rahmt iframe.mediadelivery.net).
-  //
-  // BEWUSST OHNE `playsinline=true` (Josips Folgemeldung: Vollbild geht
-  // danach bei KEINEM Video mehr, obwohl der direkte Bunny-Link auch dort
-  // Vollbild kann) — `playsinline` weist Player typischerweise an, NIE
-  // echtes Vollbild anzufordern, sondern nur eine CSS-Pseudo-Vollansicht zu
-  // zeigen; genau das würde vom `overflow-hidden` des Wrapper-`div` unten
-  // verdeckt (echtes Fullscreen-API-Element ignoriert `overflow-hidden` der
-  // Vorfahren, eine CSS-Pseudo-Vollansicht nicht). Test mit nur
-  // `disableIosPlayer`, ohne `playsinline` — isoliert, ob DAS die Ursache war.
-  const src = `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?autoplay=false&preload=true&disableIosPlayer=true`;
+  // Rückbau auf Bunnys Standardeinstellungen, WEDER `disableIosPlayer` NOCH
+  // `playsinline` (24.07.2026, dritte Runde von Josips iPhone-Tests):
+  // `disableIosPlayer=true` allein brachte die Wiedergabe wieder zum Laufen,
+  // aber Vollbild ging seitdem bei KEINEM Video mehr — auch ohne
+  // `playsinline`. Der direkte, nicht verschachtelte Bunny-Link (Standard-
+  // Player, kein `disableIosPlayer`) konnte dagegen beides: abspielen UND
+  // Vollbild. Bunnys nativer iOS-Player nutzt vermutlich
+  // `video.webkitEnterFullscreen()` (WebKit-eigene Video-Vollbildpräsentation,
+  // läuft same-origin INNERHALB von Bunnys eigenem iframe) statt der
+  // Standard-Fullscreen-API — die scheint über unsere verschachtelte
+  // iframe-Kette nicht zuverlässig durchzureichen, selbst mit
+  // `allow="fullscreen"` auf unserem iframe. Test: exakt die
+  // Standardeinstellungen, nur weiterhin verschachtelt — nächster Baustein
+  // zur Eingrenzung, ob NUR `disableIosPlayer` das Vollbild bricht oder die
+  // Verschachtelung selbst.
+  const src = `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?autoplay=false&preload=true`;
 
   return (
     <div className="aspect-video w-full overflow-hidden rounded-md border">
