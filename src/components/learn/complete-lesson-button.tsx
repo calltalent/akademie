@@ -27,27 +27,23 @@ export function CompleteLessonButton({
 }) {
   const [pending, startTransition] = useTransition();
 
+  // Größenabgleich (24.07.2026, Josips Auftrag "ordentlich und übersichtlich
+  // in der mobilen App"): identische Maße wie BookmarkButton/"Feedback
+  // geben" (rounded-[11px] px-4 py-[11px] text-sm) statt der bisherigen
+  // größeren px-4 py-2 text-base — alle vier Fußzeilen-Buttons der
+  // Lektionsseite sollen gleich groß wirken. Der "✓ Abgeschlossen"-Hinweis
+  // ist NICHT mehr Teil dieser Komponente (wanderte auf Seitenebene, siehe
+  // l/[lessonId]/page.tsx) — dort lässt er sich frei im Fußzeilen-Raster
+  // platzieren, unabhängig von diesem Button.
+  const buttonClass = "inline-flex items-center justify-center rounded-[11px] px-4 py-[11px] text-sm font-semibold text-white no-underline disabled:opacity-50";
+  const buttonStyle = { background: "var(--color-primary)" };
+
   if (alreadyCompleted) {
+    if (!nextHref) return null;
     return (
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-base text-green-700">✓ Abgeschlossen</span>
-        {/* Josips Auftrag (23.07.2026): war ein kleiner unterstrichener
-            Text-Link ("Weiter zur nächsten Lektion") — als richtiger Button
-            ersetzt, gleiche Optik wie der "Lektion abschließen"-Button
-            unten (größere Tapfläche, konsistente Primäraktion). Text zeigt
-            NICHT "Lektion abschließen" (die Lektion ist ja bereits fertig),
-            sondern das eigentliche Ziel des Klicks — siehe nextLabel-Kommentar
-            oben. */}
-        {nextHref && (
-          <a
-            href={nextHref}
-            className="px-4 py-2 text-base text-white no-underline"
-            style={{ background: "var(--color-primary)", borderRadius: "var(--radius)" }}
-          >
-            {nextLabel}
-          </a>
-        )}
-      </div>
+      <a href={nextHref} className={buttonClass} style={buttonStyle}>
+        {nextLabel}
+      </a>
     );
   }
 
@@ -61,8 +57,8 @@ export function CompleteLessonButton({
           if (nextHref) window.location.href = nextHref;
         })
       }
-      className="px-4 py-2 text-base text-white disabled:opacity-50"
-      style={{ background: "var(--color-primary)", borderRadius: "var(--radius)" }}
+      className={buttonClass}
+      style={buttonStyle}
     >
       {pending ? "Wird gespeichert …" : "Lektion abschließen"}
     </button>

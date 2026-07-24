@@ -6,6 +6,8 @@ import { ApiKeysPanel } from "@/components/admin/api-keys-panel";
 import { WebhooksPanel } from "@/components/admin/webhooks-panel";
 import { TenantSettingsForm } from "@/components/admin/tenant-settings-form";
 import { SidebarLinksPanel } from "@/components/admin/sidebar-links-panel";
+import { PromoCardsPanel } from "@/components/admin/promo-cards-panel";
+import type { PromoCardRow } from "@/lib/settings/actions";
 
 /**
  * Design-Block 6 (13.07.2026, Claude-Design-Export Teil 3,
@@ -50,7 +52,7 @@ export default async function AdminEinstellungenPage() {
   // Mandanten-Admins, die diese Seite genauso sehen).
   const isPlatformAdmin = (await checkPlatformAccess()).ok;
   const supabase = await createClient();
-  const [{ data: apiKeys }, { data: webhooks }, { data: sidebarLinks }] = await Promise.all([
+  const [{ data: apiKeys }, { data: webhooks }, { data: sidebarLinks }, { data: promoCardsRaw }] = await Promise.all([
     supabase
       .from("api_keys")
       .select("id, name, last_used, active, created_at")
@@ -66,7 +68,22 @@ export default async function AdminEinstellungenPage() {
       .select("id, label, url")
       .eq("tenant_id", tenant.id)
       .order("position", { ascending: true }),
+    supabase
+      .from("promo_cards")
+      .select("id, title, description, media_kind, image_url, bunny_video_id, link_url")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: true }),
   ]);
+
+  const promoCards: PromoCardRow[] = (promoCardsRaw ?? []).map((c) => ({
+    id: c.id,
+    title: c.title,
+    description: c.description,
+    mediaKind: c.media_kind as "image" | "video",
+    imageUrl: c.image_url,
+    bunnyVideoId: c.bunny_video_id,
+    linkUrl: c.link_url,
+  }));
 
   const branding = tenant.branding;
 
@@ -121,6 +138,7 @@ export default async function AdminEinstellungenPage() {
         </div>
 
         <SidebarLinksPanel links={sidebarLinks ?? []} />
+        <PromoCardsPanel cards={promoCards} />
       </div>
 
       <div className="mt-6 flex max-w-[820px] flex-col gap-8">

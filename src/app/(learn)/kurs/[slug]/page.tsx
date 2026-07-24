@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/compute";
 import { CertificateBadge } from "@/components/learn/certificate-badge";
+import { PromoCards } from "@/components/learn/promo-cards";
 import { AppShell } from "@/components/learn/app-shell";
 import { getVideoThumbnailUrl } from "@/lib/bunny/client";
 
@@ -218,10 +219,13 @@ export default async function CourseOverviewPage({
             </div>
           </div>
 
-          {/* Tabs */}
+          {/* Tabs — unter `sm` je zur Hälfte gestreckt statt nur inhaltsbreit
+              (24.07.2026, Josips Fund: viel Leerraum rechts auf dem Handy),
+              ab `sm` wieder die ursprüngliche Inhaltsbreite (keine optische
+              Änderung am Desktop). */}
           <div className="my-[18px] mb-6 flex gap-2.5">
             <span
-              className="inline-flex items-center gap-2 rounded-[11px] px-[18px] py-[11px] text-sm font-bold text-white"
+              className="flex flex-1 items-center justify-center gap-2 rounded-[11px] px-[18px] py-[11px] text-sm font-bold text-white sm:flex-none"
               style={{ background: NAVY }}
               aria-current="page"
             >
@@ -235,7 +239,7 @@ export default async function CourseOverviewPage({
             </span>
             <Link
               href="/lesezeichen"
-              className="inline-flex items-center gap-2 rounded-[11px] border bg-white px-[18px] py-[11px] text-sm font-semibold no-underline"
+              className="flex flex-1 items-center justify-center gap-2 rounded-[11px] border bg-white px-[18px] py-[11px] text-sm font-semibold no-underline sm:flex-none"
               style={{ borderColor: "#E0E2EF", color: NAVY }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -364,49 +368,11 @@ export default async function CourseOverviewPage({
           )}
         </div>
 
-        {/* Rechte Spalte */}
+        {/* Rechte Spalte — admin-verwaltete Positionen (Josips Auftrag,
+            24.07.2026), ersetzen die bisher fest verdrahteten "Kostenloses
+            Erstgespräch buchen"/"Nutze die Calltalent-App"-Kärtchen. */}
         <div className="flex flex-col gap-5">
-          <Link
-            href="/kontakt"
-            className="block overflow-hidden rounded-[16px] no-underline"
-            style={{ background: NAVY }}
-          >
-            <div
-              className="h-[150px]"
-              style={{
-                backgroundColor: "#2C2D4A",
-                backgroundImage:
-                  "repeating-linear-gradient(135deg,#2C2D4A 0 14px, rgba(86,99,174,.4) 14px 28px)",
-              }}
-              aria-hidden="true"
-            />
-            <div className="p-[16px_18px]">
-              <div className="text-base font-extrabold text-white">Kostenloses Erstgespräch buchen</div>
-              <div className="mt-1 text-[13px]" style={{ color: "#C9CBE6" }}>
-                Individuelle Beratung für deinen Lernweg.
-              </div>
-            </div>
-          </Link>
-
-          <div className="overflow-hidden rounded-[16px] border" style={{ background: "#EDEEF7", borderColor: "#E0E2EF" }}>
-            <div
-              className="h-[130px]"
-              style={{
-                backgroundColor: "#DFE2F4",
-                backgroundImage:
-                  "repeating-linear-gradient(45deg,#DFE2F4 0 12px, rgba(255,255,255,.55) 12px 24px)",
-              }}
-              aria-hidden="true"
-            />
-            <div className="p-[16px_18px]">
-              <div className="text-base font-extrabold" style={{ color: NAVY }}>
-                Nutze die Calltalent-App
-              </div>
-              <div className="mt-1 text-[13px]" style={{ color: "#66679B" }}>
-                Lerne unterwegs — jederzeit und überall.
-              </div>
-            </div>
-          </div>
+          <PromoCards tenantId={tenant.id} />
         </div>
       </div>
     </AppShell>

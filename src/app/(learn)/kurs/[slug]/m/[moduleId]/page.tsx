@@ -4,6 +4,7 @@ import { Check, Play, ArrowLeft, ListVideo, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { AppShell } from "@/components/learn/app-shell";
+import { PromoCards } from "@/components/learn/promo-cards";
 import { getVideoThumbnailUrl } from "@/lib/bunny/client";
 
 /**
@@ -338,29 +339,11 @@ export default async function ModulePage({
           )}
         </div>
 
-        {/* Rechte Spalte */}
+        {/* Rechte Spalte — admin-verwaltete Positionen (Josips Auftrag,
+            24.07.2026), ersetzen das bisher fest verdrahtete "Kostenloses
+            Erstgespräch buchen"-Kärtchen. */}
         <div className="flex flex-col gap-5">
-          <Link
-            href="/kontakt"
-            className="block overflow-hidden rounded-[16px] no-underline"
-            style={{ background: NAVY }}
-          >
-            <div
-              className="h-[150px]"
-              style={{
-                backgroundColor: "#2C2D4A",
-                backgroundImage:
-                  "repeating-linear-gradient(135deg,#2C2D4A 0 14px, rgba(86,99,174,.4) 14px 28px)",
-              }}
-              aria-hidden="true"
-            />
-            <div className="p-[16px_18px]">
-              <div className="text-base font-extrabold text-white">Kostenloses Erstgespräch buchen</div>
-              <div className="mt-1 text-[13px]" style={{ color: "#C9CBE6" }}>
-                Individuelle Beratung für deinen Lernweg.
-              </div>
-            </div>
-          </Link>
+          <PromoCards tenantId={tenant.id} />
         </div>
       </div>
     </AppShell>

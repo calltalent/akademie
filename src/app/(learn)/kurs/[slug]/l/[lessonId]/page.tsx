@@ -243,29 +243,42 @@ export default async function LessonPage({
               <BlockRenderer blocks={blocks} lessonId={lessonId} lessonUpdatedAt={lesson.updated_at as string | null} />
             </div>
 
-            {/* Fußzeile */}
+            {/* Fußzeile (24.07.2026, Josips Auftrag "ordentlich und
+                übersichtlich in der mobilen App"): 2-Spalten-Raster statt
+                zweier nebeneinander umbrechender Flex-Gruppen — links
+                Gemerkt/Feedback geben übereinander, rechts der
+                "Abgeschlossen"-Hinweis über dem Aktions-Button, alle vier
+                Elemente gleich groß (rounded-[11px] px-4 py-[11px] text-sm,
+                siehe complete-lesson-button.tsx). Bricht auf 375px nicht
+                mehr wild um, weil es von vornherein zwei feste Spalten sind
+                statt umbrechender Flex-Reihen. */}
             <div
-              className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t p-[20px_26px]"
+              className="mt-4 grid grid-cols-2 gap-2.5 border-t p-[20px_26px]"
               style={{ borderColor: "#EEF0F7" }}
             >
-              <div className="flex flex-wrap items-center gap-2.5">
-                <BookmarkButton lessonId={lessonId} courseSlug={slug} initiallyBookmarked={Boolean(bookmarkRow)} />
-                <Link
-                  href="/kontakt"
-                  className="inline-flex items-center gap-1.5 rounded-[11px] border bg-white px-[14px] py-[10px] text-sm font-semibold no-underline"
-                  style={{ borderColor: "#D8DAEA", color: NAVY }}
-                >
-                  <MessageSquare size={15} color={ACCENT} strokeWidth={2} aria-hidden="true" />
-                  Feedback geben
-                </Link>
+              <BookmarkButton lessonId={lessonId} courseSlug={slug} initiallyBookmarked={Boolean(bookmarkRow)} />
+              <div className="flex items-center justify-end">
+                {progressRow?.status === "completed" && (
+                  <span className="text-sm font-semibold text-green-700">✓ Abgeschlossen</span>
+                )}
               </div>
-              <CompleteLessonButton
-                lessonId={lessonId}
-                courseSlug={slug}
-                alreadyCompleted={progressRow?.status === "completed"}
-                nextHref={completeHref}
-                nextLabel={completeLabel}
-              />
+              <Link
+                href="/kontakt"
+                className="inline-flex items-center justify-center gap-1.5 rounded-[11px] border bg-white px-4 py-[11px] text-sm font-semibold no-underline"
+                style={{ borderColor: "#D8DAEA", color: NAVY }}
+              >
+                <MessageSquare size={15} color={ACCENT} strokeWidth={2} aria-hidden="true" />
+                Feedback geben
+              </Link>
+              <div className="flex items-center justify-end">
+                <CompleteLessonButton
+                  lessonId={lessonId}
+                  courseSlug={slug}
+                  alreadyCompleted={progressRow?.status === "completed"}
+                  nextHref={completeHref}
+                  nextLabel={completeLabel}
+                />
+              </div>
             </div>
           </div>
 

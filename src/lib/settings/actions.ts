@@ -268,3 +268,184 @@ export async function moveSidebarLink(id: string, direction: "up" | "down"): Pro
     return { ok: false, error: genericErrorMessage(e) };
   }
 }
+
+// --- Positionen (Josips Auftrag, 24.07.2026: admin-verwaltbare Kärtchen in
+// der rechten Spalte der Kurs-/Modulansicht, ersetzen die bisher fest
+// verdrahteten "Kostenloses Erstgespräch buchen"/"Nutze die Calltalent-App"-
+// Kärtchen, siehe Migration 20260724120000_promo_cards.sql). Gleiches
+// Grundmuster wie die Sidebar-Links oben (requireAdminTenant, Auf/Ab statt
+// Drag-and-Drop — CLAUDE.md §3.4), kein Rate-Limit (reine Konfigurations-
+// daten, gleiche Einstufung wie Sidebar-Links).
+//
+// `linkUrl` erlaubt HIER zusätzlich relative Pfade ("/kontakt") — anders als
+// `sidebarLinkSchema` oben, dessen Kommentar Sidebar-Links explizit als
+// "immer externe Ziele" einordnet. Positionen sollen genau wie das bisherige
+// Erstgespräch-Kärtchen auch auf interne Routen zeigen können.
+const promoCardSchema = z
+  .object({
+    title: z.string().trim().min(1, "Titel erforderlich.").max(150),
+    description: z.string().trim().max(500).optional(),
+    mediaKind: z.enum(["image", "video"]),
+    imageUrl: z.string().trim().url("Ungültige Bild-URL.").optional(),
+    bunnyVideoId: z.string().trim().min(1).optional(),
+    linkUrl: z
+      .string()
+      .trim()
+      .max(2000)
+      .refine((v) => v.startsWith("/") || /^https?:\/\//i.test(v), "Nur interne Pfade oder http(s)-Links erlaubt.")
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.mediaKind === "image" && !data.imageUrl) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["imageUrl"], message: "Bild erforderlich." });
+    }
+    if (data.mediaKind === "video" && !data.bunnyVideoId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bunnyVideoId"], message: "Video erforderlich." });
+    }
+  });
+
+export type PromoCardInput = z.infer<typeof promoCardSchema>;
+
+export type PromoCardRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  mediaKind: "image" | "video";
+  imageUrl: string | null;
+  bunnyVideoId: string | null;
+  linkUrl: string | null;
+};
+
+type PromoCardResult = { ok: true; card: PromoCardRow } | { ok: false; error: string };
+
+function toPromoCardRow(row: {
+  id: string;
+  title: string;
+  description: string | null;
+  media_kind: string;
+  image_url: string | null;
+  bunny_video_id: string | null;
+  link_url: string | null;
+}): PromoCardRow {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    mediaKind: row.media_kind as "image" | "video",
+    imageUrl: row.image_url,
+    bunnyVideoId: row.bunny_video_id,
+    linkUrl: row.link_url,
+  };
+}
+
+export async function createPromoCard(input: PromoCardInput): Promise<PromoCardResult> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const parsed = promoCardSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+
+    const { count } = await supabase
+      .from("promo_cards")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id);
+
+    const { data, error } = await supabase
+      .from("promo_cards")
+      .insert({
+        tenant_id: tenant.id,
+        title: parsed.data.title,
+        description: parsed.data.description ?? null,
+        media_kind: parsed.data.mediaKind,
+        image_url: parsed.data.imageUrl ?? null,
+        bunny_video_id: parsed.data.bunnyVideoId ?? null,
+        link_url: parsed.data.linkUrl ?? null,
+        position: count ?? 0,
+      })
+      .select("id, title, description, media_kind, image_url, bunny_video_id, link_url")
+      .single();
+    if (error || !data) return { ok: false, error: error ? translateDbError(error) : "Anlegen fehlgeschlagen." };
+
+    revalidatePath("/admin/einstellungen");
+    revalidatePath("/kurs");
+    return { ok: true, card: toPromoCardRow(data) };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+export async function updatePromoCard(id: string, input: PromoCardInput): Promise<PromoCardResult> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const parsed = promoCardSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+
+    const { data, error } = await supabase
+      .from("promo_cards")
+      .update({
+        title: parsed.data.title,
+        description: parsed.data.description ?? null,
+        media_kind: parsed.data.mediaKind,
+        image_url: parsed.data.imageUrl ?? null,
+        bunny_video_id: parsed.data.bunnyVideoId ?? null,
+        link_url: parsed.data.linkUrl ?? null,
+      })
+      .eq("id", id)
+      .eq("tenant_id", tenant.id)
+      .select("id, title, description, media_kind, image_url, bunny_video_id, link_url")
+      .single();
+    if (error || !data) return { ok: false, error: error ? translateDbError(error) : "Speichern fehlgeschlagen." };
+
+    revalidatePath("/admin/einstellungen");
+    revalidatePath("/kurs");
+    return { ok: true, card: toPromoCardRow(data) };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+export async function deletePromoCard(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const { error } = await supabase.from("promo_cards").delete().eq("id", id).eq("tenant_id", tenant.id);
+    if (error) return { ok: false, error: translateDbError(error) };
+
+    revalidatePath("/admin/einstellungen");
+    revalidatePath("/kurs");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+export async function movePromoCard(id: string, direction: "up" | "down"): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const { data: cards, error: listError } = await supabase
+      .from("promo_cards")
+      .select("id, position")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: true });
+    if (listError || !cards) return { ok: false, error: listError ? translateDbError(listError) : "Fehler." };
+
+    const idx = cards.findIndex((c) => c.id === id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= cards.length) {
+      return { ok: true }; // Rand erreicht, kein Fehler
+    }
+
+    const a = cards[idx];
+    const b = cards[swapIdx];
+    await supabase.from("promo_cards").update({ position: b.position }).eq("id", a.id).eq("tenant_id", tenant.id);
+    await supabase.from("promo_cards").update({ position: a.position }).eq("id", b.id).eq("tenant_id", tenant.id);
+
+    revalidatePath("/admin/einstellungen");
+    revalidatePath("/kurs");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
