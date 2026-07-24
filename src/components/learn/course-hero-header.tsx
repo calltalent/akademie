@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/compute";
 import { ProgressRing } from "@/components/learn/progress-ring";
@@ -129,85 +130,100 @@ export async function CourseHeroHeader({
         </div>
       </div>
 
-      {/* Tabs — unter `sm` je zur Hälfte gestreckt statt nur inhaltsbreit
-          (24.07.2026, Josips Fund: viel Leerraum rechts auf dem Handy),
-          ab `sm` wieder die ursprüngliche Inhaltsbreite (keine optische
-          Änderung am Desktop). DRITTER Tab "Information" (24.07.2026,
-          Informations-Tab nach Baulig-Vorbild) — vorher zwei Tabs
-          (Übersicht/Lesezeichen), "Übersicht" fest als aktiv markiert. Jetzt
-          `activeTab`-gesteuert: Übersicht und Information können beide aktiv
-          sein, Lesezeichen bleibt nie aktiv (eigene Seite außerhalb dieses
-          Kurs-Kontexts). */}
-      <div className="my-[18px] mb-6 flex gap-2.5">
-        {activeTab === "overview" ? (
-          <span
-            className="flex flex-1 items-center justify-center gap-2 rounded-[11px] px-[18px] py-[11px] text-sm font-bold text-white sm:flex-none"
-            style={{ background: NAVY }}
-            aria-current="page"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {/* Tabs — reine Symbol-Buttons ohne Textlabel (24.07.2026, Josips
+          Auftrag: "als Symbole darstellen"). Auf dem Handy als Gruppe
+          zentriert (`justify-center`), ab `sm` linksbündig
+          (`sm:justify-start`) — vorher wurden die Buttons auf dem Handy zu
+          je 1/3 gestreckt, das entfällt mit dem Wegfall der Textlabel.
+          Sichtbares Label entfällt hier bewusst zugunsten der
+          Symbol-Optik (CLAUDE.md §3.4 "sichtbares Label, kein reines ARIA"
+          gilt für Formularfelder; für diese reine Navigations-Leiste bleibt
+          die Bedeutung stattdessen über `aria-label`/`title` je Button
+          zugänglich, exakt wie bei `CourseCategorySelect`s `compact`-Fall).
+          DRITTER Tab "Information" (24.07.2026, Informations-Tab nach
+          Baulig-Vorbild) — `activeTab`-gesteuert: Übersicht und Information
+          können beide aktiv sein, Lesezeichen bleibt nie aktiv (eigene Seite
+          außerhalb dieses Kurs-Kontexts). */}
+      <div className="my-[18px] mb-6 flex justify-center gap-2.5 sm:justify-start">
+        <TabIconButton
+          active={activeTab === "overview"}
+          href={`/kurs/${slug}`}
+          label="Übersicht"
+          icon={(color) => (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="7" rx="1" />
               <rect x="14" y="3" width="7" height="7" rx="1" />
               <rect x="3" y="14" width="7" height="7" rx="1" />
               <rect x="14" y="14" width="7" height="7" rx="1" />
             </svg>
-            Übersicht
-          </span>
-        ) : (
-          <Link
-            href={`/kurs/${slug}`}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[11px] border bg-white px-[18px] py-[11px] text-sm font-semibold no-underline sm:flex-none"
-            style={{ borderColor: "#E0E2EF", color: NAVY }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
-            Übersicht
-          </Link>
-        )}
-
-        {activeTab === "information" ? (
-          <span
-            className="flex flex-1 items-center justify-center gap-2 rounded-[11px] px-[18px] py-[11px] text-sm font-bold text-white sm:flex-none"
-            style={{ background: NAVY }}
-            aria-current="page"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          )}
+        />
+        <TabIconButton
+          active={activeTab === "information"}
+          href={`/kurs/${slug}/information`}
+          label="Information"
+          icon={(color) => (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="9" />
               <line x1="12" y1="11" x2="12" y2="16" />
               <line x1="12" y1="8" x2="12" y2="8" />
             </svg>
-            Information
-          </span>
-        ) : (
-          <Link
-            href={`/kurs/${slug}/information`}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[11px] border bg-white px-[18px] py-[11px] text-sm font-semibold no-underline sm:flex-none"
-            style={{ borderColor: "#E0E2EF", color: NAVY }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="9" />
-              <line x1="12" y1="11" x2="12" y2="16" />
-              <line x1="12" y1="8" x2="12" y2="8" />
-            </svg>
-            Information
-          </Link>
-        )}
-
-        <Link
+          )}
+        />
+        <TabIconButton
+          active={false}
           href="/lesezeichen"
-          className="flex flex-1 items-center justify-center gap-2 rounded-[11px] border bg-white px-[18px] py-[11px] text-sm font-semibold no-underline sm:flex-none"
-          style={{ borderColor: "#E0E2EF", color: NAVY }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-          </svg>
-          Lesezeichen
-        </Link>
+          label="Lesezeichen"
+          icon={(color) => (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+            </svg>
+          )}
+        />
       </div>
     </>
+  );
+}
+
+/**
+ * Ein einzelner Symbol-Tab (aktiv = navy gefüllt + weißes Icon, inaktiv =
+ * weiß mit Rand + Icon in ACCENT). Fester `h-11 w-11`-Touch-Bereich (44px,
+ * gängige Mindestgröße) statt der bisherigen textbreiten Pille — `icon` ist
+ * eine Funktion, weil Aktiv-/Inaktiv-Zustand unterschiedliche Strichfarben
+ * brauchen.
+ */
+function TabIconButton({
+  active,
+  href,
+  label,
+  icon,
+}: {
+  active: boolean;
+  href: string;
+  label: string;
+  icon: (color: string) => ReactNode;
+}) {
+  const className = `flex h-11 w-11 flex-none items-center justify-center rounded-[11px] no-underline${
+    active ? "" : " border bg-white"
+  }`;
+
+  if (active) {
+    return (
+      <span
+        className={className}
+        style={{ background: NAVY }}
+        aria-current="page"
+        aria-label={label}
+        title={label}
+      >
+        {icon("#fff")}
+      </span>
+    );
+  }
+
+  return (
+    <Link href={href} className={className} style={{ borderColor: "#E0E2EF" }} aria-label={label} title={label}>
+      {icon(ACCENT)}
+    </Link>
   );
 }
