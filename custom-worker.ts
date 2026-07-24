@@ -25,9 +25,19 @@
 // `npm run preview`) generiert, existiert im Repo nicht als Quelldatei.
 import { default as handler } from "./.open-next/worker.js";
 
+// Minimaler Fetcher-Typ für das Service Binding (gleiche Begründung wie bei
+// ScheduledEvent unten: kein @cloudflare/workers-types verfügbar).
+interface Fetcher {
+  fetch(input: string | URL, init?: RequestInit): Promise<Response>;
+}
+
 interface Env {
   CRON_PROCESS_SECRET: string;
   NEXT_PUBLIC_SITE_URL: string;
+  // Service Binding auf denselben Worker (wrangler.jsonc "services") — ersetzt
+  // den bisherigen echten Netzwerk-`fetch()` unten (24.07.2026, Fund: wieder-
+  // holte 522-Fehler bei diesem Self-Call).
+  SELF: Fetcher;
 }
 
 // Minimale, selbst definierte Typen statt Abhaengigkeit von
@@ -57,7 +67,7 @@ const worker = {
     // eine ungefangene Exception im scheduled-Handler, statt sie wie den
     // regulären Fehlerfall unten im Cloudflare-Cron-Log zu protokollieren.
     try {
-      const response = await fetch(`${env.NEXT_PUBLIC_SITE_URL}/api/admin/ki/process`, {
+      const response = await env.SELF.fetch(`${env.NEXT_PUBLIC_SITE_URL}/api/admin/ki/process`, {
         method: "POST",
         headers: { "x-cron-secret": env.CRON_PROCESS_SECRET },
       });

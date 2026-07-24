@@ -72,5 +72,16 @@
     // Sekunden bis niedrige zweistellige Sekunden (ein Claude-Sonnet-Aufruf),
     // ein Kursentwurf (3 Schritte) ist damit binnen weniger Minuten fertig.
     "crons": ["*/2 * * * *"]
-  }
+  },
+  // Service Binding auf sich selbst (24.07.2026, Josips Fund: wiederholte
+  // "522"-Fehler im Cron-Log für /api/admin/ki/process) — der scheduled-
+  // Handler in custom-worker.ts rief diesen Endpunkt bisher per echtem
+  // `fetch()` über das öffentliche Netz auf (DNS + Cloudflare-Edge-Routing
+  // + TLS, wie ein fremder Client). Das ist ein bekannt fragiles Muster
+  // ("Worker ruft sich selbst über HTTP auf") — Cloudflares eigene
+  // Empfehlung dafür ist ein Service Binding: `env.SELF.fetch(...)` liefert
+  // denselben Request an denselben Worker aus, aber als lokaler RPC-Aufruf
+  // ohne Netzwerk-Hop, ohne DNS, ohne die 522-Fehlerklasse (Verbindungs-
+  // Timeout am Edge). `service` muss exakt dem `name` oben entsprechen.
+  "services": [{ "binding": "SELF", "service": "calltalent-akademie" }]
 }
