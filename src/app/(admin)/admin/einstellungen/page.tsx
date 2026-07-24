@@ -7,7 +7,8 @@ import { WebhooksPanel } from "@/components/admin/webhooks-panel";
 import { TenantSettingsForm } from "@/components/admin/tenant-settings-form";
 import { SidebarLinksPanel } from "@/components/admin/sidebar-links-panel";
 import { PromoCardsPanel } from "@/components/admin/promo-cards-panel";
-import type { PromoCardRow } from "@/lib/settings/actions";
+import { TrainerProfilePanel } from "@/components/admin/trainer-profile-panel";
+import type { PromoCardRow, TrainerRow } from "@/lib/settings/actions";
 
 /**
  * Design-Block 6 (13.07.2026, Claude-Design-Export Teil 3,
@@ -52,28 +53,34 @@ export default async function AdminEinstellungenPage() {
   // Mandanten-Admins, die diese Seite genauso sehen).
   const isPlatformAdmin = (await checkPlatformAccess()).ok;
   const supabase = await createClient();
-  const [{ data: apiKeys }, { data: webhooks }, { data: sidebarLinks }, { data: promoCardsRaw }] = await Promise.all([
-    supabase
-      .from("api_keys")
-      .select("id, name, last_used, active, created_at")
-      .eq("tenant_id", tenant.id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("webhooks")
-      .select("id, url, events, active, created_at")
-      .eq("tenant_id", tenant.id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("sidebar_links")
-      .select("id, label, url")
-      .eq("tenant_id", tenant.id)
-      .order("position", { ascending: true }),
-    supabase
-      .from("promo_cards")
-      .select("id, title, description, media_kind, image_url, bunny_video_id, link_url")
-      .eq("tenant_id", tenant.id)
-      .order("position", { ascending: true }),
-  ]);
+  const [{ data: apiKeys }, { data: webhooks }, { data: sidebarLinks }, { data: promoCardsRaw }, { data: trainersRaw }] =
+    await Promise.all([
+      supabase
+        .from("api_keys")
+        .select("id, name, last_used, active, created_at")
+        .eq("tenant_id", tenant.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("webhooks")
+        .select("id, url, events, active, created_at")
+        .eq("tenant_id", tenant.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("sidebar_links")
+        .select("id, label, url")
+        .eq("tenant_id", tenant.id)
+        .order("position", { ascending: true }),
+      supabase
+        .from("promo_cards")
+        .select("id, title, description, media_kind, image_url, bunny_video_id, link_url")
+        .eq("tenant_id", tenant.id)
+        .order("position", { ascending: true }),
+      supabase
+        .from("trainers")
+        .select("id, name, role, bio, image_url")
+        .eq("tenant_id", tenant.id)
+        .order("position", { ascending: true }),
+    ]);
 
   const promoCards: PromoCardRow[] = (promoCardsRaw ?? []).map((c) => ({
     id: c.id,
@@ -83,6 +90,14 @@ export default async function AdminEinstellungenPage() {
     imageUrl: c.image_url,
     bunnyVideoId: c.bunny_video_id,
     linkUrl: c.link_url,
+  }));
+
+  const trainers: TrainerRow[] = (trainersRaw ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    role: t.role,
+    bio: t.bio,
+    imageUrl: t.image_url,
   }));
 
   const branding = tenant.branding;
@@ -139,6 +154,7 @@ export default async function AdminEinstellungenPage() {
 
         <SidebarLinksPanel links={sidebarLinks ?? []} />
         <PromoCardsPanel cards={promoCards} />
+        <TrainerProfilePanel trainers={trainers} />
       </div>
 
       <div className="mt-6 flex max-w-[820px] flex-col gap-8">

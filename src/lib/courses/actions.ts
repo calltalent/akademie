@@ -451,6 +451,77 @@ export async function updateCourseDescription(
 }
 
 /**
+ * Kursziele (Information-Tab, Josips Auftrag 24.07.2026: Informations-Tab
+ * für Kurse nach Baulig-Vorbild, Migration
+ * 20260724130000_course_information.sql). Erscheinen als Checkmark-Liste im
+ * neuen `/kurs/[slug]/information`-Tab. Kein Auto-Save pro Tastenanschlag —
+ * bewusst einfacher als das Beschreibungsfeld, da Array-Änderungen (siehe
+ * course-info-editor.tsx): ein "Kursziele speichern"-Button überschreibt das
+ * komplette Array auf einmal. Gleiches Validierungs-/Speicher-Muster wie
+ * `updateCourseDescription` (courseSchema.pick, revalidatePath auf
+ * Admin-Liste, Admin-Editor UND öffentliche Lernseite).
+ */
+export async function updateCourseGoals(
+  courseId: string,
+  goals: string[],
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const parsed = courseSchema.pick({ goals: true }).safeParse({ goals });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Ungültige Kursziele." };
+    }
+
+    const { error } = await supabase
+      .from("courses")
+      .update({ goals: parsed.data.goals ?? [] })
+      .eq("id", courseId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+
+    revalidatePath("/admin/kurse");
+    revalidatePath(`/admin/kurse/${courseId}`);
+    revalidatePath("/kurs");
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
+ * Autor/Trainer eines Kurses (Information-Tab, gleicher Auftrag wie
+ * `updateCourseGoals` oben). Einfaches Feld-Update nach Vorbild
+ * `updateCourseCoverUrl` — `authorId = null` löst die Verknüpfung wieder
+ * ("— kein Autor —" im Kurs-Editor-Dropdown, course-info-editor.tsx). Die
+ * FK selbst (`courses.author_id references trainers(id)`) sorgt bereits
+ * dafür, dass nur existierende Trainer-IDs geschrieben werden können; ein
+ * `trainers`-Datensatz eines FREMDEN Mandanten würde die FK zwar nicht
+ * blockieren, ist aber wegen RLS `trainers_member_select` clientseitig nie
+ * im Dropdown wählbar (gleiche Absicherungslinie wie bei den Positionen).
+ */
+export async function updateCourseAuthor(
+  courseId: string,
+  authorId: string | null,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireStaffTenant();
+    const { error } = await supabase
+      .from("courses")
+      .update({ author_id: authorId })
+      .eq("id", courseId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { error: translateDbError(error) };
+
+    revalidatePath("/admin/kurse");
+    revalidatePath(`/admin/kurse/${courseId}`);
+    revalidatePath("/kurs");
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
  * SICHERHEITSHÄRTUNG (Josips Entscheidung, siehe PHASENSTATUS.md): Löschen
  * kaskadiert per FK `on delete cascade` (0001_init.sql) auf certificates,
  * progress, submissions, enrollments, bookmarks, embeddings,

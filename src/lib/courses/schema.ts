@@ -183,6 +183,8 @@ export const courseSchema = z.object({
     .max(100)
     .regex(slugPattern, "Nur Kleinbuchstaben, Ziffern, Bindestriche."),
   description: z.string().max(5000).optional(),
+  /** Kursziele (Information-Tab, Migration 20260724130000_course_information.sql) — Checkmark-Liste, optional. */
+  goals: z.array(z.string().min(1).max(300)).max(20).optional(),
 });
 
 /** Kurze Beschreibung unter Modul-/Sektions-Überschrift (23.07.2026, Migration 20260723190000) — optional, leer = keine Beschreibung. */

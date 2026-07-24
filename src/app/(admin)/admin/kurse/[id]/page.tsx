@@ -9,6 +9,7 @@ import { ReembedCourseButton } from "@/components/admin/reembed-course-button";
 import { RefreshTranscriptButton } from "@/components/admin/refresh-transcript-button";
 import { CourseTitleEditor } from "@/components/admin/course-title-editor";
 import { DeleteCourseButton } from "@/components/admin/delete-course-button";
+import { CourseInfoEditor } from "@/components/admin/course-info-editor";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
 import { getVideoThumbnailUrl } from "@/lib/bunny/client";
 
@@ -81,7 +82,7 @@ export default async function CourseEditorPage({
 
   const { data: course } = await supabase
     .from("courses")
-    .select("id, title, slug, description, status, category_id")
+    .select("id, title, slug, description, status, category_id, author_id, goals")
     .eq("id", courseId)
     .eq("tenant_id", tenant!.id)
     .maybeSingle();
@@ -97,6 +98,14 @@ export default async function CourseEditorPage({
   // Kurskategorien des Mandanten (Migration 20260722180000_course_categories.sql) für CourseCategorySelect.
   const { data: categories } = await supabase
     .from("course_categories")
+    .select("id, name")
+    .eq("tenant_id", tenant!.id)
+    .order("position", { ascending: true });
+
+  // Trainerprofile des Mandanten (Migration 20260724130000_course_information.sql)
+  // für die Autor-Auswahl im Information-Tab (CourseInfoEditor).
+  const { data: trainers } = await supabase
+    .from("trainers")
     .select("id, name")
     .eq("tenant_id", tenant!.id)
     .order("position", { ascending: true });
@@ -196,6 +205,13 @@ export default async function CourseEditorPage({
           </Link>
         </div>
       </header>
+
+      <CourseInfoEditor
+        courseId={courseId}
+        initialGoals={Array.isArray(course.goals) ? (course.goals as string[]) : []}
+        initialAuthorId={course.author_id ?? null}
+        trainers={trainers ?? []}
+      />
 
       {/* Mobile-Umbau (23.07.2026): Baum + Editor stapeln sich unter `lg`
           (Baum zuerst, Editor darunter) statt der festen 300px/1fr-Spalten —

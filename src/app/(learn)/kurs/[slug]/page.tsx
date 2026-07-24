@@ -6,6 +6,8 @@ import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/comput
 import { CertificateBadge } from "@/components/learn/certificate-badge";
 import { PromoCards } from "@/components/learn/promo-cards";
 import { AppShell } from "@/components/learn/app-shell";
+import { CourseHeroHeader } from "@/components/learn/course-hero-header";
+import { ProgressRing } from "@/components/learn/progress-ring";
 import { getVideoThumbnailUrl } from "@/lib/bunny/client";
 
 /**
@@ -21,11 +23,18 @@ import { getVideoThumbnailUrl } from "@/lib/bunny/client";
  * §8.1): Gesamt-% und Pro-Modul-% aus `progress`, „Weiter"-Lektion = erste
  * noch nicht abgeschlossene Lektion in Reihenfolge, Modul-Meta „N Lektionen ·
  * M Min." aus `lessons.video_duration_s` (Minuten weggelassen, falls keine
- * Dauern hinterlegt — keine Fantasiezahl). Bewusste Abweichungen vom Export:
- * (1) der „Information"-Tab zeigt im Export auf `#` — weggelassen statt als
- * toter Link auszuliefern (gleiche Linie wie Josips „keine toten Links");
- * (2) das „Weiter"-Banner entfällt, wenn nichts mehr offen ist (Kurs fertig
- * bzw. leer) — dann steht dort ggf. das echte Zertifikat (CertificateBadge).
+ * Dauern hinterlegt — keine Fantasiezahl). Bewusste Abweichung vom Export:
+ * das „Weiter"-Banner entfällt, wenn nichts mehr offen ist (Kurs fertig bzw.
+ * leer) — dann steht dort ggf. das echte Zertifikat (CertificateBadge).
+ *
+ * NACHTRAG (24.07.2026, Josips Auftrag "Informations-Tab nach Baulig-
+ * Vorbild"): der „Information"-Tab, der im Export nur auf `#` zeigte und
+ * deshalb bisher bewusst weggelassen war (siehe vorherige Fassung dieses
+ * Kommentars), existiert jetzt echt — Kursziele + Autor sind ergänzt
+ * (Migration 20260724130000_course_information.sql), der Tab führt auf
+ * `/kurs/[slug]/information`. Hero- und Tabs-Block liegen seither in der
+ * gemeinsam genutzten `CourseHeroHeader`-Komponente (siehe
+ * `src/components/learn/course-hero-header.tsx`).
  * Hero-Thumbnail zeigt `courses.cover_url` (18.07.2026, Kursbild-Upload-
  * Feature), sobald eines gesetzt ist — sonst der stilisierte CSS-Platzhalter
  * aus dem Export. Die „App"-Kachel rechts bleibt statischer Marketing-Inhalt
@@ -162,93 +171,13 @@ export default async function CourseOverviewPage({
       <div className="grid grid-cols-1 items-start gap-7 lg:grid-cols-[1fr_300px]">
         {/* Linke Spalte */}
         <div className="min-w-0">
-          {/* Hero */}
-          <div
-            className="flex items-center gap-6 overflow-hidden rounded-[18px] p-[26px]"
-            style={{
-              background: NAVY,
-              backgroundImage:
-                "repeating-linear-gradient(135deg,rgba(86,99,174,.5) 0 16px, rgba(62,63,102,.5) 16px 32px)",
-            }}
-          >
-            {course.cover_url ? (
-              // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
-              <img
-                src={course.cover_url}
-                alt=""
-                className="hidden aspect-video w-[180px] flex-none rounded-[12px] object-cover object-center sm:block"
-              />
-            ) : (
-              <div
-                className="hidden aspect-video w-[180px] flex-none items-center justify-center rounded-[12px] sm:flex"
-                style={{
-                  backgroundColor: "#2C2D4A",
-                  backgroundImage:
-                    "repeating-linear-gradient(45deg,#2C2D4A 0 12px, rgba(86,99,174,.35) 12px 24px)",
-                }}
-                aria-hidden="true"
-              >
-                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#C9CBE6" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 9V5a3 3 0 0 0-6 0v4" />
-                  <rect x="2" y="9" width="20" height="12" rx="2" />
-                </svg>
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="text-xs font-bold" style={{ letterSpacing: "0.2em", color: "#B9BBDA" }}>
-                KURS
-              </div>
-              <h1 className="mb-2 mt-1.5 text-[26px] font-extrabold text-white">{course.title}</h1>
-              {course.description && (
-                <p className="m-0 max-w-[520px] text-[15px]" style={{ color: "#DDDEEE" }}>
-                  {course.description}
-                </p>
-              )}
-            </div>
-            <div className="hidden flex-none md:block">
-              <ProgressRing
-                size={96}
-                radius={42}
-                stroke={7}
-                track="rgba(255,255,255,.18)"
-                color="#8BE0B7"
-                pct={progress.percent}
-                label={`${progress.percent}%`}
-                labelColor="#fff"
-                labelSize={22}
-              />
-            </div>
-          </div>
-
-          {/* Tabs — unter `sm` je zur Hälfte gestreckt statt nur inhaltsbreit
-              (24.07.2026, Josips Fund: viel Leerraum rechts auf dem Handy),
-              ab `sm` wieder die ursprüngliche Inhaltsbreite (keine optische
-              Änderung am Desktop). */}
-          <div className="my-[18px] mb-6 flex gap-2.5">
-            <span
-              className="flex flex-1 items-center justify-center gap-2 rounded-[11px] px-[18px] py-[11px] text-sm font-bold text-white sm:flex-none"
-              style={{ background: NAVY }}
-              aria-current="page"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7" rx="1" />
-                <rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" />
-                <rect x="14" y="14" width="7" height="7" rx="1" />
-              </svg>
-              Übersicht
-            </span>
-            <Link
-              href="/lesezeichen"
-              className="flex flex-1 items-center justify-center gap-2 rounded-[11px] border bg-white px-[18px] py-[11px] text-sm font-semibold no-underline sm:flex-none"
-              style={{ borderColor: "#E0E2EF", color: NAVY }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-              </svg>
-              Lesezeichen
-            </Link>
-          </div>
+          <CourseHeroHeader
+            tenantId={tenant.id}
+            userId={user.id}
+            course={course}
+            slug={slug}
+            activeTab="overview"
+          />
 
           {/* Zertifikat (nur bei abgeschlossenem Kurs sichtbar) */}
           <CertificateBadge tenantId={tenant.id} courseId={course.id} />
@@ -377,61 +306,5 @@ export default async function CourseOverviewPage({
         </div>
       </div>
     </AppShell>
-  );
-}
-
-/**
- * Reiner SVG-Fortschrittsring (Server-Component). Umfang = 2πr, der sichtbare
- * Bogen wird über stroke-dashoffset gesteuert; um 90° gedreht, damit er oben
- * beginnt — 1:1 wie im Design-Export.
- */
-function ProgressRing({
-  size,
-  radius,
-  stroke,
-  track,
-  color,
-  pct,
-  label,
-  labelColor,
-  labelSize,
-}: {
-  size: number;
-  radius: number;
-  stroke: number;
-  track: string;
-  color: string;
-  pct: number;
-  label: string;
-  labelColor: string;
-  labelSize: number;
-}) {
-  const circumference = 2 * Math.PI * radius;
-  const offset = Math.max(0, Math.round(circumference - (circumference * pct) / 100));
-  const c = size / 2;
-  return (
-    <div className="relative" style={{ width: size, height: size }} role="img" aria-label={`${pct}% abgeschlossen`}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={c} cy={c} r={radius} fill="none" stroke={track} strokeWidth={stroke} />
-        <circle
-          cx={c}
-          cy={c}
-          r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          transform={`rotate(-90 ${c} ${c})`}
-        />
-      </svg>
-      <div
-        className="absolute inset-0 flex items-center justify-center font-extrabold"
-        style={{ color: labelColor, fontSize: labelSize }}
-      >
-        {label}
-      </div>
-    </div>
   );
 }

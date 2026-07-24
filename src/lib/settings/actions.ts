@@ -449,3 +449,153 @@ export async function movePromoCard(id: string, direction: "up" | "down"): Promi
     return { ok: false, error: genericErrorMessage(e) };
   }
 }
+
+// --- Trainer-/Ansprechperson-Profile (Josips Auftrag, 24.07.2026:
+// Informations-Tab für Kurse nach Baulig-Vorbild, Migration
+// 20260724130000_course_information.sql). Wiederverwendbares Profil (Bild +
+// Name + optional Rolle/Bio), verwaltet hier unter /admin/einstellungen, im
+// Kurs-Editor pro Kurs als "Autor" auswählbar (src/lib/courses/actions.ts,
+// `updateCourseAuthor`). Exakt dasselbe Grundmuster wie die Positionen
+// oben (`createPromoCard`/`updatePromoCard`/`deletePromoCard`/
+// `movePromoCard`): requireAdminTenant(), zähl-basierte Position beim
+// Anlegen, Auf/Ab statt Drag-and-Drop (CLAUDE.md §3.4), kein Rate-Limit
+// (reine Konfigurationsdaten, gleiche Einstufung wie Positionen/Sidebar-
+// Links).
+const trainerSchema = z.object({
+  name: z.string().trim().min(1, "Name erforderlich.").max(150),
+  role: z.string().trim().max(150).optional(),
+  bio: z.string().trim().max(2000).optional(),
+  imageUrl: z.string().trim().url("Ungültige Bild-URL.").optional(),
+});
+
+export type TrainerInput = z.infer<typeof trainerSchema>;
+
+export type TrainerRow = {
+  id: string;
+  name: string;
+  role: string | null;
+  bio: string | null;
+  imageUrl: string | null;
+};
+
+type TrainerResult = { ok: true; trainer: TrainerRow } | { ok: false; error: string };
+
+function toTrainerRow(row: {
+  id: string;
+  name: string;
+  role: string | null;
+  bio: string | null;
+  image_url: string | null;
+}): TrainerRow {
+  return {
+    id: row.id,
+    name: row.name,
+    role: row.role,
+    bio: row.bio,
+    imageUrl: row.image_url,
+  };
+}
+
+export async function createTrainer(input: TrainerInput): Promise<TrainerResult> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const parsed = trainerSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+
+    const { count } = await supabase
+      .from("trainers")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id);
+
+    const { data, error } = await supabase
+      .from("trainers")
+      .insert({
+        tenant_id: tenant.id,
+        name: parsed.data.name,
+        role: parsed.data.role ?? null,
+        bio: parsed.data.bio ?? null,
+        image_url: parsed.data.imageUrl ?? null,
+        position: count ?? 0,
+      })
+      .select("id, name, role, bio, image_url")
+      .single();
+    if (error || !data) return { ok: false, error: error ? translateDbError(error) : "Anlegen fehlgeschlagen." };
+
+    revalidatePath("/admin/einstellungen");
+    return { ok: true, trainer: toTrainerRow(data) };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+export async function updateTrainer(id: string, input: TrainerInput): Promise<TrainerResult> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const parsed = trainerSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+
+    const { data, error } = await supabase
+      .from("trainers")
+      .update({
+        name: parsed.data.name,
+        role: parsed.data.role ?? null,
+        bio: parsed.data.bio ?? null,
+        image_url: parsed.data.imageUrl ?? null,
+      })
+      .eq("id", id)
+      .eq("tenant_id", tenant.id)
+      .select("id, name, role, bio, image_url")
+      .single();
+    if (error || !data) return { ok: false, error: error ? translateDbError(error) : "Speichern fehlgeschlagen." };
+
+    revalidatePath("/admin/einstellungen");
+    return { ok: true, trainer: toTrainerRow(data) };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+export async function deleteTrainer(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const { error } = await supabase.from("trainers").delete().eq("id", id).eq("tenant_id", tenant.id);
+    if (error) return { ok: false, error: translateDbError(error) };
+
+    revalidatePath("/admin/einstellungen");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+export async function moveTrainer(id: string, direction: "up" | "down"): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const { data: trainers, error: listError } = await supabase
+      .from("trainers")
+      .select("id, position")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: true });
+    if (listError || !trainers) return { ok: false, error: listError ? translateDbError(listError) : "Fehler." };
+
+    const idx = trainers.findIndex((t) => t.id === id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= trainers.length) {
+      return { ok: true }; // Rand erreicht, kein Fehler
+    }
+
+    const a = trainers[idx];
+    const b = trainers[swapIdx];
+    await supabase.from("trainers").update({ position: b.position }).eq("id", a.id).eq("tenant_id", tenant.id);
+    await supabase.from("trainers").update({ position: a.position }).eq("id", b.id).eq("tenant_id", tenant.id);
+
+    revalidatePath("/admin/einstellungen");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
