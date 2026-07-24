@@ -67,7 +67,9 @@ export function KurskatalogGrid({
         })}
       </div>
 
-      {/* Kurskarten-Grid */}
+      {/* Kurskarten-Grid — Mobile-Fix (24.07.2026): gleicher Grund wie
+          dashboard/page.tsx — unter `sm` eine volle Spalte statt linksbündig
+          mit Leerraum. */}
       {filtered.length === 0 ? (
         <div className="rounded-2xl border border-border-100 bg-white px-6 py-10 text-center text-sm text-muted-400">
           {items.length === 0
@@ -75,7 +77,7 @@ export function KurskatalogGrid({
             : "Keine Kurse in dieser Kategorie."}
         </div>
       ) : (
-        <div className="grid gap-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 320px))" }}>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-[repeat(auto-fill,minmax(260px,320px))]">
           {filtered.map((c) => (
             <a
               key={c.id}

@@ -178,7 +178,15 @@ export default async function DashboardPage() {
         </a>
       </div>
 
-      <ul className="grid gap-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 320px))" }}>
+      {/* Mobile-Fix (24.07.2026, Josips Fund: Kurskarte auf dem iPhone nicht
+          volle Breite, links ausgerichtet mit Leerraum rechts): das feste
+          `minmax(260px, 320px)`-Raster erzeugt unter `sm` eine EINZIGE Spalte
+          mit max. 320px Breite, aber ohne Zentrierung/Streckung bleibt sie
+          linksbündig in einem breiteren Container stehen. `grid-cols-1` unter
+          `sm` lässt die Karte die volle verfügbare Breite ausfüllen (implizit
+          "zentriert", da kein Leerraum mehr übrig ist); ab `sm` greift wieder
+          das ursprüngliche Auto-Fill-Raster für mehrere Karten nebeneinander. */}
+      <ul className="grid grid-cols-1 gap-6 sm:grid-cols-[repeat(auto-fill,minmax(260px,320px))]">
         {courseCards.map(({ course, coverUrl, tint, eyebrow, progress }) => {
           const notStarted = progress.completed === 0;
 

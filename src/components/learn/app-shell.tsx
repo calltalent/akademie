@@ -83,9 +83,17 @@ export async function AppShell({
     customLinks = data ?? [];
   }
 
+  const topBarUser = { name: userName, email: userEmail, role: "Kursteilnehmer" };
+
   return (
     <>
-      <LearnMobileNav isStaff={isStaff} isPlatformAdmin={platformAccess.ok} customLinks={customLinks} />
+      <LearnMobileNav
+        isStaff={isStaff}
+        isPlatformAdmin={platformAccess.ok}
+        customLinks={customLinks}
+        user={topBarUser}
+        notifications={[]}
+      />
       <div className="flex min-h-screen bg-bg">
         <HtmlBackgroundSync color="#F4F5FA" />
         <Sidebar isStaff={isStaff} isPlatformAdmin={platformAccess.ok} customLinks={customLinks} />
@@ -93,7 +101,7 @@ export async function AppShell({
           <TopBar
             breadcrumb={breadcrumb}
             title={title ?? `Willkommen zurück, ${userName}`}
-            user={{ name: userName, email: userEmail, role: "Kursteilnehmer" }}
+            user={topBarUser}
             notifications={[]}
           />
           <main className="flex-1 px-4 pb-8 pt-3 lg:px-10 lg:pb-14 lg:pt-4">{children}</main>
