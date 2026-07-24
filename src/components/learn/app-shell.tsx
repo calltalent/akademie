@@ -53,6 +53,7 @@ export async function AppShell({
   userEmail,
   breadcrumb = "Lernen · Meine Kurse",
   title,
+  hideHeading = false,
 }: {
   children: ReactNode;
   isStaff: boolean;
@@ -60,6 +61,13 @@ export async function AppShell({
   userEmail?: string;
   breadcrumb?: string;
   title?: string;
+  /**
+   * Josips Auftrag (24.07.2026): auf Kurs-/Lektions-/Modulseiten stand der
+   * Titel bereits doppelt (einmal hier in der TopBar, einmal prominent in
+   * der jeweiligen Hero-Karte weiter unten) — blendet die TopBar-Kopfzeile
+   * für diese Seiten aus, siehe TopBar.tsx-Kopfkommentar für Details.
+   */
+  hideHeading?: boolean;
 }) {
   const platformAccess = await checkPlatformAccess();
 
@@ -103,6 +111,7 @@ export async function AppShell({
             title={title ?? `Willkommen zurück, ${userName}`}
             user={topBarUser}
             notifications={[]}
+            hideHeading={hideHeading}
           />
           <main className="flex-1 px-4 pb-8 pt-3 lg:px-10 lg:pb-14 lg:pt-4">{children}</main>
         </div>

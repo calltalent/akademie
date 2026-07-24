@@ -157,6 +157,7 @@ export default async function CourseOverviewPage({
       userEmail={user.email ?? undefined}
       breadcrumb="Lernen · Meine Kurse · Übersicht"
       title={course.title}
+      hideHeading
     >
       <div className="grid grid-cols-1 items-start gap-7 lg:grid-cols-[1fr_300px]">
         {/* Linke Spalte */}

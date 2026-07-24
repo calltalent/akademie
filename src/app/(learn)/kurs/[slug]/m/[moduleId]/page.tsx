@@ -167,6 +167,7 @@ export default async function ModulePage({
       userEmail={user.email ?? undefined}
       breadcrumb={`Lernen · ${course.title}`}
       title={mod.title}
+      hideHeading
     >
       <div className="grid grid-cols-1 items-start gap-7 lg:grid-cols-[1fr_300px]">
         {/* Linke Spalte */}
