@@ -150,6 +150,7 @@ export default async function SectionCompletedPage({
       userEmail={user.email ?? undefined}
       breadcrumb={`Lernen · ${currentModule?.title ?? course.title}`}
       title="Sektion abgeschlossen"
+      hideTitle
     >
       <div className="mx-auto max-w-2xl">
         {currentModule && (

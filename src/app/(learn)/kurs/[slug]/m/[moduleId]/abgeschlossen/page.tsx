@@ -141,6 +141,7 @@ export default async function ModuleCompletedPage({
       userEmail={user.email ?? undefined}
       breadcrumb={`Lernen · ${course.title}`}
       title={courseFullyCompleted ? "Kurs abgeschlossen" : "Modul abgeschlossen"}
+      hideTitle
     >
       <div className="mx-auto max-w-2xl">
         <Link

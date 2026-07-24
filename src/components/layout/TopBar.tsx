@@ -34,19 +34,16 @@ import { NotificationsMenu, ProfileMenu, useExclusiveMenu, type NotificationItem
  * Dropdown-Inhalte. Siehe dortigen bzw. topbar-menus.tsx-Kopfkommentar für
  * die volle Begründung/Fehlersuche.
  *
- * `hideHeading` NEU (24.07.2026, Josips Fund: Breadcrumb+Titel hier waren
- * auf den Kurs-/Lektions-/Modulseiten reine Dopplung — der Kurs-/Lektions-/
- * Modultitel steht dort bereits prominent in der eigenen Hero-Karte weiter
- * unten auf der Seite). `breadcrumb`/`title` bleiben Pflicht-Props (andere
- * Seiten wie Dashboard/Kurskatalog/Einstellungen haben KEINE eigene
- * Titel-Anzeige und brauchen diese Kopfzeile weiterhin unverändert).
- *
- * Unter `lg` verschwindet die ganze Kopfzeile (`hidden lg:flex` auf dem
- * `<header>` selbst statt nur den Text auszublenden) — Glocke/Profil leben
- * mobil ohnehin schon in `LearnMobileNav.tsx` (siehe oben), eine zweite,
- * jetzt leere Balkenzeile darunter wäre nur verschenkter Platz. Ab `lg`
- * bleibt die Kopfzeile bestehen (dort ist sie die einzige Stelle für
- * Glocke/Profil), nur Breadcrumb/Titel-Text entfällt.
+ * `hideTitle` NEU (24.07.2026, Josips Fund: der große `h1`-Titel hier war
+ * auf den Kurs-/Lektions-/Modul-/Sektionsseiten reine Dopplung — derselbe
+ * Titel steht dort bereits prominent in der eigenen Hero-/Erfolgs-Karte
+ * weiter unten auf der Seite). Die Brotkrume (`breadcrumb`) bleibt IMMER
+ * sichtbar — auf ausdrücklichen Folgeauftrag hin, unabhängig von
+ * `hideTitle` und auf jeder Breite inkl. mobil (die Kopfzeile selbst wird
+ * dafür nicht mehr unter `lg` ausgeblendet, siehe frühere Fassung in der
+ * Git-Historie dieser Datei). `title` bleibt Pflicht-Prop und wird für
+ * andere Seiten (Dashboard/Kurskatalog/Einstellungen, die KEINE eigene
+ * Titel-Anzeige haben) unverändert gerendert.
  */
 const DEFAULT_USER: TopBarUser = {
   name: "Jonas Weber",
@@ -65,29 +62,24 @@ export function TopBar({
   title,
   user = DEFAULT_USER,
   notifications = DEFAULT_NOTIFICATIONS,
-  hideHeading = false,
+  hideTitle = false,
 }: {
   breadcrumb: string;
   title: string;
   user?: TopBarUser;
   notifications?: NotificationItem[];
-  hideHeading?: boolean;
+  hideTitle?: boolean;
 }) {
   const menu = useExclusiveMenu();
 
   return (
-    <header
-      className={`${hideHeading ? "hidden lg:flex" : "flex"} sticky top-0 z-20 items-center gap-[18px] bg-bg px-4 py-4 font-sans lg:px-10 lg:py-5`}
-    >
-      {/* Breadcrumb + Titel — bei hideHeading nur ein leerer Abstandshalter
-          (Kopfzeile selbst ist unter `lg` dann ohnehin komplett `hidden`,
-          siehe Kopfkommentar), damit Glocke/Profil ab `lg` rechts bleiben. */}
+    <header className="sticky top-0 z-20 flex items-center gap-[18px] bg-bg px-4 py-4 font-sans lg:px-10 lg:py-5">
+      {/* Brotkrume immer sichtbar; der große Titel entfällt nur bei
+          hideTitle (Dopplung mit der Seiten-eigenen Hero-/Erfolgs-Karte). */}
       <div className="min-w-0 flex-1">
-        {!hideHeading && (
-          <>
-            <p className="text-[13px] font-semibold tracking-[0.02em] text-muted-400">{breadcrumb}</p>
-            <h1 className="mt-0.5 text-[20px] font-extrabold tracking-[-0.01em] text-ink lg:text-[26px]">{title}</h1>
-          </>
+        <p className="text-[13px] font-semibold tracking-[0.02em] text-muted-400">{breadcrumb}</p>
+        {!hideTitle && (
+          <h1 className="mt-0.5 text-[20px] font-extrabold tracking-[-0.01em] text-ink lg:text-[26px]">{title}</h1>
         )}
       </div>
 
