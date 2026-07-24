@@ -130,27 +130,25 @@ export async function CourseHeroHeader({
         </div>
       </div>
 
-      {/* Tabs — reine Symbol-Buttons ohne Textlabel (24.07.2026, Josips
-          Auftrag: "als Symbole darstellen"). Auf dem Handy als Gruppe
-          zentriert (`justify-center`), ab `sm` linksbündig
-          (`sm:justify-start`) — vorher wurden die Buttons auf dem Handy zu
-          je 1/3 gestreckt, das entfällt mit dem Wegfall der Textlabel.
-          Sichtbares Label entfällt hier bewusst zugunsten der
-          Symbol-Optik (CLAUDE.md §3.4 "sichtbares Label, kein reines ARIA"
-          gilt für Formularfelder; für diese reine Navigations-Leiste bleibt
-          die Bedeutung stattdessen über `aria-label`/`title` je Button
-          zugänglich, exakt wie bei `CourseCategorySelect`s `compact`-Fall).
-          DRITTER Tab "Information" (24.07.2026, Informations-Tab nach
-          Baulig-Vorbild) — `activeTab`-gesteuert: Übersicht und Information
-          können beide aktiv sein, Lesezeichen bleibt nie aktiv (eigene Seite
-          außerhalb dieses Kurs-Kontexts). */}
-      <div className="my-[18px] mb-6 flex justify-center gap-2.5 sm:justify-start">
+      {/* Tabs — Josips Folgeauftrag (24.07.2026, nach der ersten Symbol-
+          Fassung): auf dem Handy bleiben es reine, linksbündige Icon-Buttons
+          (`justify-start`, `hidden` Textlabel), ab `sm` wieder volle Pillen
+          mit Text+Icon wie in der allerersten Fassung (`sm:` hebt Breite/
+          Padding/Label-Sichtbarkeit auf). Ein Button-Baustein für beide
+          Breiten statt zwei getrennter Markups (`TabIconButton` unten) —
+          Label bleibt für Screenreader auf dem Handy trotzdem über
+          `aria-label`/`title` zugänglich, exakt wie bei `CourseCategorySelect`s
+          `compact`-Fall. DRITTER Tab "Information" (24.07.2026,
+          Informations-Tab nach Baulig-Vorbild) — `activeTab`-gesteuert:
+          Übersicht und Information können beide aktiv sein, Lesezeichen
+          bleibt nie aktiv (eigene Seite außerhalb dieses Kurs-Kontexts). */}
+      <div className="my-[18px] mb-6 flex justify-start gap-2.5">
         <TabIconButton
           active={activeTab === "overview"}
           href={`/kurs/${slug}`}
           label="Übersicht"
           icon={(color) => (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="7" rx="1" />
               <rect x="14" y="3" width="7" height="7" rx="1" />
               <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -163,7 +161,7 @@ export async function CourseHeroHeader({
           href={`/kurs/${slug}/information`}
           label="Information"
           icon={(color) => (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="9" />
               <line x1="12" y1="11" x2="12" y2="16" />
               <line x1="12" y1="8" x2="12" y2="8" />
@@ -175,7 +173,7 @@ export async function CourseHeroHeader({
           href="/lesezeichen"
           label="Lesezeichen"
           icon={(color) => (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
             </svg>
           )}
@@ -186,11 +184,16 @@ export async function CourseHeroHeader({
 }
 
 /**
- * Ein einzelner Symbol-Tab (aktiv = navy gefüllt + weißes Icon, inaktiv =
- * weiß mit Rand + Icon in ACCENT). Fester `h-11 w-11`-Touch-Bereich (44px,
- * gängige Mindestgröße) statt der bisherigen textbreiten Pille — `icon` ist
- * eine Funktion, weil Aktiv-/Inaktiv-Zustand unterschiedliche Strichfarben
- * brauchen.
+ * Ein einzelner Tab-Button, zweigeteilt nach Breite (Josips Folgeauftrag,
+ * 24.07.2026): unter `sm` fester `h-11 w-11`-Icon-Button ohne Textlabel
+ * (44px-Touch-Bereich, gängige Mindestgröße), ab `sm` wieder die volle Pille
+ * mit Icon+Text wie in der allerersten Fassung (`sm:h-auto sm:w-auto` hebt
+ * die feste Größe auf, `sm:px-[18px] sm:py-[11px]` bringt das ursprüngliche
+ * Pillen-Padding zurück). Aktiv = navy gefüllt + weißes Icon/weißer Text,
+ * inaktiv = weiß mit Rand + Icon/Text in ACCENT/NAVY. `icon` ist eine
+ * Funktion, weil Aktiv-/Inaktiv-Zustand unterschiedliche Strichfarben
+ * brauchen. Das Label bleibt auf dem Handy trotz `hidden` über
+ * `aria-label`/`title` für Screenreader zugänglich.
  */
 function TabIconButton({
   active,
@@ -203,27 +206,41 @@ function TabIconButton({
   label: string;
   icon: (color: string) => ReactNode;
 }) {
-  const className = `flex h-11 w-11 flex-none items-center justify-center rounded-[11px] no-underline${
-    active ? "" : " border bg-white"
-  }`;
+  const className = `flex h-11 w-11 flex-none items-center justify-center gap-2 rounded-[11px] text-sm no-underline sm:h-auto sm:w-auto sm:px-[18px] sm:py-[11px] ${
+    active ? "font-bold" : "font-semibold"
+  }${active ? "" : " border bg-white"}`;
+
+  const text = (
+    <span className="hidden sm:inline" aria-hidden="true">
+      {label}
+    </span>
+  );
 
   if (active) {
     return (
       <span
         className={className}
-        style={{ background: NAVY }}
+        style={{ background: NAVY, color: "#fff" }}
         aria-current="page"
         aria-label={label}
         title={label}
       >
         {icon("#fff")}
+        {text}
       </span>
     );
   }
 
   return (
-    <Link href={href} className={className} style={{ borderColor: "#E0E2EF" }} aria-label={label} title={label}>
+    <Link
+      href={href}
+      className={className}
+      style={{ borderColor: "#E0E2EF", color: NAVY }}
+      aria-label={label}
+      title={label}
+    >
       {icon(ACCENT)}
+      {text}
     </Link>
   );
 }
