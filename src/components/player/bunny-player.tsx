@@ -72,7 +72,15 @@ export function BunnyPlayer({
     };
   }, []);
 
-  const src = `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?autoplay=false&preload=true`;
+  // `disableIosPlayer=true` + `playsinline=true` (24.07.2026, Josips Fund:
+  // Video laedt auf dem iPhone in unserer App endlos, direkt bei Bunny
+  // geoeffnet spielt es sofort — Bunnys Dokumentation nennt den nativen
+  // iOS-Player "typischerweise fuer die Vollbild-Behandlung auf iOS",
+  // bekannter Problemfall bei cross-origin-verschachtelten iframes (unsere
+  // App auf academy.calltalent.ai rahmt iframe.mediadelivery.net). Erzwingt
+  // stattdessen die Standard-Fullscreen-API, exakt die, auf die
+  // `handleFullscreenChange` oben bereits lauscht.
+  const src = `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?autoplay=false&preload=true&disableIosPlayer=true&playsinline=true`;
 
   return (
     <div className="aspect-video w-full overflow-hidden rounded-md border">
@@ -80,7 +88,7 @@ export function BunnyPlayer({
         ref={iframeRef}
         src={src}
         loading="eager"
-        allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+        allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
         allowFullScreen
         className="h-full w-full"
         title="Video-Player"
