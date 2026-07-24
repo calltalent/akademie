@@ -251,7 +251,7 @@ export default async function CourseOverviewPage({
           </div>
 
           {/* Zertifikat (nur bei abgeschlossenem Kurs sichtbar) */}
-          <CertificateBadge tenantId={tenant.id} courseId={course.id} isComplete={progress.isComplete} />
+          <CertificateBadge tenantId={tenant.id} courseId={course.id} />
 
           {/* „Weiter"-Banner — nur wenn es eine offene Lektion gibt */}
           {nextLesson && (

@@ -15,27 +15,29 @@ export function BookmarkButton({
 }) {
   const [bookmarked, setBookmarked] = useState(initiallyBookmarked);
   const [pending, startTransition] = useTransition();
+  const label = bookmarked ? "Aus Lesezeichen entfernen" : "Zu Lesezeichen hinzufügen";
 
   return (
     <button
       type="button"
       disabled={pending}
       aria-pressed={bookmarked}
+      aria-label={label}
+      title={label}
       onClick={() =>
         startTransition(async () => {
           const result = await toggleBookmark(lessonId, courseSlug);
           if (!result.error && result.bookmarked !== undefined) setBookmarked(result.bookmarked);
         })
       }
-      className="inline-flex items-center gap-2 rounded-[11px] border px-4 py-[11px] text-sm font-semibold disabled:opacity-50"
+      className="inline-flex h-[42px] w-[42px] flex-none items-center justify-center rounded-[11px] border disabled:opacity-50"
       style={{
         borderColor: bookmarked ? "var(--color-primary)" : "#D8DAEA",
         background: bookmarked ? "var(--color-primary)" : "#fff",
         color: bookmarked ? "#fff" : "#3E3F66",
       }}
     >
-      <Bookmark aria-hidden="true" size={15} fill={bookmarked ? "currentColor" : "none"} />
-      {bookmarked ? "Gemerkt" : "Lesezeichen"}
+      <Bookmark aria-hidden="true" size={18} fill={bookmarked ? "currentColor" : "none"} />
     </button>
   );
 }

@@ -201,7 +201,7 @@ export default async function ModuleCompletedPage({
               <p className="mb-4 text-base" style={{ color: "#66679B" }}>
                 Du hast „{course.title}&quot; vollständig abgeschlossen.
               </p>
-              <CertificateBadge tenantId={tenant.id} courseId={course.id} isComplete={true} />
+              <CertificateBadge tenantId={tenant.id} courseId={course.id} />
             </div>
           ) : (
             nextModule && (

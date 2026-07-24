@@ -1,8 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 
-type CourseSettings = { certificate_enabled?: boolean };
-type TenantSettings = { certificates_enabled?: boolean };
-
 /**
  * Zertifikatsstatus in der Kursübersicht (SPEC 4.1: "Zertifikatsstatus").
  * Async Server Component — nutzt bewusst den normalen Nutzer-Client (NICHT
@@ -14,24 +11,21 @@ type TenantSettings = { certificates_enabled?: boolean };
  * URL — der Bucket `certificates` ist privat, analog zu
  * `getSubmissionDownloadUrl()` aus Block 3.
  *
- * "Wird ausgestellt"-Falle (23.07.2026, Josips Fund): fehlt das Zertifikat
- * bei abgeschlossenem Kurs, zeigte diese Komponente unabhängig vom Grund
- * IMMER "wird ausgestellt — bitte in Kürze neu laden" an — auch wenn
- * `issueCertificateIfEligible()` (certificates/issue.ts) das Zertifikat gar
- * nicht erst ausstellt, weil Kurs- ODER Mandanten-Schalter auf "aus" steht.
- * Diese Meldung war dann dauerhaft falsch (nichts lädt je nach). Beide
- * Schalter werden jetzt hier ZUSÄTZLICH geprüft (gleiche Felder/Logik wie
- * issue.ts), damit die Meldung ehrlich zwischen "kommt noch" und "gibt es
- * für diesen Kurs nicht" unterscheidet.
+ * "Wird ausgestellt"-Meldung entfernt (24.07.2026, Josips Folgeauftrag: auf
+ * Kurs-, Modul-, Sektions- und Lektionsseiten nicht anzeigen). Fehlt das
+ * Zertifikat bei abgeschlossenem Kurs, rendert diese Komponente jetzt
+ * überall nur noch `null` — unabhängig davon, ob die Ausstellung noch
+ * läuft oder für Kurs/Mandant deaktiviert ist (siehe `certificates/
+ * issue.ts` für die eigentliche Ausstellungslogik, unverändert). Sobald ein
+ * Zertifikat tatsächlich existiert, zeigt die Komponente weiterhin die
+ * Download-Karte unten.
  */
 export async function CertificateBadge({
   tenantId,
   courseId,
-  isComplete,
 }: {
   tenantId: string;
   courseId: string;
-  isComplete: boolean;
 }) {
   const supabase = await createClient();
   const {
@@ -47,31 +41,7 @@ export async function CertificateBadge({
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (!certificate) {
-    if (!isComplete) return null;
-
-    const [{ data: course }, { data: tenantRow }] = await Promise.all([
-      supabase.from("courses").select("settings").eq("id", courseId).maybeSingle(),
-      supabase.from("tenants").select("settings").eq("id", tenantId).maybeSingle(),
-    ]);
-    const courseSettings = (course?.settings ?? {}) as CourseSettings;
-    const tenantSettings = (tenantRow?.settings ?? {}) as TenantSettings;
-    const certificatesDisabled =
-      courseSettings.certificate_enabled === false || tenantSettings.certificates_enabled === false;
-
-    // Josips Auftrag (23.07.2026): keine Meldung an dieser Stelle, wenn
-    // Zertifikate für Kurs/Mandant deaktiviert sind — die Kachel entfällt
-    // dann komplett statt eines Hinweistexts.
-    if (certificatesDisabled) {
-      return null;
-    }
-
-    return (
-      <p className="text-sm text-gray-500" role="status">
-        Zertifikat wird ausgestellt — bitte die Seite in Kürze neu laden.
-      </p>
-    );
-  }
+  if (!certificate) return null;
 
   let downloadUrl: string | null = null;
   if (certificate.pdf_path) {

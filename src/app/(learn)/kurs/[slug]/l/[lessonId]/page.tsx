@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, ArrowLeft, Check, Play, ListVideo, ChevronRight, MessageSquare } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Play, ListVideo, ChevronRight, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
@@ -244,34 +244,32 @@ export default async function LessonPage({
               <BlockRenderer blocks={blocks} lessonId={lessonId} lessonUpdatedAt={lesson.updated_at as string | null} />
             </div>
 
-            {/* Fußzeile (24.07.2026, Josips Auftrag "ordentlich und
-                übersichtlich in der mobilen App"): 2-Spalten-Raster statt
-                zweier nebeneinander umbrechender Flex-Gruppen — links
-                Gemerkt/Feedback geben übereinander, rechts der
-                "Abgeschlossen"-Hinweis über dem Aktions-Button, alle vier
-                Elemente gleich groß (rounded-[11px] px-4 py-[11px] text-sm,
-                siehe complete-lesson-button.tsx). Bricht auf 375px nicht
-                mehr wild um, weil es von vornherein zwei feste Spalten sind
-                statt umbrechender Flex-Reihen. */}
+            {/* Fußzeile (24.07.2026, Josips Folgeauftrag: "Lesezeichen/
+                Feedback als Symbole, links nebeneinander — sowohl mobil als
+                auch am Desktop"): seit beide nur noch kompakte 42×42-Icons
+                sind (statt der vorherigen breiten Text-Buttons), reicht ein
+                einziges, breitenunabhängiges Flex-Layout — kein Umbau mehr
+                zwischen Mobil/Desktop nötig. */}
             <div
-              className="mt-4 grid grid-cols-2 gap-2.5 border-t p-[20px_26px]"
+              className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t p-[20px_26px]"
               style={{ borderColor: "#EEF0F7" }}
             >
-              <BookmarkButton lessonId={lessonId} courseSlug={slug} initiallyBookmarked={Boolean(bookmarkRow)} />
-              <div className="flex items-center justify-end">
+              <div className="flex items-center gap-2.5">
+                <BookmarkButton lessonId={lessonId} courseSlug={slug} initiallyBookmarked={Boolean(bookmarkRow)} />
+                <Link
+                  href="/kontakt"
+                  aria-label="Feedback geben"
+                  title="Feedback geben"
+                  className="inline-flex h-[42px] w-[42px] flex-none items-center justify-center rounded-[11px] border bg-white no-underline"
+                  style={{ borderColor: "#D8DAEA", color: NAVY }}
+                >
+                  <Star size={18} color={ACCENT} strokeWidth={2} aria-hidden="true" />
+                </Link>
+              </div>
+              <div className="flex items-center gap-3">
                 {progressRow?.status === "completed" && (
                   <span className="text-sm font-semibold text-green-700">✓ Abgeschlossen</span>
                 )}
-              </div>
-              <Link
-                href="/kontakt"
-                className="inline-flex items-center justify-center gap-1.5 rounded-[11px] border bg-white px-4 py-[11px] text-sm font-semibold no-underline"
-                style={{ borderColor: "#D8DAEA", color: NAVY }}
-              >
-                <MessageSquare size={15} color={ACCENT} strokeWidth={2} aria-hidden="true" />
-                Feedback geben
-              </Link>
-              <div className="flex items-center justify-end">
                 <CompleteLessonButton
                   lessonId={lessonId}
                   courseSlug={slug}
