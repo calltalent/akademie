@@ -104,10 +104,6 @@ export function CourseEditorSteps({
           <ArrowLeft size={16} aria-hidden="true" style={{ color: "#5663AE" }} />
           Zurück zur Kursliste
         </Link>
-        {/* Direkt neben "Zurück zur Kursliste" statt rechts aussen (Josips
-            Fund, 25.07.2026): stand vorher weit vom Zurück-Link getrennt,
-            mit dem Kurstitel dazwischen. */}
-        <ReembedCourseButton courseId={courseId} />
         <div className="min-w-0 flex-1 truncate text-[15px] font-semibold" style={{ color: "#A9AAC4" }}>
           {courseTitle}
         </div>
@@ -199,6 +195,7 @@ export function CourseEditorSteps({
               onNext={() => router.push("/admin/kurse")}
               nextLabel="Fertig — zur Kursliste"
               finish
+              extraRight={<ReembedCourseButton courseId={courseId} />}
             />
           }
         >
@@ -329,12 +326,15 @@ function StepFoot({
   onNext,
   nextLabel,
   finish = false,
+  extraRight,
 }: {
   onBack?: () => void;
   onNext?: () => void;
   nextLabel?: string;
   /** Letzter Schritt: kein "weiter zu X", sondern ein echter Abschluss ohne Pfeil. */
   finish?: boolean;
+  /** Zusätzlicher Knopf links neben dem Abschluss-Knopf (nur Schritt 4: KI-Einbetten). */
+  extraRight?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 border-t pt-5" style={{ borderColor: "#EEF0F7" }}>
@@ -350,18 +350,21 @@ function StepFoot({
       ) : (
         <span />
       )}
-      {onNext && (
-        <button
-          type="button"
-          onClick={onNext}
-          className="inline-flex items-center gap-2 rounded-[10px] px-[18px] py-3 text-[15px] font-bold text-white"
-          style={{ background: "#5663AE" }}
-        >
-          {finish && <Check size={16} aria-hidden="true" />}
-          {nextLabel}
-          {!finish && " →"}
-        </button>
-      )}
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {extraRight}
+        {onNext && (
+          <button
+            type="button"
+            onClick={onNext}
+            className="inline-flex items-center gap-2 rounded-[10px] px-[18px] py-3 text-[15px] font-bold text-white"
+            style={{ background: "#5663AE" }}
+          >
+            {finish && <Check size={16} aria-hidden="true" />}
+            {nextLabel}
+            {!finish && " →"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
