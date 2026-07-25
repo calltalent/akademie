@@ -1,0 +1,122 @@
+"use client";
+
+import { useActionState } from "react";
+import { updateTenantFeatures } from "@/lib/platform/actions";
+import type { PlatformActionState } from "@/lib/platform/actions";
+
+const initialState: PlatformActionState = { error: null };
+
+/**
+ * "Funktionen" (25.07.2026, Josips Auftrag: "wo aktiviere ich den
+ * KI-Generator, bitte im jeweiligen Mandanten hinzufügen wo ich aktivieren
+ * kann"). Drei Schalter, die bislang NUR direkt in der Datenbank setzbar
+ * waren — siehe Kopfkommentar von `updateTenantFeatures`
+ * (lib/platform/actions.ts) für die Gate-Stellen und die Polaritäts-Warnung.
+ *
+ * Native Checkboxen mit `accentColor` statt des Pill-Toggles aus
+ * `tenant-settings-form.tsx` — dieses Portal ist dunkel gestaltet
+ * (`#0f172a`-Karten), der helle Pill-Toggle dort ist auf diesem Hintergrund
+ * nicht zu erkennen. Gleiches Muster wie die Plan-/Status-Radios in
+ * `mandant-edit-form.tsx` (native Eingabe + `accentColor`).
+ */
+export function TenantFeaturesForm({
+  tenantId,
+  paymentsEnabled,
+  tutorEnabled,
+  courseGeneratorEnabled,
+}: {
+  tenantId: string;
+  paymentsEnabled: boolean;
+  tutorEnabled: boolean;
+  courseGeneratorEnabled: boolean;
+}) {
+  const boundUpdate = updateTenantFeatures.bind(null, tenantId);
+  const [state, formAction, pending] = useActionState(boundUpdate, initialState);
+
+  return (
+    <form
+      action={formAction}
+      className="flex flex-col gap-[18px] rounded-[14px] border p-7"
+      style={{ borderColor: "#1e293b", background: "#0f172a" }}
+    >
+      <div>
+        <div className="text-[17px] font-bold text-slate-50">Funktionen</div>
+        <div className="mt-0.5 text-[13px]" style={{ color: "#64748B" }}>
+          Kostenpflichtige/optionale Funktionen für diesen Mandanten freischalten.
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3.5">
+        <FeatureCheckbox
+          name="paymentsEnabled"
+          label="Zahlungen (Stripe)"
+          desc="Kostenpflichtige Kurse/Produkte im Checkout."
+          defaultChecked={paymentsEnabled}
+        />
+        <FeatureCheckbox
+          name="tutorEnabled"
+          label="KI-Tutor"
+          desc="Chat-Tutor in der Lernansicht der Lektionen."
+          defaultChecked={tutorEnabled}
+        />
+        <FeatureCheckbox
+          name="courseGeneratorEnabled"
+          label="KI-Kursgenerator"
+          desc="PDF-Upload → automatischer Kursentwurf unter /admin/ki."
+          defaultChecked={courseGeneratorEnabled}
+        />
+      </div>
+
+      {state.error && (
+        <p role="alert" className="text-sm text-red-400">
+          {state.error}
+        </p>
+      )}
+      {state.success && !state.error && (
+        <p role="status" aria-live="polite" className="text-sm text-green-400">
+          Gespeichert.
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={pending}
+        className="w-fit rounded-[10px] px-[18px] py-2.5 text-sm font-bold text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+        style={{ background: "var(--color-primary)" }}
+      >
+        {pending ? "Speichert …" : "Änderungen speichern"}
+      </button>
+    </form>
+  );
+}
+
+function FeatureCheckbox({
+  name,
+  label,
+  desc,
+  defaultChecked,
+}: {
+  name: string;
+  label: string;
+  desc: string;
+  defaultChecked: boolean;
+}) {
+  return (
+    <label className="flex items-start gap-3 text-sm" htmlFor={`feat-${name}`}>
+      <input
+        id={`feat-${name}`}
+        type="checkbox"
+        name={name}
+        defaultChecked={defaultChecked}
+        className="mt-[3px] flex-none"
+        style={{ accentColor: "#5663AE" }}
+      />
+      <span>
+        <span className="block font-semibold text-slate-50">{label}</span>
+        <span className="block text-[13px]" style={{ color: "#64748B" }}>
+          {desc}
+        </span>
+      </span>
+    </label>
+  );
+}

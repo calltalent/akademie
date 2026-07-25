@@ -481,6 +481,56 @@ export async function updateTenantLogoUrl(
 }
 
 /**
+ * Kostenpflichtige/optionale Funktionen je Mandant (25.07.2026, Josips
+ * Auftrag: "wo aktiviere ich den KI-Generator, bitte im jeweiligen
+ * Mandanten hinzufügen wo ich aktivieren kann"). `payments_enabled`,
+ * `tutor_enabled`, `course_generator_enabled` (alle drei in
+ * `lib/tenant/types.ts` typisiert und an je einer Gate-Stelle durchgesetzt:
+ * `lib/stripe/checkout.ts`, `lib/tutor/actions.ts`,
+ * `api/admin/ki/generate/route.ts` + `admin/ki/page.tsx`) hatten bislang
+ * KEINE UI — nur direkt in der DB setzbar. Gleiches Merge-Patch-Muster wie
+ * `updateTenantBranding` (aktuelle `settings` lesen, nur die drei
+ * Feature-Schlüssel überschreiben, Rest unangetastet).
+ *
+ * Polarität beachten: `payments_enabled` ist "an, außer explizit `false`"
+ * (Standard aktiv), `tutor_enabled`/`course_generator_enabled` sind "aus,
+ * außer explizit `true`" (Standard inaktiv) — exakt wie in den jeweiligen
+ * Gate-Stellen geprüft. Das Formular (tenant-features-form.tsx) berechnet
+ * `defaultChecked` mit derselben Polarität, sonst würde der erste Speichern-
+ * Klick auf einer frischen Seite den tatsächlichen Zustand stillschweigend
+ * umdrehen.
+ */
+export async function updateTenantFeatures(
+  tenantId: string,
+  _prevState: PlatformActionState,
+  formData: FormData,
+): Promise<PlatformActionState> {
+  try {
+    await requirePlatformAdmin();
+
+    const admin = createAdminClient();
+    const { data: current } = await admin.from("tenants").select("settings").eq("id", tenantId).maybeSingle();
+
+    const mergedSettings = {
+      ...(current?.settings ?? {}),
+      payments_enabled: formData.get("paymentsEnabled") === "on",
+      tutor_enabled: formData.get("tutorEnabled") === "on",
+      course_generator_enabled: formData.get("courseGeneratorEnabled") === "on",
+    };
+
+    const { error } = await admin.from("tenants").update({ settings: mergedSettings }).eq("id", tenantId);
+    if (error) {
+      return { error: "Speichern fehlgeschlagen: " + translateDbError(error) };
+    }
+
+    revalidatePath(`/portal/mandanten/${tenantId}`);
+    return { error: null, success: true };
+  } catch (e) {
+    return errorState(e);
+  }
+}
+
+/**
  * Login-Marken-Panel (22.07.2026, Josips Auftrag: "Hintergrund-Transparenz,
  * Überschrift/Beschreibung und Copyright anpassbar machen"). Gleiches
  * Merge-Patch-Muster wie `updateTenantBranding`/`updateTenantLogoUrl` —

@@ -13,6 +13,7 @@ import { MandantDeleteForm } from "./mandant-delete-form";
 import { TenantDomainsSection } from "./tenant-domains-section";
 import { TenantBrandingForm } from "./tenant-branding-form";
 import { TenantLoginContentForm } from "./tenant-login-content-form";
+import { TenantFeaturesForm } from "./tenant-features-form";
 
 /**
  * Mandanten-Detailseite (Betreiber-Portal, Phase 4 Block 2): Kopfbereich +
@@ -77,13 +78,26 @@ export default async function MandantDetailPage({
 
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, slug, name, plan, status, custom_domain, created_at, branding")
+    .select("id, slug, name, plan, status, custom_domain, created_at, branding, settings")
     .eq("id", id)
     .maybeSingle();
 
   if (!tenant) {
     notFound();
   }
+
+  // Polarität wie an den jeweiligen Gate-Stellen geprüft (siehe
+  // updateTenantFeatures-Kopfkommentar): payments_enabled ist "an, außer
+  // explizit false", tutor_enabled/course_generator_enabled sind "aus,
+  // außer explizit true".
+  const tenantSettings = (tenant.settings ?? {}) as {
+    payments_enabled?: boolean;
+    tutor_enabled?: boolean;
+    course_generator_enabled?: boolean;
+  };
+  const paymentsEnabled = tenantSettings.payments_enabled !== false;
+  const tutorEnabled = tenantSettings.tutor_enabled === true;
+  const courseGeneratorEnabled = tenantSettings.course_generator_enabled === true;
 
   const branding = (tenant.branding ?? {}) as {
     color_primary?: string;
@@ -226,6 +240,12 @@ export default async function MandantDetailPage({
           status: tenant.status as TenantStatus,
           customDomain: tenant.custom_domain,
         }}
+      />
+      <TenantFeaturesForm
+        tenantId={tenant.id}
+        paymentsEnabled={paymentsEnabled}
+        tutorEnabled={tutorEnabled}
+        courseGeneratorEnabled={courseGeneratorEnabled}
       />
       <TenantDomainsSection tenantId={tenant.id} domains={tenantDomains ?? []} />
       <TenantBrandingForm tenantId={tenant.id} tenantName={tenant.name} initial={brandingInitial} />
