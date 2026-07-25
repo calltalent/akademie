@@ -18,6 +18,10 @@ type ImportResponse = {
 /**
  * Client-Upload -> liest Datei lokal, schickt Text an /api/admin/users/import.
  * Zeigt Fortschritt/Ergebnis inkl. Dauer (Kern-DoD: 100 Nutzer < 30 s).
+ *
+ * Optik (25.07.2026, Josips Auftrag "Einladungsoption als integriertes
+ * Design darstellen"): nutzte generisches Tailwind-Grau statt der
+ * Design-Tokens der übrigen Karten. Reine Optik, keine Logikänderung.
  */
 export function CsvImportForm() {
   const [busy, setBusy] = useState(false);
@@ -65,25 +69,18 @@ export function CsvImportForm() {
   }
 
   return (
-    <div
-      className="flex flex-col gap-3 rounded-md border p-4"
-      style={{ borderRadius: "var(--radius)" }}
-    >
-      <h2 className="text-lg font-medium">CSV-Import (Bulk)</h2>
-      <p className="text-sm text-gray-600">
+    <div className="flex flex-col gap-3 rounded-[14px] border bg-white px-6 py-5" style={{ borderColor: "#E7E8F2" }}>
+      <div className="text-[17px] font-bold" style={{ color: "#1A1A2E" }}>
+        CSV-Import (Bulk)
+      </div>
+      <p className="text-sm" style={{ color: "#66679B" }}>
         Format: Kopfzeile <code>email,full_name,course_slug</code> — <code>course_slug</code>{" "}
         optional. Maximal 500 Zeilen pro Import.
       </p>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv,text/csv"
-          required
-          className="text-base"
-        />
+        <input ref={fileInputRef} type="file" accept=".csv,text/csv" required className="text-base" />
         {error && (
-          <div role="alert" className="flex flex-col gap-1 text-sm text-red-600">
+          <div role="alert" className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#B14A4A" }}>
             <p>{error}</p>
             {parseErrors.length > 0 && (
               <ul className="list-disc pl-5">
@@ -99,8 +96,8 @@ export function CsvImportForm() {
         <button
           type="submit"
           disabled={busy}
-          className="self-start rounded-md px-4 py-2 text-base text-white disabled:opacity-50"
-          style={{ background: "var(--color-primary)" }}
+          className="self-start rounded-[10px] px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50"
+          style={{ background: "#5663AE" }}
         >
           {busy ? "Importiere …" : "Import starten"}
         </button>
@@ -108,18 +105,18 @@ export function CsvImportForm() {
 
       {result && (
         <div className="mt-2 flex flex-col gap-2 text-sm">
-          <p>
+          <p style={{ color: "#3E3F66" }}>
             {result.total} Zeilen verarbeitet in {(result.elapsedMs / 1000).toFixed(1)} s —{" "}
             {result.created} Konten neu angelegt, {result.linked} bestehenden Nutzern zugeordnet,{" "}
             {result.errors} Fehler.
           </p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs" style={{ color: "#A9AAC4" }}>
             Hinweis: Neu angelegte Konten erhalten automatisch eine Willkommensmail mit Login-Link.
             Bereits bestehenden Nutzern (zugeordnet) wird keine erneute Mail verschickt.
           </p>
           {result.parseErrors.length > 0 && (
             <details>
-              <summary className="cursor-pointer text-amber-700">
+              <summary className="cursor-pointer font-semibold" style={{ color: "#8A6D1F" }}>
                 {result.parseErrors.length} Zeile(n) beim Einlesen übersprungen
               </summary>
               <ul className="mt-1 list-disc pl-5">
@@ -133,7 +130,7 @@ export function CsvImportForm() {
           )}
           {result.errors > 0 && (
             <details>
-              <summary className="cursor-pointer text-red-700">
+              <summary className="cursor-pointer font-semibold" style={{ color: "#B14A4A" }}>
                 {result.errors} Import-Fehler anzeigen
               </summary>
               <ul className="mt-1 list-disc pl-5">
