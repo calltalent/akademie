@@ -32,6 +32,13 @@ import { PortalMobileNav } from "@/components/portal/portal-mobile-nav";
  * Navigation als Kopfzeile mit Ausklapp-Panel. Siehe dortigen Kopfkommentar
  * für die volle Begründung (live gemessen: Sidebar nahm auf 375px Breite
  * ~60% des Viewports ein, Inhalt brach wortweise um).
+ *
+ * "Zum Admin-Bereich"/"Abmelden" direkt unter der Navigation statt ganz
+ * unten (25.07.2026, Josips Auftrag "nach oben versetzen, mit Trennlinie
+ * trennen"): `mt-auto` schob beide Links bis ans Ende der Sidebar, weit weg
+ * von "Übersicht"/"Mandanten". Jetzt `mt-3 border-t ... pt-3` direkt danach
+ * — exakt dasselbe Muster wie in `portal-mobile-nav.tsx`, das diese Trennung
+ * schon immer so hatte.
  */
 export function PortalShell({
   children,
@@ -65,7 +72,7 @@ export function PortalShell({
             icon={<Building2 aria-hidden="true" size={18} />}
           />
 
-          <div className="mt-auto pt-6">
+          <div className="mt-3 flex flex-col gap-1 border-t border-slate-800 pt-3">
             {ownAdminUrl && (
               <a
                 href={ownAdminUrl}
