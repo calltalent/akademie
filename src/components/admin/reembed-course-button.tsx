@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Sparkles } from "lucide-react";
 import { reembedCourse } from "@/lib/ai/actions";
 
 /**
@@ -10,6 +11,13 @@ import { reembedCourse } from "@/lib/ai/actions";
  * siehe Dateikopf-Kommentar in `actions.ts`: kein Auto-Trigger bei Autosave).
  * Gleiches Muster wie `publish-toggle.tsx` (useTransition, Server Action
  * direkt aus Client-Komponente aufgerufen).
+ *
+ * Auffälligere Optik (25.07.2026, Josips Auftrag "etwas deutlicher
+ * darstellen"): stand als reiner grauer Rahmen-Knopf neben dem blauen
+ * "Fertig"-Knopf unter und ging optisch unter. Jetzt mit Akzentfarbe +
+ * Sparkles-Icon (dieselbe KI-Bildsprache wie der "KI-Generator"-Link im
+ * Dashboard) — bewusst NICHT vollflächig blau wie "Fertig", sonst zwei
+ * gleich starke primäre Aktionen nebeneinander.
  */
 export function ReembedCourseButton({ courseId }: { courseId: string }) {
   const [pending, startTransition] = useTransition();
@@ -27,9 +35,10 @@ export function ReembedCourseButton({ courseId }: { courseId: string }) {
             setMessage(result.message);
           });
         }}
-        className="inline-flex items-center rounded-[10px] border bg-white px-4 py-3 text-[15px] font-semibold disabled:opacity-50"
-        style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
+        className="inline-flex items-center gap-2 rounded-[10px] border-2 bg-white px-4 py-3 text-[15px] font-bold disabled:opacity-50"
+        style={{ borderColor: "#5663AE", color: "#5663AE" }}
       >
+        <Sparkles size={16} aria-hidden="true" />
         {pending ? "Wird eingebettet …" : "Kurs für KI-Suche einbetten"}
       </button>
       {message ? (
