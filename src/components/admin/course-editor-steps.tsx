@@ -240,7 +240,7 @@ function Stepper({ step, onSelect }: { step: StepNumber; onSelect: (n: StepNumbe
   return (
     <nav
       aria-label="Kurs bearbeiten — Schritte"
-      className="flex flex-wrap items-center gap-0 rounded-[14px] border bg-white px-6 py-5 sm:flex-nowrap"
+      className="flex flex-wrap items-center gap-x-3 gap-y-4 rounded-[14px] border bg-white px-6 py-5 sm:flex-nowrap sm:gap-0"
       style={{ borderColor: "#E7E8F2" }}
     >
       {STEPS.map((s, idx) => {
@@ -337,7 +337,7 @@ function StepFoot({
   extraRight?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-t pt-5" style={{ borderColor: "#EEF0F7" }}>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5" style={{ borderColor: "#EEF0F7" }}>
       {onBack ? (
         <button
           type="button"
