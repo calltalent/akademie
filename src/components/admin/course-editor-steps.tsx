@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Check } from "lucide-react";
 import { ModuleLessonTree, DeleteLessonButton, type ModuleRow } from "@/components/admin/module-lesson-tree";
 import { BlockEditor } from "@/components/editor/block-editor";
@@ -90,6 +91,7 @@ export function CourseEditorSteps({
   initialStep: StepNumber;
 }) {
   const [step, setStep] = useState<StepNumber>(initialStep);
+  const router = useRouter();
 
   return (
     <div className="flex flex-col gap-4">
@@ -188,7 +190,14 @@ export function CourseEditorSteps({
         <Panel
           title="Veröffentlichung"
           subtitle="Status setzen und letzte Prüfung vor dem Sichtbarwerden für Teilnehmer."
-          footer={<StepFoot onBack={() => setStep(3)} />}
+          footer={
+            <StepFoot
+              onBack={() => setStep(3)}
+              onNext={() => router.push("/admin/kurse")}
+              nextLabel="Fertig — zur Kursliste"
+              finish
+            />
+          }
         >
           <CourseStatusSelect courseId={courseId} status={courseStatus} />
 
@@ -316,10 +325,13 @@ function StepFoot({
   onBack,
   onNext,
   nextLabel,
+  finish = false,
 }: {
   onBack?: () => void;
   onNext?: () => void;
   nextLabel?: string;
+  /** Letzter Schritt: kein "weiter zu X", sondern ein echter Abschluss ohne Pfeil. */
+  finish?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 border-t pt-5" style={{ borderColor: "#EEF0F7" }}>
@@ -339,10 +351,12 @@ function StepFoot({
         <button
           type="button"
           onClick={onNext}
-          className="rounded-[10px] px-[18px] py-3 text-[15px] font-bold text-white"
+          className="inline-flex items-center gap-2 rounded-[10px] px-[18px] py-3 text-[15px] font-bold text-white"
           style={{ background: "#5663AE" }}
         >
-          {nextLabel} →
+          {finish && <Check size={16} aria-hidden="true" />}
+          {nextLabel}
+          {!finish && " →"}
         </button>
       )}
     </div>
