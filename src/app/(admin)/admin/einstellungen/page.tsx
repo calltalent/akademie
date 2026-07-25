@@ -1,13 +1,7 @@
-import Link from "next/link";
 import { checkAdminAccess } from "@/lib/auth/staff";
 import { checkPlatformAccess } from "@/lib/platform/auth";
 import { createClient } from "@/lib/supabase/server";
-import { ApiKeysPanel } from "@/components/admin/api-keys-panel";
-import { WebhooksPanel } from "@/components/admin/webhooks-panel";
-import { TenantSettingsForm } from "@/components/admin/tenant-settings-form";
-import { SidebarLinksPanel } from "@/components/admin/sidebar-links-panel";
-import { PromoCardsPanel } from "@/components/admin/promo-cards-panel";
-import { TrainerProfilePanel } from "@/components/admin/trainer-profile-panel";
+import { EinstellungenTabs } from "@/components/admin/einstellungen-tabs";
 import type { PromoCardRow, TrainerRow } from "@/lib/settings/actions";
 
 /**
@@ -28,6 +22,13 @@ import type { PromoCardRow, TrainerRow } from "@/lib/settings/actions";
  * "Mandanten verwalten" (Betreiber-Portal) — bewusst weggelassen, weil das
  * nur für Calltalent-Plattform-Admins zugänglich ist, nicht für normale
  * Mandanten-Administratoren, die diese Seite genauso sehen.
+ *
+ * Horizontale Reiter (25.07.2026, Josips Auftrag, gleiches Prinzip wie beim
+ * Kurs-Redesign): sieben Karten untereinander auf einer langen Seite wurden
+ * zu drei thematischen Reitern (Allgemein/Inhalte/Integrationen) —
+ * `EinstellungenTabs` (einstellungen-tabs.tsx). Diese Server Component lädt
+ * unverändert alle Daten, das Rendering übernimmt komplett der neue
+ * Client-Wrapper.
  */
 export default async function AdminEinstellungenPage() {
   const access = await checkAdminAccess();
@@ -113,62 +114,22 @@ export default async function AdminEinstellungenPage() {
         </h1>
       </header>
 
-      <div className="flex max-w-[820px] flex-col gap-[22px]">
-        <TenantSettingsForm
-          name={tenant.name}
-          supportEmail={tenant.settings.support_email ?? ""}
-          selfSignupEnabled={tenant.settings.self_signup_enabled !== false}
-          certificatesEnabled={tenant.settings.certificates_enabled !== false}
-          maintenanceEnabled={tenant.settings.maintenance_enabled === true}
-        />
-
-        <div className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
-          <div className="mb-1.5 text-[17px] font-bold">Marken-Standard</div>
-          <div className="mb-4 text-sm" style={{ color: "#66679B" }}>
-            Aktuelle Markenwerte dieses Mandanten.
-          </div>
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="flex items-center gap-2.5">
-              <span
-                aria-hidden="true"
-                className="h-[34px] w-[34px] flex-none rounded-[9px]"
-                style={{ background: branding.color_primary ?? "#5663AE" }}
-              />
-              <span className="text-sm" style={{ color: "#3E3F66" }}>
-                {branding.color_primary ?? "#5663AE"}
-              </span>
-            </div>
-            <div className="text-sm" style={{ color: "#3E3F66" }}>
-              Radius {branding.radius ?? "14px"}
-            </div>
-            <div className="text-sm" style={{ color: "#3E3F66" }}>
-              Schrift: {branding.font ?? "Montserrat"}
-            </div>
-            {isPlatformAdmin && (
-              <Link href="/portal/mandanten" className="ml-auto text-sm font-semibold no-underline">
-                Mandanten verwalten →
-              </Link>
-            )}
-          </div>
-        </div>
-
-        <SidebarLinksPanel links={sidebarLinks ?? []} />
-        <PromoCardsPanel cards={promoCards} />
-        <TrainerProfilePanel trainers={trainers} />
-      </div>
-
-      <div className="mt-6 flex max-w-[820px] flex-col gap-8">
-        <div>
-          <h2 className="text-lg font-semibold">Integrationen</h2>
-          <p className="text-sm text-gray-500">
-            API-Keys und Webhooks für externe Integrationen (z. B. Zapier, Make) dieses Mandanten.
-          </p>
-        </div>
-        <ApiKeysPanel apiKeys={apiKeys ?? []} />
-        <WebhooksPanel
-          webhooks={(webhooks ?? []) as { id: string; url: string; events: string[]; active: boolean; created_at: string }[]}
-        />
-      </div>
+      <EinstellungenTabs
+        tenantName={tenant.name}
+        supportEmail={tenant.settings.support_email ?? ""}
+        selfSignupEnabled={tenant.settings.self_signup_enabled !== false}
+        certificatesEnabled={tenant.settings.certificates_enabled !== false}
+        maintenanceEnabled={tenant.settings.maintenance_enabled === true}
+        brandingColor={branding.color_primary ?? "#5663AE"}
+        brandingRadius={branding.radius ?? "14px"}
+        brandingFont={branding.font ?? "Montserrat"}
+        isPlatformAdmin={isPlatformAdmin}
+        sidebarLinks={sidebarLinks ?? []}
+        promoCards={promoCards}
+        trainers={trainers}
+        apiKeys={apiKeys ?? []}
+        webhooks={(webhooks ?? []) as { id: string; url: string; events: string[]; active: boolean; created_at: string }[]}
+      />
     </div>
   );
 }
