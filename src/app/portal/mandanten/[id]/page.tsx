@@ -8,12 +8,7 @@ import {
   type TenantStatus,
 } from "@/lib/platform/schema";
 import { tenantOrigin } from "@/lib/tenant/url";
-import { MandantEditForm } from "./mandant-edit-form";
-import { MandantDeleteForm } from "./mandant-delete-form";
-import { TenantDomainsSection } from "./tenant-domains-section";
-import { TenantBrandingForm } from "./tenant-branding-form";
-import { TenantLoginContentForm } from "./tenant-login-content-form";
-import { TenantFeaturesForm } from "./tenant-features-form";
+import { MandantDetailTabs } from "./mandant-detail-tabs";
 
 /**
  * Mandanten-Detailseite (Betreiber-Portal, Phase 4 Block 2): Kopfbereich +
@@ -33,21 +28,15 @@ import { TenantFeaturesForm } from "./tenant-features-form";
  * bisherigen `.localhost:3000`-Annahme (siehe mandanten/page.tsx-Kommentar).
  * Der DSGVO-Export-Link (Art. 28) ist im Export nicht abgebildet, bleibt
  * aber erhalten — echte, bestehende Funktion, kein Mockup-Artefakt.
+ *
+ * Horizontale Reiter (25.07.2026, Josips Auftrag): die sieben Karten unter
+ * dem Kopfbereich (Bearbeiten, Funktionen, Domains, Branding, Login-Inhalt,
+ * Nutzungsübersicht, Gefahrenzone) wanderten in `MandantDetailTabs`
+ * (mandant-detail-tabs.tsx) — diese Seite lädt unverändert alle Daten,
+ * das Rendering übernimmt komplett der neue Client-Wrapper. Der
+ * Kopfbereich (Breadcrumb/Avatar/Badges/DSGVO-Export) bleibt außerhalb der
+ * Reiter, exakt wie beim Kurs-Editor der Zurück-Link/Kurstitel.
  */
-
-const AI_JOB_KIND_LABELS: Record<string, string> = {
-  course_gen: "Kurs-Generierung",
-  quiz_gen: "Quiz-Generierung",
-  transcript: "Transkript",
-  summary: "Zusammenfassung",
-  embed: "Embeddings",
-  // Stufe 3 „Untertitel DE+EN" (Plan calm-watching-dewdrop.md):
-  // ensureEnglishCaption() (src/lib/video/translate-captions.ts) schreibt
-  // ai_jobs mit kind:"translation" — ohne diesen Eintrag würde die englische
-  // Kind-Kennung roh in dieser sonst durchgehend deutschen Kostenübersicht
-  // auftauchen (Fallback-Verhalten unten: AI_JOB_KIND_LABELS[kind] ?? kind).
-  translation: "Untertitel-Übersetzung",
-};
 
 /** Erster des laufenden Monats als ISO-Datum — Format der `usage_counters.month`-Spalte (analog src/lib/ai/usage.ts, dort nicht exportiert). */
 function currentMonthIso(): string {
@@ -62,10 +51,6 @@ function formatDateTime(iso: string): string {
     month: "2-digit",
     year: "numeric",
   });
-}
-
-function formatUsd(value: number): string {
-  return `$${value.toFixed(4)}`;
 }
 
 export default async function MandantDetailPage({
@@ -232,100 +217,29 @@ export default async function MandantDetailPage({
         </a>
       </header>
 
-      <MandantEditForm
-        tenant={{
+      <MandantDetailTabs
+        tenantId={tenant.id}
+        slug={tenant.slug}
+        editable={{
           id: tenant.id,
           name: tenant.name,
           plan: tenant.plan as TenantPlan,
           status: tenant.status as TenantStatus,
           customDomain: tenant.custom_domain,
         }}
+        features={{ paymentsEnabled, tutorEnabled, courseGeneratorEnabled }}
+        domains={tenantDomains ?? []}
+        brandingInitial={brandingInitial}
+        tenantName={tenant.name}
+        loginContentInitial={loginContentInitial}
+        usage={{
+          memberCount: memberCount ?? 0,
+          courseCount: courseCount ?? 0,
+          tutorAnswers: usageRow?.tutor_answers ?? 0,
+          courseGens: usageRow?.course_gens ?? 0,
+          costs: Array.from(costByKind.entries()).sort((a, b) => b[1] - a[1]),
+        }}
       />
-      <TenantFeaturesForm
-        tenantId={tenant.id}
-        paymentsEnabled={paymentsEnabled}
-        tutorEnabled={tutorEnabled}
-        courseGeneratorEnabled={courseGeneratorEnabled}
-      />
-      <TenantDomainsSection tenantId={tenant.id} domains={tenantDomains ?? []} />
-      <TenantBrandingForm tenantId={tenant.id} tenantName={tenant.name} initial={brandingInitial} />
-      <TenantLoginContentForm tenantId={tenant.id} initial={loginContentInitial} />
-
-      <section aria-labelledby="usage-heading" className="flex flex-col gap-[26px] rounded-[14px] border p-7" style={{ borderColor: "#1e293b", background: "#0f172a" }}>
-        <h2 id="usage-heading" className="text-[17px] font-bold text-slate-50">
-          Nutzungsübersicht
-        </h2>
-
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="flex flex-col rounded-xl border p-[18px]" style={{ borderColor: "#1e293b", background: "#020617" }}>
-            <dt className="text-xs font-semibold" style={{ color: "#64748B" }}>
-              Aktive Teilnehmer
-            </dt>
-            <dd className="mt-auto pt-2.5 text-[28px] font-extrabold text-slate-50" style={{ letterSpacing: "-0.01em" }}>
-              {memberCount ?? 0}
-            </dd>
-          </div>
-          <div className="flex flex-col rounded-xl border p-[18px]" style={{ borderColor: "#1e293b", background: "#020617" }}>
-            <dt className="text-xs font-semibold" style={{ color: "#64748B" }}>
-              Kurse gesamt
-            </dt>
-            <dd className="mt-auto pt-2.5 text-[28px] font-extrabold text-slate-50" style={{ letterSpacing: "-0.01em" }}>
-              {courseCount ?? 0}
-            </dd>
-          </div>
-          <div className="flex flex-col rounded-xl border p-[18px]" style={{ borderColor: "#1e293b", background: "#020617" }}>
-            <dt className="text-xs font-semibold leading-tight" style={{ color: "#64748B" }}>
-              Tutor-Antworten (Monat)
-            </dt>
-            <dd className="mt-auto pt-2.5 text-[28px] font-extrabold text-slate-50" style={{ letterSpacing: "-0.01em" }}>
-              {usageRow?.tutor_answers ?? 0}
-            </dd>
-          </div>
-          <div className="flex flex-col rounded-xl border p-[18px]" style={{ borderColor: "#1e293b", background: "#020617" }}>
-            <dt className="text-xs font-semibold leading-tight" style={{ color: "#64748B" }}>
-              Kurs-Generierungen (Monat)
-            </dt>
-            <dd className="mt-auto pt-2.5 text-[28px] font-extrabold text-slate-50" style={{ letterSpacing: "-0.01em" }}>
-              {usageRow?.course_gens ?? 0}
-            </dd>
-          </div>
-        </dl>
-
-        <div>
-          <div className="mb-3 text-sm font-bold" style={{ color: "#CBD5E1" }}>
-            KI-Kosten letzte 90 Tage
-          </div>
-          <div className="overflow-hidden rounded-xl border" style={{ borderColor: "#1e293b" }}>
-            <div
-              className="grid grid-cols-2 px-[18px] py-3 text-[13px] font-bold"
-              style={{ color: "#64748B", borderBottom: "1px solid #1e293b" }}
-            >
-              <div>Art</div>
-              <div className="text-right">Kosten (USD)</div>
-            </div>
-            {costByKind.size === 0 ? (
-              <p className="px-[18px] py-4 text-sm" style={{ color: "#64748B" }}>
-                Keine KI-Aufrufe im Zeitraum.
-              </p>
-            ) : (
-              Array.from(costByKind.entries())
-                .sort((a, b) => b[1] - a[1])
-                .map(([kind, cost]) => (
-                  <div
-                    key={kind}
-                    className="grid grid-cols-2 px-[18px] py-2.5 text-sm"
-                    style={{ borderBottom: "1px solid #1e293b", color: "#CBD5E1" }}
-                  >
-                    <div>{AI_JOB_KIND_LABELS[kind] ?? kind}</div>
-                    <div className="text-right font-bold text-slate-50">{formatUsd(cost)}</div>
-                  </div>
-                ))
-            )}
-          </div>
-        </div>
-      </section>
-
-      <MandantDeleteForm tenantId={tenant.id} slug={tenant.slug} />
     </main>
   );
 }
