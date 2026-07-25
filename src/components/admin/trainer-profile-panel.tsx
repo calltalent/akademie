@@ -29,6 +29,10 @@ type SubmitResult = { ok: boolean; error?: string };
  * in lokalen State statt sofort zu persistieren, weil beim Anlegen noch
  * keine `trainers`-Zeile existiert; gespeichert wird erst beim
  * Formular-Submit zusammen mit Name/Rolle/Bio.
+ *
+ * Optik (25.07.2026, Josips Auftrag "Inhalte ... vom Stil her anpassen"):
+ * Inputs/Zeilen/Buttons nutzten generisches Tailwind-Grau statt der
+ * Design-Tokens der übrigen Karte. Reine Optik, keine Logikänderung.
  */
 export function TrainerProfilePanel({ trainers }: { trainers: TrainerRow[] }) {
   const router = useRouter();
@@ -65,7 +69,7 @@ export function TrainerProfilePanel({ trainers }: { trainers: TrainerRow[] }) {
           />
         ))}
         {trainers.length === 0 && (
-          <p className="text-sm" style={{ color: "#66679B" }}>
+          <p className="text-sm" style={{ color: "#A9AAC4" }}>
             Noch keine Trainer-Profile angelegt.
           </p>
         )}
@@ -105,7 +109,7 @@ function TrainerRowItem({
 
   if (editing) {
     return (
-      <li className="rounded-md border px-4 py-3" style={{ borderRadius: "var(--radius)" }}>
+      <li className="rounded-[10px] border px-4 py-3" style={{ borderColor: "#E7E8F2" }}>
         <TrainerForm
           initial={trainer}
           onSubmit={handleUpdate}
@@ -118,21 +122,28 @@ function TrainerRowItem({
 
   return (
     <li
-      className="flex flex-wrap items-center justify-between gap-4 rounded-md border px-4 py-3 text-base"
-      style={{ borderRadius: "var(--radius)" }}
+      className="flex flex-wrap items-center justify-between gap-4 rounded-[10px] border px-4 py-3 text-base"
+      style={{ borderColor: "#E7E8F2" }}
     >
       <div className="flex min-w-0 items-center gap-3">
         {trainer.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
           <img src={trainer.imageUrl} alt="" className="h-10 w-10 flex-none rounded-full object-cover" />
         ) : (
-          <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-gray-100 text-gray-400">
+          <span
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-full"
+            style={{ background: "#EEF0F7", color: "#A9AAC4" }}
+          >
             <UserIcon size={18} aria-hidden="true" />
           </span>
         )}
         <div className="flex min-w-0 flex-col">
           <span className="truncate font-semibold">{trainer.name}</span>
-          {trainer.role && <span className="truncate text-sm text-gray-500">{trainer.role}</span>}
+          {trainer.role && (
+            <span className="truncate text-sm" style={{ color: "#66679B" }}>
+              {trainer.role}
+            </span>
+          )}
         </div>
       </div>
       <div className="flex flex-none gap-2">
@@ -142,7 +153,8 @@ function TrainerRowItem({
           title="Nach oben"
           onClick={() => handleMove("up")}
           disabled={moving || isFirst}
-          className="rounded-md border px-2 py-1 text-sm disabled:opacity-30"
+          className="rounded-[9px] border bg-white px-2 py-1 text-sm disabled:opacity-30"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
           <ChevronUp size={16} aria-hidden="true" />
         </button>
@@ -152,7 +164,8 @@ function TrainerRowItem({
           title="Nach unten"
           onClick={() => handleMove("down")}
           disabled={moving || isLast}
-          className="rounded-md border px-2 py-1 text-sm disabled:opacity-30"
+          className="rounded-[9px] border bg-white px-2 py-1 text-sm disabled:opacity-30"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
           <ChevronDown size={16} aria-hidden="true" />
         </button>
@@ -160,7 +173,8 @@ function TrainerRowItem({
           type="button"
           onClick={() => setEditing(true)}
           disabled={moving}
-          className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+          className="rounded-[9px] border bg-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
           Bearbeiten
         </button>
@@ -168,7 +182,8 @@ function TrainerRowItem({
           type="button"
           onClick={() => onDelete(trainer.id)}
           disabled={moving}
-          className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+          className="rounded-[9px] border bg-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
+          style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
         >
           Löschen
         </button>
@@ -234,7 +249,7 @@ function TrainerForm({
           }}
         />
         <div className="flex flex-1 flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm">
+          <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
             Name
             <input
               type="text"
@@ -243,10 +258,11 @@ function TrainerForm({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Max Mustermann"
-              className="rounded-md border px-3 py-2 text-base"
+              className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
+              style={{ borderColor: "#D8DAEA" }}
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
+          <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
             Rolle (optional)
             <input
               type="text"
@@ -254,25 +270,27 @@ function TrainerForm({
               value={role}
               onChange={(e) => setRole(e.target.value)}
               placeholder="Trainer, Ansprechpartner …"
-              className="rounded-md border px-3 py-2 text-base"
+              className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
+              style={{ borderColor: "#D8DAEA" }}
             />
           </label>
         </div>
       </div>
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
         Bio (optional)
         <textarea
           maxLength={2000}
           rows={3}
           value={bio}
           onChange={(e) => setBio(e.target.value)}
-          className="rounded-md border px-3 py-2 text-base"
+          className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
+          style={{ borderColor: "#D8DAEA" }}
         />
       </label>
 
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm font-semibold" style={{ color: "#B14A4A" }}>
           {error}
         </p>
       )}
@@ -281,8 +299,8 @@ function TrainerForm({
         <button
           type="submit"
           disabled={pending}
-          className="self-start rounded-md px-4 py-2 text-base font-semibold text-white disabled:opacity-50"
-          style={{ background: "var(--color-primary)" }}
+          className="self-start rounded-[10px] px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50"
+          style={{ background: "#5663AE" }}
         >
           {pending ? "Wird gespeichert …" : submitLabel}
         </button>
@@ -291,7 +309,8 @@ function TrainerForm({
             type="button"
             onClick={onCancel}
             disabled={pending}
-            className="rounded-md border px-4 py-2 text-base disabled:opacity-50"
+            className="rounded-[10px] border bg-white px-4 py-2.5 text-base font-semibold disabled:opacity-50"
+            style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
           >
             Abbrechen
           </button>

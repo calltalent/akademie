@@ -22,6 +22,10 @@ type SidebarLinkRow = { id: string; label: string; url: string };
  * Maus-Ziehen wäre für ihn nicht bedienbar (CLAUDE.md §3.4). `links` kommt
  * bereits nach `position` sortiert aus `einstellungen/page.tsx`, daher
  * bestimmt einfach der Array-Index Anfang/Ende.
+ *
+ * Optik (25.07.2026, Josips Auftrag "Inhalte ... vom Stil her anpassen"):
+ * Inputs/Zeilen/Buttons nutzten generisches Tailwind-Grau statt der
+ * Design-Tokens der übrigen Karte. Reine Optik, keine Logikänderung.
  */
 export function SidebarLinksPanel({ links }: { links: SidebarLinkRow[] }) {
   const router = useRouter();
@@ -61,7 +65,7 @@ export function SidebarLinksPanel({ links }: { links: SidebarLinkRow[] }) {
       </div>
 
       <form onSubmit={handleCreate} className="mb-4 flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm" htmlFor="sidebar-link-label">
+        <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }} htmlFor="sidebar-link-label">
           Name
           <input
             id="sidebar-link-label"
@@ -71,10 +75,11 @@ export function SidebarLinksPanel({ links }: { links: SidebarLinkRow[] }) {
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="Unser YouTube-Kanal"
-            className="rounded-md border px-3 py-2 text-base"
+            className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
+            style={{ borderColor: "#D8DAEA" }}
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm" htmlFor="sidebar-link-url">
+        <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }} htmlFor="sidebar-link-url">
           URL
           <input
             id="sidebar-link-url"
@@ -83,20 +88,21 @@ export function SidebarLinksPanel({ links }: { links: SidebarLinkRow[] }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://youtube.com/@calltalent"
-            className="rounded-md border px-3 py-2 text-base"
+            className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
+            style={{ borderColor: "#D8DAEA" }}
           />
         </label>
         <button
           type="submit"
           disabled={pending}
-          className="self-start rounded-md px-4 py-2 text-base text-white disabled:opacity-50"
-          style={{ background: "var(--color-primary)" }}
+          className="self-start rounded-[10px] px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50"
+          style={{ background: "#5663AE" }}
         >
           {pending ? "Wird angelegt …" : "Link hinzufügen"}
         </button>
       </form>
       {error && (
-        <p role="alert" className="mb-3 text-sm text-red-600">
+        <p role="alert" className="mb-3 text-sm font-semibold" style={{ color: "#B14A4A" }}>
           {error}
         </p>
       )}
@@ -113,7 +119,7 @@ export function SidebarLinksPanel({ links }: { links: SidebarLinkRow[] }) {
           />
         ))}
         {links.length === 0 && (
-          <p className="text-sm" style={{ color: "#66679B" }}>
+          <p className="text-sm" style={{ color: "#A9AAC4" }}>
             Noch keine Sidebar-Links angelegt.
           </p>
         )}
@@ -165,9 +171,9 @@ function SidebarLinkRowItem({
 
   if (editing) {
     return (
-      <li className="rounded-md border px-4 py-3" style={{ borderRadius: "var(--radius)" }}>
+      <li className="rounded-[10px] border px-4 py-3" style={{ borderColor: "#E7E8F2" }}>
         <form onSubmit={handleSave} className="flex flex-col gap-2">
-          <label className="flex flex-col gap-1 text-sm" htmlFor={`edit-label-${link.id}`}>
+          <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }} htmlFor={`edit-label-${link.id}`}>
             Name
             <input
               id={`edit-label-${link.id}`}
@@ -176,10 +182,11 @@ function SidebarLinkRowItem({
               maxLength={60}
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className="rounded-md border px-3 py-2 text-base"
+              className="rounded-[10px] border px-3.5 py-2.5 text-base"
+              style={{ borderColor: "#D8DAEA" }}
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm" htmlFor={`edit-url-${link.id}`}>
+          <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }} htmlFor={`edit-url-${link.id}`}>
             URL
             <input
               id={`edit-url-${link.id}`}
@@ -187,11 +194,12 @@ function SidebarLinkRowItem({
               required
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              className="rounded-md border px-3 py-2 text-base"
+              className="rounded-[10px] border px-3.5 py-2.5 text-base"
+              style={{ borderColor: "#D8DAEA" }}
             />
           </label>
           {error && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-sm font-semibold" style={{ color: "#B14A4A" }}>
               {error}
             </p>
           )}
@@ -199,8 +207,8 @@ function SidebarLinkRowItem({
             <button
               type="submit"
               disabled={pending}
-              className="rounded-md px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: "var(--color-primary)" }}
+              className="rounded-[10px] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+              style={{ background: "#5663AE" }}
             >
               {pending ? "Wird gespeichert …" : "Speichern"}
             </button>
@@ -212,7 +220,8 @@ function SidebarLinkRowItem({
                 setError(null);
                 setEditing(false);
               }}
-              className="rounded-md border px-3 py-1.5 text-sm"
+              className="rounded-[10px] border bg-white px-3 py-1.5 text-sm font-semibold"
+              style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
             >
               Abbrechen
             </button>
@@ -224,12 +233,14 @@ function SidebarLinkRowItem({
 
   return (
     <li
-      className="flex items-center justify-between gap-4 rounded-md border px-4 py-3 text-base"
-      style={{ borderRadius: "var(--radius)" }}
+      className="flex items-center justify-between gap-4 rounded-[10px] border px-4 py-3 text-base"
+      style={{ borderColor: "#E7E8F2" }}
     >
       <div className="flex min-w-0 flex-col">
         <span className="font-semibold">{link.label}</span>
-        <span className="break-all text-sm text-gray-500">{link.url}</span>
+        <span className="break-all text-sm" style={{ color: "#66679B" }}>
+          {link.url}
+        </span>
       </div>
       <div className="flex flex-none gap-2">
         <button
@@ -238,7 +249,8 @@ function SidebarLinkRowItem({
           title="Nach oben"
           onClick={() => handleMove("up")}
           disabled={parentPending || pending || isFirst}
-          className="rounded-md border px-2 py-1 text-sm disabled:opacity-30"
+          className="rounded-[9px] border bg-white px-2 py-1 text-sm disabled:opacity-30"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
           <ChevronUp size={16} aria-hidden="true" />
         </button>
@@ -248,7 +260,8 @@ function SidebarLinkRowItem({
           title="Nach unten"
           onClick={() => handleMove("down")}
           disabled={parentPending || pending || isLast}
-          className="rounded-md border px-2 py-1 text-sm disabled:opacity-30"
+          className="rounded-[9px] border bg-white px-2 py-1 text-sm disabled:opacity-30"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
           <ChevronDown size={16} aria-hidden="true" />
         </button>
@@ -256,7 +269,8 @@ function SidebarLinkRowItem({
           type="button"
           onClick={() => setEditing(true)}
           disabled={parentPending}
-          className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+          className="rounded-[9px] border bg-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
           Bearbeiten
         </button>
@@ -264,7 +278,8 @@ function SidebarLinkRowItem({
           type="button"
           onClick={() => onDelete(link.id)}
           disabled={parentPending}
-          className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+          className="rounded-[9px] border bg-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
+          style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
         >
           Löschen
         </button>

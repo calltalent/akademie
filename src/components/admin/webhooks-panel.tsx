@@ -24,6 +24,12 @@ type WebhookRow = {
   created_at: string;
 };
 
+/**
+ * Optik (25.07.2026, Josips Auftrag "Inhalte und Integration vom Stil her
+ * an das neue Design anpassen"): gleiche Angleichung wie api-keys-panel.tsx
+ * — `bg-white`/`#E7E8F2`-Rahmen/`rounded-[14px]` statt generischem Grau.
+ * Reine Optik, keine Logikänderung.
+ */
 export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
   const router = useRouter();
   const [url, setUrl] = useState("");
@@ -60,17 +66,17 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-md border p-4" style={{ borderRadius: "var(--radius)" }}>
+    <section className="flex flex-col gap-4 rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
       <div>
-        <h2 className="text-lg font-medium">Webhooks</h2>
-        <p className="text-sm text-gray-500">
+        <div className="mb-1.5 text-[17px] font-bold">Webhooks</div>
+        <p className="text-sm" style={{ color: "#66679B" }}>
           Ausgehende Benachrichtigungen an eine eigene URL bei den unten gewählten Ereignissen — signiert
           per HMAC-SHA256 (Header <code>X-Calltalent-Signature</code>).
         </p>
       </div>
 
       <form onSubmit={handleCreate} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm" htmlFor="webhook-url">
+        <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }} htmlFor="webhook-url">
           Ziel-URL
           <input
             id="webhook-url"
@@ -79,12 +85,15 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://hooks.example.com/calltalent"
-            className="rounded-md border px-3 py-2 text-base"
+            className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
+            style={{ borderColor: "#D8DAEA" }}
           />
         </label>
 
         <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-medium">Ereignisse</legend>
+          <legend className="text-sm font-semibold" style={{ color: "#3E3F66" }}>
+            Ereignisse
+          </legend>
           {WEBHOOK_EVENTS.map((event) => (
             <label key={event} className="flex items-center gap-2 text-base" htmlFor={`webhook-event-${event}`}>
               <input
@@ -92,8 +101,12 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
                 type="checkbox"
                 checked={selectedEvents.includes(event)}
                 onChange={() => toggleEvent(event)}
+                style={{ accentColor: "#5663AE" }}
               />
-              {EVENT_LABELS[event]} <code className="text-sm text-gray-500">({event})</code>
+              {EVENT_LABELS[event]}{" "}
+              <code className="text-sm" style={{ color: "#A9AAC4" }}>
+                ({event})
+              </code>
             </label>
           ))}
         </fieldset>
@@ -101,14 +114,14 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
         <button
           type="submit"
           disabled={pending}
-          className="self-start rounded-md px-4 py-2 text-base text-white disabled:opacity-50"
-          style={{ background: "var(--color-primary)" }}
+          className="self-start rounded-[10px] px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50"
+          style={{ background: "#5663AE" }}
         >
           {pending ? "Wird angelegt …" : "Webhook anlegen"}
         </button>
       </form>
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm font-semibold" style={{ color: "#B14A4A" }}>
           {error}
         </p>
       )}
@@ -117,12 +130,12 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
         {webhooks.map((hook) => (
           <li
             key={hook.id}
-            className="flex items-center justify-between gap-4 rounded-md border px-4 py-3 text-base"
-            style={{ borderRadius: "var(--radius)" }}
+            className="flex items-center justify-between gap-4 rounded-[10px] border px-4 py-3 text-base"
+            style={{ borderColor: "#E7E8F2" }}
           >
             <div className="flex flex-col">
-              <span className="break-all">{hook.url}</span>
-              <span className="text-sm text-gray-500">
+              <span className="break-all font-semibold">{hook.url}</span>
+              <span className="text-sm" style={{ color: "#66679B" }}>
                 {hook.events.map((e) => EVENT_LABELS[e as WebhookEvent] ?? e).join(", ")}
               </span>
             </div>
@@ -130,13 +143,18 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
               type="button"
               onClick={() => handleDelete(hook.id)}
               disabled={pending}
-              className="shrink-0 rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+              className="shrink-0 rounded-[10px] border bg-white px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
+              style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
             >
               Löschen
             </button>
           </li>
         ))}
-        {webhooks.length === 0 && <p className="text-base text-gray-500">Noch keine Webhooks angelegt.</p>}
+        {webhooks.length === 0 && (
+          <p className="text-base" style={{ color: "#A9AAC4" }}>
+            Noch keine Webhooks angelegt.
+          </p>
+        )}
       </ul>
 
       {created && (

@@ -34,6 +34,10 @@ type SubmitResult = { ok: boolean; error?: string };
  * Submit zusammen mit Titel/Beschreibung/Link. Video-Upload nutzt
  * `VideoUpload` (Bunny Stream direkt, TUS) — nie Video-Dateien in Supabase
  * Storage (CLAUDE.md §1.3).
+ *
+ * Optik (25.07.2026, Josips Auftrag "Inhalte ... vom Stil her anpassen"):
+ * Inputs/Zeilen/Buttons nutzten generisches Tailwind-Grau statt der
+ * Design-Tokens der übrigen Karte. Reine Optik, keine Logikänderung.
  */
 export function PromoCardsPanel({ cards }: { cards: PromoCardRow[] }) {
   const router = useRouter();
@@ -70,7 +74,7 @@ export function PromoCardsPanel({ cards }: { cards: PromoCardRow[] }) {
           />
         ))}
         {cards.length === 0 && (
-          <p className="text-sm" style={{ color: "#66679B" }}>
+          <p className="text-sm" style={{ color: "#A9AAC4" }}>
             Noch keine Positionen angelegt.
           </p>
         )}
@@ -110,7 +114,7 @@ function PromoCardRowItem({
 
   if (editing) {
     return (
-      <li className="rounded-md border px-4 py-3" style={{ borderRadius: "var(--radius)" }}>
+      <li className="rounded-[10px] border px-4 py-3" style={{ borderColor: "#E7E8F2" }}>
         <PromoCardForm initial={card} onSubmit={handleUpdate} submitLabel="Speichern" onCancel={() => setEditing(false)} />
       </li>
     );
@@ -118,15 +122,18 @@ function PromoCardRowItem({
 
   return (
     <li
-      className="flex flex-wrap items-center justify-between gap-4 rounded-md border px-4 py-3 text-base"
-      style={{ borderRadius: "var(--radius)" }}
+      className="flex flex-wrap items-center justify-between gap-4 rounded-[10px] border px-4 py-3 text-base"
+      style={{ borderColor: "#E7E8F2" }}
     >
       <div className="flex min-w-0 items-center gap-3">
         {card.mediaKind === "image" && card.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
-          <img src={card.imageUrl} alt="" className="h-10 w-16 flex-none rounded-md object-cover" />
+          <img src={card.imageUrl} alt="" className="h-10 w-16 flex-none rounded-[8px] object-cover" />
         ) : (
-          <span className="flex h-10 w-16 flex-none items-center justify-center rounded-md bg-gray-100 text-gray-400">
+          <span
+            className="flex h-10 w-16 flex-none items-center justify-center rounded-[8px]"
+            style={{ background: "#EEF0F7", color: "#A9AAC4" }}
+          >
             {card.mediaKind === "video" ? (
               <VideoIcon size={18} aria-hidden="true" />
             ) : (
@@ -137,9 +144,15 @@ function PromoCardRowItem({
         <div className="flex min-w-0 flex-col">
           <span className="truncate font-semibold">{card.title}</span>
           {card.description && (
-            <span className="truncate text-sm text-gray-500">{card.description}</span>
+            <span className="truncate text-sm" style={{ color: "#66679B" }}>
+              {card.description}
+            </span>
           )}
-          {card.linkUrl && <span className="truncate text-sm text-gray-400">{card.linkUrl}</span>}
+          {card.linkUrl && (
+            <span className="truncate text-sm" style={{ color: "#A9AAC4" }}>
+              {card.linkUrl}
+            </span>
+          )}
         </div>
       </div>
       <div className="flex flex-none gap-2">
@@ -149,7 +162,8 @@ function PromoCardRowItem({
           title="Nach oben"
           onClick={() => handleMove("up")}
           disabled={moving || isFirst}
-          className="rounded-md border px-2 py-1 text-sm disabled:opacity-30"
+          className="rounded-[9px] border bg-white px-2 py-1 text-sm disabled:opacity-30"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
           <ChevronUp size={16} aria-hidden="true" />
         </button>
@@ -159,7 +173,8 @@ function PromoCardRowItem({
           title="Nach unten"
           onClick={() => handleMove("down")}
           disabled={moving || isLast}
-          className="rounded-md border px-2 py-1 text-sm disabled:opacity-30"
+          className="rounded-[9px] border bg-white px-2 py-1 text-sm disabled:opacity-30"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
           <ChevronDown size={16} aria-hidden="true" />
         </button>
@@ -167,7 +182,8 @@ function PromoCardRowItem({
           type="button"
           onClick={() => setEditing(true)}
           disabled={moving}
-          className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+          className="rounded-[9px] border bg-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
+          style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
           Bearbeiten
         </button>
@@ -175,7 +191,8 @@ function PromoCardRowItem({
           type="button"
           onClick={() => onDelete(card.id)}
           disabled={moving}
-          className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+          className="rounded-[9px] border bg-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
+          style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
         >
           Löschen
         </button>
@@ -236,7 +253,7 @@ function PromoCardForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
         Titel
         <input
           type="text"
@@ -245,32 +262,34 @@ function PromoCardForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Kostenloses Erstgespräch buchen"
-          className="rounded-md border px-3 py-2 text-base"
+          className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
+          style={{ borderColor: "#D8DAEA" }}
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
         Beschreibung (optional)
         <textarea
           maxLength={500}
           rows={2}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="rounded-md border px-3 py-2 text-base"
+          className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
+          style={{ borderColor: "#D8DAEA" }}
         />
       </label>
 
-      <div className="flex flex-col gap-1.5 text-sm">
+      <div className="flex flex-col gap-1.5 text-sm font-semibold" style={{ color: "#3E3F66" }}>
         Medium
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setMediaKind("image")}
             aria-pressed={mediaKind === "image"}
-            className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm"
+            className="flex items-center gap-1.5 rounded-[10px] border px-3 py-1.5 text-sm font-semibold"
             style={
               mediaKind === "image"
-                ? { background: "var(--color-primary)", color: "#fff", borderColor: "var(--color-primary)" }
-                : undefined
+                ? { background: "#5663AE", color: "#fff", borderColor: "#5663AE" }
+                : { background: "#fff", color: "#3E3F66", borderColor: "#E7E8F2" }
             }
           >
             <ImageIcon size={15} aria-hidden="true" /> Bild
@@ -279,11 +298,11 @@ function PromoCardForm({
             type="button"
             onClick={() => setMediaKind("video")}
             aria-pressed={mediaKind === "video"}
-            className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm"
+            className="flex items-center gap-1.5 rounded-[10px] border px-3 py-1.5 text-sm font-semibold"
             style={
               mediaKind === "video"
-                ? { background: "var(--color-primary)", color: "#fff", borderColor: "var(--color-primary)" }
-                : undefined
+                ? { background: "#5663AE", color: "#fff", borderColor: "#5663AE" }
+                : { background: "#fff", color: "#3E3F66", borderColor: "#E7E8F2" }
             }
           >
             <VideoIcon size={15} aria-hidden="true" /> Video
@@ -305,19 +324,20 @@ function PromoCardForm({
         <VideoUpload currentVideoId={bunnyVideoId} onUploaded={setBunnyVideoId} />
       )}
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
         Link (optional)
         <input
           type="text"
           value={linkUrl}
           onChange={(e) => setLinkUrl(e.target.value)}
           placeholder="/kontakt oder https://…"
-          className="rounded-md border px-3 py-2 text-base"
+          className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
+          style={{ borderColor: "#D8DAEA" }}
         />
       </label>
 
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm font-semibold" style={{ color: "#B14A4A" }}>
           {error}
         </p>
       )}
@@ -326,8 +346,8 @@ function PromoCardForm({
         <button
           type="submit"
           disabled={pending}
-          className="self-start rounded-md px-4 py-2 text-base font-semibold text-white disabled:opacity-50"
-          style={{ background: "var(--color-primary)" }}
+          className="self-start rounded-[10px] px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50"
+          style={{ background: "#5663AE" }}
         >
           {pending ? "Wird gespeichert …" : submitLabel}
         </button>
@@ -336,7 +356,8 @@ function PromoCardForm({
             type="button"
             onClick={onCancel}
             disabled={pending}
-            className="rounded-md border px-4 py-2 text-base disabled:opacity-50"
+            className="rounded-[10px] border bg-white px-4 py-2.5 text-base font-semibold disabled:opacity-50"
+            style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
           >
             Abbrechen
           </button>
