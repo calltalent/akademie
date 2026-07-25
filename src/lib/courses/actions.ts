@@ -50,27 +50,28 @@ function errorState(e: unknown): CourseActionState {
 
 // --- Kurse ---
 
-export async function createCourse(
-  _prevState: CourseActionState,
-  formData: FormData,
-): Promise<CourseActionState> {
+/**
+ * Kurs OHNE Zwischenformular anlegen (25.07.2026, Josips Fund: "Neuer Kurs"
+ * zeigte nach dem 4-Schritte-Editor-Umbau weiterhin das alte Titel/Slug/
+ * Kategorie-Modal, bevor der neue Assistent überhaupt sichtbar wurde — wirkte
+ * wie zwei verschiedene Systeme statt eines Assistenten). Ersetzt die
+ * vorherige `createCourse(prevState, formData)`, die dieses Modal befüllte.
+ *
+ * Statt Eingaben abzufragen, legt diese Action sofort einen Entwurfs-Kurs
+ * mit Platzhaltertitel an und gibt die `courseId` zurück — der Aufrufer
+ * (new-course-button.tsx) navigiert direkt zu `/admin/kurse/{id}`, Schritt 1
+ * des Assistenten. Titel/Slug sind dort sofort editierbar
+ * (`CourseTitleEditor`, bereits vorhanden), eine leere Kurs-Karte in der
+ * Liste ist unproblematisch — dieselbe RLS/Rollen-Prüfung wie vorher
+ * (`requireStaffTenant()`), kein Auftragskonflikt.
+ */
+export async function createDraftCourse(): Promise<CourseActionState> {
   try {
     const { tenant, user, supabase } = await requireStaffTenant();
-    const parsed = courseSchema.safeParse({
-      title: formData.get("title"),
-      slug: formData.get("slug"),
-      description: formData.get("description") || undefined,
-    });
-    if (!parsed.success) {
-      return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
-    }
-
-    const categoryResult = await resolveCategoryId(supabase, tenant.id, formData.get("category"));
-    if (!categoryResult.ok) return { error: categoryResult.error };
+    const slug = await resolveUniqueCourseSlug(supabase, tenant.id, "neuer-kurs");
 
     // Position ans Ende anhängen (Josips Auftrag 23.07.2026, Kursreihenfolge
-    // per Auf/Ab) — bisher fehlte das hier komplett, jeder neue Kurs blieb auf
-    // dem Spalten-Default 0 stehen. Gleiches Zähl-Muster wie createSection.
+    // per Auf/Ab) — gleiches Zähl-Muster wie createSection.
     const { count } = await supabase
       .from("courses")
       .select("id", { count: "exact", head: true })
@@ -80,10 +81,8 @@ export async function createCourse(
       .from("courses")
       .insert({
         tenant_id: tenant.id,
-        title: parsed.data.title,
-        slug: parsed.data.slug,
-        description: parsed.data.description ?? null,
-        category_id: categoryResult.categoryId,
+        title: "Neuer Kurs",
+        slug,
         position: count ?? 0,
         created_by: user.id,
       })

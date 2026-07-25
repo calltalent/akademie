@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { checkAdminAccess } from "@/lib/auth/staff";
-import { NewCourseDialog } from "@/components/admin/new-course-dialog";
+import { NewCourseButton } from "@/components/admin/new-course-button";
 import { CourseCategoryManager } from "@/components/admin/course-category-manager";
 import { CourseListTable, type CourseListRow } from "@/components/admin/course-list-table";
 
@@ -38,8 +38,9 @@ import { CourseListTable, type CourseListRow } from "@/components/admin/course-l
  * Steuerung ist auf die Bearbeiten-Seite gewandert, siehe CourseStatusSelect
  * in publish-toggle.tsx und [id]/page.tsx.
  *
- * "Neuer Kurs" öffnet das bestehende CreateCourseForm in einem Modal
- * (new-course-dialog.tsx) statt einer im Export nicht vorhandenen Zielseite.
+ * "Neuer Kurs" (Stand 13.07.2026, siehe Änderung unten): ursprünglich ein
+ * Modal mit Titel/Slug/Kategorie statt einer im Export nicht vorhandenen
+ * Zielseite.
  *
  * Aktionsspalte (17.07.2026, Josips Wunsch): statt des früheren Textlinks
  * "Bearb." zwei Symbole — Stift (Bearbeiten) und Papierkorb (Löschen ohne
@@ -80,9 +81,13 @@ import { CourseListTable, type CourseListRow } from "@/components/admin/course-l
  * Zeilendarstellung (Thumbnail, Kategorie, Status, Positions-/Löschknöpfe)
  * wanderte dafür unverändert in `CourseListTable` (course-list-table.tsx) —
  * Suche ist zwangsläufig Browser-Zustand, diese Seite bleibt Server
- * Component und liefert nur noch fertig aufbereitete Zeilen. "Neuer Kurs"
- * führt jetzt direkt in Schritt 1 des Editors weiter statt nur das Modal zu
- * schließen, siehe new-course-dialog.tsx.
+ * Component und liefert nur noch fertig aufbereitete Zeilen.
+ *
+ * "Neuer Kurs" ohne Modal (25.07.2026, Josips Fund direkt nach dem ersten
+ * Live-Test des 4-Schritte-Editors: das alte Modal wirkte wie ein zweites,
+ * älteres System): `NewCourseButton` (new-course-button.tsx) legt sofort
+ * einen Entwurfs-Kurs an (`createDraftCourse()`) und navigiert direkt zu
+ * Schritt 1 des Assistenten — kein Zwischenformular mehr.
  */
 
 const TABS: { key: string; label: string; status: string | null }[] = [
@@ -221,7 +226,7 @@ export default async function AdminKursePage({
         </div>
         <div className="flex flex-none items-center gap-2.5">
           <CourseCategoryManager categories={managedCategories} />
-          <NewCourseDialog categories={allCategories} />
+          <NewCourseButton />
         </div>
       </header>
 
