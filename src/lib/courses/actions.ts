@@ -76,21 +76,25 @@ export async function createCourse(
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenant.id);
 
-    const { error } = await supabase.from("courses").insert({
-      tenant_id: tenant.id,
-      title: parsed.data.title,
-      slug: parsed.data.slug,
-      description: parsed.data.description ?? null,
-      category_id: categoryResult.categoryId,
-      position: count ?? 0,
-      created_by: user.id,
-    });
+    const { data: created, error } = await supabase
+      .from("courses")
+      .insert({
+        tenant_id: tenant.id,
+        title: parsed.data.title,
+        slug: parsed.data.slug,
+        description: parsed.data.description ?? null,
+        category_id: categoryResult.categoryId,
+        position: count ?? 0,
+        created_by: user.id,
+      })
+      .select("id")
+      .single();
     if (error) {
       return { error: "Anlegen fehlgeschlagen: " + translateDbError(error) };
     }
 
     revalidatePath("/admin/kurse");
-    return { error: null, success: true };
+    return { error: null, success: true, courseId: created.id };
   } catch (e) {
     return errorState(e);
   }

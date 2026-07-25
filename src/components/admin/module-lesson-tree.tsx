@@ -19,7 +19,7 @@ import {
 import { initialCourseActionState } from "@/lib/courses/state";
 import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
 
-type LessonRow = {
+export type LessonRow = {
   id: string;
   title: string;
   status: string;
@@ -27,8 +27,8 @@ type LessonRow = {
   kind: "video" | "image" | null;
   thumbnailUrl: string | null;
 };
-type SectionRow = { id: string; title: string; description: string | null; lessons: LessonRow[] };
-type ModuleRow = {
+export type SectionRow = { id: string; title: string; description: string | null; lessons: LessonRow[] };
+export type ModuleRow = {
   id: string;
   title: string;
   description: string | null;

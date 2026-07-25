@@ -15,13 +15,17 @@ import type { CourseCategoryRow } from "@/lib/courses/categories";
  * früheren globalen `COURSE_CATEGORIES`-Const — die Liste kommt jetzt
  * mandantenspezifisch vom Aufrufer (admin/kurse/page.tsx), Optionswert ist
  * die Kategorie-ID statt des Namens.
+ *
+ * 4-Schritte-Editor (25.07.2026): `onSuccess` bekommt jetzt die neue
+ * `courseId` übergeben, damit new-course-dialog.tsx direkt in den Kurs-
+ * Editor weiterleiten kann, statt nur das Modal zu schließen.
  */
 export function CreateCourseForm({
   categories,
   onSuccess,
 }: {
   categories: CourseCategoryRow[];
-  onSuccess?: () => void;
+  onSuccess?: (courseId: string) => void;
 }) {
   const [state, action, pending] = useActionState(
     createCourse,
@@ -29,9 +33,9 @@ export function CreateCourseForm({
   );
 
   useEffect(() => {
-    if (state.success) onSuccess?.();
+    if (state.success && state.courseId) onSuccess?.(state.courseId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.success]);
+  }, [state.success, state.courseId]);
 
   return (
     <form

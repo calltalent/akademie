@@ -1,15 +1,10 @@
 import Link from "next/link";
-import { Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { checkAdminAccess } from "@/lib/auth/staff";
 import { NewCourseDialog } from "@/components/admin/new-course-dialog";
-import { DeleteCourseIconButton } from "@/components/admin/delete-course-icon-button";
-import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
 import { CourseCategoryManager } from "@/components/admin/course-category-manager";
-import { CourseCategorySelect } from "@/components/admin/publish-toggle";
-import { CoursePositionButtons } from "@/components/admin/course-position-buttons";
-import { updateCourseCoverUrl } from "@/lib/courses/actions";
+import { CourseListTable, type CourseListRow } from "@/components/admin/course-list-table";
 
 /**
  * Design-Block 6 (13.07.2026, Claude-Design-Export Teil 3,
@@ -79,15 +74,16 @@ import { updateCourseCoverUrl } from "@/lib/courses/actions";
  * wie Module/Sektionen im Kurs-Editor (kein Drag-and-Drop, siehe dortiger
  * Kopfkommentar). Bestimmt zugleich die Reihenfolge unter "Meine Kurse"
  * (`dashboard/page.tsx`, sortiert ebenfalls nach `courses.position`).
+ *
+ * Kennzahlenzeile + Live-Suche (25.07.2026, Josips Auftrag "auch die
+ * Kursliste umbauen" im Zuge des neuen 4-Schritte-Editors): die eigentliche
+ * Zeilendarstellung (Thumbnail, Kategorie, Status, Positions-/Löschknöpfe)
+ * wanderte dafür unverändert in `CourseListTable` (course-list-table.tsx) —
+ * Suche ist zwangsläufig Browser-Zustand, diese Seite bleibt Server
+ * Component und liefert nur noch fertig aufbereitete Zeilen. "Neuer Kurs"
+ * führt jetzt direkt in Schritt 1 des Editors weiter statt nur das Modal zu
+ * schließen, siehe new-course-dialog.tsx.
  */
-
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  published: { label: "Live", color: "#1F8A5B", bg: "#E3F2EA" },
-  draft: { label: "Entwurf", color: "#1A1A2E", bg: "#F7EED4" },
-  archived: { label: "Archiviert", color: "#66679B", bg: "#EEF0F7" },
-};
-
-const COURSE_LIST_COLS = "1.7fr 1.1fr 0.7fr 0.8fr 0.8fr 1.3fr";
 
 const TABS: { key: string; label: string; status: string | null }[] = [
   { key: "alle", label: "Alle", status: null },
@@ -183,6 +179,27 @@ export default async function AdminKursePage({
   const visibleCourses = activeStatus
     ? allCourses.filter((c) => c.status === activeStatus)
     : allCourses;
+  const draftCount = allCourses.filter((c) => c.status === "draft").length;
+  const totalMembers = (enrollments ?? []).length;
+
+  const rows: CourseListRow[] = visibleCourses.map((c) => {
+    // Auf/Ab bezieht sich auf ALLE Kurse des Mandanten (nicht nur die im
+    // aktuell gefilterten Status-Tab sichtbaren) — siehe moveCourse()-
+    // Kommentar und CoursePositionButtons-Kopfkommentar.
+    const overallIndex = allCourses.findIndex((ac) => ac.id === c.id);
+    return {
+      id: c.id,
+      title: c.title,
+      status: c.status,
+      coverUrl: c.cover_url,
+      categoryId: c.category_id,
+      lessons: lessonCountByCourse.get(c.id) ?? 0,
+      members: memberCountByCourse.get(c.id) ?? 0,
+      certificates: certificateCountByCourse.get(c.id) ?? 0,
+      isFirst: overallIndex <= 0,
+      isLast: overallIndex === -1 || overallIndex >= allCourses.length - 1,
+    };
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -194,6 +211,13 @@ export default async function AdminKursePage({
           <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
             Kurse
           </h1>
+          <p className="mt-1 text-[13.5px]" style={{ color: "#A9AAC4" }}>
+            <b style={{ color: "#3E3F66" }}>{allCourses.length}</b> {allCourses.length === 1 ? "Kurs" : "Kurse"}
+            {" · "}
+            <b style={{ color: "#3E3F66" }}>{draftCount}</b> {draftCount === 1 ? "Entwurf" : "Entwürfe"}
+            {" · "}
+            <b style={{ color: "#3E3F66" }}>{totalMembers}</b> Teilnehmer insgesamt
+          </p>
         </div>
         <div className="flex flex-none items-center gap-2.5">
           <CourseCategoryManager categories={managedCategories} />
@@ -218,116 +242,7 @@ export default async function AdminKursePage({
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
-        <div
-          className="rgrid-header px-[26px] pb-3 pt-[18px] text-[13px] font-bold"
-          style={{
-            "--rgrid-cols": COURSE_LIST_COLS,
-            color: "#A9AAC4",
-            borderBottom: "1px solid #EEF0F7",
-          } as React.CSSProperties}
-        >
-          <div>Kurs</div>
-          <div>Kategorie</div>
-          <div>Lektionen</div>
-          <div>Teilnehmer</div>
-          <div>Status</div>
-          <div />
-        </div>
-        {visibleCourses.length === 0 ? (
-          <p className="px-[26px] py-6 text-sm" style={{ color: "#A9AAC4" }}>
-            Keine Kurse in dieser Ansicht.
-          </p>
-        ) : (
-          visibleCourses.map((c) => {
-            const meta = STATUS_META[c.status] ?? STATUS_META.draft;
-            // Auf/Ab bezieht sich auf ALLE Kurse des Mandanten (nicht nur die
-            // im aktuell gefilterten Status-Tab sichtbaren) — siehe
-            // moveCourse()-Kommentar und CoursePositionButtons-Kopfkommentar.
-            const overallIndex = allCourses.findIndex((ac) => ac.id === c.id);
-            return (
-              <div
-                key={c.id}
-                className="rgrid-row px-[18px] py-4 text-[15px] lg:px-[26px]"
-                style={{
-                  "--rgrid-cols": COURSE_LIST_COLS,
-                  borderBottom: "1px solid #F4F5FA",
-                } as React.CSSProperties}
-              >
-                <div className="flex items-center gap-3.5">
-                  <ThumbnailUpload
-                    initialUrl={c.cover_url}
-                    entityLabel="Kursbild"
-                    entityTitle={c.title}
-                    onUpload={updateCourseCoverUrl.bind(null, c.id)}
-                  />
-                  <Link
-                    href={`/admin/kurse/${c.id}`}
-                    prefetch={false}
-                    className="min-w-0 truncate font-semibold no-underline hover:underline"
-                    style={{ color: "inherit" }}
-                  >
-                    {c.title}
-                  </Link>
-                </div>
-                <div>
-                  <span className="rgrid-label">Kategorie</span>
-                  <CourseCategorySelect
-                    courseId={c.id}
-                    categoryId={c.category_id}
-                    categories={allCategories}
-                    title={c.title}
-                    compact
-                  />
-                </div>
-                <div>
-                  <span className="rgrid-label">Lektionen</span>
-                  <span style={{ color: "#3E3F66" }}>{lessonCountByCourse.get(c.id) ?? 0}</span>
-                </div>
-                <div>
-                  <span className="rgrid-label">Teilnehmer</span>
-                  <span style={{ color: "#3E3F66" }}>{memberCountByCourse.get(c.id) ?? 0}</span>
-                </div>
-                <div>
-                  <span
-                    className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
-                    style={{ color: meta.color, background: meta.bg }}
-                  >
-                    {meta.label}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 lg:justify-end">
-                  <Link
-                    href={`/admin/kurse/${c.id}`}
-                    prefetch={false}
-                    aria-label={`Kurs bearbeiten: ${c.title}`}
-                    title="Bearbeiten"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-[9px] border bg-white no-underline"
-                    style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
-                  >
-                    <Pencil size={16} aria-hidden="true" />
-                  </Link>
-                  <CoursePositionButtons
-                    courseId={c.id}
-                    title={c.title}
-                    isFirst={overallIndex <= 0}
-                    isLast={overallIndex === -1 || overallIndex >= allCourses.length - 1}
-                  />
-                  {isAdmin && (
-                    <DeleteCourseIconButton
-                      courseId={c.id}
-                      title={c.title}
-                      lessonCount={lessonCountByCourse.get(c.id) ?? 0}
-                      enrollmentCount={memberCountByCourse.get(c.id) ?? 0}
-                      certificateCount={certificateCountByCourse.get(c.id) ?? 0}
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+      <CourseListTable courses={rows} categories={allCategories} isAdmin={isAdmin} />
     </div>
   );
 }
