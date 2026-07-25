@@ -13,17 +13,31 @@ import { TeilnehmerRowActions } from "@/components/admin/teilnehmer-row-actions"
  * Aktionsspalte (19.07.2026, Josips Auftrag: "Link erneut senden" +
  * "Löschen"): verbreitert von 0.6fr auf 1.4fr, damit neben „Profil" auch die
  * beiden Icon-Buttons aus `teilnehmer-row-actions.tsx` Platz haben.
+ *
+ * Kennzahlenzeile + Status-Spalte (25.07.2026, gleiches Prinzip wie beim
+ * Kurs-Redesign): Status stand vorher NUR auf der Detailseite — offene
+ * Einladungen oder deaktivierte Mitglieder waren in der Liste selbst nicht
+ * erkennbar, man musste jede Zeile einzeln öffnen. Beides rein lesend, keine
+ * neue Aktion (Status ändern bleibt auf der Detailseite, `membership-row-
+ * actions.tsx`).
  */
+const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
+  active: { label: "Aktiv", color: "#1F8A5B", bg: "#E3F2EA" },
+  invited: { label: "Eingeladen", color: "#8A6D1F", bg: "#F7EED4" },
+  deactivated: { label: "Deaktiviert", color: "#66679B", bg: "#EEF0F7" },
+};
+
 export type TeilnehmerRow = {
   userId: string;
   fullName: string | null;
   email: string;
+  status: string;
   courseCount: number;
   joined: string;
   initials: string;
 };
 
-const COLS = "2fr 1.4fr 1fr 1fr 1.4fr";
+const COLS = "1.8fr 1.3fr 0.7fr 0.8fr 0.9fr 1.4fr";
 
 export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
   const [q, setQ] = useState("");
@@ -34,6 +48,7 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
           r.email.toLowerCase().includes(query) || (r.fullName ?? "").toLowerCase().includes(query),
       )
     : rows;
+  const invitedCount = rows.filter((r) => r.status === "invited").length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -45,6 +60,11 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
           <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
             Teilnehmer
           </h1>
+          <p className="mt-1 text-[13.5px]" style={{ color: "#A9AAC4" }}>
+            <b style={{ color: "#3E3F66" }}>{rows.length}</b> {rows.length === 1 ? "Teilnehmer" : "Teilnehmer"}
+            {" · "}
+            <b style={{ color: "#3E3F66" }}>{invitedCount}</b> {invitedCount === 1 ? "offene Einladung" : "offene Einladungen"}
+          </p>
         </div>
         <div
           className="flex items-center gap-2.5 rounded-[11px] border bg-white px-[14px] py-2.5"
@@ -86,6 +106,7 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
           <div>E-Mail</div>
           <div>Kurse</div>
           <div>Beigetreten</div>
+          <div>Status</div>
           <div />
         </div>
         {visible.length === 0 ? (
@@ -93,7 +114,9 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
             {query ? "Keine Treffer für diese Suche." : "Noch keine Mitglieder."}
           </p>
         ) : (
-          visible.map((r) => (
+          visible.map((r) => {
+            const meta = STATUS_META[r.status] ?? STATUS_META.active;
+            return (
             <div
               key={r.userId}
               className="rgrid-row px-[18px] py-[15px] text-[15px] lg:px-[26px]"
@@ -120,6 +143,15 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
                 <span className="rgrid-label">Beigetreten</span>
                 {r.joined}
               </div>
+              <div>
+                <span className="rgrid-label">Status</span>
+                <span
+                  className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
+                  style={{ color: meta.color, background: meta.bg }}
+                >
+                  {meta.label}
+                </span>
+              </div>
               <div className="flex items-center gap-3 lg:justify-end">
                 <Link
                   href={`/admin/teilnehmer/${r.userId}`}
@@ -136,7 +168,8 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
                 />
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

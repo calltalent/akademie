@@ -38,6 +38,10 @@ export default async function TeilnehmerPage() {
     .select("user_id, role, status, created_at, profiles(email, full_name)")
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false });
+  // role/status kommen jetzt mit an die Liste (25.07.2026, Kennzahlenzeile +
+  // Status-Spalte, gleiches Prinzip wie beim Kurs-Redesign) — vorher nur auf
+  // der Detailseite sichtbar, man musste jeden Teilnehmer einzeln oeffnen,
+  // um z. B. offene Einladungen zu finden.
 
   const { data: enrollments } = await supabase
     .from("enrollments")
@@ -57,6 +61,7 @@ export default async function TeilnehmerPage() {
       userId: m.user_id,
       fullName,
       email,
+      status: m.status,
       courseCount: courseCountByUser.get(m.user_id) ?? 0,
       joined: formatRelativeTime(new Date(m.created_at)),
       initials: initialsFor(fullName, email),

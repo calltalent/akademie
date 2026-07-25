@@ -104,10 +104,13 @@ export function CourseEditorSteps({
           <ArrowLeft size={16} aria-hidden="true" style={{ color: "#5663AE" }} />
           Zurück zur Kursliste
         </Link>
+        {/* Direkt neben "Zurück zur Kursliste" statt rechts aussen (Josips
+            Fund, 25.07.2026): stand vorher weit vom Zurück-Link getrennt,
+            mit dem Kurstitel dazwischen. */}
+        <ReembedCourseButton courseId={courseId} />
         <div className="min-w-0 flex-1 truncate text-[15px] font-semibold" style={{ color: "#A9AAC4" }}>
           {courseTitle}
         </div>
-        <ReembedCourseButton courseId={courseId} />
       </div>
 
       <Stepper step={step} onSelect={setStep} />
