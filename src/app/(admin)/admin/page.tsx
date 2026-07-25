@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { getTenant } from "@/lib/tenant/context";
 import { createClient } from "@/lib/supabase/server";
 import { AiQuotaCard } from "@/components/admin/ai-quota-card";
+import { NewCourseButton } from "@/components/admin/new-course-button";
+import { InviteUserDialog } from "@/components/admin/invite-user-dialog";
 import { formatRelativeTime } from "@/lib/format/relative-time";
 
 /**
@@ -147,6 +150,37 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="flex flex-col gap-7">
+      <header className="flex flex-wrap items-center gap-[18px]">
+        <div className="flex-1">
+          <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
+            Übersicht
+          </div>
+          <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
+            Dashboard
+          </h1>
+        </div>
+        {/* Schnellzugriff (25.07.2026, Josips Auftrag "auch intuitiv und neu
+            designen"): das Dashboard hatte bisher keine eigene Überschrift
+            und keine direkten Aktionen — reine Kennzahlenübersicht, jeder
+            nächste Schritt (Kurs anlegen, einladen, KI-Generator) brauchte
+            erst einen Umweg über die Seitenleiste. Dieselben Einstiege wie
+            in Kurse/Teilnehmer, nur hier zusätzlich gebündelt als schnellster
+            Weg von der Startseite aus — kein Duplikat der Funktionalität,
+            NewCourseButton/InviteUserDialog sind exakt dieselben Komponenten. */}
+        <div className="flex flex-none flex-wrap items-center gap-2.5">
+          <Link
+            href="/admin/ki"
+            className="inline-flex items-center gap-2 rounded-[11px] border bg-white px-[18px] py-3 text-[15px] font-semibold no-underline"
+            style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
+          >
+            <Sparkles size={16} aria-hidden="true" style={{ color: "#5663AE" }} />
+            KI-Generator
+          </Link>
+          <InviteUserDialog />
+          <NewCourseButton />
+        </div>
+      </header>
+
       <AiQuotaCard />
 
       <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
