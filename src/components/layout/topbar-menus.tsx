@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Bell, ChevronDown, CircleUserRound } from "lucide-react";
 
 export type NotificationItem = { text: string; time: string };
@@ -155,6 +156,7 @@ export function ProfileMenu({
   const btnRef = useRef<HTMLButtonElement>(null);
   const signOutFormRef = useRef<HTMLFormElement>(null);
   const [panelTop, setPanelTop] = useState<number>();
+  const router = useRouter();
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -214,9 +216,25 @@ export function ProfileMenu({
             <p className="text-[15px] font-bold text-ink">{user.name}</p>
             {user.email && <p className="text-[13px] text-muted-400">{user.email}</p>}
           </div>
+          {/* BUGFIX (26.07.2026, Josips Fund: "Profil/Einstellungen/
+              Benachrichtigungen tun nichts, nur Abmelden funktioniert") —
+              dieselbe Geräte-Eigenheit wie beim Abmelden-Button unten
+              (24.07.2026, siehe dortiger Kommentar): `mousedown` feuert
+              zuverlässig, das anschließende `click`, an dem `next/link`
+              hängt, auf diesem Gerät nie. Jetzt zusätzlich `onPointerDown` ->
+              `router.push()`, deckt Maus UND Touch ab. `<Link>`/`href`
+              bleiben erhalten (Rechtsklick "Link öffnen in neuem Tab",
+              Screenreader-Semantik, normale Klicks woanders funktionieren
+              unverändert) — der Router-Push ist nur ein zusätzlicher,
+              redundanter zweiter Navigationsweg zum selben Ziel. */}
           <Link
             href="/einstellungen"
             prefetch={false}
+            onClick={onClose}
+            onPointerDown={() => {
+              onClose();
+              router.push("/einstellungen");
+            }}
             className="flex items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-medium text-navy no-underline"
           >
             <span className="h-2 w-2 rounded-[2px] bg-primary" />
@@ -225,6 +243,11 @@ export function ProfileMenu({
           <Link
             href="/einstellungen"
             prefetch={false}
+            onClick={onClose}
+            onPointerDown={() => {
+              onClose();
+              router.push("/einstellungen");
+            }}
             className="flex items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-medium text-navy no-underline"
           >
             <span className="h-2 w-2 rounded-[2px] bg-primary" />
@@ -233,6 +256,11 @@ export function ProfileMenu({
           <Link
             href="/einstellungen?tab=benachrichtigungen"
             prefetch={false}
+            onClick={onClose}
+            onPointerDown={() => {
+              onClose();
+              router.push("/einstellungen?tab=benachrichtigungen");
+            }}
             className="flex items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-medium text-navy no-underline"
           >
             <span className="h-2 w-2 rounded-[2px] bg-primary" />
