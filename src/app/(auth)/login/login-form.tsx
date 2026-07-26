@@ -47,11 +47,15 @@ export function LoginForm({
   subheading,
   copyright,
   bgOpacity,
+  tenantName,
+  logoUrl,
 }: {
   heading: string;
   subheading: string;
   copyright: string;
   bgOpacity: number;
+  tenantName: string;
+  logoUrl: string | null;
 }) {
   const [pwState, pwAction, pwPending] = useActionState(
     signInWithPassword,
@@ -126,18 +130,31 @@ export function LoginForm({
           }}
         />
         <div className="relative flex items-center gap-3.5">
-          <div
-            className="flex h-11 w-11 items-center justify-center rounded-[11px] text-xl font-extrabold"
-            style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
-            aria-hidden="true"
-          >
-            C
-          </div>
-          <div className="leading-tight">
-            <div className="text-lg font-extrabold tracking-tight text-white">CALLTALENT</div>
-            <div className="text-xs font-semibold" style={{ color: "#C9CBE6", letterSpacing: "0.3em" }}>
-              AKADEMIE
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
+            <img
+              src={logoUrl}
+              alt={tenantName}
+              className="h-11 w-11 flex-none rounded-[11px] object-cover"
+            />
+          ) : (
+            <div
+              className="flex h-11 w-11 flex-none items-center justify-center rounded-[11px] text-xl font-extrabold"
+              style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
+              aria-hidden="true"
+            >
+              {tenantName.charAt(0).toUpperCase()}
             </div>
+          )}
+          <div className="leading-tight">
+            <div className="text-lg font-extrabold tracking-tight text-white">
+              {tenantName.toUpperCase()}
+            </div>
+            {!logoUrl && (
+              <div className="text-xs font-semibold" style={{ color: "#C9CBE6", letterSpacing: "0.3em" }}>
+                AKADEMIE
+              </div>
+            )}
           </div>
         </div>
 
@@ -167,20 +184,27 @@ export function LoginForm({
             ohnehin nur im breiten Marken-Panel, nicht als eigenständigen
             Baustein). */}
         <div className="flex items-center gap-3 border-b px-6 py-4 lg:hidden" style={{ borderColor: "#E7E8F2" }}>
-          <div
-            className="flex h-9 w-9 flex-none items-center justify-center rounded-[9px] text-base font-extrabold"
-            style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
-            aria-hidden="true"
-          >
-            C
-          </div>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
+            <img src={logoUrl} alt={tenantName} className="h-9 w-9 flex-none rounded-[9px] object-cover" />
+          ) : (
+            <div
+              className="flex h-9 w-9 flex-none items-center justify-center rounded-[9px] text-base font-extrabold"
+              style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
+              aria-hidden="true"
+            >
+              {tenantName.charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className="leading-tight">
             <div className="text-sm font-extrabold tracking-tight" style={{ color: "#1A1A2E" }}>
-              CALLTALENT
+              {tenantName.toUpperCase()}
             </div>
-            <div className="text-[10px] font-semibold" style={{ color: "#66679B", letterSpacing: "0.28em" }}>
-              AKADEMIE
-            </div>
+            {!logoUrl && (
+              <div className="text-[10px] font-semibold" style={{ color: "#66679B", letterSpacing: "0.28em" }}>
+                AKADEMIE
+              </div>
+            )}
           </div>
         </div>
 
@@ -255,6 +279,33 @@ export function LoginForm({
               <ArrowRight size={18} strokeWidth={2.2} aria-hidden="true" />
             </button>
           </form>
+
+          {/* "Powered by"-Kennzeichnung (26.07.2026, Josips Auftrag "unter
+              dem Anmelde-Button ein Image ähnlich wie bei Baulig, powered by
+              Calltalent"): Calltalent ist hier die Plattform hinter JEDEM
+              Mandanten (analog Bauligs eigener "Powered by LearningSuite"-
+              Kennzeichnung) — deshalb bewusst NICHT tenant-brandbar wie der
+              Logo-Block oben, sondern fest. */}
+          <div className="flex items-center justify-center gap-2">
+            <span
+              className="text-[11px] font-bold uppercase"
+              style={{ letterSpacing: "0.14em", color: "#A9AAC4" }}
+            >
+              Powered by
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-[5px] text-[10px] font-extrabold"
+                style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
+                aria-hidden="true"
+              >
+                C
+              </span>
+              <span className="text-[13px] font-extrabold tracking-tight" style={{ color: "#3E3F66" }}>
+                CALLTALENT
+              </span>
+            </span>
+          </div>
 
           <div className="flex items-center gap-3.5 text-[13px]" style={{ color: "#A9AAC4" }} aria-hidden="true">
             <span className="h-px flex-1" style={{ background: "#E1E3EF" }} />
