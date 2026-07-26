@@ -1,11 +1,22 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
-import { ArrowRight } from "lucide-react";
+import { useActionState, useEffect, useState } from "react";
+import { ArrowRight, AlertTriangle } from "lucide-react";
 import { signInWithPassword, signInWithMagicLink } from "@/lib/auth/actions";
 import type { AuthActionState } from "@/lib/auth/actions";
 
 const initialState: AuthActionState = { error: null };
+
+/**
+ * Bekannte Supabase-`error_code`-Werte aus dem URL-Hash (siehe
+ * `LINK_ERROR_MESSAGES` unten) — freundlicher deutscher Text statt der
+ * rohen englischen Supabase-Meldung.
+ */
+const LINK_ERROR_MESSAGES: Record<string, string> = {
+  otp_expired: "Dieser Anmelde-Link ist abgelaufen oder wurde bereits verwendet.",
+  access_denied: "Dieser Anmelde-Link ist ungültig oder wurde bereits verwendet.",
+};
+const DEFAULT_LINK_ERROR_MESSAGE = "Dieser Anmelde-Link ist ungültig oder abgelaufen.";
 
 /**
  * Design-Block (12.07.2026, Claude-Design-Export, siehe PHASENSTATUS.md
@@ -50,6 +61,19 @@ export function LoginForm({
     signInWithMagicLink,
     initialState,
   );
+  // Lazy-initialisiert statt per Effect gesetzt (gleiches Muster wie der
+  // Portal-Ziel-Lookup in components/learn/lesson-feedback.tsx): das
+  // Auslesen ist eine reine, synchrone Berechnung aus dem bereits beim
+  // ersten Rendern vorhandenen `window.location.hash` — kein Grund, dafür
+  // einen zusätzlichen Render-Zyklus über `setState` in einem Effect zu
+  // erzwingen (react-hooks/set-state-in-effect).
+  const [linkError] = useState<string | null>(() => {
+    if (typeof window === "undefined" || !window.location.hash) return null;
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const errorCode = hashParams.get("error_code");
+    if (!hashParams.get("error") && !errorCode) return null;
+    return (errorCode && LINK_ERROR_MESSAGES[errorCode]) || DEFAULT_LINK_ERROR_MESSAGE;
+  });
 
   // BUGFIX (22.07.2026, Josips Fund: Login dauert 20+ Sekunden): siehe
   // ausführliche Begründung in lib/auth/actions.ts (signInWithPassword) —
@@ -60,6 +84,27 @@ export function LoginForm({
   useEffect(() => {
     if (pwState.redirectTo) window.location.href = pwState.redirectTo;
   }, [pwState.redirectTo]);
+
+  // BUGFIX (26.07.2026, Josips Fund: "Mandant klickt auf Passwort-setzen-/
+  // Magic-Link, landet ohne jede Erklärung auf dem leeren Login-Formular").
+  // Ist ein Recovery-/Magic-Link-Token bei Klick bereits abgelaufen oder
+  // schon einmal eingelöst (z. B. weil ein E-Mail-Sicherheitsscanner den
+  // Link vorab selbst aufruft, oder weil er ein zweites Mal angeklickt
+  // wurde — beides einmalige Tokens), führt Supabases eigener
+  // `/auth/v1/verify`-Endpunkt NICHT über unsere `/auth/callback`-Route,
+  // sondern direkt zurück zur Login-Seite mit einem Fehler im URL-HASH
+  // (`#error=access_denied&error_code=otp_expired&…`) — Hash-Fragmente
+  // erreichen den Server nie, deshalb hier und nicht in login/page.tsx.
+  // Vorher blieb dieser Fall komplett unsichtbar: leeres Formular, kein
+  // Hinweis, keine Handlungsoption. Jetzt: verständliche Meldung + Verweis
+  // auf die beiden Formulare weiter unten, die genau dafür einen neuen Link
+  // anfordern. `replaceState` entfernt den Hash aus der Adresszeile, sobald
+  // er ausgelesen ist — ein Neuladen soll die Meldung nicht endlos wiederholen.
+  useEffect(() => {
+    if (linkError) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }, [linkError]);
 
   return (
     <div
@@ -149,6 +194,19 @@ export function LoginForm({
                 Melde dich mit deinem Konto an.
               </p>
             </div>
+
+            {linkError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2.5 rounded-xl border p-3.5 text-sm"
+                style={{ borderColor: "#F0D0D0", background: "#FBEAEA", color: "#7A3535" }}
+              >
+                <AlertTriangle size={17} aria-hidden="true" className="mt-0.5 flex-none" style={{ color: "#B14A4A" }} />
+                <span>
+                  {linkError} Fordere unten einen neuen Link an — per „Passwort vergessen&quot; oder Magic Link.
+                </span>
+              </div>
+            )}
 
           <form action={pwAction} className="flex flex-col gap-4" aria-label="Mit Passwort anmelden">
             <label className="flex flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
