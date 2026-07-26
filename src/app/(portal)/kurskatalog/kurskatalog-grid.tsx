@@ -57,7 +57,7 @@ export function KurskatalogGrid({
               aria-pressed={isActive}
               className={`inline-flex items-center rounded-[10px] border px-4 py-[9px] text-sm font-semibold transition-colors ${
                 isActive
-                  ? "border-accent bg-accent text-white"
+                  ? "border-primary bg-primary text-white"
                   : "border-border-100 bg-white text-navy hover:bg-bg"
               }`}
             >
@@ -114,7 +114,7 @@ export function KurskatalogGrid({
                 <div className="mb-[18px] text-sm text-muted-500">{c.meta}</div>
                 <span
                   className={`mt-auto inline-flex items-center justify-center rounded-[10px] px-4 py-[11px] text-sm font-bold ${
-                    c.enrolled ? "bg-accent text-white" : "bg-cream text-ink"
+                    c.enrolled ? "bg-primary text-white" : "bg-cream text-ink"
                   }`}
                 >
                   {c.enrolled ? "Weiterlernen" : "Zum Kurs"}

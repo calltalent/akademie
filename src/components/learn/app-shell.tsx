@@ -93,6 +93,8 @@ export async function AppShell({
   }
 
   const topBarUser = { name: userName, email: userEmail, role: "Kursteilnehmer" };
+  const tenantName = tenant?.name || "Calltalent";
+  const logoUrl = tenant?.branding?.logo_url ?? null;
 
   return (
     <>
@@ -102,10 +104,18 @@ export async function AppShell({
         customLinks={customLinks}
         user={topBarUser}
         notifications={[]}
+        tenantName={tenantName}
+        logoUrl={logoUrl}
       />
       <div className="flex min-h-screen bg-bg">
         <HtmlBackgroundSync color="#F4F5FA" />
-        <Sidebar isStaff={isStaff} isPlatformAdmin={platformAccess.ok} customLinks={customLinks} />
+        <Sidebar
+          isStaff={isStaff}
+          isPlatformAdmin={platformAccess.ok}
+          customLinks={customLinks}
+          tenantName={tenantName}
+          logoUrl={logoUrl}
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar
             breadcrumb={breadcrumb}

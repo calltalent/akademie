@@ -84,7 +84,7 @@ export function NotificationsMenu({
       >
         <Bell size={21} aria-hidden="true" className="text-navy" />
         {unread > 0 && (
-          <span className="absolute right-2 top-2 flex h-[17px] min-w-[17px] items-center justify-center rounded-[9px] border-2 border-white bg-accent px-1 text-[10px] font-bold text-white">
+          <span className="absolute right-2 top-2 flex h-[17px] min-w-[17px] items-center justify-center rounded-[9px] border-2 border-white bg-primary px-1 text-[10px] font-bold text-white">
             {unread}
           </span>
         )}
@@ -102,7 +102,7 @@ export function NotificationsMenu({
           <div className="flex items-center justify-between px-[18px] pb-3 pt-4">
             <span className="text-[16px] font-bold text-ink">Benachrichtigungen</span>
             {unread > 0 && (
-              <button type="button" className="text-[13px] font-semibold text-accent">
+              <button type="button" className="text-[13px] font-semibold text-primary">
                 Alle gelesen
               </button>
             )}
@@ -114,14 +114,14 @@ export function NotificationsMenu({
           ) : (
             <>
               <div className="flex gap-1.5 border-b border-[#EEF0F7] px-[18px] pb-3">
-                <span className="border-b-2 border-accent pb-2 text-sm font-bold text-accent">Ungelesen</span>
+                <span className="border-b-2 border-primary pb-2 text-sm font-bold text-primary">Ungelesen</span>
                 <span className="px-2 pb-2 text-sm font-medium text-muted-400">Gelesen</span>
               </div>
               <div className="max-h-[320px] overflow-auto">
                 {notifications.map((n, i) => (
                   <div key={i} className="flex gap-[13px] border-b border-[#F2F3F9] px-[18px] py-[14px]">
                     <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] bg-[#EEF0FA]">
-                      <span className="h-[15px] w-[15px] rounded-[4px] bg-accent" />
+                      <span className="h-[15px] w-[15px] rounded-[4px] bg-primary" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-[14px] font-medium leading-[1.45] text-ink">{n.text}</p>
@@ -219,7 +219,7 @@ export function ProfileMenu({
             prefetch={false}
             className="flex items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-medium text-navy no-underline"
           >
-            <span className="h-2 w-2 rounded-[2px] bg-accent" />
+            <span className="h-2 w-2 rounded-[2px] bg-primary" />
             Profil ansehen
           </Link>
           <Link
@@ -227,7 +227,7 @@ export function ProfileMenu({
             prefetch={false}
             className="flex items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-medium text-navy no-underline"
           >
-            <span className="h-2 w-2 rounded-[2px] bg-accent" />
+            <span className="h-2 w-2 rounded-[2px] bg-primary" />
             Einstellungen
           </Link>
           <Link
@@ -235,7 +235,7 @@ export function ProfileMenu({
             prefetch={false}
             className="flex items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-medium text-navy no-underline"
           >
-            <span className="h-2 w-2 rounded-[2px] bg-accent" />
+            <span className="h-2 w-2 rounded-[2px] bg-primary" />
             Benachrichtigungen
           </Link>
           <div className="mx-1 my-1.5 h-px bg-[#EEF0F7]" />

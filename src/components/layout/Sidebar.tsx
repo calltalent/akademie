@@ -116,12 +116,19 @@ export function Sidebar({
   isPlatformAdmin = false,
   customLinks = [],
   variant = "rail",
+  tenantName = "Calltalent",
+  logoUrl = null,
 }: {
   active?: SidebarItemId;
   isStaff?: boolean;
   isPlatformAdmin?: boolean;
   customLinks?: SidebarLink[];
   variant?: "rail" | "panel";
+  /** Mandanten-Wortmarke/-Logo (26.07.2026, Josips Fund: "oben links kommt
+   * das Logo von Calltalent statt von Projekt X"). Default bewahrt exakt das
+   * bisherige Calltalent-Aussehen für Mandanten ohne eigenes Logo. */
+  tenantName?: string;
+  logoUrl?: string | null;
 }) {
   const [expanded, setExpanded] = useState(true);
   const pathname = usePathname();
@@ -151,14 +158,14 @@ export function Sidebar({
           "mb-[3px] flex items-center gap-3 rounded-sm px-3 py-[11px] text-[15px] no-underline transition-colors",
           !showLabels ? "justify-center" : "",
           isActive
-            ? "bg-accent font-bold text-white"
+            ? "bg-primary font-bold text-white"
             : "font-medium text-navy hover:bg-[rgba(62,63,102,0.06)]",
         ].join(" ")}
       >
         <Icon size={20} aria-hidden="true" className="flex-shrink-0" />
         {showLabels && <span className="flex-1">{item.label}</span>}
         {showLabels && item.badge && (
-          <span className="flex h-5 min-w-5 items-center justify-center rounded-[10px] bg-accent px-1.5 text-[11px] font-bold text-white">
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-[10px] bg-primary px-1.5 text-[11px] font-bold text-white">
             {item.badge}
           </span>
         )}
@@ -204,20 +211,31 @@ export function Sidebar({
             prefetch={false}
             className="mb-[30px] flex min-h-[34px] items-center gap-3 px-[22px] no-underline"
           >
-            <span
-              className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] bg-accent text-[18px] font-extrabold text-cream"
-              aria-hidden="true"
-            >
-              C
-            </span>
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
+              <img
+                src={logoUrl}
+                alt={tenantName}
+                className="h-[34px] w-[34px] flex-shrink-0 rounded-[9px] object-cover"
+              />
+            ) : (
+              <span
+                className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] bg-primary text-[18px] font-extrabold text-cream"
+                aria-hidden="true"
+              >
+                {tenantName.charAt(0).toUpperCase()}
+              </span>
+            )}
             {expanded && (
-              <span className="leading-[1.15]">
-                <span className="block text-[15px] font-extrabold tracking-[0.02em] text-ink">
-                  CALLTALENT
+              <span className="min-w-0 leading-[1.15]">
+                <span className="block truncate text-[15px] font-extrabold tracking-[0.02em] text-ink">
+                  {tenantName.toUpperCase()}
                 </span>
-                <span className="block text-[11px] font-semibold tracking-[0.28em] text-muted-500">
-                  AKADEMIE
-                </span>
+                {!logoUrl && (
+                  <span className="block text-[11px] font-semibold tracking-[0.28em] text-muted-500">
+                    AKADEMIE
+                  </span>
+                )}
               </span>
             )}
           </Link>

@@ -34,12 +34,16 @@ export function LearnMobileNav({
   customLinks = [],
   user,
   notifications = [],
+  tenantName = "Calltalent",
+  logoUrl = null,
 }: {
   isStaff?: boolean;
   isPlatformAdmin?: boolean;
   customLinks?: SidebarLink[];
   user: TopBarUser;
   notifications?: NotificationItem[];
+  tenantName?: string;
+  logoUrl?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -55,15 +59,24 @@ export function LearnMobileNav({
     <div className="border-b border-border-100 bg-white lg:hidden">
       <div className="flex items-center justify-between px-4 py-3">
         <Link href="/dashboard" prefetch={false} className="flex min-w-0 items-center gap-2.5 no-underline">
-          <span
-            className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-[8px] bg-accent text-[15px] font-extrabold text-cream"
-            aria-hidden="true"
-          >
-            C
-          </span>
-          <span className="leading-[1.1]">
-            <span className="block text-[13px] font-extrabold tracking-[0.02em] text-ink">CALLTALENT</span>
-            <span className="block text-[9px] font-semibold tracking-[0.24em] text-muted-500">AKADEMIE</span>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
+            <img src={logoUrl} alt={tenantName} className="h-[30px] w-[30px] flex-shrink-0 rounded-[8px] object-cover" />
+          ) : (
+            <span
+              className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-[8px] bg-primary text-[15px] font-extrabold text-cream"
+              aria-hidden="true"
+            >
+              {tenantName.charAt(0).toUpperCase()}
+            </span>
+          )}
+          <span className="min-w-0 leading-[1.1]">
+            <span className="block truncate text-[13px] font-extrabold tracking-[0.02em] text-ink">
+              {tenantName.toUpperCase()}
+            </span>
+            {!logoUrl && (
+              <span className="block text-[9px] font-semibold tracking-[0.24em] text-muted-500">AKADEMIE</span>
+            )}
           </span>
         </Link>
 
@@ -97,7 +110,7 @@ export function LearnMobileNav({
             aria-expanded={open}
             aria-controls="learn-mobile-menu"
             aria-label={open ? "Menü schließen" : "Menü öffnen"}
-            className="flex h-10 w-10 flex-none items-center justify-center rounded-md text-navy focus:outline-none focus:ring-2 focus:ring-accent/40"
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-md text-navy focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
             {open ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
           </button>
@@ -111,6 +124,8 @@ export function LearnMobileNav({
             isStaff={isStaff}
             isPlatformAdmin={isPlatformAdmin}
             customLinks={customLinks}
+            tenantName={tenantName}
+            logoUrl={logoUrl}
           />
         </div>
       )}

@@ -259,7 +259,7 @@ function AllgemeinTab({
             <button
               type="submit"
               disabled={profilePending}
-              className="ml-auto rounded-sm bg-accent px-[22px] py-3 text-[15px] font-bold text-white disabled:opacity-50"
+              className="ml-auto rounded-sm bg-primary px-[22px] py-3 text-[15px] font-bold text-white disabled:opacity-50"
             >
               {profilePending ? "Speichert …" : "Änderungen speichern"}
             </button>
@@ -281,7 +281,7 @@ function AllgemeinTab({
               <button
                 type="submit"
                 disabled={emailPending}
-                className="rounded-sm bg-accent px-[18px] py-3 text-[15px] font-bold text-white disabled:opacity-50"
+                className="rounded-sm bg-primary px-[18px] py-3 text-[15px] font-bold text-white disabled:opacity-50"
               >
                 Bestätigungslink senden
               </button>
@@ -474,7 +474,7 @@ function GeraeteTab({ sessions }: { sessions: SessionInfo[] }) {
               style={{ background: "#EEF0FA" }}
               aria-hidden="true"
             >
-              <span className="h-[18px] w-[18px] rounded-[5px] border-2 border-accent" />
+              <span className="h-[18px] w-[18px] rounded-[5px] border-2 border-primary" />
             </span>
             <div className="min-w-0 flex-1">
               <div className="text-[15px] font-bold text-ink">
