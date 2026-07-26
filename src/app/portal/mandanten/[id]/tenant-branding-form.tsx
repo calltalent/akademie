@@ -152,11 +152,15 @@ export function TenantBrandingForm({
         <div className="overflow-hidden rounded-md border border-slate-800">
           <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: colorPrimary }}>
             {logoUrl ? (
+              // BUGFIX (26.07.2026, Josips Fund "Logo wird nicht richtig
+              // angezeigt" — object-cover in einem Quadrat schnitt breite
+              // Icon+Wortmarke-Logos auf einen unlesbaren Mittelstreifen
+              // zu): object-contain statt Quadrat-Zuschnitt.
               // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
               <img
                 src={logoUrl}
                 alt=""
-                className="h-[26px] w-[26px] flex-none rounded-[7px] object-cover object-center"
+                className="h-[26px] w-auto max-w-[130px] object-contain object-left"
               />
             ) : (
               <span

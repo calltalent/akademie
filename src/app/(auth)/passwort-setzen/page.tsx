@@ -44,8 +44,14 @@ export default async function PasswortSetzenPage() {
       >
         <div className="flex items-center gap-3.5">
           {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
-            <img src={logoUrl} alt={tenantName} className="h-11 w-11 flex-none rounded-[11px] object-cover" />
+            // BUGFIX (26.07.2026, siehe Sidebar.tsx-Kommentar zum selben
+            // Fund): volles Logo per object-contain, in weißer Kachel — das
+            // dunkle Marken-Panel würde ein Logo mit dunklem Text/Icon sonst
+            // fast unsichtbar machen.
+            <div className="flex h-11 flex-none items-center rounded-[11px] bg-white px-3">
+              {/* eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert */}
+              <img src={logoUrl} alt={tenantName} className="h-7 w-auto max-w-[170px] object-contain" />
+            </div>
           ) : (
             <div
               className="flex h-11 w-11 flex-none items-center justify-center rounded-[11px] text-xl font-extrabold"
@@ -55,14 +61,14 @@ export default async function PasswortSetzenPage() {
               {tenantName.charAt(0).toUpperCase()}
             </div>
           )}
-          <div className="leading-tight">
-            <div className="text-lg font-extrabold tracking-tight text-white">{tenantName.toUpperCase()}</div>
-            {!logoUrl && (
+          {!logoUrl && (
+            <div className="leading-tight">
+              <div className="text-lg font-extrabold tracking-tight text-white">{tenantName.toUpperCase()}</div>
               <div className="text-xs font-semibold" style={{ color: "#C9CBE6", letterSpacing: "0.3em" }}>
                 AKADEMIE
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="max-w-[440px]">
@@ -82,27 +88,29 @@ export default async function PasswortSetzenPage() {
         {/* Mobile-Kopfzeile — gleiches Muster wie login/login-form.tsx. */}
         <div className="flex items-center gap-3 border-b px-6 py-4 lg:hidden" style={{ borderColor: "#E7E8F2" }}>
           {logoUrl ? (
+            // Volles Logo statt Quadrat-Zuschnitt (siehe Sidebar.tsx-Kommentar) —
+            // weißer Untergrund hier, kein Kachel-Wrapper nötig.
             // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
-            <img src={logoUrl} alt={tenantName} className="h-9 w-9 flex-none rounded-[9px] object-cover" />
+            <img src={logoUrl} alt={tenantName} className="h-9 w-auto max-w-[160px] object-contain object-left" />
           ) : (
-            <div
-              className="flex h-9 w-9 flex-none items-center justify-center rounded-[9px] text-base font-extrabold"
-              style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
-              aria-hidden="true"
-            >
-              {tenantName.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div className="leading-tight">
-            <div className="text-sm font-extrabold tracking-tight" style={{ color: "#1A1A2E" }}>
-              {tenantName.toUpperCase()}
-            </div>
-            {!logoUrl && (
-              <div className="text-[10px] font-semibold" style={{ color: "#66679B", letterSpacing: "0.28em" }}>
-                AKADEMIE
+            <>
+              <div
+                className="flex h-9 w-9 flex-none items-center justify-center rounded-[9px] text-base font-extrabold"
+                style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
+                aria-hidden="true"
+              >
+                {tenantName.charAt(0).toUpperCase()}
               </div>
-            )}
-          </div>
+              <div className="leading-tight">
+                <div className="text-sm font-extrabold tracking-tight" style={{ color: "#1A1A2E" }}>
+                  {tenantName.toUpperCase()}
+                </div>
+                <div className="text-[10px] font-semibold" style={{ color: "#66679B", letterSpacing: "0.28em" }}>
+                  AKADEMIE
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 lg:px-8 lg:py-12">

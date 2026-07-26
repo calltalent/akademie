@@ -60,24 +60,26 @@ export function LearnMobileNav({
       <div className="flex items-center justify-between px-4 py-3">
         <Link href="/dashboard" prefetch={false} className="flex min-w-0 items-center gap-2.5 no-underline">
           {logoUrl ? (
+            // Volles Logo statt Quadrat-Zuschnitt (siehe Sidebar.tsx-Kommentar
+            // zum selben Fund) — object-contain zeigt das Logo unbeschnitten.
             // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
-            <img src={logoUrl} alt={tenantName} className="h-[30px] w-[30px] flex-shrink-0 rounded-[8px] object-cover" />
+            <img src={logoUrl} alt={tenantName} className="h-[30px] w-auto max-w-[140px] object-contain object-left" />
           ) : (
-            <span
-              className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-[8px] bg-primary text-[15px] font-extrabold text-cream"
-              aria-hidden="true"
-            >
-              {tenantName.charAt(0).toUpperCase()}
-            </span>
+            <>
+              <span
+                className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-[8px] bg-primary text-[15px] font-extrabold text-cream"
+                aria-hidden="true"
+              >
+                {tenantName.charAt(0).toUpperCase()}
+              </span>
+              <span className="min-w-0 leading-[1.1]">
+                <span className="block truncate text-[13px] font-extrabold tracking-[0.02em] text-ink">
+                  {tenantName.toUpperCase()}
+                </span>
+                <span className="block text-[9px] font-semibold tracking-[0.24em] text-muted-500">AKADEMIE</span>
+              </span>
+            </>
           )}
-          <span className="min-w-0 leading-[1.1]">
-            <span className="block truncate text-[13px] font-extrabold tracking-[0.02em] text-ink">
-              {tenantName.toUpperCase()}
-            </span>
-            {!logoUrl && (
-              <span className="block text-[9px] font-semibold tracking-[0.24em] text-muted-500">AKADEMIE</span>
-            )}
-          </span>
         </Link>
 
         <div className="flex flex-shrink-0 items-center gap-2">

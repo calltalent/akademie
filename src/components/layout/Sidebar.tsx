@@ -205,18 +205,33 @@ export function Sidebar({
     >
       {!isPanel && (
         <>
-          {/* Wortmarke + Logomarke */}
+          {/* Wortmarke + Logomarke.
+              BUGFIX (26.07.2026, Josips Fund: "Logo links oben wird nicht
+              richtig angezeigt"): erzwang bisher IMMER ein 34×34-Quadrat mit
+              `object-cover` — passend für ein reines Icon (wie Calltalents
+              eigenes "C"), aber ein hochgeladenes Mandanten-Logo ist meist
+              ein VOLLES, breites Icon+Wortmarke-Lockup (bei Projekt X
+              2280×660px). `object-cover` in einem Quadrat schneidet davon
+              nur einen schmalen, meist unlesbaren Mittelstreifen aus (sah
+              wie abgeschnittener Text "PROJ" aus) — UND daneben stand
+              zusätzlich noch einmal redundant der Mandantenname als Text,
+              obwohl das Logo ihn oft schon selbst enthält. Jetzt: im
+              ausgeklappten Zustand zeigt ein eigenes Logo die volle Breite
+              per `object-contain` (keine Beschneidung) OHNE den redundanten
+              Text daneben; im eingeklappten Zustand (nur 84px, kein Platz
+              für ein breites Logo) bleibt es bei der Initiale im Quadrat —
+              exakt wie zuvor, unabhängig vom Logo. */}
           <Link
             href="/dashboard"
             prefetch={false}
             className="mb-[30px] flex min-h-[34px] items-center gap-3 px-[22px] no-underline"
           >
-            {logoUrl ? (
+            {logoUrl && expanded ? (
               // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
               <img
                 src={logoUrl}
                 alt={tenantName}
-                className="h-[34px] w-[34px] flex-shrink-0 rounded-[9px] object-cover"
+                className="h-[34px] w-auto max-w-[190px] flex-shrink-0 object-contain object-left"
               />
             ) : (
               <span
@@ -226,16 +241,14 @@ export function Sidebar({
                 {tenantName.charAt(0).toUpperCase()}
               </span>
             )}
-            {expanded && (
+            {expanded && !logoUrl && (
               <span className="min-w-0 leading-[1.15]">
                 <span className="block truncate text-[15px] font-extrabold tracking-[0.02em] text-ink">
                   {tenantName.toUpperCase()}
                 </span>
-                {!logoUrl && (
-                  <span className="block text-[11px] font-semibold tracking-[0.28em] text-muted-500">
-                    AKADEMIE
-                  </span>
-                )}
+                <span className="block text-[11px] font-semibold tracking-[0.28em] text-muted-500">
+                  AKADEMIE
+                </span>
               </span>
             )}
           </Link>
