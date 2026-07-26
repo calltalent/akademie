@@ -10,6 +10,7 @@ import { z } from "zod";
 export const CONTACT_SUBJECTS = [
   "Zugang / Anmeldung",
   "Frage zu einem Kurs",
+  "Feedback zu einer Lektion",
   "Zusammenarbeit",
   "Sonstiges",
 ] as const;

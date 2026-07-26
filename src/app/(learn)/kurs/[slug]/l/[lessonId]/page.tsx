@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, ArrowLeft, Check, Play, ListVideo, ChevronRight, Star } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Play, ListVideo, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
@@ -9,6 +9,7 @@ import { BlockRenderer } from "@/components/learn/block-renderer";
 import { CompleteLessonButton } from "@/components/learn/complete-lesson-button";
 import { TutorPanel } from "@/components/learn/tutor-panel";
 import { BookmarkButton } from "@/components/learn/bookmark-button";
+import { LessonFeedbackToggle } from "@/components/learn/lesson-feedback";
 import { AppShell } from "@/components/learn/app-shell";
 
 const ACCENT = "#5663AE";
@@ -160,6 +161,12 @@ export default async function LessonPage({
     profile?.full_name?.trim() ||
     (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : "zurück");
 
+  // Best-effort Vor-/Nachname-Aufteilung für die Feedback-Formular-Vorbelegung
+  // (LessonFeedbackToggle) — echte Daten (profiles.full_name bzw. Fallback
+  // displayName), nur heuristisch am ersten Leerzeichen getrennt.
+  const [feedbackFirstName, ...feedbackLastNameParts] = displayName.split(" ");
+  const feedbackLastName = feedbackLastNameParts.join(" ");
+
   const parsedBlocks = blocksSchema.safeParse(lesson.blocks);
   const blocks: Block[] = parsedBlocks.success ? (parsedBlocks.data as Block[]) : [];
 
@@ -256,15 +263,13 @@ export default async function LessonPage({
             >
               <div className="flex items-center gap-2.5">
                 <BookmarkButton lessonId={lessonId} courseSlug={slug} initiallyBookmarked={Boolean(bookmarkRow)} />
-                <Link
-                  href="/kontakt"
-                  aria-label="Feedback geben"
-                  title="Feedback geben"
-                  className="inline-flex h-[42px] w-[42px] flex-none items-center justify-center rounded-[11px] border bg-white no-underline"
-                  style={{ borderColor: "#D8DAEA", color: NAVY }}
-                >
-                  <Star size={18} color={ACCENT} strokeWidth={2} aria-hidden="true" />
-                </Link>
+                <LessonFeedbackToggle
+                  courseTitle={course.title}
+                  lessonTitle={lesson.title}
+                  userFirstName={feedbackFirstName ?? ""}
+                  userLastName={feedbackLastName}
+                  userEmail={user.email ?? ""}
+                />
               </div>
               <div className="flex items-center gap-3">
                 {progressRow?.status === "completed" && (
@@ -280,6 +285,11 @@ export default async function LessonPage({
               </div>
             </div>
           </div>
+
+          {/* Portal-Ziel für LessonFeedbackToggle — das Feedback-Panel wird
+              per createPortal hierher gerendert, direkt unter die
+              Lektions-Karte (siehe Kopfkommentar in lesson-feedback.tsx). */}
+          <div id="lesson-feedback-panel-target" />
 
           {/* Zusammenfassung/Kapitel/Transkript — nur wenn real vorhanden. */}
           {lesson.summary ? (
