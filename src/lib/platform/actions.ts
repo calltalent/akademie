@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { requirePlatformAdmin } from "@/lib/platform/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
@@ -40,7 +39,10 @@ import { genericErrorMessage } from "@/lib/errors/generic";
  * try/catch sonst als regulaerer Fehler abgefangen wuerde. `createTenant`
  * liefert bei Erfolg stattdessen `{ok:true→error:null,success:true,id,slug}`
  * zurueck — der Redirect zur Detailseite passiert client-seitig in
- * `neu/page.tsx` per `useRouter()` in einem `useEffect`.
+ * `neu/page.tsx` per `useRouter()` in einem `useEffect`. `deleteTenant`
+ * folgt seit 26.07.2026 (Josips Fund: "Löschen dauert sehr lange") demselben
+ * Muster — siehe dortiger Kommentar zur Vorgeschichte (serverseitiges
+ * `redirect()` war hier zwischenzeitlich die einzige Ausnahme).
  */
 
 export type PlatformActionState = {
@@ -234,30 +236,30 @@ export async function deleteTenant(
   _prevState: PlatformActionState,
   formData: FormData,
 ): Promise<PlatformActionState> {
-  // BUGFIX (Phase 5, Block 8, 12.07.2026, Josips Fund: "nach dem Löschen vom
-  // Mandanten erscheint ein weißer Bildschirm"). Ursache: das Lösch-Formular
-  // sitzt auf genau der Seite (/portal/mandanten/[id]), deren Datensatz
-  // gerade gelöscht wird. Next.js rendert nach einer per <form action=...>
-  // aufgerufenen Server Action die AUFRUFENDE Route automatisch neu (RSC-
-  // Refresh) — noch BEVOR der client-seitige `router.push()` in
-  // mandant-delete-form.tsx greifen konnte. Diese Neu-Rendering versucht,
-  // den bereits gelöschten Mandanten zu laden, `tenant.maybeSingle()`
-  // liefert `null`, `notFound()` wird geworfen — und dessen Darstellung
-  // unter dem OpenNext-Cloudflare-Adapter blieb hier leer statt einer
-  // sauberen 404-Seite.
+  // BUGFIX (26.07.2026, Josips Fund: "das Löschen dauert sehr lange, ähnlich
+  // wie früher bei der Löschung von Kursen"). War bisher ein serverseitiges
+  // `redirect()` DIREKT hier (siehe Git-Historie) — Fix für den damaligen
+  // "weißer Bildschirm"-Fund (12.07.2026): das Lösch-Formular sitzt auf
+  // genau der Seite (/portal/mandanten/[id]), deren Datensatz gerade
+  // gelöscht wird, Next.js rendert die aufrufende Route nach der Server
+  // Action automatisch neu (RSC-Refresh) — noch BEVOR ein client-seitiges
+  // `router.push()` greifen konnte —, und das damalige `notFound()` auf
+  // dieser (jetzt gelöschten) Seite blieb unter dem OpenNext-Cloudflare-
+  // Adapter dabei leer statt einer sauberen 404-Seite. Ein `redirect()`
+  // INNERHALB einer per `<form action={fn}>`/`useActionState` JS-gebunden
+  // aufgerufenen Server Action läuft auf dieser Plattform aber reproduzierbar
+  // 20+ Sekunden statt <1,5s (exakt dieselbe Fehlerklasse wie bei
+  // signInWithPassword()/deleteCourse(), siehe dortige Kommentare) — genau
+  // das war Josips heutiger Fund.
   //
-  // Fix: statt `{error:null,success:true}` zurückzugeben und die Navigation
-  // dem Client zu überlassen, wird HIER serverseitig direkt per
-  // `redirect()` (next/navigation) weitergeleitet — Next.js behandelt das
-  // als Teil der Server-Action-Antwort und rendert die (gelöschte) Route
-  // dabei nie erneut. WICHTIG (wie im Datei-Kommentar oben zu
-  // `createTenant`/`updateTenant` bereits dokumentiert): `redirect()` wirft
-  // intern eine spezielle Next.js-Exception, die von einem umgebenden
-  // try/catch fälschlich als regulärer Fehler abgefangen würde — deshalb
-  // hier bewusst AUSSERHALB des try/catch-Blocks aufgerufen, erst nachdem
-  // der eigentliche Lösch-Vorgang (inkl. aller Fehlerfälle) bereits
-  // abgeschlossen ist.
-  let deleted = false;
+  // Fix jetzt: `/portal/mandanten/[id]/page.tsx` wirft bei fehlendem
+  // Mandanten nicht mehr `notFound()`, sondern rendert eine gewöhnliche
+  // Inline-Meldung (kein Exception-Pfad mehr, der unter OpenNext bricht) —
+  // der o. g. RSC-Zwischenzustand zeigt dadurch jetzt einfach kurz diese
+  // Meldung, statt zu brechen. Dadurch kann hier wieder auf die schnelle,
+  // rein client-seitige Navigation umgestellt werden: `{error:null,
+  // success:true}` zurückgeben, `mandant-delete-form.tsx` navigiert selbst
+  // per `router.push()`.
   try {
     const { user } = await requirePlatformAdmin();
 
@@ -284,17 +286,11 @@ export async function deleteTenant(
       return { error: "Löschen fehlgeschlagen: " + translateDbError(error) };
     }
 
-    deleted = true;
+    revalidatePath("/portal/mandanten");
+    return { error: null, success: true };
   } catch (e) {
     return errorState(e);
   }
-
-  if (deleted) {
-    revalidatePath("/portal/mandanten");
-    redirect("/portal/mandanten");
-  }
-
-  return { error: "Unbekannter Fehler beim Löschen." };
 }
 
 export async function updateTenant(

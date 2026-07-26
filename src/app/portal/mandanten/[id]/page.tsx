@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -67,8 +66,35 @@ export default async function MandantDetailPage({
     .eq("id", id)
     .maybeSingle();
 
+  // BUGFIX (26.07.2026, Josips Fund: "Löschen dauert sehr lange, ähnlich wie
+  // früher bei Kursen"): war bisher `notFound()` (next/navigation) — beim
+  // Löschen dieses Mandanten rendert Next.js nach der Server Action
+  // automatisch dieselbe Route neu (RSC-Refresh), noch bevor der
+  // client-seitige router.push() in mandant-delete-form.tsx greifen kann.
+  // `notFound()` wirft dabei die Next-eigene NEXT_NOT_FOUND-Exception, deren
+  // Darstellung unter dem OpenNext-Cloudflare-Adapter genau in diesem
+  // Zwischenzustand leer blieb (siehe deleteTenant()-Kopfkommentar in
+  // platform/actions.ts, ursprünglich 12.07.2026 gefunden) — der bisherige
+  // Fix dafür war ein serverseitiges redirect() DIREKT in der Server Action,
+  // das auf dieser Plattform reproduzierbar 20+ Sekunden brauchte (exakt
+  // dieselbe Fehlerklasse wie bei signInWithPassword()/deleteCourse(), siehe
+  // dortige Kommentare). Jetzt: eine normale, nicht werfende Inline-Meldung
+  // (gleiches Muster wie admin/kurse/[id]/page.tsx bei einem gelöschten
+  // Kurs) statt notFound() — der kurze Zwischenzustand zeigt jetzt einfach
+  // diese Meldung statt zu brechen, wodurch deleteTenant() wieder auf die
+  // schnelle, rein client-seitige Navigation umstellen kann.
   if (!tenant) {
-    notFound();
+    return (
+      <div className="max-w-lg">
+        <h1 className="text-xl font-bold text-slate-50">Mandant nicht gefunden</h1>
+        <p className="mt-2 text-sm text-slate-400">
+          Dieser Mandant wurde nicht gefunden oder wurde bereits gelöscht.
+        </p>
+        <Link href="/portal/mandanten" className="mt-4 inline-block text-sm font-semibold text-indigo-400">
+          Zurück zur Mandantenliste →
+        </Link>
+      </div>
+    );
   }
 
   // Polarität wie an den jeweiligen Gate-Stellen geprüft (siehe

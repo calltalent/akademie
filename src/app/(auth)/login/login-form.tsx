@@ -65,19 +65,44 @@ export function LoginForm({
     signInWithMagicLink,
     initialState,
   );
-  // Lazy-initialisiert statt per Effect gesetzt (gleiches Muster wie der
-  // Portal-Ziel-Lookup in components/learn/lesson-feedback.tsx): das
-  // Auslesen ist eine reine, synchrone Berechnung aus dem bereits beim
-  // ersten Rendern vorhandenen `window.location.hash` — kein Grund, dafür
-  // einen zusätzlichen Render-Zyklus über `setState` in einem Effect zu
-  // erzwingen (react-hooks/set-state-in-effect).
-  const [linkError] = useState<string | null>(() => {
-    if (typeof window === "undefined" || !window.location.hash) return null;
+  // BUGFIX (26.07.2026, Josips Fund: Hydration-Fehler beim Laden mit
+  // "?fehler=anmeldung"/Hash-Fehler): stand hier ursprünglich als lazy
+  // `useState(() => …)`-Initialisierer (gleiches Muster wie der
+  // Portal-Ziel-Lookup in components/learn/lesson-feedback.tsx) — DORT
+  // sicher, weil der gelesene Wert erst nach einem Nutzerklick überhaupt
+  // in die Darstellung einfließt. HIER entscheidet der Wert aber sofort
+  // beim allerersten Rendern, ob die Warnbox erscheint — diese Seite wird
+  // aber (wie jede Server-Component-Seite) auch serverseitig vor-gerendert,
+  // wo `window` nicht existiert. Server-Rendering lieferte deshalb IMMER
+  // "kein Fehler", das anschließende Client-Rendering beim allerersten
+  // Durchlauf (der Initialisierer läuft dort synchron mit echtem `window`)
+  // dagegen bei einer Fehler-URL sofort "Fehler" — genau der Unterschied,
+  // den React beim Hydrieren als Mismatch abbricht. Deshalb jetzt bewusst
+  // per Effect (ausnahmsweise legitim trotz react-hooks/set-state-in-effect,
+  // da `window.location` grundsätzlich erst nach der Hydration verfügbar
+  // ist): Start-Wert `null` ist auf Server UND beim ersten Client-Rendern
+  // identisch, der Effect löst danach einen zweiten, rein client-seitigen
+  // Render-Durchlauf aus — kein Mismatch mehr möglich.
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // "?fehler=anmeldung" kommt von unserem eigenen /auth/callback (siehe
+    // dortiger Kopfkommentar): der Token-Austausch selbst ist fehlgeschlagen,
+    // NACHDEM Supabases eigener Verify-Schritt schon erfolgreich war — ein
+    // anderer Fehlerfall als das Hash-Fragment unten (das kommt direkt von
+    // Supabase, VOR unserem Callback).
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get("fehler") === "anmeldung") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- window.location ist erst nach der Hydration verfügbar, siehe Kommentar oben
+      setLinkError(DEFAULT_LINK_ERROR_MESSAGE);
+      return;
+    }
+    if (!window.location.hash) return;
     const hashParams = new URLSearchParams(window.location.hash.slice(1));
     const errorCode = hashParams.get("error_code");
-    if (!hashParams.get("error") && !errorCode) return null;
-    return (errorCode && LINK_ERROR_MESSAGES[errorCode]) || DEFAULT_LINK_ERROR_MESSAGE;
-  });
+    if (!hashParams.get("error") && !errorCode) return;
+    setLinkError((errorCode && LINK_ERROR_MESSAGES[errorCode]) || DEFAULT_LINK_ERROR_MESSAGE);
+  }, []);
 
   // BUGFIX (22.07.2026, Josips Fund: Login dauert 20+ Sekunden): siehe
   // ausführliche Begründung in lib/auth/actions.ts (signInWithPassword) —
@@ -106,7 +131,10 @@ export function LoginForm({
   // er ausgelesen ist — ein Neuladen soll die Meldung nicht endlos wiederholen.
   useEffect(() => {
     if (linkError) {
-      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      const cleanParams = new URLSearchParams(window.location.search);
+      cleanParams.delete("fehler");
+      const query = cleanParams.toString();
+      window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""));
     }
   }, [linkError]);
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { deleteTenant } from "@/lib/platform/actions";
 import type { PlatformActionState } from "@/lib/platform/actions";
 
@@ -18,13 +19,15 @@ const initialState: PlatformActionState = { error: null };
  * das zusätzlich noch einmal serverseitig (nie nur Client-seitige Prüfung
  * bei einer destruktiven Aktion).
  *
- * BUGFIX (12.07.2026, Josips Fund "weißer Bildschirm nach dem Löschen"):
- * die Weiterleitung nach erfolgreichem Löschen passiert jetzt serverseitig
- * per `redirect()` DIREKT in `deleteTenant()` (siehe dortiger Kommentar) —
- * kein client-seitiges `router.push()` mehr nötig. Der `state.success`-Fall
- * tritt praktisch nie ein (bei Erfolg leitet die Server Action um, bevor
- * ein Rückgabewert beim Client ankommt); es bleibt nur noch der
- * Fehler-Zweig zu behandeln.
+ * BUGFIX (12.07.2026, Josips Fund "weißer Bildschirm nach dem Löschen"),
+ * WIEDER GEÄNDERT (26.07.2026, Josips Fund "Löschen dauert sehr lange"):
+ * lag zwischenzeitlich an einem serverseitigen `redirect()` DIREKT in
+ * `deleteTenant()` — behob den weißen Bildschirm, kostete aber 20+ Sekunden
+ * (siehe ausführliche Begründung im dortigen Kopfkommentar). Jetzt navigiert
+ * dieser Client wieder selbst per `router.push()`, sobald `state.success`
+ * eintrifft — der frühere weiße Bildschirm ist stattdessen dort behoben
+ * (`/portal/mandanten/[id]/page.tsx` wirft bei fehlendem Mandanten kein
+ * `notFound()` mehr, sondern zeigt eine gewöhnliche Inline-Meldung).
  *
  * Design-Update (19.07.2026, Claude-Design-Import MandantenDetail.dc.html,
  * „Gefahrenzone"): dunkles Karten-Layout mit rotem Rahmen statt Slate
@@ -38,6 +41,11 @@ export function MandantDeleteForm({ tenantId, slug }: { tenantId: string; slug: 
   const [state, formAction, pending] = useActionState(boundDelete, initialState);
   const [confirmValue, setConfirmValue] = useState("");
   const canDelete = confirmValue.trim().toLowerCase() === slug;
+  const router = useRouter();
+
+  useEffect(() => {
+    if (state.success) router.push("/portal/mandanten");
+  }, [state.success, router]);
 
   return (
     <form
