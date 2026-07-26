@@ -34,7 +34,7 @@ export async function CourseHeroHeader({
   userId: string;
   course: { id: string; title: string; description: string | null; cover_url: string | null };
   slug: string;
-  activeTab: "overview" | "information";
+  activeTab: "overview" | "information" | "lesezeichen";
 }) {
   const supabase = await createClient();
 
@@ -140,8 +140,13 @@ export async function CourseHeroHeader({
           `aria-label`/`title` zugänglich, exakt wie bei `CourseCategorySelect`s
           `compact`-Fall. DRITTER Tab "Information" (24.07.2026,
           Informations-Tab nach Baulig-Vorbild) — `activeTab`-gesteuert:
-          Übersicht und Information können beide aktiv sein, Lesezeichen
-          bleibt nie aktiv (eigene Seite außerhalb dieses Kurs-Kontexts). */}
+          Übersicht, Information und Lesezeichen können jeweils aktiv sein.
+          NACHTRAG (26.07.2026, Josips Auftrag "eigene Lesezeichen-Sammlung
+          pro Kurs"): der Lesezeichen-Tab führt jetzt auf die kursinterne
+          Lesezeichen-Seite (`/kurs/[slug]/lesezeichen`, nur Lektionen DIESES
+          Kurses) statt auf die globale `/lesezeichen`-Seite. Die globale
+          Seite bleibt unverändert über den Sidebar-Link "Lesezeichen"
+          erreichbar und zeigt weiterhin alle Kurse. */}
       <div className="my-[18px] mb-6 flex justify-start gap-2.5">
         <TabIconButton
           active={activeTab === "overview"}
@@ -169,8 +174,8 @@ export async function CourseHeroHeader({
           )}
         />
         <TabIconButton
-          active={false}
-          href="/lesezeichen"
+          active={activeTab === "lesezeichen"}
+          href={`/kurs/${slug}/lesezeichen`}
           label="Lesezeichen"
           icon={(color) => (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

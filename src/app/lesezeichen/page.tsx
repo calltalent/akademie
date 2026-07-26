@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { Check, Play } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { AppShell } from "@/components/learn/app-shell";
 import { getVideoThumbnailUrl } from "@/lib/bunny/client";
+import { BookmarksCourseList } from "@/components/learn/bookmarks-course-list";
 
 /**
  * BUGFIX (23.07.2026, Josips Fund: "in Lesezeichen gespeichert, erscheint
@@ -28,8 +28,6 @@ function embeddedOne<T>(value: T[] | T | null | undefined): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-const ACCENT = "#5663AE";
-
 /**
  * Design-Update (23.07.2026, Josips Auftrag): Lesezeichen jetzt nach Kurs
  * gruppiert statt einer flachen Liste — je Kurs eine Karte mit Titelbild,
@@ -40,6 +38,13 @@ const ACCENT = "#5663AE";
  * echtem Bunny-Vorschaubild (bisher nur eine Platzhalterfläche) und
  * Erledigt-Häkchen (gleiche Optik wie die Lektionsliste auf der
  * Modul-Detailseite, kurs/[slug]/m/[moduleId]/page.tsx).
+ *
+ * NACHTRAG (26.07.2026, Josips Auftrag "Lesezeichen für alle Kurse ähnlich
+ * wie bei Baulig anordnen"): die Pro-Kurs-Karten sind jetzt ein Akkordeon
+ * (Titel + Anzahl "N Lesezeichen" eingeklappt, Lektionsliste erst nach
+ * Klick sichtbar) statt immer offener Listen — Rendering dafür in die
+ * Client-Komponente `BookmarksCourseList` ausgelagert, die Datenermittlung
+ * (Gruppierung nach Kurs) bleibt unverändert hier im Server Component.
  */
 export default async function LesezeichenPage() {
   const supabase = await createClient();
@@ -153,108 +158,7 @@ export default async function LesezeichenPage() {
           Noch keine Lesezeichen. Markiere eine Lektion über den „Lesezeichen&quot;-Button im Kurs.
         </div>
       ) : (
-        <div className="flex max-w-[820px] flex-col gap-5">
-          {courseGroups.map((group) => {
-            const doneCount = group.lessons.filter((l) => l.completed).length;
-            return (
-              <div
-                key={group.courseId}
-                className="overflow-hidden rounded-2xl border bg-white"
-                style={{ borderColor: "#E7E8F2" }}
-              >
-                <div className="flex items-center gap-4" style={{ borderBottom: "1px solid #EEF0F7", padding: "18px 20px" }}>
-                  {group.courseCoverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
-                    <img
-                      src={group.courseCoverUrl}
-                      alt=""
-                      className="h-14 w-14 flex-none rounded-xl object-cover"
-                    />
-                  ) : (
-                    <span
-                      className="h-14 w-14 flex-none rounded-xl"
-                      style={{ background: "#DFE2F4" }}
-                      aria-hidden="true"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <a
-                      href={`/kurs/${group.courseSlug}`}
-                      className="text-base font-extrabold no-underline"
-                      style={{ color: "#1A1A2E" }}
-                    >
-                      {group.courseTitle}
-                    </a>
-                    {group.courseDescription && (
-                      <p className="mt-0.5 truncate text-sm" style={{ color: "#66679B" }}>
-                        {group.courseDescription}
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className="flex-none rounded-[8px] px-2.5 py-1 text-xs font-bold"
-                    style={{
-                      color: doneCount === group.lessons.length ? "#1F8A5B" : ACCENT,
-                      background: doneCount === group.lessons.length ? "#E3F2EA" : "#EAEBF7",
-                    }}
-                  >
-                    {doneCount} von {group.lessons.length} erledigt
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-1.5 p-3">
-                  {group.lessons.map((item) => (
-                    <a
-                      key={item.bookmarkId}
-                      href={`/kurs/${group.courseSlug}/l/${item.lessonId}`}
-                      className="flex items-center gap-3.5 rounded-xl px-2.5 py-2 no-underline"
-                      style={{ background: "transparent" }}
-                    >
-                      <span
-                        className="relative flex h-11 w-[64px] flex-none items-center justify-center overflow-hidden rounded-[8px]"
-                        style={
-                          item.thumbnailUrl
-                            ? undefined
-                            : {
-                                backgroundColor: "#DFE2F4",
-                                backgroundImage:
-                                  "repeating-linear-gradient(45deg,#DFE2F4 0 9px, rgba(255,255,255,.55) 9px 18px)",
-                              }
-                        }
-                        aria-hidden="true"
-                      >
-                        {item.thumbnailUrl && (
-                          // eslint-disable-next-line @next/next/no-img-element -- Bunny-CDN-URL, kein next/image-Loader konfiguriert
-                          <img
-                            src={item.thumbnailUrl}
-                            alt=""
-                            className="absolute inset-0 h-full w-full object-cover object-center"
-                          />
-                        )}
-                        <span
-                          className="relative flex h-5 w-5 items-center justify-center rounded-full"
-                          style={{ background: ACCENT }}
-                        >
-                          <Play size={9} color="#fff" fill="#fff" />
-                        </span>
-                      </span>
-                      <span className="min-w-0 flex-1 text-[15px] font-bold" style={{ color: "#1A1A2E" }}>
-                        {item.title}
-                      </span>
-                      <span
-                        className="flex h-7 w-7 flex-none items-center justify-center rounded-full"
-                        style={{ background: item.completed ? "#E4F5EC" : "#F0F1F8" }}
-                        aria-hidden="true"
-                      >
-                        <Check size={13} strokeWidth={3} color={item.completed ? "#3CA36A" : "#C6C8DC"} />
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <BookmarksCourseList groups={courseGroups} />
       )}
     </AppShell>
   );
