@@ -1,8 +1,7 @@
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { NewPasswordForm } from "./new-password-form";
-
-const DEFAULT_TENANT_NAME = "Calltalent";
 
 /**
  * Design-Update (26.07.2026, Josips Auftrag "Design für Passwort erstellen
@@ -22,11 +21,20 @@ const DEFAULT_TENANT_NAME = "Calltalent";
  */
 export default async function PasswortSetzenPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const tenant = await getTenant();
-  const tenantName = tenant?.name || DEFAULT_TENANT_NAME;
+  const [
+    {
+      data: { user },
+    },
+    tenant,
+    t,
+    tShared,
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    getTenant(),
+    getTranslations("auth.passwordSet"),
+    getTranslations("auth.shared"),
+  ]);
+  const tenantName = tenant?.name || t("defaultTenantName");
   const logoUrl = tenant?.branding?.logo_url ?? null;
 
   return (
@@ -65,16 +73,16 @@ export default async function PasswortSetzenPage() {
             <div className="leading-tight">
               <div className="text-lg font-extrabold tracking-tight text-white">{tenantName.toUpperCase()}</div>
               <div className="text-xs font-semibold" style={{ color: "#C9CBE6", letterSpacing: "0.3em" }}>
-                AKADEMIE
+                {tShared("brandSuffix")}
               </div>
             </div>
           )}
         </div>
 
         <div className="max-w-[440px]">
-          <h2 className="mb-3.5 text-[34px] font-extrabold leading-tight text-white">Fast geschafft.</h2>
+          <h2 className="mb-3.5 text-[34px] font-extrabold leading-tight text-white">{t("brandHeading")}</h2>
           <p className="text-[17px]" style={{ color: "#DDDEEE" }}>
-            Leg jetzt dein Passwort fest — danach kannst du dich direkt anmelden.
+            {t("brandSubheading")}
           </p>
         </div>
 
@@ -106,7 +114,7 @@ export default async function PasswortSetzenPage() {
                   {tenantName.toUpperCase()}
                 </div>
                 <div className="text-[10px] font-semibold" style={{ color: "#66679B", letterSpacing: "0.28em" }}>
-                  AKADEMIE
+                  {tShared("brandSuffix")}
                 </div>
               </div>
             </>
@@ -116,27 +124,30 @@ export default async function PasswortSetzenPage() {
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 lg:px-8 lg:py-12">
           <div className="flex w-full max-w-[400px] flex-col">
             <h1 className="mb-1.5 text-[28px] font-extrabold" style={{ color: "#1A1A2E" }}>
-              Passwort setzen
+              {t("title")}
             </h1>
 
             {user ? (
               <>
                 <p className="mb-8 text-base" style={{ color: "#66679B" }}>
-                  Lege ein Passwort für <strong style={{ color: "#1A1A2E" }}>{user.email}</strong> fest.
+                  {t.rich("descriptionForUser", {
+                    email: user.email ?? "",
+                    b: (chunks) => <strong style={{ color: "#1A1A2E" }}>{chunks}</strong>,
+                  })}
                 </p>
                 <NewPasswordForm />
               </>
             ) : (
               <>
                 <p className="mb-8 text-base" style={{ color: "#66679B" }}>
-                  Dieser Link ist abgelaufen oder wurde bereits verwendet.
+                  {t("expiredLink")}
                 </p>
                 <a
                   href="/passwort-vergessen"
                   className="flex items-center justify-center gap-[9px] rounded-xl py-3.5 text-base font-bold text-white no-underline"
                   style={{ background: "var(--color-primary)" }}
                 >
-                  Neuen Link anfordern
+                  {t("requestNewLink")}
                 </a>
               </>
             )}

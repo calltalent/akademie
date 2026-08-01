@@ -1,21 +1,23 @@
 "use client";
 
 import { useActionState } from "react";
+import { useTranslations } from "next-intl";
 import { signUpWithPassword } from "@/lib/auth/actions";
 import type { AuthActionState } from "@/lib/auth/actions";
 
 const initialState: AuthActionState = { error: null };
 
 export default function RegistrierenPage() {
+  const t = useTranslations("auth.register");
   const [state, action, pending] = useActionState(signUpWithPassword, initialState);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
-      <h1 className="text-2xl font-semibold">Registrieren</h1>
+      <h1 className="text-2xl font-semibold">{t("title")}</h1>
 
       <form action={action} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm">
-          Name
+          {t("nameLabel")}
           <input
             name="fullName"
             type="text"
@@ -25,7 +27,7 @@ export default function RegistrierenPage() {
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          E-Mail
+          {t("emailLabel")}
           <input
             name="email"
             type="email"
@@ -35,7 +37,7 @@ export default function RegistrierenPage() {
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Passwort
+          {t("passwordLabel")}
           <input
             name="password"
             type="password"
@@ -52,7 +54,7 @@ export default function RegistrierenPage() {
         )}
         {state.success && (
           <p role="status" className="text-sm text-green-700">
-            Konto erstellt. Bitte E-Mail-Postfach zur Bestätigung prüfen.
+            {t("success")}
           </p>
         )}
         <button
@@ -60,12 +62,12 @@ export default function RegistrierenPage() {
           disabled={pending}
           className="rounded-md bg-black px-4 py-2 text-base text-white disabled:opacity-50"
         >
-          Konto erstellen
+          {t("submitButton")}
         </button>
       </form>
 
       <a href="/login" className="text-center text-sm underline">
-        Bereits ein Konto? Anmelden
+        {t("haveAccountLink")}
       </a>
     </main>
   );

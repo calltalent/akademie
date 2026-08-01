@@ -1,22 +1,12 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ArrowRight, AlertTriangle } from "lucide-react";
 import { signInWithPassword, signInWithMagicLink } from "@/lib/auth/actions";
 import type { AuthActionState } from "@/lib/auth/actions";
 
 const initialState: AuthActionState = { error: null };
-
-/**
- * Bekannte Supabase-`error_code`-Werte aus dem URL-Hash (siehe
- * `LINK_ERROR_MESSAGES` unten) — freundlicher deutscher Text statt der
- * rohen englischen Supabase-Meldung.
- */
-const LINK_ERROR_MESSAGES: Record<string, string> = {
-  otp_expired: "Dieser Anmelde-Link ist abgelaufen oder wurde bereits verwendet.",
-  access_denied: "Dieser Anmelde-Link ist ungültig oder wurde bereits verwendet.",
-};
-const DEFAULT_LINK_ERROR_MESSAGE = "Dieser Anmelde-Link ist ungültig oder abgelaufen.";
 
 /**
  * Design-Block (12.07.2026, Claude-Design-Export, siehe PHASENSTATUS.md
@@ -26,10 +16,12 @@ const DEFAULT_LINK_ERROR_MESSAGE = "Dieser Anmelde-Link ist ungültig oder abgel
  * PHASENSTATUS.md "Nachtrag Demo-Mandanten" der einzige funktionierende
  * Erst-Login-Weg für importierte/eingeladene Nutzer, also nicht verzichtbar.
  *
- * Label-Texte "E-Mail"/"Passwort" bewusst UNVERÄNDERT gelassen — `e2e/
+ * Label-Texte "E-Mail"/"Passwort" (jetzt `t("emailLabel")`/`t("passwordLabel")`,
+ * i18n Block C1) liefern für die Standardsprache Deutsch weiterhin exakt
+ * "E-Mail"/"Passwort" (siehe messages/de.json auth.login) — `e2e/
  * auth.spec.ts` nutzt `getByLabel("E-Mail", { exact: true })` bzw.
- * `getByLabel("Passwort", { exact: true })`, eine Umbenennung würde den
- * Test brechen.
+ * `getByLabel("Passwort", { exact: true })`, eine Änderung des deutschen
+ * Übersetzungswerts würde den Test brechen.
  *
  * Marken-Panel-Inhalt anpassbar (22.07.2026, Josips Auftrag: "Hintergrund-
  * Transparenz, Überschrift/Beschreibung und Copyright pro Mandant
@@ -57,6 +49,8 @@ export function LoginForm({
   tenantName: string;
   logoUrl: string | null;
 }) {
+  const t = useTranslations("auth.login");
+  const tShared = useTranslations("auth.shared");
   const [pwState, pwAction, pwPending] = useActionState(
     signInWithPassword,
     initialState,
@@ -65,6 +59,14 @@ export function LoginForm({
     signInWithMagicLink,
     initialState,
   );
+  // i18n Block C1: bekannte Supabase-`error_code`-Werte aus dem URL-Hash —
+  // freundlicher übersetzter Text statt der rohen englischen Supabase-Meldung.
+  // `t` ist über next-intl referenzstabil (siehe useEffect-Abhängigkeiten unten).
+  const linkErrorMessages: Record<string, string> = {
+    otp_expired: t("linkErrorOtpExpired"),
+    access_denied: t("linkErrorAccessDenied"),
+  };
+  const defaultLinkErrorMessage = t("linkErrorDefault");
   // BUGFIX (26.07.2026, Josips Fund: Hydration-Fehler beim Laden mit
   // "?fehler=anmeldung"/Hash-Fehler): stand hier ursprünglich als lazy
   // `useState(() => …)`-Initialisierer (gleiches Muster wie der
@@ -94,14 +96,15 @@ export function LoginForm({
     const searchParams = new URLSearchParams(window.location.search);
     if (searchParams.get("fehler") === "anmeldung") {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- window.location ist erst nach der Hydration verfügbar, siehe Kommentar oben
-      setLinkError(DEFAULT_LINK_ERROR_MESSAGE);
+      setLinkError(defaultLinkErrorMessage);
       return;
     }
     if (!window.location.hash) return;
     const hashParams = new URLSearchParams(window.location.hash.slice(1));
     const errorCode = hashParams.get("error_code");
     if (!hashParams.get("error") && !errorCode) return;
-    setLinkError((errorCode && LINK_ERROR_MESSAGES[errorCode]) || DEFAULT_LINK_ERROR_MESSAGE);
+    setLinkError((errorCode && linkErrorMessages[errorCode]) || defaultLinkErrorMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- läuft bewusst nur beim Mount (siehe Kommentar oben), t ist über next-intl referenzstabil
   }, []);
 
   // BUGFIX (22.07.2026, Josips Fund: Login dauert 20+ Sekunden): siehe
@@ -184,7 +187,7 @@ export function LoginForm({
                 {tenantName.toUpperCase()}
               </div>
               <div className="text-xs font-semibold" style={{ color: "#C9CBE6", letterSpacing: "0.3em" }}>
-                AKADEMIE
+                {tShared("brandSuffix")}
               </div>
             </div>
           )}
@@ -235,7 +238,7 @@ export function LoginForm({
                   {tenantName.toUpperCase()}
                 </div>
                 <div className="text-[10px] font-semibold" style={{ color: "#66679B", letterSpacing: "0.28em" }}>
-                  AKADEMIE
+                  {tShared("brandSuffix")}
                 </div>
               </div>
             </>
@@ -246,10 +249,10 @@ export function LoginForm({
           <div className="flex w-full max-w-[400px] flex-col gap-6">
             <div>
               <h1 className="mb-1.5 text-[28px] font-extrabold" style={{ color: "#1A1A2E" }}>
-                Anmelden
+                {t("title")}
               </h1>
               <p className="text-base" style={{ color: "#66679B" }}>
-                Melde dich mit deinem Konto an.
+                {t("subtitle")}
               </p>
             </div>
 
@@ -261,14 +264,14 @@ export function LoginForm({
               >
                 <AlertTriangle size={17} aria-hidden="true" className="mt-0.5 flex-none" style={{ color: "#B14A4A" }} />
                 <span>
-                  {linkError} Fordere unten einen neuen Link an — per „Passwort vergessen&quot; oder Magic Link.
+                  {linkError} {t("linkErrorHint")}
                 </span>
               </div>
             )}
 
-          <form action={pwAction} className="flex flex-col gap-4" aria-label="Mit Passwort anmelden">
+          <form action={pwAction} className="flex flex-col gap-4" aria-label={t("passwordFormAriaLabel")}>
             <label className="flex flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
-              E-Mail
+              {t("emailLabel")}
               <input
                 name="email"
                 type="email"
@@ -281,10 +284,10 @@ export function LoginForm({
             <div>
               <div className="mb-[7px] flex items-baseline justify-between">
                 <label htmlFor="login-password" className="text-sm font-semibold" style={{ color: "#3E3F66" }}>
-                  Passwort
+                  {t("passwordLabel")}
                 </label>
                 <a href="/passwort-vergessen" className="text-[13px] font-semibold no-underline">
-                  Passwort vergessen?
+                  {t("forgotPasswordLink")}
                 </a>
               </div>
               <input
@@ -309,7 +312,7 @@ export function LoginForm({
               className="flex items-center justify-center gap-2 rounded-md py-3.5 text-base font-bold text-white disabled:opacity-50"
               style={{ background: "var(--color-primary)" }}
             >
-              Anmelden
+              {t("submitButton")}
               <ArrowRight size={18} strokeWidth={2.2} aria-hidden="true" />
             </button>
           </form>
@@ -325,7 +328,7 @@ export function LoginForm({
               className="text-[11px] font-bold uppercase"
               style={{ letterSpacing: "0.14em", color: "#A9AAC4" }}
             >
-              Powered by
+              {t("poweredByLabel")}
             </span>
             <span className="flex items-center gap-1.5">
               <span
@@ -333,23 +336,23 @@ export function LoginForm({
                 style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
                 aria-hidden="true"
               >
-                C
+                {tShared("brandInitial")}
               </span>
               <span className="text-[13px] font-extrabold tracking-tight" style={{ color: "#3E3F66" }}>
-                CALLTALENT
+                {tShared("brandName")}
               </span>
             </span>
           </div>
 
           <div className="flex items-center gap-3.5 text-[13px]" style={{ color: "#A9AAC4" }} aria-hidden="true">
             <span className="h-px flex-1" style={{ background: "#E1E3EF" }} />
-            oder
+            {t("orDivider")}
             <span className="h-px flex-1" style={{ background: "#E1E3EF" }} />
           </div>
 
-          <form action={magicAction} className="flex flex-col gap-3" aria-label="Mit Magic Link anmelden">
+          <form action={magicAction} className="flex flex-col gap-3" aria-label={t("magicLinkFormAriaLabel")}>
             <label className="flex flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
-              E-Mail für Magic Link
+              {t("magicLinkEmailLabel")}
               <input
                 name="email"
                 type="email"
@@ -366,7 +369,7 @@ export function LoginForm({
             )}
             {magicState.success && (
               <p role="status" className="text-sm" style={{ color: "#1F8A5B" }}>
-                Link gesendet. Bitte E-Mail-Postfach prüfen.
+                {t("magicLinkSuccess")}
               </p>
             )}
             <button
@@ -375,14 +378,14 @@ export function LoginForm({
               className="rounded-md border py-3 text-[15px] font-semibold disabled:opacity-50"
               style={{ borderColor: "#D8DAEA", color: "#3E3F66", background: "#fff" }}
             >
-              Magic Link senden
+              {t("magicLinkSubmitButton")}
             </button>
           </form>
 
           <div className="text-center text-[15px]" style={{ color: "#66679B" }}>
-            Noch kein Zugang?{" "}
+            {t("noAccountText")}{" "}
             <a href="/kontakt" className="font-bold no-underline">
-              Kontakt aufnehmen
+              {t("contactLink")}
             </a>
             {/*
               Design-Block 4 (12.07.2026): Login.dc.html verlinkt hier auf

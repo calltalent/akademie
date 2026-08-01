@@ -7,9 +7,74 @@
     "cancel": "Otkaži"
   },
   "auth": {
-    "login": "Prijava",
-    "register": "Registracija",
-    "logout": "Odjava"
+    "logout": "Odjava",
+    "shared": {
+      "brandSuffix": "AKADEMIJA",
+      "brandName": "CALLTALENT",
+      "brandInitial": "C"
+    },
+    "login": {
+      "defaultHeading": "Prodaja se može naučiti.",
+      "defaultSubheading": "Dobrodošao/la u svoju akademiju za telefonsku prodaju. Nastavi tamo gdje si stao/la.",
+      "defaultCopyright": "Calltalent Akademija",
+      "defaultTenantName": "Calltalent",
+      "title": "Prijava",
+      "subtitle": "Prijavi se sa svojim nalogom.",
+      "linkErrorOtpExpired": "Ovaj link za prijavu je istekao ili je već iskorišten.",
+      "linkErrorAccessDenied": "Ovaj link za prijavu je nevažeći ili je već iskorišten.",
+      "linkErrorDefault": "Ovaj link za prijavu je nevažeći ili je istekao.",
+      "linkErrorHint": "Zatraži novi link ispod — putem „Zaboravljena lozinka“ ili Magic Link-a.",
+      "passwordFormAriaLabel": "Prijava lozinkom",
+      "emailLabel": "E-mail",
+      "passwordLabel": "Lozinka",
+      "forgotPasswordLink": "Zaboravljena lozinka?",
+      "submitButton": "Prijavi se",
+      "poweredByLabel": "Powered by",
+      "orDivider": "ili",
+      "magicLinkFormAriaLabel": "Prijava Magic Linkom",
+      "magicLinkEmailLabel": "E-mail za Magic Link",
+      "magicLinkSuccess": "Link poslan. Provjeri svoj e-mail sandučić.",
+      "magicLinkSubmitButton": "Pošalji Magic Link",
+      "noAccountText": "Još nemaš pristup?",
+      "contactLink": "Kontaktiraj nas"
+    },
+    "register": {
+      "title": "Registracija",
+      "nameLabel": "Ime",
+      "emailLabel": "E-mail",
+      "passwordLabel": "Lozinka",
+      "submitButton": "Kreiraj nalog",
+      "success": "Nalog je kreiran. Provjeri svoj e-mail sandučić radi potvrde.",
+      "haveAccountLink": "Već imaš nalog? Prijavi se"
+    },
+    "passwordForgot": {
+      "brandHeading": "Nema problema.",
+      "brandSubheading": "Šaljemo ti link za resetovanje lozinke. Za par minuta si ponovo unutra.",
+      "brandCopyright": "Calltalent Akademija",
+      "backToLogin": "Nazad na prijavu",
+      "title": "Zaboravljena lozinka",
+      "subtitle": "Unesi svoju e-mail adresu i poslat ćemo ti link za resetovanje.",
+      "emailLabel": "E-mail adresa",
+      "emailPlaceholder": "name@email.de",
+      "submitButton": "Pošalji link",
+      "success": "Ako nalog s ovom e-mail adresom postoji, link je na putu. Provjeri svoj e-mail sandučić.",
+      "noEmailHint": "Nisi primio/la e-mail? Provjeri spam folder ili",
+      "contactLink": "kontaktiraj nas"
+    },
+    "passwordSet": {
+      "defaultTenantName": "Calltalent",
+      "brandHeading": "Skoro gotovo.",
+      "brandSubheading": "Postavi sada svoju lozinku — nakon toga se možeš odmah prijaviti.",
+      "title": "Postavi lozinku",
+      "descriptionForUser": "Postavi lozinku za <b>{email}</b>.",
+      "expiredLink": "Ovaj link je istekao ili je već iskorišten.",
+      "requestNewLink": "Zatraži novi link",
+      "newPasswordLabel": "Nova lozinka",
+      "showPassword": "Prikaži lozinku",
+      "hidePassword": "Sakrij lozinku",
+      "submitButton": "Sačuvaj lozinku",
+      "submitting": "Spremanje u toku …"
+    }
   },
   "quiz": {
     "kinds": {

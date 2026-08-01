@@ -1,11 +1,6 @@
+import { getTranslations } from "next-intl/server";
 import { getTenant } from "@/lib/tenant/context";
 import { LoginForm } from "./login-form";
-
-const DEFAULT_HEADING = "Verkaufen ist erlernbar.";
-const DEFAULT_SUBHEADING =
-  "Willkommen in deiner Akademie für Vertrieb am Telefon. Setze fort, wo du aufgehört hast.";
-const DEFAULT_COPYRIGHT = "Calltalent-Akademie";
-const DEFAULT_TENANT_NAME = "Calltalent";
 
 /**
  * NEU (22.07.2026, Josips Auftrag: "Login-Bildschirm anpassbar machen"):
@@ -22,18 +17,22 @@ const DEFAULT_TENANT_NAME = "Calltalent";
  * Produkt tatsächlich angezeigt) und `tenant.name` werden jetzt zusätzlich
  * durchgereicht — ohne eigenes Logo bleibt die Calltalent-Standardmarke
  * unverändert (siehe LoginForm-Kopfkommentar).
+ *
+ * i18n Block C1: die bisherigen hartkodierten deutschen Fallback-Konstanten
+ * (DEFAULT_HEADING usw.) kommen jetzt aus `getTranslations("auth.login")` —
+ * gleiches Verhalten für Mandanten ohne eigenes Branding, nur sprachabhängig.
  */
 export default async function LoginPage() {
-  const tenant = await getTenant();
+  const [tenant, t] = await Promise.all([getTenant(), getTranslations("auth.login")]);
   const branding = tenant?.branding ?? {};
 
   return (
     <LoginForm
-      heading={branding.login_heading || DEFAULT_HEADING}
-      subheading={branding.login_subheading || DEFAULT_SUBHEADING}
-      copyright={branding.login_copyright || DEFAULT_COPYRIGHT}
+      heading={branding.login_heading || t("defaultHeading")}
+      subheading={branding.login_subheading || t("defaultSubheading")}
+      copyright={branding.login_copyright || t("defaultCopyright")}
       bgOpacity={typeof branding.login_bg_opacity === "number" ? branding.login_bg_opacity : 100}
-      tenantName={tenant?.name || DEFAULT_TENANT_NAME}
+      tenantName={tenant?.name || t("defaultTenantName")}
       logoUrl={branding.logo_url ?? null}
     />
   );

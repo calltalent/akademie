@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Eye, EyeOff } from "lucide-react";
 import { setNewPassword } from "@/lib/auth/actions";
 import type { AuthActionState } from "@/lib/auth/actions";
@@ -15,6 +16,7 @@ const initialState: AuthActionState = { error: null };
  * (`type="text"`/`"password"`), keine Logikänderung an setNewPassword().
  */
 export function NewPasswordForm() {
+  const t = useTranslations("auth.passwordSet");
   const [state, action, pending] = useActionState(setNewPassword, initialState);
   const [visible, setVisible] = useState(false);
 
@@ -27,7 +29,7 @@ export function NewPasswordForm() {
   return (
     <form action={action} className="flex flex-col gap-6">
       <label className="flex flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
-        Neues Passwort
+        {t("newPasswordLabel")}
         <div className="relative">
           <input
             name="password"
@@ -41,7 +43,7 @@ export function NewPasswordForm() {
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
-            aria-label={visible ? "Passwort verbergen" : "Passwort anzeigen"}
+            aria-label={visible ? t("hidePassword") : t("showPassword")}
             aria-pressed={visible}
             className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg"
             style={{ color: "#66679B" }}
@@ -61,7 +63,7 @@ export function NewPasswordForm() {
         className="rounded-xl py-3.5 text-base font-bold text-white disabled:opacity-50"
         style={{ background: "var(--color-primary)" }}
       >
-        {pending ? "Wird gespeichert …" : "Passwort speichern"}
+        {pending ? t("submitting") : t("submitButton")}
       </button>
     </form>
   );

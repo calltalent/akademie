@@ -7,9 +7,74 @@
     "cancel": "Abbrechen"
   },
   "auth": {
-    "login": "Anmelden",
-    "register": "Registrieren",
-    "logout": "Abmelden"
+    "logout": "Abmelden",
+    "shared": {
+      "brandSuffix": "AKADEMIE",
+      "brandName": "CALLTALENT",
+      "brandInitial": "C"
+    },
+    "login": {
+      "defaultHeading": "Verkaufen ist erlernbar.",
+      "defaultSubheading": "Willkommen in deiner Akademie für Vertrieb am Telefon. Setze fort, wo du aufgehört hast.",
+      "defaultCopyright": "Calltalent-Akademie",
+      "defaultTenantName": "Calltalent",
+      "title": "Anmelden",
+      "subtitle": "Melde dich mit deinem Konto an.",
+      "linkErrorOtpExpired": "Dieser Anmelde-Link ist abgelaufen oder wurde bereits verwendet.",
+      "linkErrorAccessDenied": "Dieser Anmelde-Link ist ungültig oder wurde bereits verwendet.",
+      "linkErrorDefault": "Dieser Anmelde-Link ist ungültig oder abgelaufen.",
+      "linkErrorHint": "Fordere unten einen neuen Link an — per „Passwort vergessen“ oder Magic Link.",
+      "passwordFormAriaLabel": "Mit Passwort anmelden",
+      "emailLabel": "E-Mail",
+      "passwordLabel": "Passwort",
+      "forgotPasswordLink": "Passwort vergessen?",
+      "submitButton": "Anmelden",
+      "poweredByLabel": "Powered by",
+      "orDivider": "oder",
+      "magicLinkFormAriaLabel": "Mit Magic Link anmelden",
+      "magicLinkEmailLabel": "E-Mail für Magic Link",
+      "magicLinkSuccess": "Link gesendet. Bitte E-Mail-Postfach prüfen.",
+      "magicLinkSubmitButton": "Magic Link senden",
+      "noAccountText": "Noch kein Zugang?",
+      "contactLink": "Kontakt aufnehmen"
+    },
+    "register": {
+      "title": "Registrieren",
+      "nameLabel": "Name",
+      "emailLabel": "E-Mail",
+      "passwordLabel": "Passwort",
+      "submitButton": "Konto erstellen",
+      "success": "Konto erstellt. Bitte E-Mail-Postfach zur Bestätigung prüfen.",
+      "haveAccountLink": "Bereits ein Konto? Anmelden"
+    },
+    "passwordForgot": {
+      "brandHeading": "Kein Problem.",
+      "brandSubheading": "Wir schicken dir einen Link zum Zurücksetzen deines Passworts. In wenigen Minuten bist du wieder drin.",
+      "brandCopyright": "Calltalent-Akademie",
+      "backToLogin": "Zurück zur Anmeldung",
+      "title": "Passwort vergessen",
+      "subtitle": "Gib deine E-Mail-Adresse ein und wir senden dir einen Link zum Zurücksetzen.",
+      "emailLabel": "E-Mail-Adresse",
+      "emailPlaceholder": "name@email.de",
+      "submitButton": "Link senden",
+      "success": "Falls ein Konto mit dieser E-Mail existiert, ist ein Link unterwegs. Bitte E-Mail-Postfach prüfen.",
+      "noEmailHint": "Keine E-Mail erhalten? Prüfe deinen Spam-Ordner oder",
+      "contactLink": "kontaktiere uns"
+    },
+    "passwordSet": {
+      "defaultTenantName": "Calltalent",
+      "brandHeading": "Fast geschafft.",
+      "brandSubheading": "Leg jetzt dein Passwort fest — danach kannst du dich direkt anmelden.",
+      "title": "Passwort setzen",
+      "descriptionForUser": "Lege ein Passwort für <b>{email}</b> fest.",
+      "expiredLink": "Dieser Link ist abgelaufen oder wurde bereits verwendet.",
+      "requestNewLink": "Neuen Link anfordern",
+      "newPasswordLabel": "Neues Passwort",
+      "showPassword": "Passwort anzeigen",
+      "hidePassword": "Passwort verbergen",
+      "submitButton": "Passwort speichern",
+      "submitting": "Wird gespeichert …"
+    }
   },
   "quiz": {
     "kinds": {

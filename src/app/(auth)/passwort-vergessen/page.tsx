@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useTranslations } from "next-intl";
 import { requestPasswordReset } from "@/lib/auth/actions";
 import type { AuthActionState } from "@/lib/auth/actions";
 
@@ -15,6 +16,8 @@ const initialState: AuthActionState = { error: null };
  * bewusst immer Erfolg wg. E-Mail-Enumeration-Schutz) unverändert.
  */
 export default function PasswortVergessenPage() {
+  const t = useTranslations("auth.passwordForgot");
+  const tShared = useTranslations("auth.shared");
   const [state, action, pending] = useActionState(requestPasswordReset, initialState);
 
   return (
@@ -36,26 +39,25 @@ export default function PasswortVergessenPage() {
             style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
             aria-hidden="true"
           >
-            C
+            {tShared("brandInitial")}
           </div>
           <div className="leading-tight">
-            <div className="text-lg font-extrabold tracking-tight text-white">CALLTALENT</div>
+            <div className="text-lg font-extrabold tracking-tight text-white">{tShared("brandName")}</div>
             <div className="text-xs font-semibold" style={{ color: "#C9CBE6", letterSpacing: "0.3em" }}>
-              AKADEMIE
+              {tShared("brandSuffix")}
             </div>
           </div>
         </div>
 
         <div className="max-w-[440px]">
-          <h2 className="mb-3.5 text-[34px] font-extrabold leading-tight text-white">Kein Problem.</h2>
+          <h2 className="mb-3.5 text-[34px] font-extrabold leading-tight text-white">{t("brandHeading")}</h2>
           <p className="text-[17px]" style={{ color: "#DDDEEE" }}>
-            Wir schicken dir einen Link zum Zurücksetzen deines Passworts. In wenigen Minuten bist
-            du wieder drin.
+            {t("brandSubheading")}
           </p>
         </div>
 
         <div className="text-[13px]" style={{ color: "#B9BBDA" }}>
-          © {new Date().getFullYear()} Calltalent-Akademie
+          © {new Date().getFullYear()} {t("brandCopyright")}
         </div>
       </div>
 
@@ -70,14 +72,14 @@ export default function PasswortVergessenPage() {
             style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
             aria-hidden="true"
           >
-            C
+            {tShared("brandInitial")}
           </div>
           <div className="leading-tight">
             <div className="text-sm font-extrabold tracking-tight" style={{ color: "#1A1A2E" }}>
-              CALLTALENT
+              {tShared("brandName")}
             </div>
             <div className="text-[10px] font-semibold" style={{ color: "#66679B", letterSpacing: "0.28em" }}>
-              AKADEMIE
+              {tShared("brandSuffix")}
             </div>
           </div>
         </div>
@@ -93,25 +95,25 @@ export default function PasswortVergessenPage() {
               <path d="M19 12H5"></path>
               <path d="m11 18-6-6 6-6"></path>
             </svg>
-            Zurück zur Anmeldung
+            {t("backToLogin")}
           </a>
 
           <h1 className="mb-1.5 text-[28px] font-extrabold" style={{ color: "#1A1A2E" }}>
-            Passwort vergessen
+            {t("title")}
           </h1>
           <p className="mb-8 text-base" style={{ color: "#66679B" }}>
-            Gib deine E-Mail-Adresse ein und wir senden dir einen Link zum Zurücksetzen.
+            {t("subtitle")}
           </p>
 
           <form action={action} className="flex flex-col gap-6">
             <label className="flex flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
-              E-Mail-Adresse
+              {t("emailLabel")}
               <input
                 name="email"
                 type="email"
                 required
                 autoComplete="email"
-                placeholder="name@email.de"
+                placeholder={t("emailPlaceholder")}
                 className="rounded-xl border px-4 py-3.5 text-base font-normal focus:outline-none focus:ring-2 focus:ring-offset-1"
                 style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
               />
@@ -129,7 +131,7 @@ export default function PasswortVergessenPage() {
               className="flex items-center justify-center gap-[9px] rounded-xl py-3.5 text-base font-bold text-white disabled:opacity-50"
               style={{ background: "var(--color-primary)" }}
             >
-              Link senden
+              {t("submitButton")}
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14"></path>
                 <path d="m13 6 6 6-6 6"></path>
@@ -139,8 +141,7 @@ export default function PasswortVergessenPage() {
 
           {state.success && (
             <p role="status" className="mt-4 text-sm" style={{ color: "#1F8A5B" }}>
-              Falls ein Konto mit dieser E-Mail existiert, ist ein Link unterwegs. Bitte
-              E-Mail-Postfach prüfen.
+              {t("success")}
             </p>
           )}
 
@@ -165,9 +166,9 @@ export default function PasswortVergessenPage() {
               <path d="M12 8h.01"></path>
             </svg>
             <div className="text-sm" style={{ color: "#66679B" }}>
-              Keine E-Mail erhalten? Prüfe deinen Spam-Ordner oder{" "}
+              {t("noEmailHint")}{" "}
               <a href="/kontakt" className="font-bold no-underline">
-                kontaktiere uns
+                {t("contactLink")}
               </a>
               .
             </div>
