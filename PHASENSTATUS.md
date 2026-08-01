@@ -2399,3 +2399,64 @@ Josips Auftrag: Baulig Akademie zeigt in der Kursübersicht einen dritten Tab �
 **Keine generierten DB-Typen betroffen:** Das Projekt nutzt an keiner Stelle `supabase gen types`/einen generischen `Database`-Typ im Supabase-Client (geprüft in `src/lib/supabase/server.ts`/`browser.ts`) — kein zusätzlicher Typegenerierungsschritt nötig.
 
 **Übergabe an tester:** Verifikationsschritte laut Plan (nach Migration-Anwendung): (1) Admin → Einstellungen → Trainer-Profil anlegen (Bild + Name + Rolle + Bio) → Speichern, Bild sichtbar. (2) Admin → Kurse → Kurs öffnen → Kursziele hinzufügen, Autor aus Dropdown wählen → Speichern. (3) Als Kursteilnehmer `/kurs/<slug>` öffnen → „Information"-Tab sichtbar/klickbar → Beschreibung/Kursziele/Autor korrekt, Fortschrittsring identisch zur Übersicht, „Übersicht"-Tab führt zurück. (4) Leerfall: Kurs ohne Ziele/Autor → ehrliche Leerzustände statt erfundener Inhalte. (5) Tastatur-/Screenreader-Durchlauf des neuen Tabs und der Kursziele-Liste (CLAUDE.md §3.4).
+
+## salestalent.app — neuer Mandant für den internationalen Markt (30.07.2026)
+
+Josips Auftrag: neue Domain `salestalent.app` (über Cloudflare gekauft) für den internationalen Markt, Oberfläche auf Englisch. Entscheidung (Josip, 30.07.2026, siehe `Entscheidungs-Log.md` auf Calltalent-Ltd-Ebene): kein Fork — neuer Mandant auf derselben Plattform. Übersetzung der Oberfläche bewusst vertagt, erst die technische Mandanten-Einrichtung. Vollständiger Prozess dokumentiert in `SALESTALENT-KLON-ANLEITUNG.md`.
+
+**Erledigt:**
+
+1. Neuer Mandant live in Supabase angelegt (per Supabase-MCP, `execute_sql` gegen Projekt `vklqksdiyiijzoirntyt`, exakt nach dem Insert-Muster von `createTenant()` in `src/lib/platform/actions.ts`): `name='SalesTalent'`, `slug='salestalent'`, `plan='komplett'`, `custom_domain='salestalent.app'`, `status='active'` (Default). Tenant-ID `9707965d-b9aa-4841-9d70-68e3cae803f6`. Kein Inhaber/Owner-Account angelegt — reiner Aufbau-Mandant, noch keine echten Nutzer.
+2. `wrangler.jsonc`: zwei neue Routen ergänzt (`salestalent.app/*`, `www.salestalent.app/*`, `zone_name: "salestalent.app"`), noch NICHT deployt.
+
+**Erledigt (Fortsetzung, 31.07.2026):**
+
+3. Cloudflare-Zone `salestalent.app` bestätigt aktiv im selben Account wie `calltalent.ai` (Screenshot-Prüfung durch Josip).
+4. Josips Rechner war einen Tag zuvor komplett neu aufgesetzt worden (Windows-Neuinstallation) — Node.js fehlte, PowerShell-Execution-Policy stand auf `Restricted`, Wrangler-Login-Token weg. Alles behoben: Node LTS neu installiert, `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, `npx wrangler login` (Account `calltalent.ai` gewählt). Projektordner selbst (`.env`, `node_modules`) hatte die Neuinstallation unberührt überstanden, kein `npm install` nötig.
+5. **`npm run deploy` erfolgreich**, lokal von Josip ausgeführt. Bestätigte Routen laut Deploy-Ausgabe: `*.calltalent.ai/*`, `academy.calltalent.ai/*`, `salestalent.app/*`, `www.salestalent.app/*` (beide `zone_name: salestalent.app`), Cron-Trigger `*/2 * * * *` unverändert aktiv. Worker-Version-ID `7ed1967e-8be8-42d4-a4f8-370ef81dc00e`.
+
+**Noch offen:**
+
+1. Funktionstest: `https://salestalent.app` im Browser aufrufen und prüfen, ob die Login-Seite des neuen, leeren `SalesTalent`-Mandanten erscheint (noch nicht verifiziert).
+2. Branding (Login-Texte, Logo, Farben) für den Mandanten noch nicht gesetzt — Felder sind vorhanden (`tenants.branding.*`), aber leer.
+3. Rechtstexte (`tenants.legal.impressum_url`/`datenschutz_url`) offen — Rechtsträger-Frage noch nicht geklärt.
+4. Englische Plattform-Oberfläche: eigenes Folgeprojekt, siehe `SALESTALENT-KLON-ANLEITUNG.md` Abschnitt 6 — bewusst noch nicht begonnen.
+5. `security-reviewer`-Agent noch nicht gegen die neue Route/den neuen Mandanten gelaufen.
+6. Änderungen (`wrangler.jsonc`, `PHASENSTATUS.md`, `SALESTALENT-KLON-ANLEITUNG.md`) lokal noch nicht committet.
+
+## Mehrsprachigkeit (i18n) — Plan erstellt, Start mit Bosnisch (01.08.2026)
+
+Auftrag: Plattform mehrsprachig machen, erste zusätzliche Sprache Bosnisch, Struktur so, dass weitere Sprachen danach mit minimalem Aufwand ergänzbar sind. Deutsch bleibt Standard. Plan vom `architect`-Agenten (Opus) erstellt und mit Josip abgestimmt: **`PLAN_Mehrsprachigkeit-i18n.md`** (vollständiger Plan, noch nicht gebaut).
+
+**Wichtigster Befund:** `messages/de.json` wird aktuell nirgends gelesen — die gesamte Oberfläche ist hartkodiertes Deutsch. Es geht also um Ersterfassung aller UI-Texte, nicht um Migration.
+
+**Entscheidungen (Josip, 01.08.2026):**
+1. Kein `/bs/...`-Pfadpräfix — Locale über Cookie + `profiles.locale`, um die bestehende Mandanten-Subdomain-Auflösung (`src/lib/tenant/routing.ts`, bereits zwei dokumentierte Bugs aus dieser Achse) nicht zu gefährden.
+2. Sprachen sind **pro Mandant freischaltbar** (`tenants.settings.enabled_locales`, jsonb, keine Migration nötig), nicht global.
+3. Übersetzung bs.json: KI-Entwurf zuerst, Josip prüft danach.
+4. E-Mails/Zertifikate: **Mandanten-Standardsprache**, nicht individuelle Nutzereinstellung.
+5. **Vorgezogene Fehlerbehebung, vor dem i18n-Vorhaben:** Zertifikats-PDF (`src/lib/certificates/pdf.ts`) nutzt `StandardFonts.Helvetica` (nur WinAnsi/Windows-1252) — bosnische Sonderzeichen (č, ć, ž, š, đ) werden lautlos entfernt. Bestehender Fehler, nicht durch Bosnisch verursacht: Schon heute wird z. B. „Josipović" zu „Josipovic" verstümmelt. Fix: Unicode-Schrift (Montserrat, SIL OFL) via `@pdf-lib/fontkit` einbetten, eigener Arbeitsblock vor Block A.
+
+**Reihenfolge:** Zertifikats-PDF-Fix → Block A (Infrastruktur: Locale-Config, Auflösungskette, `messages/bs.json`) → Block B (Sprachumschalter, Mandanten-Freischaltung in Admin-Einstellungen) → security-reviewer-Pflichtlauf → Block C (Textextraktion, inkrementell: Auth → Lernansicht → Portal → Admin/E-Mails später).
+
+**Noch offen:** Block A/B/C — noch kein Code gebaut, nur geplant. Zertifikats-PDF-Fehlerbehebung (Punkt 5 oben) ist erledigt, siehe nächster Abschnitt.
+
+## Zertifikats-PDF: Diakritika-Fix (01.08.2026, builder)
+
+Vorgezogene, eigenständige Fehlerbehebung aus dem i18n-Plan oben (Punkt 5) — von Josip als eigenständiger Fix freigegeben, unabhängig vom restlichen i18n-Vorhaben umgesetzt (kein Block A/B/C angerührt).
+
+**Erledigt:**
+
+1. `@pdf-lib/fontkit` (`^1`, installiert `1.1.1`) zu `package.json` ergänzt, `npm install` gelaufen.
+2. `src/lib/certificates/pdf.ts`: `StandardFonts.Helvetica`/`HelveticaBold` ersetzt durch die echten, bereits im Repo liegenden `Montserrat-Regular.ttf`/`Montserrat-Bold.ttf` (SIL Open Font License, `src/lib/certificates/fonts/OFL.txt`) — exakt die im Design (`Zertifikat.dc.html`) vorgesehene Schrift. `pdfDoc.registerFontkit(fontkit)` vor dem Embed ergänzt.
+3. **Lade-Mechanismus:** `fs.readFileSync()` scheidet aus (kein echtes Dateisystem im Cloudflare-Worker zur Laufzeit, siehe Dateikopf-Kommentar `pdf.ts`). Stattdessen: `scripts/build-certificate-fonts.mjs` erzeugt einmalig `src/lib/certificates/fonts/montserrat-data.ts` (base64-Rohdaten als TS-Exporte, generiert, nicht von Hand bearbeiten) aus den beiden `.ttf`-Dateien. Damit läuft das Laden zur Bundle-Zeit, identisch in `next dev`, Vitest, `next build` und im deployten Worker, ganz ohne Netzwerk-Roundtrip oder Storage-Binding — am wenigsten bewegliche Teile im Vergleich zur R2/ASSETS-Binding-Alternative (die für ~330-KB-Dateien unnötig komplex wäre, siehe `wrangler.jsonc`-Kommentar zum 25-MiB-Limit, das hier nicht greift).
+4. **Base64-Dekodierung bewusst NICHT über `Buffer.from(base64, "base64")`:** beim Schreiben des Tests fiel auf, dass `pdf-lib`s Typ-Validierung (`value instanceof Uint8Array`) für ein `Buffer`-Objekt unter Vitest/jsdom fehlschlägt (Cross-Realm-Verhalten, `embedFont()` wirft `TypeError`). Ob das auch im echten Cloudflare-Worker so wäre, ist nicht abschließend geprüft — statt dem nachzugehen, `src/lib/certificates/fonts/decode.ts` (`base64ToUint8Array()`) ergänzt: nutzt `atob()` (Standard-Web-API-Global, Node/Browser/Workers nativ, unabhängig vom `nodejs_compat`-Polyfill) und baut ein echtes `Uint8Array` im aktuellen Realm — robuster, ein Grund weniger zur Sorge.
+5. Kommentare in `pdf.ts` korrigiert: Dateikopf (Montserrat wird jetzt eingebettet, nicht mehr "unverhältnismäßig") und `sanitizeForFont()` (bleibt als letztes Sicherheitsnetz für Zeichen außerhalb von Montserrats Zeichensatz, ist aber nicht mehr die primäre Verteidigungslinie gegen bosnische/kroatische Diakritika).
+6. `src/lib/certificates/fonts/OFL.txt` unverändert im Repo belassen (Lizenz-Herkunftsnachweis für die eingebetteten `.ttf`-Rohdaten, die ebenfalls committet bleiben).
+7. Test `src/lib/certificates/pdf.test.ts` (neu): **`generateCertificatePdf()` konnte NICHT direkt getestet werden** — `pdf.ts` hat `import "server-only"`, das unter Vitest/Vite nicht auflösbar ist (`server-only` ist kein echtes npm-Paket, Next.js biegt den Spezifizierer nur beim eigenen Build/Dev-Server intern um; siehe bereits bestehender Kommentar in `issue.test.ts` zum selben Thema — vorbestehende, von diesem Fix unabhängige Einschränkung). Stattdessen testet `pdf.test.ts` denselben Mechanismus direkt (gleiche base64-Daten, gleiche `base64ToUint8Array()`-Dekodierung, gleiche fontkit-Registrierung, gleicher `embedFont()`-Aufruf): `widthOfTextAtSize()` für č/ć/š/ž/đ (Groß-/Kleinschreibung) und für „Josipović Ćurić" wirft nicht und liefert eine Breite > 0.
+
+**Verifiziert:** `npx tsc --noEmit` fehlerfrei, `npm run lint` fehlerfrei, `npm run test` 299/299 grün (299 statt vorher 297 — die zwei neuen Font-Tests), `npm run build` erfolgreich (Route-Liste unverändert, keine neuen Build-Fehler; Webpack meldet lediglich Cache-Serialisierungs-Warnungen wegen der großen base64-Strings, kein Fehler).
+
+**Offener Punkt:** Bundle-Größen-Zuwachs nicht abschließend vermessen — `montserrat-data.ts` allein ist ~872 KB (Text/base64), `@pdf-lib/fontkit` bringt zusätzliches Gewicht mit. Das betrifft ausschließlich den Server-Bundle-Anteil (`pdf.ts` ist `server-only`, landet nie im Client-Bundle). `npm run deploy` (echter Cloudflare-Worker-Build) wurde NICHT ausgeführt (keine Freigabe, CLAUDE.md §4.6) — Josip sollte vor dem nächsten echten Deploy einmal die tatsächliche Worker-Skriptgröße prüfen, insbesondere im Zusammenspiel mit dem bereits bestehenden ffmpeg-Workaround (25-MiB-Asset-Limit war dort schon einmal ein echtes Problem).
+
+**Übergabe an tester:** Automatisiert bereits grün (s. o.). Manuell empfohlen: ein echtes Zertifikat für einen Namen mit č/ć/š/ž/đ erzeugen (z. B. über die bestehende Zertifikats-Ausstellung nach Kursabschluss) und das PDF visuell prüfen — Sonderzeichen müssen jetzt korrekt erscheinen, nicht mehr als Basisform oder „?". Kein Rendering-Pixel-Vergleich nötig, reine Sichtprüfung reicht.

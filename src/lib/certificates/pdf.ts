@@ -1,6 +1,9 @@
 import "server-only";
-import { PDFDocument, StandardFonts, rgb, degrees, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import { safeAccentColor } from "@/lib/email/templates";
+import { MONTSERRAT_REGULAR_BASE64, MONTSERRAT_BOLD_BASE64 } from "./fonts/montserrat-data";
+import { base64ToUint8Array } from "./fonts/decode";
 
 /**
  * Erzeugt das Zertifikats-PDF mit `pdf-lib` (reines JavaScript, keine
@@ -20,10 +23,16 @@ import { safeAccentColor } from "@/lib/email/templates";
  * Mandantennamen statt "CALLTALENT" fest zu verdrahten, weiß-label-Fall
  * beachten), Eyebrow/Titel/Divider-Raute/Namen/Kurstitel-Hierarchie, die
  * Fußzeile mit rundem Haken-Abzeichen zwischen Datum und Seriennummer.
- * Bewusst NICHT übernommen: die Google-Font "Montserrat" — ein Einbetten
- * würde eine Font-Datei als Workers-Static-Asset + `@pdf-lib/fontkit`
- * einführen, für ein einzelnes PDF-Layout unverhältnismäßig; Helvetica/
- * Helvetica-Bold (bereits eingebettet) bleiben die Schrift.
+ * Schrift: die Google-Font "Montserrat" (Regular + Bold, SIL Open Font
+ * License, siehe `fonts/OFL.txt`) genau wie im Design — ursprünglich nicht
+ * eingebettet (Helvetica-Fallback), seit dem Diakritika-Fix vom 01.08.2026
+ * aber schon (siehe `sanitizeForFont()`-Kommentar unten: der eigentliche
+ * Auslöser war, dass Helvetica/WinAnsi bosnische/kroatische Sonderzeichen
+ * wie č/ć/š/ž/đ lautlos verschluckt hat). Die Rohdaten liegen als
+ * `fonts/Montserrat-Regular.ttf` / `fonts/Montserrat-Bold.ttf` im Repo,
+ * base64-kodiert re-exportiert über `fonts/montserrat-data.ts`
+ * (generiert von `scripts/build-certificate-fonts.mjs` — dort auch die
+ * Begründung, warum kein `fs.readFileSync()` zur Laufzeit).
  *
  * Nachsync (22.07.2026, gleicher Tag): Josip hat `Zertifikat.dc.html` im
  * Editor überarbeitet, bevor der erste Import überhaupt gesichtet werden
@@ -54,19 +63,21 @@ function truncate(value: string, max: number): string {
 }
 
 /**
- * Sicherheitsnetz gegen einen Absturz bei der PDF-Erzeugung (aufgefallen
- * 22.07.2026 beim manuellen Sichtprüfen dieses Designs): `pdf-lib`s
- * Standardschriften (Helvetica) kodieren nur WinAnsi/Windows-1252 — das
- * deckt zwar ü/ö/ä/ß ab, NICHT aber z. B. kroatische/balkanische
- * Diakritika (č, ć, š, ž, đ) oder andere Nicht-Latin-1-Zeichen. Ohne diese
- * Absicherung würde `font.widthOfTextAtSize()` bei einem echten Namen mit
- * einem solchen Zeichen werfen — `issueCertificateIfEligible()` fängt das
- * zwar fail-soft ab (die Lektion bleibt korrekt abgeschlossen), aber der
- * Lernende bekäme dann STILLSCHWEIGEND nie ein Zertifikat. Fällt ein
- * Zeichen aus der Schrift heraus, wird zuerst die unicode-zerlegte
- * Basisform ohne Diakritikum probiert (č -> c), erst als letzter Ausweg "?"
- * — kein Unicode-Font-Einbetten (siehe Dateikopf-Kommentar zu Montserrat),
- * aber auch kein Absturz mehr.
+ * Letztes Sicherheitsnetz, nicht mehr die primäre Verteidigungslinie: seit
+ * dem Diakritika-Fix vom 01.08.2026 ist Montserrat (Unicode/CFF, via
+ * `@pdf-lib/fontkit` eingebettet) die tatsächliche Schrift — bosnische/
+ * kroatische Zeichen (č, ć, š, ž, đ) werden jetzt korrekt dargestellt statt
+ * (wie zuvor mit dem WinAnsi-only Helvetica-Fallback) lautlos auf die
+ * Basisform ohne Diakritikum reduziert. Diese Funktion bleibt trotzdem
+ * bestehen: Montserrats Zeichensatz deckt zwar Latin Extended-A/B ab, aber
+ * nicht jedes denkbare Unicode-Zeichen (z. B. Kyrillisch, CJK, Emoji) — für
+ * den (nun sehr seltenen) Fall eines Zeichens außerhalb dieses Zeichensatzes
+ * würde `font.widthOfTextAtSize()` sonst werfen. `issueCertificateIfEligible()`
+ * fängt das zwar ohnehin fail-soft ab (die Lektion bleibt korrekt
+ * abgeschlossen), aber der Lernende bekäme dann STILLSCHWEIGEND nie ein
+ * Zertifikat. Fällt ein Zeichen aus der Schrift heraus, wird zuerst die
+ * unicode-zerlegte Basisform ohne Diakritikum probiert (im Montserrat-Fall
+ * praktisch nie nötig), erst als letzter Ausweg "?" statt Absturz.
  */
 function sanitizeForFont(font: PDFFont, text: string): string {
   const canEncode = (s: string) => {
@@ -167,11 +178,15 @@ export async function generateCertificatePdf({
   const accent = hexToPdfRgb(safeAccentColor(accentColor));
 
   const pdfDoc = await PDFDocument.create();
+  // `embedFont()` mit einer echten TrueType-Schrift (statt einer der 14
+  // eingebauten StandardFonts) braucht fontkit als Glyph-Parser/Subsetter —
+  // pdf-lib bringt das aus Bundle-Größen-Gründen nicht selbst mit.
+  pdfDoc.registerFontkit(fontkit);
   const page = pdfDoc.addPage(A4_LANDSCAPE);
   const { width: W, height: H } = page.getSize();
 
-  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontRegular = await pdfDoc.embedFont(base64ToUint8Array(MONTSERRAT_REGULAR_BASE64));
+  const fontBold = await pdfDoc.embedFont(base64ToUint8Array(MONTSERRAT_BOLD_BASE64));
 
   // Dynamische, nicht selbst verfasste Werte (Nutzername, Kurstitel,
   // Mandantenname) gegen die WinAnsi-Lücke absichern — siehe sanitizeForFont().
