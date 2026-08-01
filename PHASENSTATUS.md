@@ -208,7 +208,7 @@ Nach dem erfolgreichen Go-Live-Smoke-Test meldete Josip drei konkrete Lücken im
 
 **4. Mandant löschen (Fund 1):** neue Server Action `deleteTenant()` in `src/lib/platform/actions.ts` — löscht ausschließlich die `tenants`-Zeile; alle ~25 abhängigen Tabellen haben laut Migrationen durchgängig `ON DELETE CASCADE` auf `tenant_id` und werden von Postgres automatisch mitgelöscht (vorab per Recherche-Subagent gegen sämtliche `supabase/migrations/*.sql` verifiziert, keine Ausnahme gefunden). NICHT automatisch bereinigt: Storage-Objekte unter `{tenant_id}/...` (Branding/Kursmaterial/Zertifikate/Abgaben), Bunny-CDN-Videos, ein eventuell laufendes Stripe-Abo — dafür gibt es (bewusst, Scope-Entscheidung) noch keine automatische Bereinigung, nur einen Warnhinweis im UI. Neue UI in `/portal/mandanten/[id]` (neue Komponente `mandant-delete-form.tsx`, Abschnitt "Gefahrenzone"): Bestätigung nur durch exaktes Eintippen der Subdomain (nicht nur ein Klick), Button bleibt bis dahin deaktiviert, Server Action prüft die Bestätigung zusätzlich noch einmal serverseitig.
 
-**Noch offen:** Josip muss `npm run deploy` ausführen und den kompletten Batch testen (Mandant mit Inhaber-E-Mail anlegen → Einladungsmail prüfen → Passwort setzen → Login; danach Mandant löschen testen, idealerweise an einem der ohnehin geplanten Test-Mandanten `vm`/`viralmedia`/`demo-blau`/`demo-gruen`). Die drei kleinen, unkritischen Aufräumpunkte aus dem vorherigen Abschnitt (4 Test-Mandanten löschen — jetzt per UI möglich —, verwaistes Worker-Secret `whsec_ROTATED_2026-08-02_SEE_PHASENSTATUS` entfernen, redundante `akademie.calltalent.ai`-DNS-Route aufräumen) bleiben unverändert offen, weiterhin ohne Zeitdruck.
+**Noch offen:** Josip muss `npm run deploy` ausführen und den kompletten Batch testen (Mandant mit Inhaber-E-Mail anlegen → Einladungsmail prüfen → Passwort setzen → Login; danach Mandant löschen testen, idealerweise an einem der ohnehin geplanten Test-Mandanten `vm`/`viralmedia`/`demo-blau`/`demo-gruen`). Die drei kleinen, unkritischen Aufräumpunkte aus dem vorherigen Abschnitt (4 Test-Mandanten löschen — jetzt per UI möglich —, verwaistes Worker-Secret `whsec_…` [REDIGIERT 01.08.2026, security-reviewer-Audit KRITISCH — Klartext-Secret stand hier committed im Repo. Rotation in Stripe + Cloudflare-Worker-Secret UND Bereinigung der Git-Historie stehen noch aus, siehe Abschnitt "Sicherheits-Audit RLS/OWASP" unten.] entfernen, redundante `akademie.calltalent.ai`-DNS-Route aufräumen) bleiben unverändert offen, weiterhin ohne Zeitdruck.
 
 ## Design-Update — Claude-Design-Export übernimmt die Sidebar-Entscheidung (12.07.2026, Cowork-Sitzung)
 
@@ -1767,7 +1767,7 @@ Der erste echte `npm run deploy` durchlief nach dem Custom-Domain-Schritt fünf 
 
 **Nach dem Fix-Deploy verifiziert (12.07.2026, 18:17 Uhr):** „Resend" auf `checkout.session.completed` zweimal ausgeführt (für beide offenen Checkout-Sessions, eine davon ein abgebrochener erster Versuch) — Stripe zeigt „Delivery recovered", jetzt beide `200 OK`. Datenbank bestätigt: `orders` enthält beide Zahlungen (`status='paid'`, je 100 Cent/EUR, `pi_3TsPoIE4Wm2mVgvF1WyohOyO` und `pi_3TsPuRE4Wm2mVgvF1mRknxSa`), `enrollments` zeigt `source='purchase'` für Josips Kurs-Einschreibung (Upsert von der ursprünglich manuellen Einschreibung — `enrolled_at` bewusst unverändert, nur `source` aktualisiert).
 
-**Block 8 damit vollständig abgeschlossen — kompletter Smoke-Test grün: Login/Registrierung, Kursseite mit Fortschrittsanzeige, Stripe-Live-Checkout mit echter Zahlung, Webhook-Verarbeitung (Bestellung + Einschreibung), Portal-Login.** Drei kleine, unkritische Aufräumpunkte bleiben (kein Zeitdruck, siehe Josips Freigabe oben): die 4 Test-Mandanten löschen, den versehentlich falsch benannten Worker-Secret (`whsec_ROTATED_2026-08-02_SEE_PHASENSTATUS`) entfernen, redundante `akademie.calltalent.ai`-DNS-Route aufräumen.
+**Block 8 damit vollständig abgeschlossen — kompletter Smoke-Test grün: Login/Registrierung, Kursseite mit Fortschrittsanzeige, Stripe-Live-Checkout mit echter Zahlung, Webhook-Verarbeitung (Bestellung + Einschreibung), Portal-Login.** Drei kleine, unkritische Aufräumpunkte bleiben (kein Zeitdruck, siehe Josips Freigabe oben): die 4 Test-Mandanten löschen, den versehentlich falsch benannten Worker-Secret (`whsec_…` [REDIGIERT 01.08.2026, security-reviewer-Audit KRITISCH — Klartext-Secret stand hier committed im Repo. Rotation in Stripe + Cloudflare-Worker-Secret UND Bereinigung der Git-Historie stehen noch aus, siehe Abschnitt "Sicherheits-Audit RLS/OWASP" unten.]) entfernen, redundante `akademie.calltalent.ai`-DNS-Route aufräumen.
 
 ## Design-Block — Calltalent-Markendesign + Sidebar-Navigation (Cowork, 12.07.2026)
 
@@ -2421,11 +2421,22 @@ Josips Auftrag: neue Domain `salestalent.app` (über Cloudflare gekauft) für de
 
 **Noch offen:**
 
-1. Prüfen, ob die Seite den erwarteten leeren `SalesTalent`-Mandanten zeigt (nicht versehentlich einen anderen Mandanten) — noch nicht bestätigt, welcher Bildschirm genau erschien.
-2. Branding (Login-Texte, Logo, Farben) für den Mandanten noch nicht gesetzt — Felder sind vorhanden (`tenants.branding.*`), aber leer.
-3. Rechtstexte (`tenants.legal.impressum_url`/`datenschutz_url`) offen — Rechtsträger-Frage noch nicht geklärt.
-4. Englische Plattform-Oberfläche: eigenes Folgeprojekt, siehe `SALESTALENT-KLON-ANLEITUNG.md` Abschnitt 6 — bewusst noch nicht begonnen.
-5. `security-reviewer`-Agent noch nicht gegen die neue Route/den neuen Mandanten gelaufen.
+1. Branding (Farben/Logo/Login-Texte) inzwischen gesetzt und live, siehe `SALESTALENT-BRANDING.md` — Rechtstexte (`tenants.legal.impressum_url`/`datenschutz_url`) bleiben offen, Rechtsträger-Frage noch nicht geklärt.
+2. Englische Plattform-Oberfläche: eigenes Folgeprojekt, siehe `SALESTALENT-KLON-ANLEITUNG.md` Abschnitt 6 — bewusst noch nicht begonnen.
+
+## Supabase-Security-Advisor durchgegangen (01.08.2026)
+
+Josip hat den vollständigen Advisor-Report eingefügt ("bitte prüfen und alles abarbeiten"). Aktuellen Live-Stand per `get_advisors` erneut abgefragt statt den eingefügten (teils veralteten) Text blind zu übernehmen — ein Punkt daraus (`public_bucket_allows_listing`, Bucket `avatars`) war zu diesem Zeitpunkt bereits durch die heutige Migration `20260801151000_avatars_bucket_listing_fix.sql` behoben (Policy von öffentlich-lesbar auf `authenticated`-only eingeschränkt) — vermutlich Ergebnis der parallel laufenden anderen Sitzung.
+
+**Geprüft und als unbedenklich eingestuft (kein Code-/Migrations-Fix nötig):**
+
+1. `rls_enabled_no_policy` (INFO) für `platform_admins` und `rate_limits`: RLS aktiv, keine Policy — das ist beabsichtigt "deny all außer service_role", nicht ein vergessener Policy-Fall. Beide Tabellen werden ausschließlich serverseitig über den Admin-Client gelesen/geschrieben, nie über den öffentlichen PostgREST-Zugang.
+2. `authenticated_security_definer_function_executable` (WARN) für `is_staff`, `member_role`: bereits seit Phase 0 als beabsichtigt dokumentiert (Zeile weiter oben in dieser Datei).
+3. `authenticated_security_definer_function_executable` (WARN) für `my_sessions()` und `revoke_my_session(target uuid)` (NEU seit Migration `settings_profile_notifications_sessions`, 15.07.2026 — bisher nicht einzeln geprüft): Funktionsdefinitionen gelesen (`pg_get_functiondef`). Beide filtern intern hart auf `auth.uid()` (`my_sessions`: `where s.user_id = auth.uid()`; `revoke_my_session`: `where s.id = target and s.user_id = auth.uid() and s.id <> aktuelle Session`) — SECURITY DEFINER ist hier nötig, weil `auth.sessions` für `authenticated` sonst gar nicht zugreifbar ist, liefert aber garantiert nur die eigenen Sessions des Aufrufers und kann die eigene aktuelle Session nicht versehentlich abmelden. Gleiches Muster wie `is_staff`/`member_role`, damit ebenfalls beabsichtigt.
+
+**Noch zu erledigen (Josip, außerhalb von Code/Migration):**
+
+1. `auth_leaked_password_protection` (WARN): Supabase prüft neue Passwörter aktuell nicht gegen HaveIBeenPwned. Kein SQL-/Migrations-Fix möglich (Auth-Dienst-Einstellung, nicht Datenbank) — im Supabase-Dashboard unter **Authentication → Sign In / Providers → Password** (oder „Auth → Policies", je nach Dashboard-Version) den Schalter „Leaked password protection" aktivieren. Kein funktionaler Nachteil für Nutzer mit unkompromittierten Passwörtern.
 
 ## Mehrsprachigkeit (i18n) — Plan erstellt, Start mit Bosnisch (01.08.2026)
 
@@ -2553,3 +2564,18 @@ Umfang laut Plan Abschnitt 6, Zeile C1: `src/app/(auth)/**` — Login, Registrie
 **Verifikation:** `npx tsc --noEmit` grün, `npm run lint` grün, `npm run test` grün (27 Testdateien/323 Tests, inkl. `src/i18n/messages.test.ts` — Schlüsselmengen- und Platzhalter-Abgleich de/bs weiterhin bestanden), `npm run build` grün (alle 51 Routen, kein neuer Fehler).
 
 **Übergabe an tester:** (1) `/login`, `/registrieren`, `/passwort-vergessen`, `/passwort-setzen` (mit gültigem Recovery-Link) jeweils mit Cookie `NEXT_LOCALE=bs` aufrufen — alle vier Seiten müssen vollständig bosnisch sein (Marken-Panel, Formular-Labels, Buttons, Erfolgstexte), bis auf die absichtlich unübersetzten Server-Action-Fehlermeldungen. (2) `e2e/auth.spec.ts` erneut laufen lassen (deutsche Standard-Locale). (3) Screenreader-/Tastatur-Stichprobe auf `/passwort-setzen`, da dort erstmals `t.rich()` mit einem `<strong>`-Tag in dieser Codebasis verwendet wird — sicherstellen, dass die Sprachausgabe den Namen weiterhin sinnvoll vorliest. (4) Sichtprüfung `/login` ohne aktiven Dev-Server nicht durchgeführt — offener Punkt, siehe oben.
+
+## Sicherheits-Audit RLS/OWASP + zwei Fixes (01.08.2026, security-reviewer + direkt angewendet)
+
+Auf Josips Anfrage vollständiges Sicherheits-Audit über den `security-reviewer`-Agenten (RLS-Policy-Rekonstruktion aus allen 32 Migrationen + Live-Abgleich per SQL, API-Routen, Secret-Scan, OWASP). Ergebnis: 1× KRITISCH, 3× HOCH, 4× MITTEL/NIEDRIG. Auf Josips Freigabe zwei der HOCH-Funde direkt live gefixt (Migration + passende lokale Datei, kein `supabase db push` nötig, da per MCP `apply_migration` direkt auf `vklqksdiyiijzoirntyt` angewendet und per SQL verifiziert):
+
+1. **`supabase/migrations/20260801150000_memberships_owner_escalation_fix.sql`** — Rollen-Eskalation über `memberships`-RLS geschlossen. Bisher prüften `memberships_admin_insert`/`_update`/`_delete` nur die Rolle des Aufrufers (`member_role(tenant_id) in ('owner','admin')`), nie die betroffene/resultierende Zeile — ein `admin` konnte sich per direktem PostgREST-Aufruf selbst zu `owner` befördern oder den echten Owner umschreiben/löschen. Fix: zusätzliche Bedingung `role <> 'owner' or member_role(tenant_id) = 'owner'` in `USING` und `WITH CHECK` — nur ein bestehender Owner darf `owner`-Zeilen anlegen, ändern oder löschen.
+2. **`supabase/migrations/20260801150100_storage_bucket_limits.sql`** — alle 5 Storage-Buckets (`branding`, `course-assets`, `submissions`, `certificates`, `avatars`) hatten `file_size_limit`/`allowed_mime_types` = `null`; die zod-Whitelists (`asset-upload-schema.ts`, `submissions/schema.ts`, `account/actions.ts`) griffen nur bei der Anfrage der signierten Upload-URL, nicht beim tatsächlichen PUT gegen Supabase Storage. Fix: Bucket-Grenzwerte synchron zu den bestehenden zod-Konstanten gesetzt (branding 8 MB Bild, course-assets 50 MB Bild/Audio/Dokument, submissions 50 MB, certificates 10 MB PDF, avatars 2 MB jpeg/png).
+
+Beides mit `get_advisors`/`pg_policies`/`storage.buckets`-Abfrage nach Anwendung live verifiziert. `get_advisors` unverändert (Linter erkennt weder Policy-Logik-Fehler noch Bucket-Limits, daher keine neue/verschwundene Warnung zu erwarten).
+
+**Noch offen aus demselben Audit (nicht in diesem Block behoben):**
+1. KRITISCH: Live-Stripe-Webhook-Secret im Klartext in dieser Datei (Zeile 211/1770, Commit `ea1c1bd`) — muss in Stripe/Cloudflare rotiert und aus der Git-Historie getilgt werden (destruktive Historie-Operation, braucht Josips ausdrückliche Freigabe).
+2. HOCH: `avatars`-Bucket erlaubt weiterhin öffentliches Listing aller Dateien (Supabase-Advisor-WARN, Storage-Policy `avatars_public_read`).
+3. MITTEL: CSV-Formula-Injection im Reporting-Export, Stripe-Webhook-Retry-Idempotenz bei ausgehenden Mandanten-Webhooks, Leaked-Password-Protection in Supabase Auth deaktiviert, Login-Rate-Limit nur pro IP.
+4. NIEDRIG: Rate-Limit-Fallback auf spoofbaren `x-forwarded-for`-Header.
