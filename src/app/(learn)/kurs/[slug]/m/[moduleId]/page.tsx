@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { Check, Play, ArrowLeft, ListVideo, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
@@ -43,6 +44,9 @@ export default async function ModulePage({
   params: Promise<{ slug: string; moduleId: string }>;
 }) {
   const { slug, moduleId } = await params;
+  const t = await getTranslations("learn.module");
+  const tShared = await getTranslations("learn.shared");
+  const tNotFound = await getTranslations("learn.notFound");
   const tenant = await getTenant();
   if (!tenant) redirect("/login");
   const supabase = await createClient();
@@ -61,7 +65,7 @@ export default async function ModulePage({
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
     profile?.full_name?.trim() ||
-    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : "zurück");
+    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : tShared("fallbackUserName"));
 
   const { data: course } = await supabase
     .from("courses")
@@ -86,11 +90,11 @@ export default async function ModulePage({
         isStaff={Boolean(isStaff)}
         userName={displayName}
         userEmail={user.email ?? undefined}
-        breadcrumb={`Lernen · ${course.title}`}
-        title="Modul nicht gefunden"
+        breadcrumb={`${tShared("courseBreadcrumbPrefix")} · ${course.title}`}
+        title={tNotFound("module.title")}
       >
         <p className="text-base" style={{ color: "#66679B" }}>
-          Modul nicht gefunden oder gehört nicht zu diesem Kurs.
+          {tNotFound("module.body")}
         </p>
       </AppShell>
     );
@@ -125,13 +129,13 @@ export default async function ModulePage({
     0,
   );
   const totalMinutes = Math.round(totalSeconds / 60);
-  const lessonCountLabel = `${lessonList.length} ${lessonList.length === 1 ? "Lektion" : "Lektionen"}`;
-  const heroMeta = totalMinutes > 0 ? `${lessonCountLabel} · ${totalMinutes} Minuten` : lessonCountLabel;
+  const lessonCountLabel = tShared("lessonsCount", { count: lessonList.length });
+  const heroMeta = totalMinutes > 0 ? `${lessonCountLabel} · ${tShared("minutesCount", { count: totalMinutes })}` : lessonCountLabel;
 
   function lessonMinutes(seconds: number | null): string | null {
     if (!seconds) return null;
     const m = Math.round(seconds / 60);
-    return `${m} ${m === 1 ? "Minute" : "Minuten"}`;
+    return tShared("minutesCount", { count: m });
   }
 
   // Eine Karte je Sektion (statt vorher EINER Karte fürs ganze Modul, siehe
@@ -152,7 +156,7 @@ export default async function ModulePage({
       ? [
           {
             key: "loose",
-            title: sectionsWithLessons.length > 0 ? "Weitere Lektionen" : mod.title,
+            title: sectionsWithLessons.length > 0 ? t("looseLessonsTitle") : mod.title,
             description: null as string | null,
             lessons: looseLessons,
           },
@@ -165,7 +169,7 @@ export default async function ModulePage({
       isStaff={Boolean(isStaff)}
       userName={displayName}
       userEmail={user.email ?? undefined}
-      breadcrumb={`Lernen · ${course.title}`}
+      breadcrumb={`${tShared("courseBreadcrumbPrefix")} · ${course.title}`}
       title={mod.title}
       hideTitle
     >
@@ -178,7 +182,7 @@ export default async function ModulePage({
             style={{ color: ACCENT }}
           >
             <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" />
-            Zurück zur Kursübersicht
+            {tShared("backToCourseOverview")}
           </Link>
 
           {/* Modul-Hero */}
@@ -208,7 +212,7 @@ export default async function ModulePage({
                 aria-hidden="true"
               >
                 <span className="text-xs font-extrabold leading-tight" style={{ letterSpacing: "0.08em", color: "#C9CBE6" }}>
-                  MODUL {moduleIndex + 1}
+                  {tShared("moduleEyebrow", { number: moduleIndex + 1 })}
                 </span>
               </div>
             )}
@@ -228,7 +232,7 @@ export default async function ModulePage({
           {/* Lektionen — eine Karte je Sektion (siehe Dateikopf) */}
           {lessonCards.length === 0 ? (
             <p className="text-base" style={{ color: "#66679B" }}>
-              Dieses Modul hat noch keine veröffentlichten Lektionen.
+              {t("noPublishedLessons")}
             </p>
           ) : (
             <div className="flex flex-col gap-4">
@@ -263,7 +267,7 @@ export default async function ModulePage({
                               style={{ color: "#A9AAC4" }}
                             >
                               <Clock size={14} strokeWidth={2} aria-hidden="true" />
-                              {cardMinutes} Min.
+                              {tShared("minutesShort", { count: cardMinutes })}
                             </div>
                           )}
                         </div>

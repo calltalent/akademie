@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { getTranslations } from "next-intl/server";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { LearnMobileNav } from "@/components/layout/LearnMobileNav";
@@ -51,7 +52,7 @@ export async function AppShell({
   isStaff,
   userName,
   userEmail,
-  breadcrumb = "Lernen · Meine Kurse",
+  breadcrumb,
   title,
   hideTitle = false,
 }: {
@@ -59,6 +60,12 @@ export async function AppShell({
   isStaff: boolean;
   userName: string;
   userEmail?: string;
+  /**
+   * Kein Default-Parameterwert mehr (i18n Block C2, siehe PHASENSTATUS.md):
+   * `t()`/`getTranslations()` lässt sich nicht in einem Parameter-Default
+   * einsetzen (kein `await` in Default-Ausdrücken). Der Fallback auf
+   * "Lernen · Meine Kurse" passiert jetzt im Funktionskörper.
+   */
   breadcrumb?: string;
   title?: string;
   /**
@@ -70,6 +77,9 @@ export async function AppShell({
    */
   hideTitle?: boolean;
 }) {
+  const t = await getTranslations("learn.shell");
+  const tShared = await getTranslations("learn.shared");
+  const effectiveBreadcrumb = breadcrumb ?? tShared("myCoursesBreadcrumb");
   const platformAccess = await checkPlatformAccess();
 
   // NEU (23.07.2026, Josips Auftrag: admin-verwaltbarer "LINKS"-Bereich in
@@ -92,7 +102,7 @@ export async function AppShell({
     customLinks = data ?? [];
   }
 
-  const topBarUser = { name: userName, email: userEmail, role: "Kursteilnehmer" };
+  const topBarUser = { name: userName, email: userEmail, role: t("role") };
   const tenantName = tenant?.name || "Calltalent";
   const logoUrl = tenant?.branding?.logo_url ?? null;
 
@@ -118,8 +128,8 @@ export async function AppShell({
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar
-            breadcrumb={breadcrumb}
-            title={title ?? `Willkommen zurück, ${userName}`}
+            breadcrumb={effectiveBreadcrumb}
+            title={title ?? t("welcomeBack", { name: userName })}
             user={topBarUser}
             notifications={[]}
             hideTitle={hideTitle}

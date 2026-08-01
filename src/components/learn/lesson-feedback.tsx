@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
 import { Star, X } from "lucide-react";
 import { submitContactForm } from "@/lib/contact/actions";
 import { initialContactActionState } from "@/lib/contact/state";
@@ -41,6 +42,7 @@ export function LessonFeedbackToggle({
   userLastName: string;
   userEmail: string;
 }) {
+  const t = useTranslations("learn.feedback");
   const [open, setOpen] = useState(false);
   // Lazy-initialisiert statt per Effect gesetzt: das Ziel-Element ist Teil
   // des server-gerenderten HTML (siehe `#lesson-feedback-panel-target` in
@@ -66,8 +68,8 @@ export function LessonFeedbackToggle({
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-label="Feedback geben"
-        title="Feedback geben"
+        aria-label={t("toggleButton")}
+        title={t("toggleButton")}
         className="inline-flex h-[42px] w-[42px] flex-none items-center justify-center rounded-[11px] border"
         style={{
           borderColor: open ? ACCENT : "#D8DAEA",
@@ -86,7 +88,7 @@ export function LessonFeedbackToggle({
               >
                 <div className="min-w-0">
                   <div className="text-base font-extrabold" style={{ color: "#1A1A2E" }}>
-                    Feedback zu dieser Lektion
+                    {t("panelHeading")}
                   </div>
                   <div className="mt-0.5 truncate text-sm" style={{ color: "#66679B" }}>
                     {courseTitle} · {lessonTitle}
@@ -95,7 +97,7 @@ export function LessonFeedbackToggle({
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  aria-label="Feedback-Formular schließen"
+                  aria-label={t("closeButton")}
                   className="flex h-9 w-9 flex-none items-center justify-center rounded-[9px]"
                   style={{ background: "#F0F1F8", color: NAVY }}
                 >
@@ -106,7 +108,7 @@ export function LessonFeedbackToggle({
               <form action={action} className="flex flex-col gap-4 p-[22px]">
                 <div className="flex gap-4">
                   <label className="flex flex-1 flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
-                    Vorname
+                    {t("firstNameLabel")}
                     <input
                       name="firstName"
                       type="text"
@@ -117,7 +119,7 @@ export function LessonFeedbackToggle({
                     />
                   </label>
                   <label className="flex flex-1 flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
-                    Nachname
+                    {t("lastNameLabel")}
                     <input
                       name="lastName"
                       type="text"
@@ -130,7 +132,7 @@ export function LessonFeedbackToggle({
                 </div>
 
                 <label className="flex flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
-                  E-Mail-Adresse
+                  {t("emailLabel")}
                   <input
                     name="email"
                     type="email"
@@ -142,7 +144,7 @@ export function LessonFeedbackToggle({
                 </label>
 
                 <label className="flex flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
-                  Betreff
+                  {t("subjectLabel")}
                   <select
                     name="subject"
                     required
@@ -159,12 +161,12 @@ export function LessonFeedbackToggle({
                 </label>
 
                 <label className="flex flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
-                  Nachricht
+                  {t("messageLabel")}
                   <textarea
                     name="message"
                     rows={4}
                     required
-                    defaultValue={`Kurs: ${courseTitle}\nLektion: ${lessonTitle}\n\n`}
+                    defaultValue={t("messagePrefix", { courseTitle, lessonTitle })}
                     className="resize-y rounded-xl border px-[15px] py-[13px] text-base font-normal"
                     style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
                   />
@@ -182,7 +184,7 @@ export function LessonFeedbackToggle({
                   className="self-start rounded-xl px-6 py-[13px] text-base font-bold text-white disabled:opacity-50"
                   style={{ background: ACCENT }}
                 >
-                  {pending ? "Wird gesendet …" : "Feedback senden"}
+                  {pending ? t("sendingState") : t("submitButton")}
                 </button>
               </form>
             </div>,

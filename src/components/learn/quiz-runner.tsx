@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { startAttempt, submitAttempt } from "@/lib/quiz/actions";
 import type { LearnerQuestion, LearnerQuiz } from "@/lib/quiz/load";
 
@@ -31,6 +32,7 @@ function formatSeconds(totalSeconds: number): string {
  * technisch durchgesetzt (siehe PHASENSTATUS.md).
  */
 export function QuizRunner({ quiz }: { quiz: LearnerQuiz }) {
+  const t = useTranslations("quiz");
   const [phase, setPhase] = useState<Phase>("intro");
   const [attemptsUsed, setAttemptsUsed] = useState(quiz.attemptsUsed);
   const [answers, setAnswers] = useState<Answers>({});
@@ -111,14 +113,17 @@ export function QuizRunner({ quiz }: { quiz: LearnerQuiz }) {
   }
 
   const attemptsLabel =
-    quiz.attemptsAllowed === null ? "unbegrenzt" : `${Math.max(0, quiz.attemptsAllowed - attemptsUsed)} von ${quiz.attemptsAllowed} verbleibend`;
+    quiz.attemptsAllowed === null
+      ? t("attemptsUnlimited")
+      : t("attemptsRemaining", { count: Math.max(0, quiz.attemptsAllowed - attemptsUsed), total: quiz.attemptsAllowed });
 
   return (
     <div className="rounded-md border p-4" style={{ borderRadius: "var(--radius)" }}>
       <h3 className="mb-1 text-lg font-medium">{quiz.title}</h3>
       <p className="mb-3 text-sm text-gray-500">
-        {quiz.kind === "exam" ? "Prüfung" : "Quiz"} — Bestehensgrenze {quiz.passPct}% — Versuche: {attemptsLabel}
-        {quiz.timeLimitS !== null && ` — Zeitlimit: ${formatSeconds(quiz.timeLimitS)} (nicht automatisch durchgesetzt)`}
+        {quiz.kind === "exam" ? t("kinds.exam") : t("kinds.quiz")} — {t("passThreshold", { passPct: quiz.passPct })} —{" "}
+        {t("attemptsPrefix", { attempts: attemptsLabel })}
+        {quiz.timeLimitS !== null && ` — ${t("timeLimitLabel", { time: formatSeconds(quiz.timeLimitS) })}`}
       </p>
 
       {error && (
@@ -130,7 +135,7 @@ export function QuizRunner({ quiz }: { quiz: LearnerQuiz }) {
       {phase === "intro" && (
         <div>
           {attemptsExhausted ? (
-            <p className="text-base text-gray-700">Versuchslimit erreicht — keine weiteren Versuche möglich.</p>
+            <p className="text-base text-gray-700">{t("attemptsExhausted")}</p>
           ) : (
             <button
               type="button"
@@ -139,7 +144,7 @@ export function QuizRunner({ quiz }: { quiz: LearnerQuiz }) {
               className="rounded-md px-4 py-2 text-base text-white disabled:opacity-50"
               style={{ background: "var(--color-primary)" }}
             >
-              {pending ? "Wird gestartet …" : "Quiz starten"}
+              {pending ? t("starting") : t("start")}
             </button>
           )}
         </div>
@@ -149,7 +154,7 @@ export function QuizRunner({ quiz }: { quiz: LearnerQuiz }) {
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           {remainingS !== null && (
             <p aria-live="polite" className={`text-sm ${remainingS === 0 ? "text-red-600" : "text-gray-500"}`}>
-              Verbleibende Zeit: {formatSeconds(remainingS)}
+              {t("remainingTimeLabel", { time: formatSeconds(remainingS) })}
             </p>
           )}
 
@@ -171,7 +176,7 @@ export function QuizRunner({ quiz }: { quiz: LearnerQuiz }) {
             className="self-start rounded-md px-4 py-2 text-base text-white disabled:opacity-50"
             style={{ background: "var(--color-primary)" }}
           >
-            {pending ? "Wird ausgewertet …" : "Antworten abschicken"}
+            {pending ? t("evaluating") : t("submit")}
           </button>
         </form>
       )}
@@ -179,9 +184,9 @@ export function QuizRunner({ quiz }: { quiz: LearnerQuiz }) {
       {phase === "result" && result && (
         <div role="status" aria-live="polite" className="flex flex-col gap-2">
           <p className={`text-lg font-medium ${result.passed ? "text-green-700" : "text-red-600"}`}>
-            {result.passed ? "Bestanden" : "Nicht bestanden"} — {result.scorePct}%
+            {result.passed ? t("passed") : t("failed")} — {result.scorePct}%
           </p>
-          <p className="text-sm text-gray-500">Versuche: {attemptsLabel}</p>
+          <p className="text-sm text-gray-500">{t("attemptsPrefix", { attempts: attemptsLabel })}</p>
           {!attemptsExhausted && (
             <button
               type="button"
@@ -191,7 +196,7 @@ export function QuizRunner({ quiz }: { quiz: LearnerQuiz }) {
               }}
               className="self-start rounded-md border px-3 py-2 text-sm"
             >
-              Erneut versuchen
+              {t("retry")}
             </button>
           )}
         </div>
@@ -215,13 +220,12 @@ function QuestionField({
   onMultiToggle: (optionId: string, checked: boolean) => void;
   onText: (value: string) => void;
 }) {
+  const t = useTranslations("quiz");
   return (
     <fieldset className="flex flex-col gap-2 border-t pt-4">
       <legend className="text-base font-medium">
         {index + 1}. {question.prompt}{" "}
-        <span className="text-xs text-gray-500">
-          ({question.points} Punkt{question.points === 1 ? "" : "e"})
-        </span>
+        <span className="text-xs text-gray-500">({t("pointsLabel", { points: question.points })})</span>
       </legend>
 
       {question.kind === "single" &&
@@ -258,7 +262,7 @@ function QuestionField({
       {question.kind === "gap" && (
         <div className="flex flex-col gap-1">
           <label htmlFor={`answer-${question.id}`} className="text-sm">
-            Antwort
+            {t("answerLabel")}
           </label>
           <input
             id={`answer-${question.id}`}
@@ -273,7 +277,7 @@ function QuestionField({
       {question.kind === "open" && (
         <div className="flex flex-col gap-1">
           <label htmlFor={`answer-${question.id}`} className="text-sm">
-            Ihre Antwort (wird nicht automatisch bewertet)
+            {t("openAnswerLabel")}
           </label>
           <textarea
             id={`answer-${question.id}`}

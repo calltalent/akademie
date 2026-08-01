@@ -1,13 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { AlertTriangle, Check, Clock, ClipboardCheck, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import { createSubmission } from "@/lib/submissions/actions";
 import {
   ALLOWED_SUBMISSION_MIME_TYPES,
   MAX_SUBMISSION_FILE_SIZE_BYTES,
-  SUBMISSION_STATUS_LABELS,
   type SubmissionKind,
   type SubmissionStatus,
 } from "@/lib/submissions/schema";
@@ -44,10 +44,6 @@ type SubmitState =
   | { status: "submitting" }
   | { status: "error"; message: string };
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
-}
-
 /**
  * Barrierefreiheit (CLAUDE.md §3.4): echte `<label htmlFor>`-Zuordnungen,
  * `aria-pressed` für den Text/Datei-Umschalter, `aria-live` für Status-/
@@ -68,6 +64,15 @@ export function SubmissionForm({
   instructions: string;
   lastSubmission: LastSubmission | null;
 }) {
+  const t = useTranslations("submissions");
+  const tLearn = useTranslations("learn.submission");
+  const format = useFormatter();
+  const statusLabels: Record<SubmissionStatus, string> = {
+    submitted: t("statuses.submitted"),
+    approved: t("statuses.approved"),
+    revision: t("statuses.revision"),
+    rejected: t("statuses.rejected"),
+  };
   const [submitted, setSubmitted] = useState<LastSubmission | null>(lastSubmission);
   const [mode, setMode] = useState<Mode>("text");
   const [text, setText] = useState("");
@@ -88,7 +93,7 @@ export function SubmissionForm({
             <ClipboardCheck size={17} style={{ color: "var(--color-primary)" }} />
           </span>
           <span className="text-base font-extrabold" style={{ color: "#1A1A2E" }}>
-            Abgabe
+            {tLearn("heading")}
           </span>
         </div>
         {instructions && (
@@ -107,10 +112,10 @@ export function SubmissionForm({
             style={{ color: meta.color, background: meta.bg }}
           >
             <StatusIcon size={14} aria-hidden="true" />
-            {SUBMISSION_STATUS_LABELS[submitted.status]}
+            {statusLabels[submitted.status]}
           </span>
           <span className="text-sm" style={{ color: "#66679B" }}>
-            Eingereicht am {formatDate(submitted.createdAt)}
+            {t("submittedAt", { date: format.dateTime(new Date(submitted.createdAt), { dateStyle: "medium", timeStyle: "short" }) })}
           </span>
         </div>
         {submitted.feedback && (
@@ -119,7 +124,7 @@ export function SubmissionForm({
             style={{ borderColor: "#E7E8F2", background: "#F6F7FC", color: "#3E3F66" }}
           >
             <p className="mb-1 text-xs font-bold uppercase tracking-wide" style={{ color: "#A9AAC4" }}>
-              Rückmeldung
+              {tLearn("feedbackHeading")}
             </p>
             {submitted.feedback}
           </div>
@@ -132,13 +137,13 @@ export function SubmissionForm({
     if (!ALLOWED_SUBMISSION_MIME_TYPES.includes(file.type as (typeof ALLOWED_SUBMISSION_MIME_TYPES)[number])) {
       setState({
         status: "error",
-        message: `Dateityp „${file.type || "unbekannt"}" nicht erlaubt. Erlaubt: PDF, Word, PNG/JPG, ZIP, MP4, MP3.`,
+        message: tLearn("fileTypeNotAllowed", { mimeType: file.type || tLearn("unknownFileType") }),
       });
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
     if (file.size > MAX_SUBMISSION_FILE_SIZE_BYTES) {
-      setState({ status: "error", message: "Datei zu groß (max. 50 MB)." });
+      setState({ status: "error", message: tLearn("fileTooLarge") });
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -151,7 +156,7 @@ export function SubmissionForm({
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setState({ status: "error", message: body.error ?? "Upload-URL konnte nicht erzeugt werden." });
+      setState({ status: "error", message: body.error ?? tLearn("uploadUrlFailed") });
       return;
     }
     const { path, token } = (await res.json()) as { path: string; token: string; signedUrl: string };
@@ -163,9 +168,9 @@ export function SubmissionForm({
     if (uploadError) {
       // uploadError.message kommt von der Supabase-Storage-Bibliothek
       // (technisch/englisch) — Detail nur in der Konsole, Nutzer bekommt
-      // einen klaren deutschen Satz.
+      // einen klaren, übersetzten Satz.
       console.error("[submission-form] Datei-Upload fehlgeschlagen.", uploadError);
-      setState({ status: "error", message: "Datei-Upload fehlgeschlagen. Bitte versuche es erneut." });
+      setState({ status: "error", message: tLearn("uploadFailed") });
       return;
     }
 
@@ -204,7 +209,7 @@ export function SubmissionForm({
           <ClipboardCheck size={17} style={{ color: "var(--color-primary)" }} />
         </span>
         <span className="text-base font-extrabold" style={{ color: "#1A1A2E" }}>
-          Abgabe
+          {tLearn("heading")}
         </span>
       </div>
       {instructions && (
@@ -213,7 +218,7 @@ export function SubmissionForm({
         </p>
       )}
 
-      <div className="mb-3.5 flex gap-2" role="group" aria-label="Art der Abgabe">
+      <div className="mb-3.5 flex gap-2" role="group" aria-label={tLearn("modeGroupAriaLabel")}>
         <button
           type="button"
           onClick={() => setMode("text")}
@@ -225,7 +230,7 @@ export function SubmissionForm({
             color: mode === "text" ? "#fff" : "#3E3F66",
           }}
         >
-          Text
+          {t("modeText")}
         </button>
         <button
           type="button"
@@ -238,14 +243,14 @@ export function SubmissionForm({
             color: mode === "file" ? "#fff" : "#3E3F66",
           }}
         >
-          Datei
+          {t("modeFile")}
         </button>
       </div>
 
       {mode === "text" ? (
         <form onSubmit={handleTextSubmit} className="flex flex-col gap-2">
           <label className="text-sm font-bold" style={{ color: "#3E3F66" }} htmlFor="submission-text">
-            Dein Text
+            {t("textLabel")}
           </label>
           <textarea
             id="submission-text"
@@ -259,7 +264,7 @@ export function SubmissionForm({
             style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
           />
           <p id="submission-text-count" className="text-xs" style={{ color: "#A9AAC4" }}>
-            {text.length} / {MAX_TEXT_LENGTH} Zeichen
+            {tLearn("charCount", { count: text.length, max: MAX_TEXT_LENGTH })}
           </p>
           <button
             type="submit"
@@ -267,13 +272,13 @@ export function SubmissionForm({
             className="mt-1 inline-flex self-start items-center rounded-xl px-5 py-3 text-[15px] font-bold text-white disabled:opacity-50"
             style={{ background: "var(--color-primary)" }}
           >
-            {pending ? "Wird eingereicht …" : "Abgabe einreichen"}
+            {pending ? t("submitting") : t("submit")}
           </button>
         </form>
       ) : (
         <div className="flex flex-col gap-2">
           <label className="text-sm font-bold" style={{ color: "#3E3F66" }} htmlFor="submission-file">
-            Datei auswählen (PDF, Word, PNG/JPG, ZIP, MP4, MP3 — max. 50 MB)
+            {t("fileLabel")}
           </label>
           <input
             id="submission-file"
@@ -292,8 +297,8 @@ export function SubmissionForm({
       )}
 
       <p aria-live="polite" className="mt-2.5 text-sm">
-        {state.status === "uploading" && <span style={{ color: "#66679B" }}>Datei wird hochgeladen …</span>}
-        {state.status === "submitting" && <span style={{ color: "#66679B" }}>Wird übermittelt …</span>}
+        {state.status === "uploading" && <span style={{ color: "#66679B" }}>{t("uploading")}</span>}
+        {state.status === "submitting" && <span style={{ color: "#66679B" }}>{tLearn("submittingStatus")}</span>}
         {state.status === "error" && (
           <span role="alert" className="font-semibold" style={{ color: "#B14A4A" }}>
             {state.message}

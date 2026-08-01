@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/compute";
 import { ProgressRing } from "@/components/learn/progress-ring";
@@ -36,6 +37,8 @@ export async function CourseHeroHeader({
   slug: string;
   activeTab: "overview" | "information" | "lesezeichen";
 }) {
+  const t = await getTranslations("learn.shared");
+  const tTabs = await getTranslations("learn.tabs");
   const supabase = await createClient();
 
   const { data: modules } = await supabase
@@ -106,7 +109,7 @@ export async function CourseHeroHeader({
         )}
         <div className="min-w-0 flex-1">
           <div className="text-xs font-bold" style={{ letterSpacing: "0.2em", color: "#B9BBDA" }}>
-            KURS
+            {t("courseEyebrow")}
           </div>
           <h1 className="mb-2 mt-1.5 text-[26px] font-extrabold text-white">{course.title}</h1>
           {course.description && (
@@ -151,7 +154,7 @@ export async function CourseHeroHeader({
         <TabIconButton
           active={activeTab === "overview"}
           href={`/kurs/${slug}`}
-          label="Übersicht"
+          label={tTabs("overview")}
           icon={(color) => (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -164,7 +167,7 @@ export async function CourseHeroHeader({
         <TabIconButton
           active={activeTab === "information"}
           href={`/kurs/${slug}/information`}
-          label="Information"
+          label={tTabs("information")}
           icon={(color) => (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="9" />
@@ -176,7 +179,7 @@ export async function CourseHeroHeader({
         <TabIconButton
           active={activeTab === "lesezeichen"}
           href={`/kurs/${slug}/lesezeichen`}
-          label="Lesezeichen"
+          label={tTabs("bookmarks")}
           icon={(color) => (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />

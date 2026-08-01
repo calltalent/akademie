@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Check, ChevronDown, ExternalLink, Play } from "lucide-react";
 
 const ACCENT = "#5663AE";
@@ -36,6 +37,7 @@ export type BookmarkCourseGroup = {
  * Chevron, Direktlink zum Kurs) ist das Vorbild, nicht die Farbwelt.
  */
 export function BookmarksCourseList({ groups }: { groups: BookmarkCourseGroup[] }) {
+  const t = useTranslations("learn.bookmarksList");
   const [openId, setOpenId] = useState<string | null>(groups[0]?.courseId ?? null);
 
   return (
@@ -83,15 +85,15 @@ export function BookmarksCourseList({ groups }: { groups: BookmarkCourseGroup[] 
                   {group.courseTitle}
                 </div>
                 <div className="mt-0.5 text-[13px] font-semibold uppercase" style={{ letterSpacing: "0.04em", color: "#A9AAC4" }}>
-                  {count} Lesezeichen
-                  {doneCount > 0 ? ` · ${doneCount} von ${count} erledigt` : ""}
+                  {t("countLabel", { count })}
+                  {doneCount > 0 ? ` · ${t("doneSuffix", { done: doneCount, count })}` : ""}
                 </div>
               </div>
               <a
                 href={`/kurs/${group.courseSlug}`}
                 onClick={(e) => e.stopPropagation()}
-                title="Zum Kurs"
-                aria-label="Zum Kurs"
+                title={t("goToCourse")}
+                aria-label={t("goToCourse")}
                 className="flex h-9 w-9 flex-none items-center justify-center rounded-[9px]"
                 style={{ background: "#EEF0F7", color: ACCENT }}
               >

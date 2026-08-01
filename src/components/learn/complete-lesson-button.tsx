@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { completeLesson } from "@/lib/progress/actions";
 
 export function CompleteLessonButton({
@@ -8,7 +9,7 @@ export function CompleteLessonButton({
   courseSlug,
   alreadyCompleted,
   nextHref,
-  nextLabel = "Nächste Lektion",
+  nextLabel,
 }: {
   lessonId: string;
   courseSlug: string;
@@ -19,12 +20,17 @@ export function CompleteLessonButton({
    * zeigt bei einer Grenz-Lektion (letzte einer Sektion/eines Moduls) jetzt auf
    * den neuen Zwischenbildschirm statt auf die nächste Lektion. Aufrufer
    * übergeben dann einen passenden Text (siehe l/[lessonId]/page.tsx) — Default
-   * "Nächste Lektion" gilt für den Normalfall (kein Grenzfall), "Nächstes
-   * Modul" für die letzte Lektion eines Moduls, "Sektion ansehen →" für die
-   * letzte Lektion einer Sektion (Josips Auftrag 23.07.2026).
+   * "Nächste Lektion" (i18n Block C2: `t("nextLessonDefault")`) gilt für den
+   * Normalfall (kein Grenzfall), "Nächstes Modul" für die letzte Lektion eines
+   * Moduls, "Sektion ansehen →" für die letzte Lektion einer Sektion (Josips
+   * Auftrag 23.07.2026). Kein Default-Parameterwert mehr (i18n Block C2, siehe
+   * PHASENSTATUS.md) — `t()` lässt sich nicht als Parameter-Default-Ausdruck
+   * aufrufen, das Zusammenführen passiert jetzt im Funktionskörper.
    */
   nextLabel?: string;
 }) {
+  const t = useTranslations("learn.completeLessonButton");
+  const label = nextLabel ?? t("nextLessonDefault");
   const [pending, startTransition] = useTransition();
 
   // Größenabgleich (24.07.2026, Josips Auftrag "ordentlich und übersichtlich
@@ -42,7 +48,7 @@ export function CompleteLessonButton({
     if (!nextHref) return null;
     return (
       <a href={nextHref} className={buttonClass} style={buttonStyle}>
-        {nextLabel}
+        {label}
       </a>
     );
   }
@@ -60,7 +66,7 @@ export function CompleteLessonButton({
       className={buttonClass}
       style={buttonStyle}
     >
-      {pending ? "Wird gespeichert …" : "Lektion abschließen"}
+      {pending ? t("saving") : t("completeButton")}
     </button>
   );
 }

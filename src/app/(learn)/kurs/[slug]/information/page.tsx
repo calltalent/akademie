@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { Check, User as UserIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
@@ -33,6 +34,9 @@ export default async function CourseInformationPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getTranslations("learn.information");
+  const tShared = await getTranslations("learn.shared");
+  const tNotFound = await getTranslations("learn.notFound");
   const tenant = await getTenant();
   // Wie in kurs/[slug]/page.tsx: RSC wertet die Seite auch aus, wenn ein
   // übergeordneter Gate greift — defensiv statt auf tenant!.id zu laufen.
@@ -53,7 +57,7 @@ export default async function CourseInformationPage({
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
     profile?.full_name?.trim() ||
-    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : "zurück");
+    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : tShared("fallbackUserName"));
 
   const { data: course } = await supabase
     .from("courses")
@@ -68,11 +72,11 @@ export default async function CourseInformationPage({
         isStaff={isStaff ?? false}
         userName={displayName}
         userEmail={user.email ?? undefined}
-        breadcrumb="Lernen · Meine Kurse"
-        title="Kurs nicht gefunden"
+        breadcrumb={tShared("myCoursesBreadcrumb")}
+        title={tNotFound("course.title")}
       >
         <p className="text-base" style={{ color: "#66679B" }}>
-          Kurs nicht gefunden oder nicht veröffentlicht.
+          {tNotFound("course.body")}
         </p>
       </AppShell>
     );
@@ -95,7 +99,7 @@ export default async function CourseInformationPage({
       isStaff={isStaff ?? false}
       userName={displayName}
       userEmail={user.email ?? undefined}
-      breadcrumb="Lernen · Meine Kurse · Information"
+      breadcrumb={t("breadcrumb")}
       title={course.title}
       hideTitle
     >
@@ -114,7 +118,7 @@ export default async function CourseInformationPage({
             {/* Beschreibung */}
             <section className="rounded-[14px] border bg-white p-[22px]" style={{ borderColor: "#E7E8F2" }}>
               <h2 className="mb-2 text-lg font-extrabold" style={{ color: NAVY }}>
-                Beschreibung
+                {t("descriptionHeading")}
               </h2>
               {course.description ? (
                 <p className="m-0 whitespace-pre-line text-[15px]" style={{ color: "#66679B" }}>
@@ -122,7 +126,7 @@ export default async function CourseInformationPage({
                 </p>
               ) : (
                 <p className="m-0 text-[15px]" style={{ color: "#66679B" }}>
-                  Noch keine Beschreibung hinterlegt.
+                  {t("descriptionEmpty")}
                 </p>
               )}
             </section>
@@ -130,7 +134,7 @@ export default async function CourseInformationPage({
             {/* Kursziele */}
             <section className="rounded-[14px] border bg-white p-[22px]" style={{ borderColor: "#E7E8F2" }}>
               <h2 className="mb-2 text-lg font-extrabold" style={{ color: NAVY }}>
-                Kursziele
+                {t("goalsHeading")}
               </h2>
               {goals.length > 0 ? (
                 <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
@@ -149,7 +153,7 @@ export default async function CourseInformationPage({
                 </ul>
               ) : (
                 <p className="m-0 text-[15px]" style={{ color: "#66679B" }}>
-                  Noch keine Kursziele hinterlegt.
+                  {t("goalsEmpty")}
                 </p>
               )}
             </section>
@@ -157,7 +161,7 @@ export default async function CourseInformationPage({
             {/* Autoren */}
             <section className="rounded-[14px] border bg-white p-[22px]" style={{ borderColor: "#E7E8F2" }}>
               <h2 className="mb-2 text-lg font-extrabold" style={{ color: NAVY }}>
-                Autoren
+                {t("authorsHeading")}
               </h2>
               {trainer ? (
                 <div className="flex items-start gap-4">
@@ -195,7 +199,7 @@ export default async function CourseInformationPage({
                 </div>
               ) : (
                 <p className="m-0 text-[15px]" style={{ color: "#66679B" }}>
-                  Noch keine Autoreninfo hinterlegt.
+                  {t("authorsEmpty")}
                 </p>
               )}
             </section>

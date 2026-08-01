@@ -97,7 +97,16 @@
     "attemptsExhausted": "Versuchslimit erreicht — keine weiteren Versuche möglich.",
     "noQuizLinked": "Kein Quiz verknüpft.",
     "quizUnavailable": "Quiz aktuell nicht verfügbar.",
-    "rateLimited": "Zu viele Anfragen. Bitte kurz warten und erneut versuchen."
+    "rateLimited": "Zu viele Anfragen. Bitte kurz warten und erneut versuchen.",
+    "starting": "Wird gestartet …",
+    "evaluating": "Wird ausgewertet …",
+    "passThreshold": "Bestehensgrenze {passPct}%",
+    "attemptsPrefix": "Versuche: {attempts}",
+    "timeLimitLabel": "Zeitlimit: {time} (nicht automatisch durchgesetzt)",
+    "remainingTimeLabel": "Verbleibende Zeit: {time}",
+    "answerLabel": "Antwort",
+    "openAnswerLabel": "Ihre Antwort (wird nicht automatisch bewertet)",
+    "pointsLabel": "{points, plural, one {# Punkt} other {# Punkte}}"
   },
   "submissions": {
     "statuses": {
@@ -147,6 +156,7 @@
     },
     "buyButton": "Kaufen",
     "buyPending": "Wird vorbereitet …",
+    "orderButton": "Zahlungspflichtig bestellen",
     "loginRequired": "Bitte melde dich an, um dieses Produkt zu kaufen.",
     "login": "Anmelden",
     "register": "Registrieren",
@@ -217,6 +227,194 @@
       "columnFailed": "Nicht bestanden",
       "columnAverage": "Durchschnitt (%)",
       "noAttempts": "—"
+    }
+  },
+  "learn": {
+    "shell": {
+      "role": "Kursteilnehmer",
+      "welcomeBack": "Willkommen zurück, {name}"
+    },
+    "shared": {
+      "myCoursesBreadcrumb": "Lernen · Meine Kurse",
+      "courseBreadcrumbPrefix": "Lernen",
+      "backToCourseOverview": "Zurück zur Kursübersicht",
+      "moduleEyebrow": "MODUL {number}",
+      "courseEyebrow": "KURS",
+      "lessonsFallbackTitle": "Lektionen",
+      "fallbackUserName": "zurück",
+      "lessonsCount": "{count, plural, one {# Lektion} other {# Lektionen}}",
+      "minutesCount": "{count, plural, one {# Minute} other {# Minuten}}",
+      "minutesShort": "{count} Min.",
+      "modulesCount": "{count, plural, one {# Modul} other {# Module}}",
+      "progressAriaLabel": "{pct}% abgeschlossen"
+    },
+    "notFound": {
+      "course": {
+        "title": "Kurs nicht gefunden",
+        "body": "Kurs nicht gefunden oder nicht veröffentlicht."
+      },
+      "module": {
+        "title": "Modul nicht gefunden",
+        "body": "Modul nicht gefunden oder gehört nicht zu diesem Kurs."
+      },
+      "section": {
+        "title": "Sektion nicht gefunden",
+        "body": "Sektion nicht gefunden oder gehört nicht zu diesem Kurs."
+      },
+      "lesson": "Lektion nicht gefunden oder nicht veröffentlicht."
+    },
+    "tabs": {
+      "overview": "Übersicht",
+      "information": "Information",
+      "bookmarks": "Lesezeichen"
+    },
+    "overview": {
+      "breadcrumb": "Lernen · Meine Kurse · Übersicht",
+      "continueBannerActive": "MACHE DIREKT WEITER!",
+      "continueBannerStart": "STARTE DEINEN KURS!",
+      "continueButton": "Fortsetzen",
+      "startButton": "Starten",
+      "modulesHeading": "Module",
+      "noPublishedContent": "Dieser Kurs hat noch keine veröffentlichten Inhalte."
+    },
+    "information": {
+      "breadcrumb": "Lernen · Meine Kurse · Information",
+      "descriptionHeading": "Beschreibung",
+      "descriptionEmpty": "Noch keine Beschreibung hinterlegt.",
+      "goalsHeading": "Kursziele",
+      "goalsEmpty": "Noch keine Kursziele hinterlegt.",
+      "authorsHeading": "Autoren",
+      "authorsEmpty": "Noch keine Autoreninfo hinterlegt."
+    },
+    "bookmarksCourse": {
+      "breadcrumb": "Lernen · Meine Kurse · Lesezeichen",
+      "heading": "Lesezeichen in diesem Kurs",
+      "empty": "Noch keine Lesezeichen in diesem Kurs. Markiere eine Lektion über den „Lesezeichen“-Button in der Lektionsansicht."
+    },
+    "bookmarksList": {
+      "countLabel": "{count} Lesezeichen",
+      "doneSuffix": "{done} von {count} erledigt",
+      "goToCourse": "Zum Kurs"
+    },
+    "module": {
+      "looseLessonsTitle": "Weitere Lektionen",
+      "noPublishedLessons": "Dieses Modul hat noch keine veröffentlichten Lektionen."
+    },
+    "moduleCompleted": {
+      "courseTitle": "Kurs abgeschlossen",
+      "moduleTitle": "Modul abgeschlossen",
+      "progressEyebrow": "Modul {number} · {title}",
+      "congratsHeading": "Herzlichen Glückwunsch!",
+      "courseDoneBody": "Du hast „{title}“ vollständig abgeschlossen.",
+      "nextModuleLabel": "Nächstes Modul",
+      "courseProgressAriaLabel": "{percent}% des Kurses abgeschlossen",
+      "nextModuleButton": "Weiter zum nächsten Modul"
+    },
+    "sectionCompleted": {
+      "heading": "Sektion abgeschlossen",
+      "nextSectionLabel": "Nächste Sektion",
+      "backToModule": "Zurück zur Modulübersicht",
+      "nextSectionButton": "Weiter zur nächsten Sektion"
+    },
+    "lesson": {
+      "summaryLabel": "Zusammenfassung",
+      "chaptersLabel": "Kapitel",
+      "transcriptToggle": "Transkript anzeigen",
+      "completedBadge": "✓ Abgeschlossen",
+      "previousLesson": "Vorherige Lektion",
+      "nextLessonLabel": "Nächste Lektion",
+      "nextSectionButton": "Nächste Sektion",
+      "nextModuleButtonLabel": "Nächstes Modul",
+      "viewSectionButtonLabel": "Sektion ansehen →"
+    },
+    "player": {
+      "noContent": "Diese Lektion hat noch keinen Inhalt.",
+      "noImage": "Kein Bild ausgewählt.",
+      "noVideo": "Kein Video zugewiesen.",
+      "playerUnavailable": "Video-Player nicht verfügbar (Bunny Stream nicht konfiguriert).",
+      "videoProcessingFailed": "Video konnte nicht verarbeitet werden. Bitte im Kurs-Editor erneut hochladen.",
+      "videoProcessingHeading": "Video wird noch verarbeitet …",
+      "videoProcessingBody": "Das kann bei frisch hochgeladenen Videos einige Minuten dauern. Diese Seite aktualisiert sich automatisch, sobald es fertig ist.",
+      "noAudio": "Keine Audiodatei ausgewählt.",
+      "noFile": "Keine Datei ausgewählt.",
+      "fileFallbackName": "Datei herunterladen",
+      "openLinkButton": "Link öffnen",
+      "noEmbedUrl": "Keine Einbettungs-URL angegeben.",
+      "embedTitle": "Eingebetteter Inhalt"
+    },
+    "bookmarkButton": {
+      "add": "Zu Lesezeichen hinzufügen",
+      "remove": "Aus Lesezeichen entfernen"
+    },
+    "completeLessonButton": {
+      "nextLessonDefault": "Nächste Lektion",
+      "saving": "Wird gespeichert …",
+      "completeButton": "Lektion abschließen"
+    },
+    "feedback": {
+      "toggleButton": "Feedback geben",
+      "panelHeading": "Feedback zu dieser Lektion",
+      "closeButton": "Feedback-Formular schließen",
+      "firstNameLabel": "Vorname",
+      "lastNameLabel": "Nachname",
+      "emailLabel": "E-Mail-Adresse",
+      "subjectLabel": "Betreff",
+      "messageLabel": "Nachricht",
+      "messagePrefix": "Kurs: {courseTitle}\nLektion: {lessonTitle}\n\n",
+      "submitButton": "Feedback senden",
+      "sendingState": "Wird gesendet …"
+    },
+    "tutor": {
+      "heading": "Tutor",
+      "aiAssistantBadge": "KI-Assistent",
+      "logAriaLabel": "Tutor-Konversation",
+      "emptyState": "Stelle eine Frage zu diesem Kurs — der KI-Assistent antwortet ausschließlich auf Basis der Kursinhalte und sagt ehrlich, wenn etwas nicht im Kurs steht.",
+      "sourceLabel": "Quelle:",
+      "quotaExceededHint": "Bitte wende dich an dein Team oder versuche es im nächsten Monat erneut.",
+      "inputLabel": "Frage an den Tutor",
+      "inputPlaceholder": "Frage zum Kurs stellen …",
+      "sendingState": "Wird gesendet …",
+      "sendButton": "Frage senden",
+      "escalateButton": "An Trainer weiterleiten",
+      "escalatedStatus": "An Trainer weitergeleitet ✓"
+    },
+    "submission": {
+      "heading": "Abgabe",
+      "feedbackHeading": "Rückmeldung",
+      "modeGroupAriaLabel": "Art der Abgabe",
+      "fileTypeNotAllowed": "Dateityp „{mimeType}“ nicht erlaubt. Erlaubt: PDF, Word, PNG/JPG, ZIP, MP4, MP3.",
+      "unknownFileType": "unbekannt",
+      "fileTooLarge": "Datei zu groß (max. 50 MB).",
+      "uploadUrlFailed": "Upload-URL konnte nicht erzeugt werden.",
+      "uploadFailed": "Datei-Upload fehlgeschlagen. Bitte versuche es erneut.",
+      "submittingStatus": "Wird übermittelt …",
+      "charCount": "{count} / {max} Zeichen"
+    },
+    "search": {
+      "backToCourses": "← Meine Kurse",
+      "heading": "Suche",
+      "searchLabel": "Suchbegriff",
+      "placeholder": "Kursinhalte durchsuchen…",
+      "submitButton": "Suchen",
+      "genericError": "Die semantische Suche ist gerade nicht verfügbar. Bitte später erneut versuchen.",
+      "noResults": "Keine Treffer für „{query}“."
+    },
+    "buy": {
+      "tenantNotFound": "Kein Mandant zu diesem Host gefunden.",
+      "heroBadgeTitle": "Dein Calltalent-Kurszugang",
+      "heroBadgeSubtitle": "Direkter Zugang zum vollständigen Trainingskurs nach erfolgreichem Kauf.",
+      "selectedProductHeading": "Ausgewähltes Produkt",
+      "costSummaryHeading": "Kosten-Zusammenfassung",
+      "durationHoursMinutes": "{hours} Std. {minutes} Min. Videomaterial",
+      "durationHoursOnly": "{hours} Std. Videomaterial",
+      "durationMinutesOnly": "{minutes} Min. Videomaterial",
+      "certificateBullet": "Zertifikat nach Abschluss",
+      "accessNoteSubscription": "Der Zugang bleibt bestehen, solange dein Abo aktiv ist. Abrechnung monatlich, jederzeit kündbar.",
+      "accessNoteOneTime": "Mit diesem Kauf erhältst du dauerhaften Zugang zum vollständigen Kurs.",
+      "billingHint": "Rechnungs- und Zahlungsdaten gibst du im nächsten Schritt sicher bei unserem Zahlungsdienstleister Stripe ein.",
+      "totalLabel": "GESAMTBETRAG",
+      "perMonthSuffix": " / Monat",
+      "secureBadge": "Sichere Zahlung über Stripe"
     }
   }
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { ArrowRight, Check, ListVideo } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
@@ -30,6 +31,9 @@ export default async function SectionCompletedPage({
   params: Promise<{ slug: string; sectionId: string }>;
 }) {
   const { slug, sectionId } = await params;
+  const t = await getTranslations("learn.sectionCompleted");
+  const tShared = await getTranslations("learn.shared");
+  const tNotFound = await getTranslations("learn.notFound");
   const tenant = await getTenant();
   if (!tenant) redirect("/login");
   const supabase = await createClient();
@@ -44,7 +48,7 @@ export default async function SectionCompletedPage({
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
     profile?.full_name?.trim() ||
-    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : "zurück");
+    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : tShared("fallbackUserName"));
 
   const { data: course } = await supabase
     .from("courses")
@@ -82,11 +86,11 @@ export default async function SectionCompletedPage({
         isStaff={Boolean(isStaff)}
         userName={displayName}
         userEmail={user.email ?? undefined}
-        breadcrumb={`Lernen · ${course.title}`}
-        title="Sektion nicht gefunden"
+        breadcrumb={`${tShared("courseBreadcrumbPrefix")} · ${course.title}`}
+        title={tNotFound("section.title")}
       >
         <p className="text-base" style={{ color: "#66679B" }}>
-          Sektion nicht gefunden oder gehört nicht zu diesem Kurs.
+          {tNotFound("section.body")}
         </p>
       </AppShell>
     );
@@ -113,12 +117,10 @@ export default async function SectionCompletedPage({
   );
   const nextSectionMinutes = Math.round(nextSectionSeconds / 60);
   const nextSectionLessonLabel =
-    nextSectionLessons.length > 0
-      ? `${nextSectionLessons.length} ${nextSectionLessons.length === 1 ? "Lektion" : "Lektionen"}`
-      : null;
+    nextSectionLessons.length > 0 ? tShared("lessonsCount", { count: nextSectionLessons.length }) : null;
   const nextSectionMeta =
     nextSectionLessonLabel && nextSectionMinutes > 0
-      ? `${nextSectionLessonLabel} · ${nextSectionMinutes} Min.`
+      ? `${nextSectionLessonLabel} · ${tShared("minutesShort", { count: nextSectionMinutes })}`
       : nextSectionLessonLabel;
 
   // Modul-Fortschrittsring im Kopfbalken — 100 %, da die Sektion gerade
@@ -148,8 +150,8 @@ export default async function SectionCompletedPage({
       isStaff={Boolean(isStaff)}
       userName={displayName}
       userEmail={user.email ?? undefined}
-      breadcrumb={`Lernen · ${currentModule?.title ?? course.title}`}
-      title="Sektion abgeschlossen"
+      breadcrumb={`${tShared("courseBreadcrumbPrefix")} · ${currentModule?.title ?? course.title}`}
+      title={t("heading")}
       hideTitle
     >
       <div className="mx-auto max-w-2xl">
@@ -204,7 +206,7 @@ export default async function SectionCompletedPage({
             {currentSection.title}
           </div>
           <h1 className="mt-1.5 text-[26px] font-extrabold" style={{ color: "#1A1A2E" }}>
-            Sektion abgeschlossen
+            {t("heading")}
           </h1>
 
           {nextSection && (
@@ -224,7 +226,7 @@ export default async function SectionCompletedPage({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="text-[11px] font-bold uppercase" style={{ letterSpacing: "0.16em", color: "#A9AAC4" }}>
-                  Nächste Sektion
+                  {t("nextSectionLabel")}
                 </div>
                 <div className="mt-[3px] truncate text-base font-bold" style={{ color: "#1A1A2E" }}>
                   {nextSection.title}
@@ -244,7 +246,7 @@ export default async function SectionCompletedPage({
               className="inline-flex items-center gap-2 rounded-[11px] px-5 py-3 text-[15px] font-bold no-underline"
               style={{ background: NAVY, color: "#fff" }}
             >
-              Zurück zur Modulübersicht
+              {t("backToModule")}
             </Link>
             {nextSectionFirstLessonId && (
               <Link
@@ -252,7 +254,7 @@ export default async function SectionCompletedPage({
                 className="inline-flex items-center gap-2 rounded-[11px] px-5 py-3 text-[15px] font-bold text-white no-underline"
                 style={{ background: "#3CA36A" }}
               >
-                Weiter zur nächsten Sektion
+                {t("nextSectionButton")}
                 <ArrowRight size={16} aria-hidden="true" />
               </Link>
             )}

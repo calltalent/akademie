@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { ArrowRight, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
@@ -31,6 +32,9 @@ export default async function ModuleCompletedPage({
   params: Promise<{ slug: string; moduleId: string }>;
 }) {
   const { slug, moduleId } = await params;
+  const t = await getTranslations("learn.moduleCompleted");
+  const tShared = await getTranslations("learn.shared");
+  const tNotFound = await getTranslations("learn.notFound");
   const tenant = await getTenant();
   if (!tenant) redirect("/login");
   const supabase = await createClient();
@@ -45,7 +49,7 @@ export default async function ModuleCompletedPage({
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
     profile?.full_name?.trim() ||
-    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : "zurück");
+    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : tShared("fallbackUserName"));
 
   const { data: course } = await supabase
     .from("courses")
@@ -71,11 +75,11 @@ export default async function ModuleCompletedPage({
         isStaff={Boolean(isStaff)}
         userName={displayName}
         userEmail={user.email ?? undefined}
-        breadcrumb={`Lernen · ${course.title}`}
-        title="Modul nicht gefunden"
+        breadcrumb={`${tShared("courseBreadcrumbPrefix")} · ${course.title}`}
+        title={tNotFound("module.title")}
       >
         <p className="text-base" style={{ color: "#66679B" }}>
-          Modul nicht gefunden oder gehört nicht zu diesem Kurs.
+          {tNotFound("module.body")}
         </p>
       </AppShell>
     );
@@ -122,12 +126,10 @@ export default async function ModuleCompletedPage({
   );
   const nextModuleMinutes = Math.round(nextModuleSeconds / 60);
   const nextModuleLessonLabel =
-    nextModuleLessons.length > 0
-      ? `${nextModuleLessons.length} ${nextModuleLessons.length === 1 ? "Lektion" : "Lektionen"}`
-      : null;
+    nextModuleLessons.length > 0 ? tShared("lessonsCount", { count: nextModuleLessons.length }) : null;
   const nextModuleMeta =
     nextModuleLessonLabel && nextModuleMinutes > 0
-      ? `${nextModuleLessonLabel} · ${nextModuleMinutes} Min.`
+      ? `${nextModuleLessonLabel} · ${tShared("minutesShort", { count: nextModuleMinutes })}`
       : nextModuleLessonLabel;
 
   // Dritter Fall: kein nächstes Modul mit Inhalt → das war die letzte
@@ -139,8 +141,8 @@ export default async function ModuleCompletedPage({
       isStaff={Boolean(isStaff)}
       userName={displayName}
       userEmail={user.email ?? undefined}
-      breadcrumb={`Lernen · ${course.title}`}
-      title={courseFullyCompleted ? "Kurs abgeschlossen" : "Modul abgeschlossen"}
+      breadcrumb={`${tShared("courseBreadcrumbPrefix")} · ${course.title}`}
+      title={courseFullyCompleted ? t("courseTitle") : t("moduleTitle")}
       hideTitle
     >
       <div className="mx-auto max-w-2xl">
@@ -190,16 +192,18 @@ export default async function ModuleCompletedPage({
             <Check size={40} strokeWidth={3} color="#3CA36A" />
           </span>
           <div className="text-[13px] font-bold uppercase" style={{ letterSpacing: "0.16em", color: "#A9AAC4" }}>
-            {courseFullyCompleted ? "Kurs abgeschlossen" : `Modul ${moduleIndex + 1} · ${mod.title}`}
+            {courseFullyCompleted
+              ? t("courseTitle")
+              : t("progressEyebrow", { number: moduleIndex + 1, title: mod.title })}
           </div>
           <h1 className="mt-1.5 text-[26px] font-extrabold" style={{ color: "#1A1A2E" }}>
-            {courseFullyCompleted ? "Herzlichen Glückwunsch!" : "Modul abgeschlossen"}
+            {courseFullyCompleted ? t("congratsHeading") : t("moduleTitle")}
           </h1>
 
           {courseFullyCompleted ? (
             <div className="mt-7 w-full">
               <p className="mb-4 text-base" style={{ color: "#66679B" }}>
-                Du hast „{course.title}&quot; vollständig abgeschlossen.
+                {t("courseDoneBody", { title: course.title })}
               </p>
               <CertificateBadge tenantId={tenant.id} courseId={course.id} />
             </div>
@@ -227,13 +231,13 @@ export default async function ModuleCompletedPage({
                     aria-hidden="true"
                   >
                     <span className="text-[10px] font-extrabold leading-tight" style={{ letterSpacing: "0.06em", color: "#C9CBE6" }}>
-                      MODUL {moduleIndex + 2}
+                      {tShared("moduleEyebrow", { number: moduleIndex + 2 })}
                     </span>
                   </span>
                 )}
                 <div className="min-w-0 flex-1 text-left">
                   <div className="text-[11px] font-bold uppercase" style={{ letterSpacing: "0.16em", color: "#A9AAC4" }}>
-                    Nächstes Modul
+                    {t("nextModuleLabel")}
                   </div>
                   <div className="mt-[3px] truncate text-base font-bold" style={{ color: "#1A1A2E" }}>
                     {nextModule.title}
@@ -264,7 +268,7 @@ export default async function ModuleCompletedPage({
                     className="absolute inset-0 flex items-center justify-center text-[11px] font-extrabold"
                     style={{ color: NAVY }}
                     role="img"
-                    aria-label={`${courseProgress.percent}% des Kurses abgeschlossen`}
+                    aria-label={t("courseProgressAriaLabel", { percent: courseProgress.percent })}
                   >
                     {courseProgress.percent}%
                   </div>
@@ -279,7 +283,7 @@ export default async function ModuleCompletedPage({
               className="inline-flex items-center gap-2 rounded-[11px] px-5 py-3 text-[15px] font-bold no-underline"
               style={{ background: NAVY, color: "#fff" }}
             >
-              Zurück zur Kursübersicht
+              {tShared("backToCourseOverview")}
             </Link>
             {!courseFullyCompleted && nextModuleFirstLessonId && (
               <Link
@@ -287,7 +291,7 @@ export default async function ModuleCompletedPage({
                 className="inline-flex items-center gap-2 rounded-[11px] px-5 py-3 text-[15px] font-bold text-white no-underline"
                 style={{ background: "#3CA36A" }}
               >
-                Weiter zum nächsten Modul
+                {t("nextModuleButton")}
                 <ArrowRight size={16} aria-hidden="true" />
               </Link>
             )}

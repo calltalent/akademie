@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { Bookmark } from "lucide-react";
 import { toggleBookmark } from "@/lib/bookmarks/actions";
 
@@ -13,9 +14,10 @@ export function BookmarkButton({
   courseSlug: string;
   initiallyBookmarked: boolean;
 }) {
+  const t = useTranslations("learn.bookmarkButton");
   const [bookmarked, setBookmarked] = useState(initiallyBookmarked);
   const [pending, startTransition] = useTransition();
-  const label = bookmarked ? "Aus Lesezeichen entfernen" : "Zu Lesezeichen hinzufügen";
+  const label = bookmarked ? t("remove") : t("add");
 
   return (
     <button

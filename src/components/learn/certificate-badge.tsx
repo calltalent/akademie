@@ -1,3 +1,4 @@
+import { getFormatter, getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -27,6 +28,8 @@ export async function CertificateBadge({
   tenantId: string;
   courseId: string;
 }) {
+  const t = await getTranslations("certificates");
+  const format = await getFormatter();
   const supabase = await createClient();
   const {
     data: { user },
@@ -53,17 +56,17 @@ export async function CertificateBadge({
 
   return (
     <div className="rounded-md border p-3" style={{ borderRadius: "var(--radius)" }}>
-      <p className="text-sm font-medium">Zertifikat ausgestellt 🎓</p>
+      <p className="text-sm font-medium">{t("issued")} 🎓</p>
       <p className="text-xs text-gray-500">
-        Ausgestellt am {new Date(certificate.issued_at).toLocaleDateString("de-DE")} — Seriennummer{" "}
+        {t("issuedOn", { date: format.dateTime(new Date(certificate.issued_at)) })} — {t("serialLabel")}{" "}
         {certificate.serial}
       </p>
       {downloadUrl ? (
         <a href={downloadUrl} className="mt-2 inline-block text-sm underline">
-          Zertifikat herunterladen (PDF)
+          {t("download")}
         </a>
       ) : (
-        <p className="mt-2 text-xs text-gray-500">Download aktuell nicht verfügbar.</p>
+        <p className="mt-2 text-xs text-gray-500">{t("downloadUnavailable")}</p>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { ArrowRight, ArrowLeft, Check, Play, ListVideo, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
@@ -51,6 +52,9 @@ export default async function LessonPage({
   params: Promise<{ slug: string; lessonId: string }>;
 }) {
   const { slug, lessonId } = await params;
+  const t = await getTranslations("learn.lesson");
+  const tShared = await getTranslations("learn.shared");
+  const tNotFound = await getTranslations("learn.notFound");
   const tenant = await getTenant();
   if (!tenant) redirect("/login");
   const supabase = await createClient();
@@ -87,7 +91,7 @@ export default async function LessonPage({
   if (!lesson) {
     return (
       <main className="mx-auto max-w-2xl px-6 py-12">
-        <p className="text-base">Lektion nicht gefunden oder nicht veröffentlicht.</p>
+        <p className="text-base">{tNotFound("lesson")}</p>
       </main>
     );
   }
@@ -133,7 +137,11 @@ export default async function LessonPage({
           ? `/kurs/${slug}/l/${nextId}`
           : null;
   const completeLabel =
-    boundary.kind === "module" ? "Nächstes Modul" : boundary.kind === "section" ? "Sektion ansehen →" : undefined;
+    boundary.kind === "module"
+      ? t("nextModuleButtonLabel")
+      : boundary.kind === "section"
+        ? t("viewSectionButtonLabel")
+        : undefined;
 
   // Aktuelles Modul + Modul-Fortschritt für die Kopf-Leiste; „nächste Sektion"
   // = das nachfolgende Modul (Rechte Spalte zeigt nur das aktuelle Modul).
@@ -159,7 +167,7 @@ export default async function LessonPage({
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
     profile?.full_name?.trim() ||
-    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : "zurück");
+    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : tShared("fallbackUserName"));
 
   // Best-effort Vor-/Nachname-Aufteilung für die Feedback-Formular-Vorbelegung
   // (LessonFeedbackToggle) — echte Daten (profiles.full_name bzw. Fallback
@@ -179,7 +187,7 @@ export default async function LessonPage({
       isStaff={Boolean(isStaff)}
       userName={displayName}
       userEmail={user.email ?? undefined}
-      breadcrumb={`Lernen · ${currentModule?.title ?? course.title}`}
+      breadcrumb={`${tShared("courseBreadcrumbPrefix")} · ${currentModule?.title ?? course.title}`}
       title={lesson.title}
       hideTitle
     >
@@ -207,7 +215,7 @@ export default async function LessonPage({
                 aria-hidden="true"
               >
                 <span className="text-[10px] font-extrabold leading-tight" style={{ letterSpacing: "0.06em", color: "#C9CBE6" }}>
-                  MODUL {currentModuleIndex + 1}
+                  {tShared("moduleEyebrow", { number: currentModuleIndex + 1 })}
                 </span>
               </div>
               <div className="min-w-0 flex-1">
@@ -273,7 +281,7 @@ export default async function LessonPage({
               </div>
               <div className="flex items-center gap-3">
                 {progressRow?.status === "completed" && (
-                  <span className="text-sm font-semibold text-green-700">✓ Abgeschlossen</span>
+                  <span className="text-sm font-semibold text-green-700">{t("completedBadge")}</span>
                 )}
                 <CompleteLessonButton
                   lessonId={lessonId}
@@ -295,16 +303,16 @@ export default async function LessonPage({
           {lesson.summary ? (
             <div className="mt-5 rounded-2xl border p-4 text-base leading-relaxed" style={{ borderColor: "#E7E8F2", background: "#fff" }}>
               <p className="mb-1 text-sm font-medium" style={{ color: "#A9AAC4" }}>
-                Zusammenfassung
+                {t("summaryLabel")}
               </p>
               <p>{lesson.summary}</p>
             </div>
           ) : null}
 
           {Array.isArray(lesson.chapters) && (lesson.chapters as LessonChapter[]).length > 0 ? (
-            <nav aria-label="Kapitel" className="mt-5 flex flex-col gap-1">
+            <nav aria-label={t("chaptersLabel")} className="mt-5 flex flex-col gap-1">
               <p className="text-sm font-medium" style={{ color: "#A9AAC4" }}>
-                Kapitel
+                {t("chaptersLabel")}
               </p>
               <ol className="flex flex-col gap-1">
                 {(lesson.chapters as LessonChapter[]).map((chapter, index) => (
@@ -323,7 +331,7 @@ export default async function LessonPage({
           {lesson.transcript ? (
             <details className="mt-5 rounded-2xl border p-4" style={{ borderColor: "#E7E8F2", background: "#fff" }}>
               <summary className="cursor-pointer text-sm font-medium" style={{ color: "#A9AAC4" }}>
-                Transkript anzeigen
+                {t("transcriptToggle")}
               </summary>
               <p className="mt-3 max-h-96 overflow-y-auto whitespace-pre-line text-base leading-relaxed">
                 {lesson.transcript}
@@ -343,7 +351,7 @@ export default async function LessonPage({
             {prevId && (
               <Link href={`/kurs/${slug}/l/${prevId}`} className="inline-flex items-center gap-1.5 self-start text-sm font-semibold no-underline" style={{ color: "#66679B" }}>
                 <ArrowLeft size={15} strokeWidth={2.2} aria-hidden="true" />
-                Vorherige Lektion
+                {t("previousLesson")}
               </Link>
             )}
             {nextId && nextLessonObj && (
@@ -367,7 +375,7 @@ export default async function LessonPage({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] font-bold uppercase" style={{ letterSpacing: "0.16em", color: "#A9AAC4" }}>
-                    Nächste Lektion
+                    {t("nextLessonLabel")}
                   </div>
                   <div className="mt-[3px] truncate text-base font-bold" style={{ color: "#1A1A2E" }}>
                     {nextLessonObj.title}
@@ -390,10 +398,10 @@ export default async function LessonPage({
             </span>
             <div className="min-w-0">
               <div className="truncate text-[15px] font-extrabold" style={{ color: "#1A1A2E" }}>
-                {currentModule?.title ?? "Lektionen"}
+                {currentModule?.title ?? tShared("lessonsFallbackTitle")}
               </div>
               <div className="text-[11px] font-bold uppercase" style={{ letterSpacing: "0.1em", color: "#A9AAC4" }}>
-                {currentModuleLessons.length} {currentModuleLessons.length === 1 ? "Lektion" : "Lektionen"}
+                {tShared("lessonsCount", { count: currentModuleLessons.length })}
               </div>
             </div>
           </div>
@@ -458,7 +466,7 @@ export default async function LessonPage({
               className="mt-3.5 flex items-center justify-center gap-1.5 rounded-[11px] border p-[11px] text-sm font-semibold no-underline"
               style={{ borderColor: "#E0E2EF", color: NAVY }}
             >
-              Nächste Sektion
+              {t("nextSectionButton")}
               <ChevronRight size={15} color={ACCENT} strokeWidth={2.4} aria-hidden="true" />
             </Link>
           )}

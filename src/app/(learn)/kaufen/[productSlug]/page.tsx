@@ -1,20 +1,15 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { ShoppingBag, GraduationCap, CheckCircle2, Play, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { getPublicProduct, getPublicProductFeatures } from "@/lib/stripe/storefront";
-import { PRODUCT_KIND_LABELS } from "@/lib/stripe/schema";
+import type { ProductKind } from "@/lib/stripe/schema";
 import { BuyButton } from "@/components/learn/buy-button";
 
 const ACCENT = "#5663AE";
 const NAVY = "#3E3F66";
-
-function formatPrice(cents: number, currency: string): string {
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency: currency.toUpperCase() }).format(
-    cents / 100,
-  );
-}
 
 /**
  * Oeffentliche Kaufseite (SPEC 4.1: `/kaufen/[productSlug]`) - erreichbar
@@ -70,13 +65,22 @@ export default async function KaufenPage({
   params: Promise<{ productSlug: string }>;
 }) {
   const { productSlug } = await params;
+  const t = await getTranslations("learn.buy");
+  const tShared = await getTranslations("learn.shared");
+  const tPayments = await getTranslations("payments");
+  const tAuthShared = await getTranslations("auth.shared");
+  const format = await getFormatter();
   const tenant = await getTenant();
 
   if (!tenant) {
     return (
-      <PageChrome>
+      <PageChrome
+        brandInitial={tAuthShared("brandInitial")}
+        brandName={tAuthShared("brandName")}
+        brandSuffix={tAuthShared("brandSuffix")}
+      >
         <p className="text-base" style={{ color: "#66679B" }}>
-          Kein Mandant zu diesem Host gefunden.
+          {t("tenantNotFound")}
         </p>
       </PageChrome>
     );
@@ -86,12 +90,16 @@ export default async function KaufenPage({
 
   if (!paymentsEnabled) {
     return (
-      <PageChrome>
+      <PageChrome
+        brandInitial={tAuthShared("brandInitial")}
+        brandName={tAuthShared("brandName")}
+        brandSuffix={tAuthShared("brandSuffix")}
+      >
         <h1 className="mb-2 text-2xl font-extrabold" style={{ color: "#1A1A2E" }}>
           {tenant.name}
         </h1>
         <p className="text-base" style={{ color: "#66679B" }}>
-          Zahlungen sind für diese Akademie aktuell nicht verfügbar.
+          {tPayments("paymentsDisabled")}
         </p>
       </PageChrome>
     );
@@ -100,12 +108,16 @@ export default async function KaufenPage({
   const product = await getPublicProduct(tenant.id, productSlug);
   if (!product) {
     return (
-      <PageChrome>
+      <PageChrome
+        brandInitial={tAuthShared("brandInitial")}
+        brandName={tAuthShared("brandName")}
+        brandSuffix={tAuthShared("brandSuffix")}
+      >
         <h1 className="mb-2 text-2xl font-extrabold" style={{ color: "#1A1A2E" }}>
           {tenant.name}
         </h1>
         <p className="text-base" style={{ color: "#66679B" }}>
-          Dieses Produkt ist nicht verfügbar.
+          {tPayments("productUnavailable")}
         </p>
       </PageChrome>
     );
@@ -123,8 +135,10 @@ export default async function KaufenPage({
     if (!features || features.totalMinutes <= 0) return null;
     const hours = Math.floor(features.totalMinutes / 60);
     const minutes = features.totalMinutes % 60;
-    if (hours <= 0) return `${minutes} Min. Videomaterial`;
-    return `${hours} Std.${minutes > 0 ? ` ${minutes} Min.` : ""} Videomaterial`;
+    if (hours <= 0) return t("durationMinutesOnly", { minutes });
+    return minutes > 0
+      ? t("durationHoursMinutes", { hours, minutes })
+      : t("durationHoursOnly", { hours });
   })();
 
   // moduleCount > 0 statt nur "features vorhanden" pruefen: product.course_ids
@@ -137,21 +151,24 @@ export default async function KaufenPage({
   const featureBullets =
     features && features.moduleCount > 0
       ? [
-          `${features.moduleCount} ${features.moduleCount === 1 ? "Modul" : "Module"} · ${features.lessonCount} ${
-            features.lessonCount === 1 ? "Lektion" : "Lektionen"
-          }`,
+          `${tShared("modulesCount", { count: features.moduleCount })} · ${tShared("lessonsCount", { count: features.lessonCount })}`,
           durationLabel,
-          "Zertifikat nach Abschluss",
+          t("certificateBullet"),
         ].filter((v): v is string => Boolean(v))
       : [];
 
-  const accessNote =
-    product.kind === "subscription"
-      ? "Der Zugang bleibt bestehen, solange dein Abo aktiv ist. Abrechnung monatlich, jederzeit kündbar."
-      : "Mit diesem Kauf erhältst du dauerhaften Zugang zum vollständigen Kurs.";
+  const accessNote = product.kind === "subscription" ? t("accessNoteSubscription") : t("accessNoteOneTime");
+  const kindLabels: Record<ProductKind, string> = {
+    one_time: tPayments("kinds.one_time"),
+    subscription: tPayments("kinds.subscription"),
+  };
 
   return (
-    <PageChrome>
+    <PageChrome
+      brandInitial={tAuthShared("brandInitial")}
+      brandName={tAuthShared("brandName")}
+      brandSuffix={tAuthShared("brandSuffix")}
+    >
       <div
         className="mb-7 flex items-center gap-3.5 rounded-[14px] p-[18px_22px]"
         style={{
@@ -168,9 +185,9 @@ export default async function KaufenPage({
           <ShoppingBag size={20} color="#F7EED4" strokeWidth={2} />
         </span>
         <div>
-          <div className="text-[17px] font-extrabold text-white">Dein Calltalent-Kurszugang</div>
+          <div className="text-[17px] font-extrabold text-white">{t("heroBadgeTitle")}</div>
           <div className="text-sm font-semibold" style={{ color: "#C9CBE6" }}>
-            Direkter Zugang zum vollständigen Trainingskurs nach erfolgreichem Kauf.
+            {t("heroBadgeSubtitle")}
           </div>
         </div>
       </div>
@@ -186,7 +203,7 @@ export default async function KaufenPage({
             >
               <GraduationCap size={17} color={ACCENT} strokeWidth={2.2} />
             </span>
-            <h2 className="m-0 text-lg font-extrabold">Ausgewähltes Produkt</h2>
+            <h2 className="m-0 text-lg font-extrabold">{t("selectedProductHeading")}</h2>
           </div>
 
           <div
@@ -202,7 +219,7 @@ export default async function KaufenPage({
                 className="inline-flex items-center gap-1.5 text-[13px] font-extrabold"
                 style={{ letterSpacing: "0.08em", color: "#C9CBE6" }}
               >
-                {PRODUCT_KIND_LABELS[product.kind].toUpperCase()}
+                {kindLabels[product.kind].toUpperCase()}
               </div>
               <div className="mb-2 mt-1 text-xl font-extrabold text-white">{product.title}</div>
               {featureBullets.length > 0 && (
@@ -261,20 +278,19 @@ export default async function KaufenPage({
               {accessNote}
             </div>
             <div className="text-[13px] font-semibold" style={{ color: "#3E3F66" }}>
-              Rechnungs- und Zahlungsdaten gibst du im nächsten Schritt sicher bei unserem
-              Zahlungsdienstleister Stripe ein.
+              {t("billingHint")}
             </div>
           </div>
         </div>
 
         {/* Rechte Spalte: Kosten-Zusammenfassung */}
         <div className="rounded-[16px] border bg-white p-[22px] lg:sticky lg:top-6" style={{ borderColor: "#E7E8F2" }}>
-          <h2 className="m-0 mb-4 text-lg font-extrabold">Kosten-Zusammenfassung</h2>
+          <h2 className="m-0 mb-4 text-lg font-extrabold">{t("costSummaryHeading")}</h2>
 
           <div className="mb-4 flex items-center gap-2 rounded-[11px] p-[11px_14px]" style={{ background: ACCENT }}>
             <ShoppingBag size={15} color="#fff" strokeWidth={2.2} aria-hidden="true" />
             <span className="text-[13px] font-extrabold" style={{ letterSpacing: "0.04em", color: "#fff" }}>
-              {PRODUCT_KIND_LABELS[product.kind].toUpperCase()}
+              {kindLabels[product.kind].toUpperCase()}
             </span>
           </div>
 
@@ -283,14 +299,14 @@ export default async function KaufenPage({
             style={{ borderColor: "#EEF0F7" }}
           >
             <span className="text-sm font-extrabold" style={{ color: "#1A1A2E" }}>
-              GESAMTBETRAG
+              {t("totalLabel")}
             </span>
             <span
               className="rounded-[9px] px-3.5 py-1.5 text-[17px] font-extrabold text-white"
               style={{ background: "#1A1A2E" }}
             >
-              {formatPrice(product.priceCents, product.currency)}
-              {product.kind === "subscription" && <span className="text-sm font-normal"> / Monat</span>}
+              {format.number(product.priceCents / 100, { style: "currency", currency: product.currency.toUpperCase() })}
+              {product.kind === "subscription" && <span className="text-sm font-normal">{t("perMonthSuffix")}</span>}
             </span>
           </div>
 
@@ -301,7 +317,7 @@ export default async function KaufenPage({
           ) : (
             <div className="mt-5 flex flex-col gap-3 rounded-xl border p-4" style={{ borderColor: "#E0E2EF" }}>
               <p className="text-sm font-semibold" style={{ color: "#3E3F66" }}>
-                Bitte melde dich an, um dieses Produkt zu kaufen.
+                {tPayments("loginRequired")}
               </p>
               <div className="flex gap-2.5">
                 <Link
@@ -309,14 +325,14 @@ export default async function KaufenPage({
                   className="flex-1 rounded-[11px] px-4 py-2.5 text-center text-sm font-bold text-white no-underline"
                   style={{ background: ACCENT }}
                 >
-                  Anmelden
+                  {tPayments("login")}
                 </Link>
                 <Link
                   href="/registrieren"
                   className="flex-1 rounded-[11px] border px-4 py-2.5 text-center text-sm font-bold no-underline"
                   style={{ borderColor: "#D8DAEA", color: NAVY }}
                 >
-                  Registrieren
+                  {tPayments("register")}
                 </Link>
               </div>
             </div>
@@ -327,7 +343,7 @@ export default async function KaufenPage({
             style={{ color: "#66679B" }}
           >
             <ShieldCheck size={14} strokeWidth={2.2} aria-hidden="true" />
-            Sichere Zahlung über Stripe
+            {t("secureBadge")}
           </div>
         </div>
       </div>
@@ -335,8 +351,23 @@ export default async function KaufenPage({
   );
 }
 
-/** Markenkopfzeile + Seitenrahmen, gleiche Farbwerte wie Modul/Lektion/KursUebersicht. */
-function PageChrome({ children }: { children: ReactNode }) {
+/**
+ * Markenkopfzeile + Seitenrahmen, gleiche Farbwerte wie Modul/Lektion/KursUebersicht.
+ * `brand*`-Props (i18n Block C2): der Aufrufer reicht `auth.shared` durch —
+ * exakt dieselben Marken-Textbausteine wie im Login-Formular (Block C1),
+ * siehe PHASENSTATUS.md. Kein eigener `learn.buy`-Namensraum-Duplikat dafür.
+ */
+function PageChrome({
+  children,
+  brandInitial,
+  brandName,
+  brandSuffix,
+}: {
+  children: ReactNode;
+  brandInitial: string;
+  brandName: string;
+  brandSuffix: string;
+}) {
   return (
     <div
       style={{
@@ -358,12 +389,12 @@ function PageChrome({ children }: { children: ReactNode }) {
           style={{ background: "var(--color-primary)", color: "var(--color-cream)" }}
           aria-hidden="true"
         >
-          C
+          {brandInitial}
         </div>
         <div className="text-base font-extrabold" style={{ letterSpacing: "0.02em", color: NAVY }}>
-          CALLTALENT
+          {brandName}
           <span className="ml-2 text-sm font-semibold" style={{ letterSpacing: "0.2em", color: "#A9AAC4" }}>
-            AKADEMIE
+            {brandSuffix}
           </span>
         </div>
       </div>

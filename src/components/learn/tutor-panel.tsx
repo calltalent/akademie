@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, useTransition, type FormEvent } from "react";
+import { useTranslations } from "next-intl";
 import { askTutor, escalateToTrainer } from "@/lib/tutor/actions";
 import type { AskTutorResult, TutorSource } from "@/lib/tutor/state";
 
@@ -44,6 +45,7 @@ export function TutorPanel({
   courseSlug: string;
   currentLessonId: string;
 }) {
+  const t = useTranslations("learn.tutor");
   const inputId = useId();
   const headingId = `${inputId}-heading`;
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -101,25 +103,20 @@ export function TutorPanel({
     <section aria-labelledby={headingId} className="rounded-md border p-4" style={{ borderRadius: "var(--radius)" }}>
       <div className="mb-3 flex items-center gap-2">
         <h2 id={headingId} className="text-lg font-semibold">
-          Tutor
+          {t("heading")}
         </h2>
         <span className="rounded-full border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-600">
-          KI-Assistent
+          {t("aiAssistantBadge")}
         </span>
       </div>
 
       <div
         role="log"
         aria-live="polite"
-        aria-label="Tutor-Konversation"
+        aria-label={t("logAriaLabel")}
         className="mb-3 flex max-h-80 flex-col gap-3 overflow-y-auto"
       >
-        {messages.length === 0 && (
-          <p className="text-sm text-gray-500">
-            Stelle eine Frage zu diesem Kurs — der KI-Assistent antwortet ausschließlich auf Basis der
-            Kursinhalte und sagt ehrlich, wenn etwas nicht im Kurs steht.
-          </p>
-        )}
+        {messages.length === 0 && <p className="text-sm text-gray-500">{t("emptyState")}</p>}
         {messages.map((m) => (
           <div key={m.id} className={m.role === "user" ? "self-end text-right" : "self-start"}>
             <p
@@ -136,7 +133,7 @@ export function TutorPanel({
               <ul className="mt-1 flex flex-col gap-0.5 text-xs text-gray-500">
                 {m.sources.map((s) => (
                   <li key={s.lessonId}>
-                    Quelle:{" "}
+                    {t("sourceLabel")}{" "}
                     {s.lessonId === currentLessonId ? (
                       s.lessonTitle
                     ) : (
@@ -154,7 +151,7 @@ export function TutorPanel({
 
       {state.status === "quota_exceeded" && (
         <p role="alert" className="mb-2 text-sm text-red-600">
-          {state.message} Bitte wende dich an dein Team oder versuche es im nächsten Monat erneut.
+          {state.message} {t("quotaExceededHint")}
         </p>
       )}
       {state.status === "error" && (
@@ -165,7 +162,7 @@ export function TutorPanel({
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
         <label htmlFor={inputId} className="sr-only">
-          Frage an den Tutor
+          {t("inputLabel")}
         </label>
         <textarea
           id={inputId}
@@ -174,7 +171,7 @@ export function TutorPanel({
           onChange={(e) => setInput(e.target.value.slice(0, MAX_MESSAGE_LENGTH))}
           rows={2}
           maxLength={MAX_MESSAGE_LENGTH}
-          placeholder="Frage zum Kurs stellen …"
+          placeholder={t("inputPlaceholder")}
           className="w-full rounded-md border px-3 py-2 text-base"
         />
         <div className="flex flex-wrap items-center gap-2">
@@ -184,7 +181,7 @@ export function TutorPanel({
             className="rounded-md px-4 py-2 text-base text-white disabled:opacity-50"
             style={{ background: "var(--color-primary)" }}
           >
-            {sending ? "Wird gesendet …" : "Frage senden"}
+            {sending ? t("sendingState") : t("sendButton")}
           </button>
           {conversationId && !escalated && (
             <button
@@ -193,10 +190,10 @@ export function TutorPanel({
               disabled={pending}
               className="rounded-md border px-4 py-2 text-base disabled:opacity-50"
             >
-              An Trainer weiterleiten
+              {t("escalateButton")}
             </button>
           )}
-          {escalated && <span className="text-sm text-green-700">An Trainer weitergeleitet ✓</span>}
+          {escalated && <span className="text-sm text-green-700">{t("escalatedStatus")}</span>}
         </div>
         {escalationMessage && !escalated && (
           <p role="alert" className="text-sm text-red-600">

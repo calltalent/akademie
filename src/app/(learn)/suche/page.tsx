@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { searchLessons, type SearchResult } from "@/lib/ai/search";
@@ -23,6 +24,7 @@ export default async function SearchPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
+  const t = await getTranslations("learn.search");
   const tenant = await getTenant();
   const supabase = await createClient();
 
@@ -44,31 +46,29 @@ export default async function SearchPage({
       // .message, siehe src/lib/ai/search.ts) wird 1:1 durchgereicht, alle
       // anderen Fehler (z. B. fehlender VOYAGE_API_KEY) bleiben generisch.
       searchError =
-        e instanceof Error && e.message === RATE_LIMIT_MESSAGE
-          ? RATE_LIMIT_MESSAGE
-          : "Die semantische Suche ist gerade nicht verfügbar. Bitte später erneut versuchen.";
+        e instanceof Error && e.message === RATE_LIMIT_MESSAGE ? RATE_LIMIT_MESSAGE : t("genericError");
     }
   }
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 px-6 py-12">
       <Link href="/" className="text-sm underline">
-        ← Meine Kurse
+        {t("backToCourses")}
       </Link>
       <h1 className="text-2xl font-semibold" style={{ color: "var(--color-primary)" }}>
-        Suche
+        {t("heading")}
       </h1>
 
       <form action="/suche" method="get" className="flex flex-col gap-2 sm:flex-row">
         <label htmlFor="q" className="sr-only">
-          Suchbegriff
+          {t("searchLabel")}
         </label>
         <input
           id="q"
           name="q"
           type="search"
           defaultValue={query}
-          placeholder="Kursinhalte durchsuchen…"
+          placeholder={t("placeholder")}
           className="w-full rounded-md border px-3 py-2 text-base"
           style={{ borderRadius: "var(--radius)" }}
         />
@@ -77,7 +77,7 @@ export default async function SearchPage({
           className="px-4 py-2 text-base text-white"
           style={{ background: "var(--color-primary)", borderRadius: "var(--radius)" }}
         >
-          Suchen
+          {t("submitButton")}
         </button>
       </form>
 
@@ -88,7 +88,7 @@ export default async function SearchPage({
       )}
 
       {!searchError && query.length > 0 && results.length === 0 && (
-        <p className="text-base text-gray-500">Keine Treffer für „{query}“.</p>
+        <p className="text-base text-gray-500">{t("noResults", { query })}</p>
       )}
 
       {!searchError && results.length > 0 && (

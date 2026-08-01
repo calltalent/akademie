@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { AlertTriangle, Clock } from "lucide-react";
 import { checkLessonVideoStatus } from "@/lib/video/actions";
 
@@ -23,6 +24,7 @@ const POLL_INTERVAL_MS = 5000;
  * feuern — gleiches Muster wie `unmountedRef` in video-recorder.tsx.
  */
 export function VideoProcessingStatus({ lessonId }: { lessonId: string }) {
+  const t = useTranslations("learn.player");
   const router = useRouter();
   const [failed, setFailed] = useState(false);
   const unmountedRef = useRef(false);
@@ -65,7 +67,7 @@ export function VideoProcessingStatus({ lessonId }: { lessonId: string }) {
       >
         <AlertTriangle size={22} aria-hidden="true" style={{ color: "#B14A4A" }} />
         <p className="text-base font-bold" style={{ color: "#B14A4A" }}>
-          Video konnte nicht verarbeitet werden. Bitte im Kurs-Editor erneut hochladen.
+          {t("videoProcessingFailed")}
         </p>
       </div>
     );
@@ -80,11 +82,10 @@ export function VideoProcessingStatus({ lessonId }: { lessonId: string }) {
     >
       <Clock size={22} aria-hidden="true" style={{ color: "#5663AE" }} />
       <p className="text-base font-bold" style={{ color: "#1A1A2E" }}>
-        Video wird noch verarbeitet …
+        {t("videoProcessingHeading")}
       </p>
       <p className="max-w-sm text-sm" style={{ color: "#66679B" }}>
-        Das kann bei frisch hochgeladenen Videos einige Minuten dauern. Diese Seite aktualisiert sich automatisch,
-        sobald es fertig ist.
+        {t("videoProcessingBody")}
       </p>
     </div>
   );

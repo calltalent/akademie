@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { ExternalLink, File as FileIcon } from "lucide-react";
 import { DEFAULT_FILE_BLOCK_DESCRIPTION, type Block } from "@/lib/courses/schema";
 import { getBunnyVideo, getPlayerConfig } from "@/lib/bunny/client";
@@ -39,7 +40,7 @@ const RECENT_EDIT_WINDOW_MS = 30 * 60 * 1000;
  * BunnyPlayer/getPlayerConfig weiter unten; der submission-Fall (Block 3)
  * folgt demselben Muster für die letzte eigene Abgabe des Nutzers).
  */
-export function BlockRenderer({
+export async function BlockRenderer({
   blocks,
   lessonId,
   lessonUpdatedAt,
@@ -48,14 +49,13 @@ export function BlockRenderer({
   lessonId: string;
   lessonUpdatedAt?: string | null;
 }) {
+  const t = await getTranslations("learn.player");
   return (
     <div className="flex flex-col gap-4">
       {blocks.map((block) => (
         <BlockView key={block.id} block={block} lessonId={lessonId} lessonUpdatedAt={lessonUpdatedAt} />
       ))}
-      {blocks.length === 0 && (
-        <p className="text-base text-gray-500">Diese Lektion hat noch keinen Inhalt.</p>
-      )}
+      {blocks.length === 0 && <p className="text-base text-gray-500">{t("noContent")}</p>}
     </div>
   );
 }
@@ -69,6 +69,8 @@ async function BlockView({
   lessonId: string;
   lessonUpdatedAt?: string | null;
 }) {
+  const t = await getTranslations("learn.player");
+  const tQuiz = await getTranslations("quiz");
   switch (block.type) {
     case "text":
       // Inhalt stammt nur von Staff (RLS lessons_staff_write), kein
@@ -93,20 +95,14 @@ async function BlockView({
       // (courses/schema.ts, emptyOrUrl) leer sein — ein frisch angelegter,
       // noch nicht befüllter Block. Ohne diese Prüfung: kaputtes <img>.
       if (!block.url) {
-        return (
-          <div className="rounded-md border p-6 text-center text-base text-gray-500">Kein Bild ausgewählt.</div>
-        );
+        return <div className="rounded-md border p-6 text-center text-base text-gray-500">{t("noImage")}</div>;
       }
       // eslint-disable-next-line @next/next/no-img-element -- externe/Storage-URLs, kein next/image-Loader konfiguriert
       return <img src={block.url} alt={block.alt} className="w-full rounded-md" />;
 
     case "video": {
       if (!block.bunnyVideoId) {
-        return (
-          <div className="rounded-md border p-6 text-center text-base text-gray-500">
-            Kein Video zugewiesen.
-          </div>
-        );
+        return <div className="rounded-md border p-6 text-center text-base text-gray-500">{t("noVideo")}</div>;
       }
       // Korrektur (Josips Lint-Lauf, 12.07.2026): "Avoid constructing JSX
       // within try/catch" (react-hooks/error-boundaries) — libraryId wird
@@ -120,7 +116,7 @@ async function BlockView({
       if (!libraryId) {
         return (
           <div className="rounded-md border p-6 text-center text-base text-gray-500">
-            Video-Player nicht verfügbar (Bunny Stream nicht konfiguriert).
+            {t("playerUnavailable")}
           </div>
         );
       }
@@ -152,7 +148,7 @@ async function BlockView({
             className="rounded-md border p-6 text-center text-base"
             style={{ borderColor: "#E9CFCF", background: "#FBEAEA", color: "#B14A4A" }}
           >
-            Video konnte nicht verarbeitet werden. Bitte im Kurs-Editor erneut hochladen.
+            {t("videoProcessingFailed")}
           </div>
         );
       }
@@ -166,19 +162,13 @@ async function BlockView({
     case "audio":
       // BUGFIX (23.07.2026, Block-Audit): s. Kommentar im "image"-Fall oben.
       if (!block.url) {
-        return (
-          <div className="rounded-md border p-6 text-center text-base text-gray-500">
-            Keine Audiodatei ausgewählt.
-          </div>
-        );
+        return <div className="rounded-md border p-6 text-center text-base text-gray-500">{t("noAudio")}</div>;
       }
       return <audio controls src={block.url} className="w-full" />;
 
     case "file":
       if (!block.url) {
-        return (
-          <div className="rounded-md border p-6 text-center text-base text-gray-500">Keine Datei ausgewählt.</div>
-        );
+        return <div className="rounded-md border p-6 text-center text-base text-gray-500">{t("noFile")}</div>;
       }
       // Karten-Darstellung statt nacktem Textlink (Josips Auftrag,
       // 23.07.2026) — eigenständiges Design (CLAUDE.md §3.1: kein
@@ -209,7 +199,7 @@ async function BlockView({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-base font-bold" style={{ color: "#1A1A2E" }}>
-              {block.filename || "Datei herunterladen"}
+              {block.filename || t("fileFallbackName")}
             </span>
             <span className="block text-sm" style={{ color: "#66679B" }}>
               {block.description || DEFAULT_FILE_BLOCK_DESCRIPTION}
@@ -220,40 +210,24 @@ async function BlockView({
             style={{ background: "var(--color-primary)" }}
           >
             <ExternalLink size={15} aria-hidden="true" />
-            Link öffnen
+            {t("openLinkButton")}
           </span>
         </a>
       );
 
     case "embed":
       if (!block.url) {
-        return (
-          <div className="rounded-md border p-6 text-center text-base text-gray-500">
-            Keine Einbettungs-URL angegeben.
-          </div>
-        );
+        return <div className="rounded-md border p-6 text-center text-base text-gray-500">{t("noEmbedUrl")}</div>;
       }
-      return (
-        <iframe
-          src={block.url}
-          className="aspect-video w-full rounded-md border"
-          title="Eingebetteter Inhalt"
-        />
-      );
+      return <iframe src={block.url} className="aspect-video w-full rounded-md border" title={t("embedTitle")} />;
 
     case "quiz": {
       if (!block.quizId) {
-        return (
-          <div className="rounded-md border p-4 text-base text-gray-500">Kein Quiz verknüpft.</div>
-        );
+        return <div className="rounded-md border p-4 text-base text-gray-500">{tQuiz("noQuizLinked")}</div>;
       }
       const result = await loadQuizForLearner(block.quizId);
       if (!result.ok) {
-        return (
-          <div className="rounded-md border p-4 text-base text-gray-500">
-            Quiz aktuell nicht verfügbar.
-          </div>
-        );
+        return <div className="rounded-md border p-4 text-base text-gray-500">{tQuiz("quizUnavailable")}</div>;
       }
       return <QuizRunner quiz={result.quiz} />;
     }

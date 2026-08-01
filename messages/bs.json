@@ -97,7 +97,16 @@
     "attemptsExhausted": "Dostignut je limit pokušaja — nema više pokušaja.",
     "noQuizLinked": "Nije povezan nijedan kviz.",
     "quizUnavailable": "Kviz trenutno nije dostupan.",
-    "rateLimited": "Previše zahtjeva. Molimo sačekajte i pokušajte ponovo."
+    "rateLimited": "Previše zahtjeva. Molimo sačekajte i pokušajte ponovo.",
+    "starting": "Pokretanje u toku …",
+    "evaluating": "Ocjenjivanje u toku …",
+    "passThreshold": "Granica za prolaz {passPct}%",
+    "attemptsPrefix": "Pokušaji: {attempts}",
+    "timeLimitLabel": "Vremensko ograničenje: {time} (nije automatski primijenjeno)",
+    "remainingTimeLabel": "Preostalo vrijeme: {time}",
+    "answerLabel": "Odgovor",
+    "openAnswerLabel": "Vaš odgovor (nije automatski ocijenjeno)",
+    "pointsLabel": "{points, plural, one {# bod} few {# boda} other {# bodova}}"
   },
   "submissions": {
     "statuses": {
@@ -147,6 +156,7 @@
     },
     "buyButton": "Kupi",
     "buyPending": "Priprema u toku …",
+    "orderButton": "Naruči uz obavezu plaćanja",
     "loginRequired": "Molimo prijavite se da biste kupili ovaj proizvod.",
     "login": "Prijava",
     "register": "Registracija",
@@ -217,6 +227,194 @@
       "columnFailed": "Nije položeno",
       "columnAverage": "Prosjek (%)",
       "noAttempts": "—"
+    }
+  },
+  "learn": {
+    "shell": {
+      "role": "Polaznik kursa",
+      "welcomeBack": "Dobrodošao/la nazad, {name}"
+    },
+    "shared": {
+      "myCoursesBreadcrumb": "Učenje · Moji kursevi",
+      "courseBreadcrumbPrefix": "Učenje",
+      "backToCourseOverview": "Nazad na pregled kursa",
+      "moduleEyebrow": "MODUL {number}",
+      "courseEyebrow": "KURS",
+      "lessonsFallbackTitle": "Lekcije",
+      "fallbackUserName": "nazad",
+      "lessonsCount": "{count, plural, one {# lekcija} few {# lekcije} other {# lekcija}}",
+      "minutesCount": "{count, plural, one {# minuta} few {# minute} other {# minuta}}",
+      "minutesShort": "{count} min.",
+      "modulesCount": "{count, plural, one {# modul} few {# modula} other {# modula}}",
+      "progressAriaLabel": "{pct}% završeno"
+    },
+    "notFound": {
+      "course": {
+        "title": "Kurs nije pronađen",
+        "body": "Kurs nije pronađen ili nije objavljen."
+      },
+      "module": {
+        "title": "Modul nije pronađen",
+        "body": "Modul nije pronađen ili ne pripada ovom kursu."
+      },
+      "section": {
+        "title": "Sekcija nije pronađena",
+        "body": "Sekcija nije pronađena ili ne pripada ovom kursu."
+      },
+      "lesson": "Lekcija nije pronađena ili nije objavljena."
+    },
+    "tabs": {
+      "overview": "Pregled",
+      "information": "Informacije",
+      "bookmarks": "Zabilješke"
+    },
+    "overview": {
+      "breadcrumb": "Učenje · Moji kursevi · Pregled",
+      "continueBannerActive": "NASTAVI DIREKTNO!",
+      "continueBannerStart": "ZAPOČNI SVOJ KURS!",
+      "continueButton": "Nastavi",
+      "startButton": "Započni",
+      "modulesHeading": "Moduli",
+      "noPublishedContent": "Ovaj kurs još nema objavljenih sadržaja."
+    },
+    "information": {
+      "breadcrumb": "Učenje · Moji kursevi · Informacije",
+      "descriptionHeading": "Opis",
+      "descriptionEmpty": "Još nema unesenog opisa.",
+      "goalsHeading": "Ciljevi kursa",
+      "goalsEmpty": "Još nema unesenih ciljeva kursa.",
+      "authorsHeading": "Autori",
+      "authorsEmpty": "Još nema unesenih informacija o autoru."
+    },
+    "bookmarksCourse": {
+      "breadcrumb": "Učenje · Moji kursevi · Zabilješke",
+      "heading": "Zabilješke u ovom kursu",
+      "empty": "Još nema zabilježaka u ovom kursu. Označi lekciju putem dugmeta „Zabilješka“ u prikazu lekcije."
+    },
+    "bookmarksList": {
+      "countLabel": "{count} zabilježaka",
+      "doneSuffix": "{done} od {count} završeno",
+      "goToCourse": "Idi na kurs"
+    },
+    "module": {
+      "looseLessonsTitle": "Ostale lekcije",
+      "noPublishedLessons": "Ovaj modul još nema objavljenih lekcija."
+    },
+    "moduleCompleted": {
+      "courseTitle": "Kurs završen",
+      "moduleTitle": "Modul završen",
+      "progressEyebrow": "Modul {number} · {title}",
+      "congratsHeading": "Čestitamo!",
+      "courseDoneBody": "Uspješno si u potpunosti završio/la „{title}“.",
+      "nextModuleLabel": "Sljedeći modul",
+      "courseProgressAriaLabel": "{percent}% kursa završeno",
+      "nextModuleButton": "Nastavi na sljedeći modul"
+    },
+    "sectionCompleted": {
+      "heading": "Sekcija završena",
+      "nextSectionLabel": "Sljedeća sekcija",
+      "backToModule": "Nazad na pregled modula",
+      "nextSectionButton": "Nastavi na sljedeću sekciju"
+    },
+    "lesson": {
+      "summaryLabel": "Sažetak",
+      "chaptersLabel": "Poglavlja",
+      "transcriptToggle": "Prikaži transkript",
+      "completedBadge": "✓ Završeno",
+      "previousLesson": "Prethodna lekcija",
+      "nextLessonLabel": "Sljedeća lekcija",
+      "nextSectionButton": "Sljedeća sekcija",
+      "nextModuleButtonLabel": "Sljedeći modul",
+      "viewSectionButtonLabel": "Pogledaj sekciju →"
+    },
+    "player": {
+      "noContent": "Ova lekcija još nema sadržaja.",
+      "noImage": "Nije odabrana slika.",
+      "noVideo": "Nije dodijeljen video.",
+      "playerUnavailable": "Video plejer nije dostupan (Bunny Stream nije konfigurisan).",
+      "videoProcessingFailed": "Video nije mogao biti obrađen. Molimo ponovo otpremi u uređivaču kursa.",
+      "videoProcessingHeading": "Video se još uvijek obrađuje …",
+      "videoProcessingBody": "Kod svježe otpremljenih videa ovo može potrajati nekoliko minuta. Ova stranica se automatski osvježava čim bude gotovo.",
+      "noAudio": "Nije odabrana audio datoteka.",
+      "noFile": "Nije odabrana datoteka.",
+      "fileFallbackName": "Preuzmi datoteku",
+      "openLinkButton": "Otvori link",
+      "noEmbedUrl": "Nije unesen URL za ugrađeni sadržaj.",
+      "embedTitle": "Ugrađeni sadržaj"
+    },
+    "bookmarkButton": {
+      "add": "Dodaj u zabilješke",
+      "remove": "Ukloni iz zabilješki"
+    },
+    "completeLessonButton": {
+      "nextLessonDefault": "Sljedeća lekcija",
+      "saving": "Spremanje u toku …",
+      "completeButton": "Završi lekciju"
+    },
+    "feedback": {
+      "toggleButton": "Ostavi povratnu informaciju",
+      "panelHeading": "Povratna informacija o ovoj lekciji",
+      "closeButton": "Zatvori obrazac za povratnu informaciju",
+      "firstNameLabel": "Ime",
+      "lastNameLabel": "Prezime",
+      "emailLabel": "E-mail adresa",
+      "subjectLabel": "Predmet",
+      "messageLabel": "Poruka",
+      "messagePrefix": "Kurs: {courseTitle}\nLekcija: {lessonTitle}\n\n",
+      "submitButton": "Pošalji povratnu informaciju",
+      "sendingState": "Slanje u toku …"
+    },
+    "tutor": {
+      "heading": "Tutor",
+      "aiAssistantBadge": "AI asistent",
+      "logAriaLabel": "Razgovor s tutorom",
+      "emptyState": "Postavi pitanje o ovom kursu — AI asistent odgovara isključivo na osnovu sadržaja kursa i iskreno kaže kada nešto nije obrađeno u kursu.",
+      "sourceLabel": "Izvor:",
+      "quotaExceededHint": "Obrati se svom timu ili pokušaj ponovo sljedećeg mjeseca.",
+      "inputLabel": "Pitanje za tutora",
+      "inputPlaceholder": "Postavi pitanje o kursu …",
+      "sendingState": "Slanje u toku …",
+      "sendButton": "Pošalji pitanje",
+      "escalateButton": "Proslijedi treneru",
+      "escalatedStatus": "Proslijeđeno treneru ✓"
+    },
+    "submission": {
+      "heading": "Zadatak",
+      "feedbackHeading": "Povratna informacija",
+      "modeGroupAriaLabel": "Vrsta zadatka",
+      "fileTypeNotAllowed": "Tip datoteke „{mimeType}“ nije dozvoljen. Dozvoljeno: PDF, Word, PNG/JPG, ZIP, MP4, MP3.",
+      "unknownFileType": "nepoznato",
+      "fileTooLarge": "Datoteka je prevelika (maks. 50 MB).",
+      "uploadUrlFailed": "URL za otpremanje nije mogao biti kreiran.",
+      "uploadFailed": "Otpremanje datoteke nije uspjelo. Molimo pokušaj ponovo.",
+      "submittingStatus": "Slanje u toku …",
+      "charCount": "{count} / {max} znakova"
+    },
+    "search": {
+      "backToCourses": "← Moji kursevi",
+      "heading": "Pretraga",
+      "searchLabel": "Pojam za pretragu",
+      "placeholder": "Pretraži sadržaj kurseva…",
+      "submitButton": "Pretraži",
+      "genericError": "Semantička pretraga trenutno nije dostupna. Molimo pokušaj ponovo kasnije.",
+      "noResults": "Nema rezultata za „{query}“."
+    },
+    "buy": {
+      "tenantNotFound": "Nije pronađen nijedan klijent za ovaj host.",
+      "heroBadgeTitle": "Tvoj pristup Calltalent kursu",
+      "heroBadgeSubtitle": "Direktan pristup kompletnom kursu obuke nakon uspješne kupovine.",
+      "selectedProductHeading": "Odabrani proizvod",
+      "costSummaryHeading": "Pregled troškova",
+      "durationHoursMinutes": "{hours} h {minutes} min. video materijala",
+      "durationHoursOnly": "{hours} h video materijala",
+      "durationMinutesOnly": "{minutes} min. video materijala",
+      "certificateBullet": "Certifikat nakon završetka",
+      "accessNoteSubscription": "Pristup ostaje aktivan sve dok je tvoja pretplata aktivna. Obračun mjesečno, otkazivo u svakom trenutku.",
+      "accessNoteOneTime": "Ovom kupovinom dobijaš trajan pristup kompletnom kursu.",
+      "billingHint": "Podatke za plaćanje unosiš u sljedećem koraku sigurno kod našeg pružaoca usluga plaćanja, Stripe-a.",
+      "totalLabel": "UKUPAN IZNOS",
+      "perMonthSuffix": " / mjesečno",
+      "secureBadge": "Sigurno plaćanje putem Stripe-a"
     }
   }
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/compute";
@@ -56,6 +57,9 @@ export default async function CourseOverviewPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getTranslations("learn.overview");
+  const tShared = await getTranslations("learn.shared");
+  const tNotFound = await getTranslations("learn.notFound");
   const tenant = await getTenant();
   // Wie in lesezeichen/page.tsx: RSC wertet die Seite auch aus, wenn ein
   // übergeordneter Gate greift — defensiv statt auf tenant!.id zu laufen.
@@ -76,7 +80,7 @@ export default async function CourseOverviewPage({
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
     profile?.full_name?.trim() ||
-    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : "zurück");
+    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : tShared("fallbackUserName"));
 
   const { data: course } = await supabase
     .from("courses")
@@ -91,11 +95,11 @@ export default async function CourseOverviewPage({
         isStaff={isStaff ?? false}
         userName={displayName}
         userEmail={user.email ?? undefined}
-        breadcrumb="Lernen · Meine Kurse"
-        title="Kurs nicht gefunden"
+        breadcrumb={tShared("myCoursesBreadcrumb")}
+        title={tNotFound("course.title")}
       >
         <p className="text-base" style={{ color: "#66679B" }}>
-          Kurs nicht gefunden oder nicht veröffentlicht.
+          {tNotFound("course.body")}
         </p>
       </AppShell>
     );
@@ -153,8 +157,8 @@ export default async function CourseOverviewPage({
         0,
       );
       const minutes = Math.round(totalSeconds / 60);
-      const lessonLabel = `${mLessons.length} ${mLessons.length === 1 ? "Lektion" : "Lektionen"}`;
-      const meta = minutes > 0 ? `${lessonLabel} · ${minutes} Min.` : lessonLabel;
+      const lessonLabel = tShared("lessonsCount", { count: mLessons.length });
+      const meta = minutes > 0 ? `${lessonLabel} · ${tShared("minutesShort", { count: minutes })}` : lessonLabel;
       return { id: m.id, title: m.title, coverUrl: (m.cover_url as string | null) ?? null, number: i + 1, pct, meta };
     })
     .filter((c): c is NonNullable<typeof c> => c !== null);
@@ -164,7 +168,7 @@ export default async function CourseOverviewPage({
       isStaff={isStaff ?? false}
       userName={displayName}
       userEmail={user.email ?? undefined}
-      breadcrumb="Lernen · Meine Kurse · Übersicht"
+      breadcrumb={t("breadcrumb")}
       title={course.title}
       hideTitle
     >
@@ -217,7 +221,7 @@ export default async function CourseOverviewPage({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-bold" style={{ letterSpacing: "0.14em", color: "#B9BBDA" }}>
-                  {progress.completed > 0 ? "MACHE DIREKT WEITER!" : "STARTE DEINEN KURS!"}
+                  {progress.completed > 0 ? t("continueBannerActive") : t("continueBannerStart")}
                 </div>
                 <div className="mt-[3px] truncate text-[17px] font-bold text-white">{nextLesson.title}</div>
               </div>
@@ -225,7 +229,7 @@ export default async function CourseOverviewPage({
                 className="inline-flex flex-none items-center gap-2 rounded-[11px] px-[18px] py-[11px] text-sm font-bold text-white"
                 style={{ background: ACCENT }}
               >
-                {progress.completed > 0 ? "Fortsetzen" : "Starten"}
+                {progress.completed > 0 ? t("continueButton") : t("startButton")}
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M5 12h14" />
                   <path d="m13 6 6 6-6 6" />
@@ -237,12 +241,12 @@ export default async function CourseOverviewPage({
           {/* Module */}
           <div className="mb-3.5 flex items-center gap-2.5">
             <span className="h-[22px] w-1 rounded-[3px]" style={{ background: ACCENT }} />
-            <h2 className="m-0 text-xl font-extrabold">Module</h2>
+            <h2 className="m-0 text-xl font-extrabold">{t("modulesHeading")}</h2>
           </div>
 
           {moduleCards.length === 0 ? (
             <p className="text-base" style={{ color: "#66679B" }}>
-              Dieser Kurs hat noch keine veröffentlichten Inhalte.
+              {t("noPublishedContent")}
             </p>
           ) : (
             <div className="flex flex-col gap-3.5">
@@ -267,7 +271,7 @@ export default async function CourseOverviewPage({
                       aria-hidden="true"
                     >
                       <span className="text-[11px] font-extrabold leading-tight" style={{ letterSpacing: "0.08em", color: "#C9CBE6" }}>
-                        MODUL {m.number}
+                        {tShared("moduleEyebrow", { number: m.number })}
                       </span>
                     </div>
                   )}

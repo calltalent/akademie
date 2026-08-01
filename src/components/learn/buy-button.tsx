@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { Check } from "lucide-react";
 import { createCheckoutSession } from "@/lib/stripe/checkout";
 
@@ -26,6 +27,7 @@ import { createCheckoutSession } from "@/lib/stripe/checkout";
  * zu Stripe Checkout weiter, kein eigenes Bestell-/Zahlungsformular.
  */
 export function BuyButton({ productSlug }: { productSlug: string }) {
+  const t = useTranslations("payments");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +50,7 @@ export function BuyButton({ productSlug }: { productSlug: string }) {
         className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-[15px] text-base font-extrabold text-white disabled:opacity-50"
         style={{ background: "#1F8A5B" }}
       >
-        {pending ? "Wird vorbereitet …" : "Zahlungspflichtig bestellen"}
+        {pending ? t("buyPending") : t("orderButton")}
         {!pending && <Check size={18} strokeWidth={2.6} aria-hidden="true" />}
       </button>
       {error && (

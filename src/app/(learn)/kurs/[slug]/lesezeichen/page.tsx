@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { Check, Play } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
@@ -33,6 +34,9 @@ export default async function CourseLesezeichenPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getTranslations("learn.bookmarksCourse");
+  const tShared = await getTranslations("learn.shared");
+  const tNotFound = await getTranslations("learn.notFound");
   const tenant = await getTenant();
   if (!tenant) redirect("/login");
   const supabase = await createClient();
@@ -51,7 +55,7 @@ export default async function CourseLesezeichenPage({
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
     profile?.full_name?.trim() ||
-    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : "zurück");
+    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : tShared("fallbackUserName"));
 
   const { data: course } = await supabase
     .from("courses")
@@ -66,11 +70,11 @@ export default async function CourseLesezeichenPage({
         isStaff={isStaff ?? false}
         userName={displayName}
         userEmail={user.email ?? undefined}
-        breadcrumb="Lernen · Meine Kurse"
-        title="Kurs nicht gefunden"
+        breadcrumb={tShared("myCoursesBreadcrumb")}
+        title={tNotFound("course.title")}
       >
         <p className="text-base" style={{ color: "#66679B" }}>
-          Kurs nicht gefunden oder nicht veröffentlicht.
+          {tNotFound("course.body")}
         </p>
       </AppShell>
     );
@@ -133,7 +137,7 @@ export default async function CourseLesezeichenPage({
       isStaff={isStaff ?? false}
       userName={displayName}
       userEmail={user.email ?? undefined}
-      breadcrumb="Lernen · Meine Kurse · Lesezeichen"
+      breadcrumb={t("breadcrumb")}
       title={course.title}
       hideTitle
     >
@@ -150,7 +154,7 @@ export default async function CourseLesezeichenPage({
 
           <div className="mb-3.5 flex items-center gap-2.5">
             <span className="h-[22px] w-1 rounded-[3px]" style={{ background: ACCENT }} />
-            <h2 className="m-0 text-xl font-extrabold">Lesezeichen in diesem Kurs</h2>
+            <h2 className="m-0 text-xl font-extrabold">{t("heading")}</h2>
           </div>
 
           {lessons.length === 0 ? (
@@ -158,8 +162,7 @@ export default async function CourseLesezeichenPage({
               className="rounded-[14px] border bg-white px-6 py-10 text-center text-sm"
               style={{ borderColor: "#E7E8F2", color: "#A9AAC4" }}
             >
-              Noch keine Lesezeichen in diesem Kurs. Markiere eine Lektion über den „Lesezeichen&quot;-Button
-              in der Lektionsansicht.
+              {t("empty")}
             </div>
           ) : (
             <div className="flex flex-col gap-1.5 rounded-[14px] border bg-white p-3" style={{ borderColor: "#E7E8F2" }}>
