@@ -11,6 +11,8 @@ import {
 } from "@/lib/account/actions";
 import { DeletionRequestForm } from "@/app/profil/deletion-request-form";
 import { PushToggle } from "@/components/pwa/push-toggle";
+import { LocaleSwitcher } from "@/components/settings/locale-switcher";
+import type { Locale } from "@/i18n/config";
 
 /**
  * Client-Teil des Einstellungen-Bereichs (Referenz Einstellungen.dc.html):
@@ -88,6 +90,8 @@ export function EinstellungenTabs({
   pendingDeletionDate,
   vapidPublicKey,
   initialTab,
+  enabledLocales,
+  currentLocale,
 }: {
   profile: SettingsProfile;
   email: string;
@@ -98,6 +102,9 @@ export function EinstellungenTabs({
   pendingDeletionDate: string | null;
   vapidPublicKey: string | null;
   initialTab: Tab;
+  /** i18n Block B3: effektive Locale-Menge + aktuelle Wahl, aus page.tsx (Server Component). */
+  enabledLocales: Locale[];
+  currentLocale: Locale;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
 
@@ -137,6 +144,8 @@ export function EinstellungenTabs({
           initials={initials}
           certificates={certificates}
           pendingDeletionDate={pendingDeletionDate}
+          enabledLocales={enabledLocales}
+          currentLocale={currentLocale}
         />
       )}
       {tab === "benachrichtigungen" && (
@@ -155,12 +164,16 @@ function AllgemeinTab({
   initials,
   certificates,
   pendingDeletionDate,
+  enabledLocales,
+  currentLocale,
 }: {
   profile: SettingsProfile;
   email: string;
   initials: string;
   certificates: CertificateInfo[];
   pendingDeletionDate: string | null;
+  enabledLocales: Locale[];
+  currentLocale: Locale;
 }) {
   const [avatarState, avatarAction, avatarPending] = useActionState(uploadAvatar, initialState);
   const [profileState, profileAction, profilePending] = useActionState(updateProfile, initialState);
@@ -295,6 +308,23 @@ function AllgemeinTab({
           </form>
         )}
       </div>
+
+      {/* i18n Block B3 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 4): eigene
+          Karte statt Feld im Profilformular oben — die Sprachwahl greift
+          sofort beim Umschalten (eigene Server Action, kein Teil von
+          updateProfile()/profileAction), eine gemeinsame Karte mit Speichern-
+          Button hätte das verschleiert. LocaleSwitcher rendert selbst `null`
+          bei nur einer freigeschalteten Sprache, die Karte deshalb ebenfalls
+          gated, damit kein leerer Kartenrahmen übrigbleibt. */}
+      {enabledLocales.length > 1 && (
+        <div className="rounded-[14px] border border-border-100 bg-white p-[30px]">
+          <h2 className="text-lg font-bold text-ink">Sprache</h2>
+          <p className="mt-2 mb-4 text-sm text-muted-500">
+            In welcher Sprache die Oberfläche angezeigt wird.
+          </p>
+          <LocaleSwitcher enabledLocales={enabledLocales} currentLocale={currentLocale} />
+        </div>
+      )}
 
       {/* Bestehende echte Konto-Funktionen (aus /profil übernommen) */}
       <div className="rounded-[14px] border border-border-100 bg-white p-[30px]">

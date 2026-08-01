@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { updateTenantSettings } from "@/lib/tenant/actions";
 import { initialCourseActionState } from "@/lib/courses/state";
+import { DEFAULT_LOCALE, LOCALE_NAMES, SUPPORTED_LOCALES, type Locale } from "@/i18n/config";
 
 function ToggleRow({
   name,
@@ -58,14 +59,37 @@ export function TenantSettingsForm({
   selfSignupEnabled,
   certificatesEnabled,
   maintenanceEnabled,
+  enabledLocales,
+  defaultLocale,
 }: {
   name: string;
   supportEmail: string;
   selfSignupEnabled: boolean;
   certificatesEnabled: boolean;
   maintenanceEnabled: boolean;
+  /** i18n Block B5 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 4): aktuell freigeschaltete Sprachen + Standardsprache dieses Mandanten. */
+  enabledLocales: Locale[];
+  defaultLocale: Locale;
 }) {
   const [state, action, pending] = useActionState(updateTenantSettings, initialCourseActionState);
+
+  // Client-seitiger Zustand NUR für die Sprachen-Karte (Rest des Formulars
+  // bleibt unkontrolliert/uncontrolled wie bisher) — nötig, damit das
+  // Standardsprache-<select> beim Abwählen einer Sprache automatisch auf
+  // "de" zurückfällt (Plan Bedingung 1: Standardsprache muss freigeschaltet
+  // bleiben, hier strukturell verhindert statt erst nach dem Absenden als
+  // Fehler gemeldet — serverseitig prüft updateTenantSettings() trotzdem
+  // erneut, siehe lib/tenant/actions.ts).
+  const [enabled, setEnabled] = useState<Locale[]>(enabledLocales);
+  const [selectedDefault, setSelectedDefault] = useState<Locale>(defaultLocale);
+
+  function toggleLocale(locale: Locale, checked: boolean) {
+    setEnabled((prev) => {
+      const next = checked ? [...new Set([...prev, locale])] : prev.filter((l) => l !== locale);
+      if (!checked && selectedDefault === locale) setSelectedDefault(DEFAULT_LOCALE);
+      return next;
+    });
+  }
 
   return (
     <form action={action} className="flex flex-col gap-[22px]">
@@ -119,6 +143,81 @@ export function TenantSettingsForm({
           desc="Wird gespeichert, sperrt das Portal aktuell noch nicht (folgt in einem späteren Block)."
           defaultChecked={maintenanceEnabled}
         />
+      </div>
+
+      {/* i18n Block B5: Sprachen dieses Mandanten — welche Lernende wählen
+          können ("enabled_locales") und welche standardmäßig gilt
+          ("default_locale"), z. B. für E-Mails/Zertifikate (Josips
+          Entscheidung, Plan Kopf: Mandanten-Standardsprache statt
+          individueller Nutzereinstellung). */}
+      <div className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
+        <div className="mb-1 text-[17px] font-bold">Sprachen</div>
+        <div className="mb-5 text-sm" style={{ color: "#A9AAC4" }}>
+          Welche Sprachen Lernende in dieser Akademie wählen können.
+        </div>
+
+        <fieldset className="mb-5 border-0 p-0">
+          <legend className="mb-2 text-sm font-semibold" style={{ color: "#3E3F66" }}>
+            Freigeschaltete Sprachen
+          </legend>
+          <div className="flex flex-col gap-2.5">
+            {/* Deutsch ist nie abwählbar (Plan Abschnitt 5) — als fest
+                markierte, deaktivierte Checkbox sichtbar statt nur im
+                Backend still erzwungen. Ein `disabled`-Input wird NICHT mit
+                abgeschickt, deshalb zusätzlich der versteckte Pflichtwert
+                daneben. */}
+            <label className="flex items-center gap-2.5 text-[15px]" style={{ color: "#3E3F66" }}>
+              <input type="checkbox" checked disabled />
+              Deutsch
+              <span className="text-[13px]" style={{ color: "#A9AAC4" }}>
+                (immer aktiv)
+              </span>
+            </label>
+            <input type="hidden" name="enabledLocales" value={DEFAULT_LOCALE} />
+
+            {SUPPORTED_LOCALES.filter((locale) => locale !== DEFAULT_LOCALE).map((locale) => (
+              <label
+                key={locale}
+                className="flex items-center gap-2.5 text-[15px]"
+                style={{ color: "#3E3F66" }}
+              >
+                <input
+                  type="checkbox"
+                  name="enabledLocales"
+                  value={locale}
+                  checked={enabled.includes(locale)}
+                  onChange={(e) => toggleLocale(locale, e.target.checked)}
+                />
+                {LOCALE_NAMES[locale]}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <label
+          className="flex max-w-xs flex-col gap-[7px] text-sm font-semibold"
+          style={{ color: "#3E3F66" }}
+          htmlFor="default-locale-select"
+        >
+          Standardsprache
+          <select
+            id="default-locale-select"
+            name="defaultLocale"
+            value={selectedDefault}
+            onChange={(e) => setSelectedDefault(e.target.value as Locale)}
+            className="rounded-[11px] border px-[15px] py-[13px] text-base font-normal"
+            style={{ borderColor: "#D8DAEA" }}
+          >
+            {SUPPORTED_LOCALES.filter((locale) => enabled.includes(locale)).map((locale) => (
+              <option key={locale} value={locale}>
+                {LOCALE_NAMES[locale]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="mt-2 text-[13px]" style={{ color: "#A9AAC4" }}>
+          Sprache für automatische E-Mails und Zertifikate dieses Mandanten.
+        </p>
       </div>
 
       {state.error && (

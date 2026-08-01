@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { getTenant } from "@/lib/tenant/context";
+import { localeSchema, resolveEnabledLocales, isSupportedLocale } from "@/i18n/config";
 
 /**
  * Server-Actions für den Einstellungen-Bereich ((portal)/einstellungen,
@@ -130,4 +133,100 @@ export async function revokeSession(sessionId: string): Promise<SettingsState> {
   if (error) return { error: "Abmelden fehlgeschlagen." };
   revalidatePath("/einstellungen");
   return { error: null, success: true };
+}
+
+/**
+ * i18n Block B1 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 4+8.2): kein
+ * `domain`-Attribut (host-only, sonst gilt die Sprachwahl mandanten-
+ * übergreifend), sonst dieselben Attribute an beiden Schreibstellen dieser
+ * Datei (setLocale() und mirrorProfileLocaleCookie(), B4) — deshalb hier
+ * einmal zentral statt zweimal dupliziert.
+ */
+const NEXT_LOCALE_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
+  maxAge: 60 * 60 * 24 * 365,
+};
+
+/**
+ * i18n Block B1: Sprachumschalter (locale-switcher.tsx) ruft das direkt mit
+ * dem `<select>`-Wert auf (kein FormData/useActionState — gleiches Muster
+ * wie updateNotificationPref() oben). `value` ist Nutzereingabe (kommt vom
+ * Client) — zod-Prüfung gegen SUPPORTED_LOCALES ist deshalb Pflicht
+ * (CLAUDE.md §2.3), bevor irgendetwas geschrieben wird. Zusätzlich muss der
+ * Wert in der effektiven Freischaltung DIESES Mandanten liegen (Plan
+ * Abschnitt 3) — sonst könnte ein Nutzer über die Server Action eine vom
+ * Mandanten gesperrte Sprache erzwingen, obwohl die UI sie gar nicht anbietet.
+ */
+export async function setLocale(value: string): Promise<SettingsState> {
+  const parsed = localeSchema.safeParse(value);
+  if (!parsed.success) return { error: "Unbekannte Sprache." };
+  const locale = parsed.data;
+
+  const tenant = await getTenant();
+  const enabledLocales = resolveEnabledLocales(tenant?.settings ?? {});
+  if (!enabledLocales.includes(locale)) {
+    return { error: "Diese Sprache ist für diese Akademie nicht freigeschaltet." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Nicht angemeldet." };
+
+  const { error } = await supabase.from("profiles").update({ locale }).eq("id", user.id);
+  if (error) return { error: "Speichern fehlgeschlagen." };
+
+  const cookieStore = await cookies();
+  cookieStore.set("NEXT_LOCALE", locale, NEXT_LOCALE_COOKIE_OPTIONS);
+
+  return { error: null, success: true };
+}
+
+/**
+ * i18n Block B4 (Plan Abschnitt 4): spiegelt `profiles.locale` als
+ * `NEXT_LOCALE`-Cookie, direkt nach erfolgreichem Login aufgerufen — damit
+ * middleware.ts die richtige Sprache schon beim allerersten Request nach dem
+ * Login sieht, auch auf einem neuen Gerät ohne bestehendes Cookie.
+ *
+ * ABWEICHUNG vom Plan (dokumentiert, siehe PHASENSTATUS.md): der Plan zielte
+ * auf `src/app/auth/callback/route.ts`. Dieser Route Handler wurde am
+ * 26.07.2026 (Commit 65d5910) zu einer Client Component (`page.tsx`), weil
+ * die meisten E-Mail-Links dieses Projekts die Session als URL-FRAGMENT
+ * liefern (`#access_token=…`) — Fragmente erreichen den Server grundsätzlich
+ * nie, ein Route Handler kann sie technisch nicht lesen. Diese Funktion wird
+ * deshalb als Server Action direkt aus der Client Component heraus
+ * aufgerufen (Next.js erlaubt das ohne Formular/Route Handler), nachdem
+ * `setSession()`/`exchangeCodeForSession()` die Auth-Cookies gesetzt hat.
+ *
+ * Kein zod hier: `profiles.locale` ist kein externer Eingabe-Request, sondern
+ * ein bereits gespeicherter DB-Wert (i. d. R. selbst über setLocale() oben
+ * geschrieben) — `isSupportedLocale()` genügt als Typ-Wächter, bevor der Wert
+ * in einen Set-Cookie-Header gelangt (gleiches Muster wie i18n/request.ts).
+ * Bewusst OHNE Freischaltungs-Prüfung des Mandanten (anders als setLocale()
+ * oben): middleware.ts prüft `enabled_locales` bei JEDEM Request ohnehin
+ * erneut und fällt sonst durch (siehe resolve.ts) — eine zweite Prüfung hier
+ * bräuchte einen zusätzlichen Mandanten-Ladevorgang ohne Sicherheitsgewinn.
+ */
+export async function mirrorProfileLocaleCookie(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("locale")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const locale = profile?.locale;
+  if (typeof locale !== "string" || !isSupportedLocale(locale)) return;
+
+  const cookieStore = await cookies();
+  cookieStore.set("NEXT_LOCALE", locale, NEXT_LOCALE_COOKIE_OPTIONS);
 }

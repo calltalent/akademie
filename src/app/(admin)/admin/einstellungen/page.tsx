@@ -3,6 +3,7 @@ import { checkPlatformAccess } from "@/lib/platform/auth";
 import { createClient } from "@/lib/supabase/server";
 import { EinstellungenTabs } from "@/components/admin/einstellungen-tabs";
 import type { PromoCardRow, TrainerRow } from "@/lib/settings/actions";
+import { DEFAULT_LOCALE, isSupportedLocale, resolveEnabledLocales } from "@/i18n/config";
 
 /**
  * Design-Block 6 (13.07.2026, Claude-Design-Export Teil 3,
@@ -103,6 +104,18 @@ export default async function AdminEinstellungenPage() {
 
   const branding = tenant.branding;
 
+  // i18n Block B5 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 4): "de" ist
+  // immer Teil der effektiven Menge (resolveEnabledLocales()) — der
+  // Standardwert fällt nur dann auf DEFAULT_LOCALE zurück, wenn
+  // `default_locale` fehlt oder (z. B. durch ein direktes DB-Update) auf ein
+  // inzwischen gesperrtes Kürzel zeigt.
+  const enabledLocales = resolveEnabledLocales(tenant.settings);
+  const storedDefaultLocale = tenant.settings.default_locale;
+  const defaultLocale =
+    storedDefaultLocale && isSupportedLocale(storedDefaultLocale) && enabledLocales.includes(storedDefaultLocale)
+      ? storedDefaultLocale
+      : DEFAULT_LOCALE;
+
   return (
     <div className="flex flex-col gap-4">
       <header>
@@ -129,6 +142,8 @@ export default async function AdminEinstellungenPage() {
         trainers={trainers}
         apiKeys={apiKeys ?? []}
         webhooks={(webhooks ?? []) as { id: string; url: string; events: string[]; active: boolean; created_at: string }[]}
+        enabledLocales={enabledLocales}
+        defaultLocale={defaultLocale}
       />
     </div>
   );

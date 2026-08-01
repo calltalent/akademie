@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { mirrorProfileLocaleCookie } from "@/lib/account/actions";
 
 /**
  * BUGFIX (26.07.2026, Josips Fund: "Link zum Passwort festlegen führt zum
@@ -79,6 +80,19 @@ export default function AuthCallbackPage() {
           if (error) throw error;
         } else {
           throw new Error("Kein Token im Callback gefunden.");
+        }
+        // i18n Block B4 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 4): profiles.locale
+        // als NEXT_LOCALE-Cookie spiegeln, damit middleware.ts ab dem nächsten
+        // Request (auch auf einem neuen Gerät ohne bestehendes Cookie) die
+        // richtige Sprache sieht. Als Server Action statt Route Handler
+        // aufgerufen — siehe Kopfkommentar zu mirrorProfileLocaleCookie() für
+        // die dokumentierte Plan-Abweichung. Best-effort: ein Fehlschlag darf
+        // die Anmeldung selbst nie blockieren.
+        try {
+          await mirrorProfileLocaleCookie();
+        } catch {
+          // Sprache bleibt auf dem bisherigen Stand (Accept-Language/"de") —
+          // kein Grund, die Anmeldung abzubrechen.
         }
         window.location.href = next;
       } catch {

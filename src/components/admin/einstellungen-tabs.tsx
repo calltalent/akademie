@@ -9,6 +9,7 @@ import { TrainerProfilePanel } from "@/components/admin/trainer-profile-panel";
 import { ApiKeysPanel } from "@/components/admin/api-keys-panel";
 import { WebhooksPanel } from "@/components/admin/webhooks-panel";
 import type { PromoCardRow, TrainerRow } from "@/lib/settings/actions";
+import type { Locale } from "@/i18n/config";
 
 /**
  * Einstellungen als horizontale Reiter (Josips Auftrag, 25.07.2026: "als
@@ -50,6 +51,8 @@ export function EinstellungenTabs({
   trainers,
   apiKeys,
   webhooks,
+  enabledLocales,
+  defaultLocale,
 }: {
   tenantName: string;
   supportEmail: string;
@@ -65,6 +68,9 @@ export function EinstellungenTabs({
   trainers: TrainerRow[];
   apiKeys: { id: string; name: string; last_used: string | null; active: boolean; created_at: string }[];
   webhooks: { id: string; url: string; events: string[]; active: boolean; created_at: string }[];
+  /** i18n Block B5 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 4). */
+  enabledLocales: Locale[];
+  defaultLocale: Locale;
 }) {
   const [tab, setTab] = useState<TabKey>("allgemein");
 
@@ -97,6 +103,8 @@ export function EinstellungenTabs({
             selfSignupEnabled={selfSignupEnabled}
             certificatesEnabled={certificatesEnabled}
             maintenanceEnabled={maintenanceEnabled}
+            enabledLocales={enabledLocales}
+            defaultLocale={defaultLocale}
           />
 
           <div className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>

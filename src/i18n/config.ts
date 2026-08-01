@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Einzige Locale-Liste des Projekts (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 5:
  * "kein Kürzel taucht sonst als Literal auf"). Neue Sprache = neuer Eintrag
@@ -20,6 +22,14 @@ export const LOCALE_NAMES: Record<Locale, string> = {
 export function isSupportedLocale(value: string): value is Locale {
   return (SUPPORTED_LOCALES as readonly string[]).includes(value);
 }
+
+/**
+ * zod-Gegenstück zu `isSupportedLocale()` für Eingabegrenzen, die eine
+ * `safeParse()`-Fehlerform brauchen (Server Actions, Plan Block B — CLAUDE.md
+ * §2.3: zod an jeder Eingabegrenze). Leitet sich aus SUPPORTED_LOCALES ab,
+ * führt also kein zweites Kürzel-Literal ein.
+ */
+export const localeSchema = z.enum(SUPPORTED_LOCALES);
 
 /**
  * Effektive Freischaltung eines Mandanten (Plan Abschnitt 3.3):

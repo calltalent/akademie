@@ -5,6 +5,7 @@ import { requireAdminTenant } from "@/lib/auth/staff";
 import { translateDbError } from "@/lib/errors/db";
 import { genericErrorMessage } from "@/lib/errors/generic";
 import type { CourseActionState } from "@/lib/courses/state";
+import { parseTenantLocaleSettings } from "@/lib/tenant/locale-settings";
 
 /**
  * Design-Block 6 (13.07.2026, AdminEinstellungen.dc.html): neue, ECHTE
@@ -35,12 +36,26 @@ export async function updateTenantSettings(
     }
     const supportEmailRaw = String(formData.get("supportEmail") ?? "").trim();
 
+    // i18n Block B5 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 4): Nutzereingabe
+    // eines Mandanten-Admins — zod-geprüft in lib/tenant/locale-settings.ts,
+    // bevor sie in tenants.settings (jsonb) landet. "de" wird dort immer
+    // erzwungen, unabhängig davon, was das Formular schickt.
+    const localesResult = parseTenantLocaleSettings({
+      defaultLocaleRaw: String(formData.get("defaultLocale") ?? ""),
+      enabledLocalesRaw: formData.getAll("enabledLocales").map(String),
+    });
+    if (!localesResult.ok) {
+      return { error: localesResult.error };
+    }
+
     const mergedSettings = {
       ...tenant.settings,
       support_email: supportEmailRaw || undefined,
       self_signup_enabled: formData.get("selfSignup") === "on",
       certificates_enabled: formData.get("certificates") === "on",
       maintenance_enabled: formData.get("maintenance") === "on",
+      default_locale: localesResult.defaultLocale,
+      enabled_locales: localesResult.enabledLocales,
     };
 
     const { error } = await supabase

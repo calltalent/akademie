@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { publicEnv } from "@/lib/env";
 import { AppShell } from "@/components/learn/app-shell";
+import { DEFAULT_LOCALE, isSupportedLocale, resolveEnabledLocales, type Locale } from "@/i18n/config";
 import {
   EinstellungenTabs,
   type SessionInfo,
@@ -83,9 +84,25 @@ export default async function EinstellungenPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, first_name, last_name, phone, city, job_position, about, avatar_url, notification_prefs")
+    .select(
+      "full_name, first_name, last_name, phone, city, job_position, about, avatar_url, notification_prefs, locale",
+    )
     .eq("id", user.id)
     .maybeSingle();
+
+  // i18n Block B3 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 4): effektive
+  // Locale-Menge DIESES Mandanten (nie SUPPORTED_LOCALES direkt an die UI
+  // reichen) + aktuelle Wahl des Nutzers. Fällt auf DEFAULT_LOCALE zurück,
+  // falls `profiles.locale` fehlt/unbekannt ist oder der Mandant die zuletzt
+  // gewählte Sprache inzwischen wieder gesperrt hat (Plan Abschnitt 3, "Fall
+  // Nutzer hat bs gewählt, Mandant deaktiviert es später" — kein Fehler,
+  // reiner Anzeige-Fallback, `profiles.locale` bleibt in der DB unverändert).
+  const enabledLocales = resolveEnabledLocales(tenant.settings);
+  const storedLocale = profile?.locale as string | null | undefined;
+  const currentLocale: Locale =
+    storedLocale && isSupportedLocale(storedLocale) && enabledLocales.includes(storedLocale)
+      ? storedLocale
+      : DEFAULT_LOCALE;
 
   const { data: isStaff } = await supabase.rpc("is_staff", { t: tenant.id });
 
@@ -169,6 +186,8 @@ export default async function EinstellungenPage({
         pendingDeletionDate={pendingDeletion ? formatDateDe(pendingDeletion.requested_at) : null}
         vapidPublicKey={publicEnv.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
         initialTab={initialTab}
+        enabledLocales={enabledLocales}
+        currentLocale={currentLocale}
       />
     </AppShell>
   );
