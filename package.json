@@ -25,7 +25,7 @@
     "@supabase/supabase-js": "^2",
     "lucide-react": "^0.460",
     "next": "16.2.10",
-    "next-intl": "latest",
+    "next-intl": "4.13.2",
     "pdf-lib": "^1",
     "react": "19.2.4",
     "react-dom": "19.2.4",

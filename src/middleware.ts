@@ -3,6 +3,9 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env";
 import { resolveTenantByHost } from "@/lib/tenant/resolve";
 import { decideRouting } from "@/lib/tenant/routing";
+import type { PublicTenant } from "@/lib/tenant/types";
+import { resolveEnabledLocales } from "@/i18n/config";
+import { resolveLocale } from "@/i18n/resolve";
 
 /**
  * ROLLBACK zu middleware.ts (Edge-Runtime) — Phase 5, Block 8, 12.07.2026,
@@ -63,8 +66,9 @@ export async function middleware(request: NextRequest) {
   });
   const servedPath = routing.servedPath;
 
+  let tenant: PublicTenant | null = null;
   if (routing.resolveTenant) {
-    const tenant = await resolveTenantByHost(host);
+    tenant = await resolveTenantByHost(host);
     if (tenant) {
       requestHeaders.set("x-tenant-id", tenant.id);
       requestHeaders.set("x-tenant-slug", tenant.slug);
@@ -83,6 +87,23 @@ export async function middleware(request: NextRequest) {
       requestHeaders.set("x-tenant-missing", "1");
     }
   }
+
+  // i18n Block A6 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 1+6): x-locale
+  // direkt nach x-tenant-data setzen, gleiches Header-Muster wie oben. Kein
+  // Zusatz-Query — der Mandanten-Standard kommt aus dem tenant-Objekt, das
+  // ohnehin gerade geladen wurde (falls Mandanten-Host); auf dem Portal-Host
+  // bleibt tenantDefault leer, die Kette fällt dann auf Accept-Language/"de"
+  // zurück (siehe resolveLocale()). Das Cookie wird hier NUR gelesen — der
+  // Schreibpfad (Server Action, NEXT_LOCALE setzen) ist Block B, nicht Teil
+  // dieses Blocks.
+  const enabledLocales = resolveEnabledLocales(tenant?.settings ?? {});
+  const locale = resolveLocale({
+    cookie: request.cookies.get("NEXT_LOCALE")?.value ?? null,
+    tenantDefault: tenant?.settings.default_locale ?? null,
+    acceptLanguage: request.headers.get("accept-language"),
+    enabledLocales,
+  });
+  requestHeaders.set("x-locale", locale);
 
   // Für den Zugriffs-Gate in src/app/portal/layout.tsx: next/headers() kennt
   // keinen Pfad, nur Header. Ohne diesen Header wüsste der Gate nicht, ob er

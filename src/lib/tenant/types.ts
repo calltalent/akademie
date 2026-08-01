@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n/config";
+
 /**
  * Öffentliche, sichere Teilmenge von `public.tenants` — das ist alles, was
  * anonyme Besucher vor dem Login zu sehen bekommen (Branding). Niemals
@@ -71,6 +73,15 @@ export type PublicTenant = {
     certificates_enabled?: boolean;
     maintenance_enabled?: boolean;
     support_email?: string;
+    /**
+     * NEU (i18n Block A10, 01.08.2026, PLAN_Mehrsprachigkeit-i18n.md
+     * Abschnitt 3): pro Mandant freigeschaltete Sprachen zusätzlich zu
+     * `default_locale`. Keine Migration nötig — lebt in diesem bereits
+     * bestehenden jsonb-Feld. Fehlt das Feld (Bestandsmandanten), liefert
+     * `resolveEnabledLocales()` (src/i18n/config.ts) effektiv `["de"]` —
+     * unverändertes Verhalten.
+     */
+    enabled_locales?: Locale[];
   };
 };
 

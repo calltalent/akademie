@@ -1,6 +1,7 @@
 {
   "common": {
     "appName": "Calltalent-Akademie",
+    "metaDescription": "KI-native, mandantenfähige Lernplattform von Calltalent Ltd.",
     "loading": "Wird geladen …",
     "save": "Speichern",
     "cancel": "Abbrechen"

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Montserrat } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages } from "next-intl/server";
+import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { getTenant } from "@/lib/tenant/context";
 import { ThemeStyle } from "@/components/branding/theme-style";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
@@ -24,20 +24,27 @@ const montserrat = Montserrat({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const tenant = await getTenant();
+  // i18n Block A8: hartkodierter deutscher Fallback-Titel/-Beschreibung durch
+  // getTranslations() ersetzt — Namensraum "common" existiert bereits in
+  // messages/de.json (appName) bzw. wird hier um metaDescription ergänzt.
+  const [tenant, t] = await Promise.all([getTenant(), getTranslations("common")]);
   return {
-    title: tenant?.name ?? "Calltalent-Akademie",
-    description: "KI-native, mandantenfähige Lernplattform von Calltalent Ltd.",
+    title: tenant?.name ?? t("appName"),
+    description: t("metaDescription"),
   };
 }
 
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const [messages, tenant] = await Promise.all([getMessages(), getTenant()]);
+  const [messages, tenant, locale] = await Promise.all([
+    getMessages(),
+    getTenant(),
+    getLocale(),
+  ]);
 
   return (
-    <html lang="de" suppressHydrationWarning className={montserrat.variable}>
+    <html lang={locale} suppressHydrationWarning className={montserrat.variable}>
       {/* suppressHydrationWarning: bekannte Fehlmeldung durch Browser-Erweiterungen
           (z. B. LanguageTool, data-lt-installed), die vor React-Hydration ins
           <html>-Tag schreiben. Betrifft nur dieses Tag, keine Kindelemente. */}

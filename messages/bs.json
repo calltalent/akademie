@@ -1,0 +1,157 @@
+{
+  "common": {
+    "appName": "Calltalent Akademija",
+    "metaDescription": "AI-nativna, multi-klijentska platforma za učenje kompanije Calltalent Ltd.",
+    "loading": "Učitavanje …",
+    "save": "Sačuvaj",
+    "cancel": "Otkaži"
+  },
+  "auth": {
+    "login": "Prijava",
+    "register": "Registracija",
+    "logout": "Odjava"
+  },
+  "quiz": {
+    "kinds": {
+      "quiz": "Kviz",
+      "exam": "Ispit"
+    },
+    "questionKinds": {
+      "single": "Jednostruki izbor (jedan tačan odgovor)",
+      "multi": "Višestruki izbor (više tačnih odgovora)",
+      "gap": "Popuni prazninu / slobodan tekst (automatski ocijenjeno)",
+      "open": "Slobodan tekst (nije automatski ocijenjeno)"
+    },
+    "start": "Pokreni kviz",
+    "submit": "Pošalji odgovore",
+    "retry": "Pokušaj ponovo",
+    "passed": "Položeno",
+    "failed": "Nije položeno",
+    "attemptsRemaining": "{count} od {total} preostalo",
+    "attemptsUnlimited": "neograničeno",
+    "attemptsExhausted": "Dostignut je limit pokušaja — nema više pokušaja.",
+    "noQuizLinked": "Nije povezan nijedan kviz.",
+    "quizUnavailable": "Kviz trenutno nije dostupan.",
+    "rateLimited": "Previše zahtjeva. Molimo sačekajte i pokušajte ponovo."
+  },
+  "submissions": {
+    "statuses": {
+      "submitted": "Predano",
+      "approved": "Prihvaćeno",
+      "revision": "Potrebna dorada",
+      "rejected": "Odbijeno"
+    },
+    "modeText": "Tekst",
+    "modeFile": "Datoteka",
+    "textLabel": "Tvoj tekst",
+    "fileLabel": "Odaberi datoteku (PDF, Word, PNG/JPG, ZIP, MP4, MP3 — maks. 50 MB)",
+    "submit": "Pošalji zadatak",
+    "submitting": "Slanje u toku …",
+    "uploading": "Datoteka se učitava …",
+    "statusLabel": "Status",
+    "submittedAt": "Predano {date}",
+    "feedbackLabel": "Povratna informacija",
+    "rateLimited": "Previše zahtjeva. Molimo sačekajte i pokušajte ponovo.",
+    "inbox": {
+      "title": "Zadaci",
+      "filterAll": "Svi",
+      "empty": "Nema pronađenih zadataka.",
+      "download": "Preuzmi datoteku (link važi 5 min.)",
+      "gradeLabel": "Ocjena/vrednovanje (opcionalno, slobodan tekst)",
+      "feedbackToLearner": "Povratna informacija za polaznika (opcionalno)",
+      "save": "Sačuvaj ocjenu",
+      "saved": "Sačuvano — polaznik/ica će biti obaviješten/a mejlom."
+    }
+  },
+  "certificates": {
+    "issued": "Certifikat izdat",
+    "pending": "Certifikat se izdaje — molimo ponovo učitajte stranicu za kratko.",
+    "issuedOn": "Izdato {date}",
+    "serialLabel": "Serijski broj",
+    "download": "Preuzmi certifikat (PDF)",
+    "downloadUnavailable": "Preuzimanje trenutno nije dostupno.",
+    "empty": "Još nema izdatih certifikata.",
+    "profileTitle": "Moj profil",
+    "profileCertificatesTitle": "Moji certifikati",
+    "profilePasswordHint": "Promjena lozinke: zatraži putem „Zaboravljena lozinka“ na stranici za prijavu."
+  },
+  "payments": {
+    "kinds": {
+      "one_time": "Jednokratna kupovina",
+      "subscription": "Pretplata (mjesečno)"
+    },
+    "buyButton": "Kupi",
+    "buyPending": "Priprema u toku …",
+    "loginRequired": "Molimo prijavite se da biste kupili ovaj proizvod.",
+    "login": "Prijava",
+    "register": "Registracija",
+    "paymentsDisabled": "Plaćanja trenutno nisu dostupna za ovu akademiju.",
+    "productUnavailable": "Ovaj proizvod nije dostupan.",
+    "rateLimited": "Previše zahtjeva. Molimo sačekajte i pokušajte ponovo.",
+    "admin": {
+      "title": "Plaćanja",
+      "subtitle": "Proizvodi, cijene i narudžbe ovog klijenta.",
+      "newProduct": "Novi proizvod",
+      "products": "Proizvodi",
+      "noProducts": "Još nisu kreirani proizvodi.",
+      "active": "Aktivno",
+      "inactive": "Deaktivirano",
+      "deactivate": "Deaktiviraj (sakrij iz prodavnice)",
+      "reactivate": "Ponovo aktiviraj",
+      "titleLabel": "Naslov",
+      "slugLabel": "Slug (URL, npr. kurs-za-pocetnike)",
+      "kindLabel": "Vrsta",
+      "priceLabel": "Cijena u eurima",
+      "courseLabel": "Povezani kurs (opcionalno)",
+      "noCourse": "Bez kursa",
+      "activeLabel": "Aktivno (vidljivo u prodavnici)",
+      "save": "Sačuvaj izmjene",
+      "create": "Kreiraj proizvod",
+      "saved": "Sačuvano.",
+      "orders": "Narudžbe",
+      "noOrders": "Još nema narudžbi.",
+      "orderStatuses": {
+        "pending": "Na čekanju",
+        "paid": "Plaćeno",
+        "refunded": "Vraćen novac",
+        "failed": "Neuspješno"
+      }
+    }
+  },
+  "reporting": {
+    "title": "Izvještavanje",
+    "subtitle": "Napredak, stope završetka i analiza kvizova ovog klijenta.",
+    "exportCsv": "Izvezi CSV",
+    "courses": {
+      "title": "Izvještaji o kursevima",
+      "empty": "Još nema kurseva sa upisima.",
+      "columnCourse": "Kurs",
+      "columnEnrolled": "Upisano",
+      "columnActive": "Aktivno",
+      "columnCompletionRate": "Stopa završetka (%)"
+    },
+    "users": {
+      "title": "Izvještaji o korisnicima",
+      "subtitle": "Svi upisani polaznici u svim kursevima (jedan red po upisu na kurs).",
+      "empty": "Još nema upisa.",
+      "columnName": "Ime",
+      "columnEmail": "E-mail",
+      "columnCourse": "Kurs",
+      "columnProgress": "Napredak (%)",
+      "columnCompletedLessons": "Završene lekcije",
+      "columnLastActivity": "Posljednja aktivnost",
+      "noActivity": "—"
+    },
+    "quiz": {
+      "title": "Analiza kvizova",
+      "empty": "Još nema pokušaja kviza.",
+      "columnQuiz": "Kviz",
+      "columnCourse": "Kurs",
+      "columnAttempts": "Pokušaji",
+      "columnPassed": "Položeno",
+      "columnFailed": "Nije položeno",
+      "columnAverage": "Prosjek (%)",
+      "noAttempts": "—"
+    }
+  }
+}

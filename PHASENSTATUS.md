@@ -2415,14 +2415,17 @@ Josips Auftrag: neue Domain `salestalent.app` (über Cloudflare gekauft) für de
 4. Josips Rechner war einen Tag zuvor komplett neu aufgesetzt worden (Windows-Neuinstallation) — Node.js fehlte, PowerShell-Execution-Policy stand auf `Restricted`, Wrangler-Login-Token weg. Alles behoben: Node LTS neu installiert, `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, `npx wrangler login` (Account `calltalent.ai` gewählt). Projektordner selbst (`.env`, `node_modules`) hatte die Neuinstallation unberührt überstanden, kein `npm install` nötig.
 5. **`npm run deploy` erfolgreich**, lokal von Josip ausgeführt. Bestätigte Routen laut Deploy-Ausgabe: `*.calltalent.ai/*`, `academy.calltalent.ai/*`, `salestalent.app/*`, `www.salestalent.app/*` (beide `zone_name: salestalent.app`), Cron-Trigger `*/2 * * * *` unverändert aktiv. Worker-Version-ID `7ed1967e-8be8-42d4-a4f8-370ef81dc00e`.
 
+**Erledigt (Fortsetzung, 31.07.2026, Abschluss):**
+
+6. Funktionstest bestanden: `https://salestalent.app` live erreichbar und lädt (verifiziert, nachdem ein NXDOMAIN durch einen veralteten ISP-DNS-Negativ-Cache beim Testen kurzzeitig auftrat — DNS-Records waren die ganze Zeit korrekt, siehe Diagnose per `Resolve-DnsName`/Cloudflare-DoH; behoben durch Umstellung auf Cloudflare-DNS `1.1.1.1` im Browser).
+
 **Noch offen:**
 
-1. Funktionstest: `https://salestalent.app` im Browser aufrufen und prüfen, ob die Login-Seite des neuen, leeren `SalesTalent`-Mandanten erscheint (noch nicht verifiziert).
+1. Prüfen, ob die Seite den erwarteten leeren `SalesTalent`-Mandanten zeigt (nicht versehentlich einen anderen Mandanten) — noch nicht bestätigt, welcher Bildschirm genau erschien.
 2. Branding (Login-Texte, Logo, Farben) für den Mandanten noch nicht gesetzt — Felder sind vorhanden (`tenants.branding.*`), aber leer.
 3. Rechtstexte (`tenants.legal.impressum_url`/`datenschutz_url`) offen — Rechtsträger-Frage noch nicht geklärt.
 4. Englische Plattform-Oberfläche: eigenes Folgeprojekt, siehe `SALESTALENT-KLON-ANLEITUNG.md` Abschnitt 6 — bewusst noch nicht begonnen.
 5. `security-reviewer`-Agent noch nicht gegen die neue Route/den neuen Mandanten gelaufen.
-6. Änderungen (`wrangler.jsonc`, `PHASENSTATUS.md`, `SALESTALENT-KLON-ANLEITUNG.md`) lokal noch nicht committet.
 
 ## Mehrsprachigkeit (i18n) — Plan erstellt, Start mit Bosnisch (01.08.2026)
 
@@ -2460,3 +2463,35 @@ Vorgezogene, eigenständige Fehlerbehebung aus dem i18n-Plan oben (Punkt 5) — 
 **Offener Punkt:** Bundle-Größen-Zuwachs nicht abschließend vermessen — `montserrat-data.ts` allein ist ~872 KB (Text/base64), `@pdf-lib/fontkit` bringt zusätzliches Gewicht mit. Das betrifft ausschließlich den Server-Bundle-Anteil (`pdf.ts` ist `server-only`, landet nie im Client-Bundle). `npm run deploy` (echter Cloudflare-Worker-Build) wurde NICHT ausgeführt (keine Freigabe, CLAUDE.md §4.6) — Josip sollte vor dem nächsten echten Deploy einmal die tatsächliche Worker-Skriptgröße prüfen, insbesondere im Zusammenspiel mit dem bereits bestehenden ffmpeg-Workaround (25-MiB-Asset-Limit war dort schon einmal ein echtes Problem).
 
 **Übergabe an tester:** Automatisiert bereits grün (s. o.). Manuell empfohlen: ein echtes Zertifikat für einen Namen mit č/ć/š/ž/đ erzeugen (z. B. über die bestehende Zertifikats-Ausstellung nach Kursabschluss) und das PDF visuell prüfen — Sonderzeichen müssen jetzt korrekt erscheinen, nicht mehr als Basisform oder „?". Kein Rendering-Pixel-Vergleich nötig, reine Sichtprüfung reicht.
+
+## Mehrsprachigkeit (i18n) — Block A: Infrastruktur (01.08.2026, builder)
+
+Block A aus `PLAN_Mehrsprachigkeit-i18n.md` (Abschnitt 2, A1–A10) umgesetzt — reine Infrastruktur, noch KEIN Sprachumschalter (Block B) und noch KEINE Textextraktion (Block C). `<html lang>` und die Message-Auflösung funktionieren bereits vollständig; sichtbar wird das erst, sobald Block C tatsächlich `t()` in Komponenten verwendet.
+
+**Erledigt, exakt nach Plan, keine Abweichungen:**
+
+1. **A1** `package.json`: `"next-intl": "latest"` → `"4.13.2"` gepinnt (installierte Version unverändert, `npm install` synchronisiert nur `package-lock.json`).
+2. **A2** `src/i18n/config.ts` (neu): `SUPPORTED_LOCALES = ["de", "bs"]` (Kommentar zu `en` als drittem, später absehbarem Eintrag, siehe Plan Abschnitt 5), `DEFAULT_LOCALE`, Typ `Locale`, `LOCALE_NAMES` (`{ de: "Deutsch", bs: "Bosanski" }` — Sprachname jeweils in der Sprache selbst), `isSupportedLocale()`, `resolveEnabledLocales(settings)` (Formel aus Plan Abschnitt 3.3, defensiv gegen fehlerhafte jsonb-Daten zur Laufzeit — kein Fehler, nur stilles Verwerfen unbekannter/falsch typisierter Einträge).
+3. **A3** `src/i18n/resolve.ts` (neu): reine Funktion `resolveLocale()`, Kette Cookie → Mandanten-Standard → Accept-Language → `"de"`, jede Stufe zusätzlich gegen `enabledLocales` geprüft, fällt bei Sperrung durch statt zu brechen.
+4. **A4** `src/i18n/resolve.test.ts` (neu): 8 Fälle für `resolveLocale` (alle vier Kettenstufen einzeln, gesperrtes Cookie fällt durch, nicht unterstütztes Kürzel fällt durch, kombinierter Totalausfall, „de" nie sperrbar) + 5 Fälle für `resolveEnabledLocales` (leer/fehlend → `["de"]`, unbekanntes Kürzel verworfen, Deduplizierung, defensive Eingaben).
+5. **A5** `src/i18n/request.ts` umgebaut: liest `x-locale` über `headers()`, validiert **vor** dem dynamischen Import gegen `SUPPORTED_LOCALES` (Path-Traversal-Schutz, Plan Abschnitt 8.1) — ungeprüfter Wert gelangt nie in den Template-String.
+6. **A6** `src/middleware.ts`: `tenant`-Variable aus dem `if (routing.resolveTenant)`-Block herausgehoben (vorher blockscoped, jetzt für den Locale-Block danach sichtbar), `x-locale` direkt nach dem bestehenden `x-tenant-data`-Block gesetzt via `resolveLocale()` — Cookie aus `request.cookies`, Mandanten-Standard aus dem bereits geladenen Tenant-Objekt (kein Zusatz-Query), Accept-Language aus dem Request-Header, effektive Menge über `resolveEnabledLocales()`. Nur lesend — Cookie-Schreibpfad ist Block B.
+7. **A7** `messages/bs.json` (neu): KI-Entwurf, 1:1-Strukturvorlage von `de.json` (gleiche Keys/Verschachtelung), ICU-Platzhalter (`{count}`, `{total}`, `{date}`) unverändert übernommen. **Fachbegriffe für Josips Durchsicht** (bosnische Wahl in Klammern): Lektion → *lekcija*, Modul → *modul*, Abgabe → *zadatak* (wörtlich „Aufgabe" statt „Einreichung" — las sich im Kontext natürlicher, bitte gegenprüfen), Versuch → *pokušaj*, Bestehensgrenze → *prag/granica prolaska* (Konzept kommt in `de.json` aktuell noch nicht als eigener Schlüssel vor, Übersetzungsentscheidung trotzdem hier dokumentiert für später), Zertifikat → *certifikat*. Mandant/Tenant wurde durchgehend mit *klijent* übersetzt (z. B. „ovog klijenta"). Zusätzlich `src/i18n/messages.test.ts` (neu, A4-Erweiterung laut Plan Abschnitt 2/5): rekursiver Schlüsselmengen-Vergleich `de.json` vs. `bs.json` + Abgleich der ICU-Platzhalter je Schlüssel.
+8. **A8** `src/app/layout.tsx`: `<html lang="de">` → `<html lang={locale}>` (`getLocale()` aus `next-intl/server`). `generateMetadata()` nutzte hartkodierten deutschen Text (Titel-Fallback, Beschreibung) — jetzt über `getTranslations("common")`; dafür `common.metaDescription` in `messages/de.json` (und entsprechend `bs.json`) ergänzt, `common.appName` als Titel-Fallback wiederverwendet statt dupliziert.
+9. **A9** `src/global.d.ts` (neu): `declare module "next-intl" { interface AppConfig { Locale; Messages } }` gegen `messages/de.json` typisiert (offizielles next-intl-v4-Muster) — reine Typdeklaration, keine Laufzeit-Wirkung, gibt späteren `t()`-Aufrufen (Block C) Autovervollständigung/Typfehler auf echte Keys.
+10. **A10** `src/lib/tenant/types.ts`: `enabled_locales?: Locale[]` im `settings`-Block von `PublicTenant` ergänzt (Import `Locale` aus `src/i18n/config.ts`), analog zu `default_locale`/`self_signup_enabled` — fehlendes Feld bei Bestandsmandanten bleibt unverändert (`resolveEnabledLocales()` liefert dann `["de"]`).
+
+**Keine Abweichungen vom Plan.** Kein `[locale]`-Pfadsegment, `src/lib/tenant/routing.ts` unangetastet, keine DB-Migration, kein `CHECK`-Constraint auf `profiles.locale`, Cookie wird in diesem Block ausschließlich gelesen (Schreibpfad bleibt Block B).
+
+**Verifiziert:** `npx tsc --noEmit` fehlerfrei, `npm run lint` fehlerfrei, `npm run test` **313/313 grün** (299 vorher + 14 neue: 8+5 in `resolve.test.ts`, 2 in `messages.test.ts`), `npm run build` erfolgreich (Routenliste unverändert — erwartet, Block A ändert keine Seiten sichtbar).
+
+**Definition of Done (Plan Abschnitt 2) erfüllt, verifiziert ohne Browser** (noch keine Seite nutzt `t()` sichtbar, siehe Block C): `resolveLocale({cookie: "bs", enabledLocales: ["de","bs"], ...})` liefert `"bs"`, `src/i18n/request.ts` lädt dann `messages/bs.json` — durch `resolve.test.ts` (Kettenlogik) und `messages.test.ts` (Struktur-Identität beider Dateien) automatisiert abgedeckt. Ein echter Browser-Check mit gesetztem `NEXT_LOCALE=bs`-Cookie bleibt ohne sichtbaren Effekt, weil noch keine Komponente `useTranslations`/`t()` aufruft — das ändert sich erst mit Block C.
+
+**Noch offen:**
+
+1. Josips inhaltliche Durchsicht von `messages/bs.json` (Fachbegriffe s. o.), insbesondere *zadatak* für „Abgabe" und *klijent* für „Mandant".
+2. Block B (Sprachumschalter `locale-switcher.tsx`, Server Action `setLocale()`, Mandanten-Einstellungen `enabled_locales`-Mehrfachauswahl) — noch nicht begonnen.
+3. security-reviewer-Pflichtlauf ist laut Plan erst NACH Block B fällig, nicht nach Block A (Block A schreibt keinen neuen Zustand, liest nur — siehe Plan Abschnitt 8.3).
+4. Block C (Textextraktion Auth/Lernansicht/Portal/E-Mails) folgt danach, inkrementell mit je eigenem Commit.
+
+**Übergabe an tester:** Block A ist reine Infrastruktur ohne UI-Wirkung — kein manueller Browser-Testfall im eigentlichen Sinn. Empfohlen: `npm run test -- src/i18n` gezielt laufen lassen, sowie ein Blick in `messages/bs.json` auf Lesbarkeit/Kodierung (č/ć/š/ž/đ) außerhalb des Editors (z. B. `cat`/GitHub-Diff-Ansicht), um Encoding-Probleme auszuschließen, bevor Josip die inhaltliche Prüfung übernimmt.
