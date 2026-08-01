@@ -47,9 +47,11 @@ Direkt in `tenants.branding` gesetzt (Supabase, Tenant `salestalent`):
   "radius": "14px",
   "login_heading": "Welcome to SalesTalent",
   "login_subheading": "Sales training built for the way modern teams sell. Sign in to continue your program.",
-  "login_copyright": "© 2026 SalesTalent. All rights reserved."
+  "login_copyright": "SalesTalent. All rights reserved."
 }
 ```
+
+(`login_copyright` bewusst ohne "© {Jahr}" — `login-form.tsx` setzt das Jahr automatisch davor; ein erster Versuch mit "© 2026 ..." erzeugte "© 2026 © 2026 ..." und wurde am 01.08.2026 korrigiert.)
 
 `color_primary`, `color_bg`, `radius` und die drei `login_*`-Felder sind **sofort sichtbar** auf `salestalent.app` (werden über `src/components/branding/theme-style.tsx` bzw. direkt in `login-form.tsx` eingebunden).
 
