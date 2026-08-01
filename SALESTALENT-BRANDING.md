@@ -55,10 +55,21 @@ Direkt in `tenants.branding` gesetzt (Supabase, Tenant `salestalent`):
 
 Copyright-Zeile bewusst neutral gehalten ("SalesTalent", keine Rechtsträger-Angabe wie "a Calltalent brand") — die Rechtsträger-Frage ist laut `Entscheidungs-Log.md` (30.07.2026) noch offen. Sobald geklärt, diese Zeile anpassen.
 
-## 4. Bewusst NICHT gemacht — ehrlicher Stand
+## 4a. Logo (ergänzt 01.08.2026)
+
+Drei Vektor-Entwürfe generiert (Recraft V4.1, `vector`-Modell, Farbpalette auf `#4655C6` beschränkt, Hintergrund Weiß — bewusst verbundenes, bereits vorhandenes Kreativ-Tool statt einer neuen Pipeline, siehe Entscheidung im Gespräch mit Josip). Kosten: 3 × 2,5 Credits = 7,5 von 23,1 verfügbaren Credits.
+
+Josips Auswahl: horizontales Logo (Icon + Schriftzug) als Haupt-Logo übernommen. Alle drei Varianten liegen im Repo unter `public/branding/salestalent/`:
+
+- `logo-horizontal.svg` — Haupt-Logo, eingetragen als `tenants.branding.logo_url = "/branding/salestalent/logo-horizontal.svg"` (Sidebar/Login/Passwort-setzen, siehe Commit `bbd1ca5`).
+- `icon-mark.svg` — reines Icon (Pfeil+Sprechblase), Reserve für z. B. Favicon/App-Icon, aktuell nicht verdrahtet.
+- `icon-monogram.svg` — reines Icon (S-Monogramm aus Balken), Alternative, aktuell nicht verdrahtet.
+
+**Wichtig:** `logo_url` ist ein relativer, selbst gehosteter Pfad (`public/`-Ordner des Next.js-Apps) — kein externer Cloudfront-Link des Generierungs-Tools. Das Bild ist erst nach dem nächsten `npm run deploy` tatsächlich unter `salestalent.app/branding/salestalent/logo-horizontal.svg` erreichbar; bis dahin zeigt die Login-Seite ein gebrochenes Bild statt des Logos (kein Datenfehler, nur fehlender Deploy).
+
+## 4b. Bewusst weiterhin NICHT gemacht — ehrlicher Stand
 
 1. **`font: "Montserrat"` hat aktuell keine sichtbare Wirkung.** Laut Code-Kommentar in `src/lib/tenant/types.ts` ist das Feld "noch nicht in CSS eingebunden" (`theme-style.tsx` injiziert nur `--color-primary`/`--color-background`/`--radius`, keine Schriftart). Gesetzt für Dokumentationszwecke/Zukunftssicherheit, aber die Seite zeigt bis zu einem Code-Fix weiterhin die technische Fallback-Schrift.
-2. **Kein Logo/Wortmarke als Bilddatei.** `branding.logo_url` bleibt leer — ohne Logo fällt die Oberfläche auf den Mandantennamen als Überschrift zurück (bereits vorhandenes, getestetes Verhalten, kein Fehlerzustand). Eine echte Wortmarke wäre ein eigener kleiner Auftrag (Logo-Design + Upload in den Storage-Bucket `branding/{tenant_id}/...`) — bewusst nicht Teil dieses Durchgangs, um keinen Datei-Upload mit Produktions-Zugangsdaten ad hoc zu improvisieren.
-3. **`support_email` nicht gesetzt** — es existiert noch keine echte Mailbox für SalesTalent, ein Platzhalter hätte einen funktionierenden Kontaktweg vorgetäuscht.
-4. **Rechtstexte weiterhin offen** (`legal.impressum_url`/`datenschutz_url`) — unverändert seit `SALESTALENT-KLON-ANLEITUNG.md` Abschnitt 6.
-5. **Kein Eingriff in die Icon-/Layout-Ebene** (Dashboard, Kurskarten usw.) — das sind hartcodierte, mandantenunabhängige Komponenten (siehe `PHASENSTATUS.md`/`DESIGN-MASTERPROMPT.md` §4.3: "jede neue Komponente muss über `var(--color-primary)` arbeiten" ist als Soll-Regel dokumentiert, aber laut Code-Fund vom 30.07.2026 in weiten Teilen der Admin-/Portal-Oberfläche noch nicht umgesetzt — hartcodierte Hex-Werte statt CSS-Variablen). Diese Lücke betrifft alle Mandanten gleichermaßen, kein SalesTalent-spezifisches Problem.
+2. **`support_email` nicht gesetzt** — es existiert noch keine echte Mailbox für SalesTalent, ein Platzhalter hätte einen funktionierenden Kontaktweg vorgetäuscht.
+3. **Rechtstexte weiterhin offen** (`legal.impressum_url`/`datenschutz_url`) — unverändert seit `SALESTALENT-KLON-ANLEITUNG.md` Abschnitt 6.
+4. **Kein Eingriff in die Icon-/Layout-Ebene** (Dashboard, Kurskarten usw.) — das sind hartcodierte, mandantenunabhängige Komponenten (siehe `PHASENSTATUS.md`/`DESIGN-MASTERPROMPT.md` §4.3: "jede neue Komponente muss über `var(--color-primary)` arbeiten" ist als Soll-Regel dokumentiert, aber laut Code-Fund vom 30.07.2026 in weiten Teilen der Admin-/Portal-Oberfläche noch nicht umgesetzt — hartcodierte Hex-Werte statt CSS-Variablen). Diese Lücke betrifft alle Mandanten gleichermaßen, kein SalesTalent-spezifisches Problem.
