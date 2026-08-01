@@ -64,7 +64,14 @@
   // Datei, siehe PHASENSTATUS.md.
   "routes": [
     { "pattern": "*.calltalent.ai/*", "zone_name": "calltalent.ai" },
-    { "pattern": "academy.calltalent.ai/*", "zone_name": "calltalent.ai" }
+    { "pattern": "academy.calltalent.ai/*", "zone_name": "calltalent.ai" },
+    // salestalent.app (wieder ergaenzt 01.08.2026 -- war zwischenzeitlich aus
+    // dieser Datei verschwunden, siehe SALESTALENT-KLON-ANLEITUNG.md): neue
+    // Marke fuer den internationalen Markt, gleicher mandantenfaehiger
+    // Worker. Setzt voraus, dass die Zone salestalent.app im selben
+    // Cloudflare-Account (calltalent.ai, account_id oben) aktiv ist.
+    { "pattern": "salestalent.app/*", "zone_name": "salestalent.app" },
+    { "pattern": "www.salestalent.app/*", "zone_name": "salestalent.app" }
   ],
   "keep_vars": true,
   "triggers": {
