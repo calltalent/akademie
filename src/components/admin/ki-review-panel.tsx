@@ -1,19 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { CheckCircle2, HelpCircle } from "lucide-react";
 import { applyDraftAsCourse } from "@/lib/generator/apply";
 import { retryDraft } from "@/lib/generator/actions";
 import type { CourseDraft, CourseGenOutput } from "@/lib/generator/schema";
 
 type Status = "queued" | "running" | "done" | "error";
-
-const STEP_LABELS = [
-  "Auftrag wird eingereiht …",
-  "Gliederung wird erstellt …",
-  "Lektionsinhalte werden ausformuliert …",
-  "Quiz-Fragen werden erstellt …",
-];
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -35,6 +29,8 @@ export function KiReviewPanel({
   initialOutput: CourseGenOutput;
   initialError: string | null;
 }) {
+  const t = useTranslations("admin.ki");
+  const STEP_LABELS = [t("reviewStep0"), t("queueStep1"), t("queueStep2"), t("queueStep3")];
   const [status, setStatus] = useState<Status>(initialStatus);
   const [step, setStep] = useState(initialOutput.step);
   const [draft, setDraft] = useState<CourseDraft | null>(initialOutput.draft ?? null);
@@ -100,7 +96,7 @@ export function KiReviewPanel({
         {status === "error" ? (
           <div className="flex flex-col gap-3">
             <p className="text-base font-semibold" style={{ color: "#B24343" }}>
-              Fehler: {jobError ?? "Unbekannter Fehler."}
+              {t("reviewError", { error: jobError ?? t("unknownError") })}
             </p>
             <button
               type="button"
@@ -109,16 +105,16 @@ export function KiReviewPanel({
               className="self-start rounded-[10px] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
               style={{ background: "#5663AE" }}
             >
-              {isRetrying ? "Wird eingereiht …" : "Erneut versuchen"}
+              {isRetrying ? t("queueStep0") : t("reviewRetryButton")}
             </button>
           </div>
         ) : status === "done" ? (
           <p className="flex items-center gap-2.5 text-base font-semibold">
             <CheckCircle2 size={18} color="#1F8A5B" aria-hidden="true" />
-            Entwurf „{draft?.title ?? "Kurs"}“ ist fertig.
+            {t("draftReadyMessage", { title: draft?.title ?? t("fallbackCourseTitle") })}
           </p>
         ) : (
-          <p className="text-base font-semibold">{STEP_LABELS[step] ?? "Wird verarbeitet …"}</p>
+          <p className="text-base font-semibold">{STEP_LABELS[step] ?? t("processingFallback")}</p>
         )}
       </div>
 
@@ -141,7 +137,7 @@ export function KiReviewPanel({
                   {mod.quiz && (
                     <li className="flex items-center gap-1.5">
                       <HelpCircle size={14} aria-hidden="true" />
-                      Quiz: {mod.quiz.title} ({mod.quiz.questions.length} Fragen)
+                      {t("quizSummary", { title: mod.quiz.title, count: mod.quiz.questions.length })}
                     </li>
                   )}
                 </ul>
@@ -151,16 +147,16 @@ export function KiReviewPanel({
 
           {applyResult ? (
             <p className="mt-5 text-[15px] font-semibold">
-              Kurs übernommen (als Entwurf, noch nicht veröffentlicht).{" "}
+              {t("appliedMessage")}{" "}
               <a href={`/admin/kurse/${applyResult.courseId}`} style={{ color: "#5663AE" }}>
-                Zum Kurs-Editor →
+                {t("goToCourseEditorLink")}
               </a>
             </p>
           ) : appliedCourseId ? (
             <p className="mt-5 text-[15px] font-semibold">
-              Dieser Entwurf wurde bereits übernommen.{" "}
+              {t("alreadyAppliedMessage")}{" "}
               <a href={`/admin/kurse/${appliedCourseId}`} style={{ color: "#5663AE" }}>
-                Zum Kurs-Editor →
+                {t("goToCourseEditorLink")}
               </a>
             </p>
           ) : (
@@ -177,7 +173,7 @@ export function KiReviewPanel({
                 className="mt-5 rounded-[11px] px-[18px] py-[13px] text-[15px] font-bold text-white disabled:opacity-50"
                 style={{ background: "#5663AE" }}
               >
-                {isApplying ? "Wird übernommen …" : "Als Kurs übernehmen"}
+                {isApplying ? t("applying") : t("applyButton")}
               </button>
             </>
           )}

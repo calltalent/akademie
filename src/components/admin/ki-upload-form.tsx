@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Upload, Sparkles } from "lucide-react";
 
 type CourseOption = { id: string; title: string };
@@ -21,6 +22,7 @@ type CourseOption = { id: string; title: string };
  * Listenseite bleibt die Übersicht über ALLE Entwürfe.
  */
 export function KiUploadForm({ courseOptions }: { courseOptions: CourseOption[] }) {
+  const t = useTranslations("admin.ki");
   const [file, setFile] = useState<File | null>(null);
   const [targetCourseId, setTargetCourseId] = useState("new");
   const [dragActive, setDragActive] = useState(false);
@@ -30,7 +32,7 @@ export function KiUploadForm({ courseOptions }: { courseOptions: CourseOption[] 
 
   function pickFile(f: File | null) {
     if (f && f.type !== "application/pdf") {
-      setError("Bitte eine PDF-Datei auswählen.");
+      setError(t("fileRequiredError"));
       return;
     }
     setError(null);
@@ -39,7 +41,7 @@ export function KiUploadForm({ courseOptions }: { courseOptions: CourseOption[] 
 
   async function handleSubmit() {
     if (!file) {
-      setError("Bitte eine PDF-Datei auswählen.");
+      setError(t("fileRequiredError"));
       return;
     }
     setError(null);
@@ -53,20 +55,20 @@ export function KiUploadForm({ courseOptions }: { courseOptions: CourseOption[] 
       const res = await fetch("/api/admin/ki/generate", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) {
-        setError(typeof data.error === "string" ? data.error : "Hochladen fehlgeschlagen.");
+        setError(typeof data.error === "string" ? data.error : t("uploadGenericError"));
         setIsUploading(false);
         return;
       }
       router.push(`/admin/ki/${data.jobId}`);
     } catch {
-      setError("Hochladen fehlgeschlagen. Bitte erneut versuchen.");
+      setError(t("uploadNetworkError"));
       setIsUploading(false);
     }
   }
 
   return (
     <div className="rounded-[14px] border bg-white p-[28px]" style={{ borderColor: "#E7E8F2" }}>
-      <div className="mb-4 text-[17px] font-bold">Neuer Entwurf</div>
+      <div className="mb-4 text-[17px] font-bold">{t("uploadHeading")}</div>
 
       <label
         className="flex flex-col items-center justify-center gap-2.5 rounded-[12px] p-[40px_20px] text-center"
@@ -94,23 +96,23 @@ export function KiUploadForm({ courseOptions }: { courseOptions: CourseOption[] 
           <Upload size={20} color="#5663AE" strokeWidth={2.2} />
         </span>
         <span className="text-[15px] font-semibold">
-          {file ? file.name : "PDF hierher ziehen oder klicken zum Hochladen"}
+          {file ? file.name : t("dropzoneLabel")}
         </span>
         <span className="text-[13px]" style={{ color: "#A9AAC4" }}>
-          Max. 25 MB · nur .pdf
+          {t("dropzoneHint")}
         </span>
         <input
           type="file"
           accept=".pdf,application/pdf"
           className="sr-only"
-          aria-label="PDF-Dokument auswählen"
+          aria-label={t("filePickerAria")}
           onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
         />
       </label>
 
       <div className="mt-[18px] flex items-center gap-2.5">
         <label htmlFor="ki-target-course" className="flex-none text-[13px] font-semibold" style={{ color: "#66679B" }}>
-          Zielkurs
+          {t("targetCourseLabel")}
         </label>
         <select
           id="ki-target-course"
@@ -119,7 +121,7 @@ export function KiUploadForm({ courseOptions }: { courseOptions: CourseOption[] 
           className="w-full flex-1 rounded-[10px] border bg-white px-[13px] py-2.5 text-sm"
           style={{ borderColor: "#E7E8F2", color: "#1A1A2E" }}
         >
-          <option value="new">Neuen Kurs erstellen</option>
+          <option value="new">{t("newCourseOption")}</option>
           {courseOptions.map((c) => (
             <option key={c.id} value={c.id}>
               {c.title}
@@ -142,7 +144,7 @@ export function KiUploadForm({ courseOptions }: { courseOptions: CourseOption[] 
         style={{ background: "#5663AE" }}
       >
         <Sparkles size={16} aria-hidden="true" />
-        {isUploading ? "Wird hochgeladen …" : "Entwurf generieren"}
+        {isUploading ? t("uploading") : t("generateButton")}
       </button>
     </div>
   );

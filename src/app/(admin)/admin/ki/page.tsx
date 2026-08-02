@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { getTenant } from "@/lib/tenant/context";
 import { createClient } from "@/lib/supabase/server";
 import { courseGenOutputSchema } from "@/lib/generator/schema";
@@ -38,6 +39,8 @@ import { KiDraftRow, type KiDraftRowData } from "@/components/admin/ki-draft-row
  * (neue Module ans Ende, siehe `applyDraftAsCourse()`).
  */
 export default async function AdminKiPage() {
+  const t = await getTranslations("admin.ki");
+  const tShared = await getTranslations("learn.shared");
   const tenant = await getTenant();
   const enabled = tenant?.settings.course_generator_enabled === true;
   const supabase = await createClient();
@@ -64,20 +67,18 @@ export default async function AdminKiPage() {
     const parsedOutput = courseGenOutputSchema.safeParse(j.output ?? {});
     const output = parsedOutput.success ? parsedOutput.data : { step: 0 };
 
-    const title = output.draft?.title || input.titleHint || input.sourceFilename || "Unbenannter Entwurf";
-    const source = input.sourceFilename ?? "—";
+    const title = output.draft?.title || input.titleHint || input.sourceFilename || t("unnamedDraft");
+    const source = input.sourceFilename ?? t("noSource");
 
     let meta: string;
     if (j.status === "error") {
-      meta = "Verarbeitung abgebrochen";
+      meta = t("processingAbortedMeta");
     } else if (j.status === "done" && output.draft) {
       const moduleCount = output.draft.modules.length;
       const lessonCount = output.draft.modules.reduce((sum, m) => sum + m.lessons.length, 0);
-      meta = `${moduleCount} ${moduleCount === 1 ? "Modul" : "Module"} · ${lessonCount} ${lessonCount === 1 ? "Lektion" : "Lektionen"}`;
+      meta = `${tShared("modulesCount", { count: moduleCount })} · ${tShared("lessonsCount", { count: lessonCount })}`;
     } else {
-      meta = ["Wird eingereiht …", "Gliederung wird erstellt …", "Lektionsinhalte werden ausformuliert …", "Quiz-Fragen werden erstellt …"][
-        output.step
-      ] ?? "Wird verarbeitet …";
+      meta = [t("queueStep0"), t("queueStep1"), t("queueStep2"), t("queueStep3")][output.step] ?? t("processingFallback");
     }
 
     const status: KiDraftRowData["status"] =
@@ -90,17 +91,15 @@ export default async function AdminKiPage() {
     <div className="flex max-w-[920px] flex-col gap-6">
       <header>
         <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
-          Inhalte · KI-Generator
+          {t("eyebrow")}
         </div>
         <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
-          KI-Kursgenerator
+          {t("title")}
         </h1>
       </header>
 
       <p className="text-base" style={{ color: "#66679B" }}>
-        Lade ein PDF-Dokument hoch — Claude erstellt daraus einen Kursentwurf (Module, Lektionen,
-        Quiz-Fragen). Der Entwurf wird nie automatisch veröffentlicht; du prüfst und übernimmst ihn
-        aktiv.
+        {t("intro")}
       </p>
 
       {!enabled ? (
@@ -113,9 +112,9 @@ export default async function AdminKiPage() {
             <AlertTriangle size={20} color="#B98A1E" strokeWidth={2.2} />
           </span>
           <div>
-            <div className="mb-1 text-base font-bold">Der KI-Kursgenerator ist für diese Akademie nicht aktiviert.</div>
+            <div className="mb-1 text-base font-bold">{t("disabledHeading")}</div>
             <div className="text-[15px]" style={{ color: "#66679B" }}>
-              Wende dich an dein Plattform-Team, um die Funktion freizuschalten.
+              {t("disabledHint")}
             </div>
           </div>
         </div>
@@ -124,10 +123,10 @@ export default async function AdminKiPage() {
           <KiUploadForm courseOptions={courses ?? []} />
 
           <div className="overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
-            <div className="p-[24px_28px_16px] text-[17px] font-bold">Entwürfe</div>
+            <div className="p-[24px_28px_16px] text-[17px] font-bold">{t("draftsHeading")}</div>
             {drafts.length === 0 ? (
               <p className="px-[28px] pb-6 text-sm" style={{ color: "#A9AAC4" }}>
-                Noch keine Entwürfe generiert.
+                {t("noDrafts")}
               </p>
             ) : (
               drafts.map((d) => <KiDraftRow key={d.id} draft={d} />)

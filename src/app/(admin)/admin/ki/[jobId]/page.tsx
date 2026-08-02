@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { getTenant } from "@/lib/tenant/context";
 import { createClient } from "@/lib/supabase/server";
 import { courseGenOutputSchema } from "@/lib/generator/schema";
@@ -19,6 +20,7 @@ export default async function AdminKiJobPage({
 }: {
   params: Promise<{ jobId: string }>;
 }) {
+  const t = await getTranslations("admin.ki");
   const { jobId } = await params;
   const tenant = await getTenant();
   const supabase = await createClient();
@@ -39,12 +41,12 @@ export default async function AdminKiJobPage({
         style={{ color: "#5663AE" }}
       >
         <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" />
-        Zurück zu den Entwürfen
+        {t("backToDraftsLink")}
       </Link>
 
       {!job ? (
         <p className="text-base" style={{ color: "#66679B" }}>
-          Entwurf nicht gefunden.
+          {t("draftNotFound")}
         </p>
       ) : (
         <KiReviewPanel

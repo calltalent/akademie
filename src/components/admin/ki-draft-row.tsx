@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { FileText, Clock, Check, X, Eye, ExternalLink, RotateCcw, Trash2 } from "lucide-react";
 import { retryDraft, deleteDraft } from "@/lib/generator/actions";
 
@@ -14,11 +15,11 @@ export type KiDraftRowData = {
   appliedCourseId: string | null;
 };
 
-const STATUS_META: Record<KiDraftRowData["status"], { label: string; color: string; bg: string; Icon: typeof Clock }> = {
-  processing: { label: "Wird verarbeitet", color: "#5663AE", bg: "#EAEBF7", Icon: Clock },
-  review: { label: "Zu prüfen", color: "#B98A1E", bg: "#FBF1DC", Icon: Clock },
-  applied: { label: "Übernommen", color: "#1F8A5B", bg: "#E3F2EA", Icon: Check },
-  failed: { label: "Fehlgeschlagen", color: "#B24343", bg: "#FBE7E7", Icon: X },
+const STATUS_COLORS: Record<KiDraftRowData["status"], { color: string; bg: string; Icon: typeof Clock }> = {
+  processing: { color: "#5663AE", bg: "#EAEBF7", Icon: Clock },
+  review: { color: "#B98A1E", bg: "#FBF1DC", Icon: Clock },
+  applied: { color: "#1F8A5B", bg: "#E3F2EA", Icon: Check },
+  failed: { color: "#B24343", bg: "#FBE7E7", Icon: X },
 };
 
 /**
@@ -29,7 +30,14 @@ const STATUS_META: Record<KiDraftRowData["status"], { label: string; color: stri
  * `teilnehmer-row-actions.tsx` in diesem Bereich.
  */
 export function KiDraftRow({ draft }: { draft: KiDraftRowData }) {
-  const meta = STATUS_META[draft.status];
+  const t = useTranslations("admin.ki");
+  const colors = STATUS_COLORS[draft.status];
+  const statusLabel = {
+    processing: t("statusProcessing"),
+    review: t("statusReview"),
+    applied: t("statusApplied"),
+    failed: t("statusFailed"),
+  }[draft.status];
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -45,7 +53,7 @@ export function KiDraftRow({ draft }: { draft: KiDraftRowData }) {
   }
 
   function handleDelete() {
-    if (!confirm(`Entwurf „${draft.title}“ löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.`)) return;
+    if (!confirm(t("deleteDraftConfirm", { title: draft.title }))) return;
     startTransition(async () => {
       const result = await deleteDraft(draft.id);
       if (result.error) alert(result.error);
@@ -69,18 +77,18 @@ export function KiDraftRow({ draft }: { draft: KiDraftRowData }) {
       </div>
       <span
         className="flex h-8 w-8 flex-none items-center justify-center rounded-[8px]"
-        style={{ background: meta.bg }}
-        title={meta.label}
-        aria-label={`Status: ${meta.label}`}
+        style={{ background: colors.bg }}
+        title={statusLabel}
+        aria-label={t("statusAria", { label: statusLabel })}
       >
-        <meta.Icon size={15} color={meta.color} strokeWidth={2.3} aria-hidden="true" />
+        <colors.Icon size={15} color={colors.color} strokeWidth={2.3} aria-hidden="true" />
       </span>
 
       {draft.status === "review" && (
         <a
           href={`/admin/ki/${draft.id}`}
-          title="Entwurf prüfen"
-          aria-label={`Entwurf prüfen: ${draft.title}`}
+          title={t("reviewDraftTitle")}
+          aria-label={t("reviewDraftAria", { title: draft.title })}
           className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-[8px]"
           style={{ background: "#F4F5FA" }}
         >
@@ -90,8 +98,8 @@ export function KiDraftRow({ draft }: { draft: KiDraftRowData }) {
       {draft.status === "applied" && draft.appliedCourseId && (
         <a
           href={`/admin/kurse/${draft.appliedCourseId}`}
-          title="Ansehen"
-          aria-label={`Übernommenen Kurs ansehen: ${draft.title}`}
+          title={t("viewAppliedTitle")}
+          aria-label={t("viewAppliedAria", { title: draft.title })}
           className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-[8px]"
           style={{ background: "#F4F5FA" }}
         >
@@ -103,8 +111,8 @@ export function KiDraftRow({ draft }: { draft: KiDraftRowData }) {
           type="button"
           onClick={handleRetry}
           disabled={pending}
-          title="Erneut versuchen"
-          aria-label={`Erneut versuchen: ${draft.title}`}
+          title={t("retryTitle")}
+          aria-label={t("retryAria", { title: draft.title })}
           className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-[8px] disabled:opacity-50"
           style={{ background: "#F4F5FA" }}
         >
@@ -117,8 +125,8 @@ export function KiDraftRow({ draft }: { draft: KiDraftRowData }) {
         type="button"
         onClick={handleDelete}
         disabled={pending}
-        title="Entwurf löschen"
-        aria-label={`Entwurf löschen: ${draft.title}`}
+        title={t("deleteDraftTitle")}
+        aria-label={t("deleteDraftAria", { title: draft.title })}
         className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-[8px] disabled:opacity-50"
         style={{ background: "#F4F5FA" }}
       >
