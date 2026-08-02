@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { TenantSettingsForm } from "@/components/admin/tenant-settings-form";
 import { SidebarLinksPanel } from "@/components/admin/sidebar-links-panel";
 import { PromoCardsPanel } from "@/components/admin/promo-cards-panel";
@@ -29,12 +30,7 @@ import type { Locale } from "@/i18n/config";
  * ein eigener Reiter macht den Kontextwechsel klarer als ein Aufklapp-Pfeil
  * mitten in der Seite.
  */
-const TABS = [
-  { key: "allgemein" as const, label: "Allgemein" },
-  { key: "inhalte" as const, label: "Inhalte" },
-  { key: "integrationen" as const, label: "Integrationen" },
-];
-type TabKey = (typeof TABS)[number]["key"];
+type TabKey = "allgemein" | "inhalte" | "integrationen";
 
 export function EinstellungenTabs({
   tenantName,
@@ -72,25 +68,31 @@ export function EinstellungenTabs({
   enabledLocales: Locale[];
   defaultLocale: Locale;
 }) {
+  const t = useTranslations("admin.settings");
   const [tab, setTab] = useState<TabKey>("allgemein");
+  const TABS: { key: TabKey; label: string }[] = [
+    { key: "allgemein", label: t("tabs.general") },
+    { key: "inhalte", label: t("tabs.content") },
+    { key: "integrationen", label: t("tabs.integrations") },
+  ];
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap gap-2.5">
-        {TABS.map((t) => (
+        {TABS.map((tabItem) => (
           <button
-            key={t.key}
+            key={tabItem.key}
             type="button"
-            onClick={() => setTab(t.key)}
-            aria-current={tab === t.key ? "true" : undefined}
+            onClick={() => setTab(tabItem.key)}
+            aria-current={tab === tabItem.key ? "true" : undefined}
             className="inline-flex rounded-[10px] px-[15px] py-[9px] text-sm font-semibold"
             style={
-              tab === t.key
+              tab === tabItem.key
                 ? { background: "#5663AE", color: "#fff" }
                 : { background: "#fff", color: "#3E3F66", border: "1px solid #E7E8F2" }
             }
           >
-            {t.label}
+            {tabItem.label}
           </button>
         ))}
       </div>
@@ -108,9 +110,9 @@ export function EinstellungenTabs({
           />
 
           <div className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
-            <div className="mb-1.5 text-[17px] font-bold">Marken-Standard</div>
+            <div className="mb-1.5 text-[17px] font-bold">{t("branding.heading")}</div>
             <div className="mb-4 text-sm" style={{ color: "#66679B" }}>
-              Aktuelle Markenwerte dieses Mandanten.
+              {t("branding.subtitle")}
             </div>
             <div className="flex flex-wrap items-center gap-6">
               <div className="flex items-center gap-2.5">
@@ -124,14 +126,14 @@ export function EinstellungenTabs({
                 </span>
               </div>
               <div className="text-sm" style={{ color: "#3E3F66" }}>
-                Radius {brandingRadius}
+                {t("branding.radiusLabel", { radius: brandingRadius })}
               </div>
               <div className="text-sm" style={{ color: "#3E3F66" }}>
-                Schrift: {brandingFont}
+                {t("branding.fontLabel", { font: brandingFont })}
               </div>
               {isPlatformAdmin && (
                 <Link href="/portal/mandanten" className="ml-auto text-sm font-semibold no-underline">
-                  Mandanten verwalten →
+                  {t("branding.manageTenantsLink")}
                 </Link>
               )}
             </div>
@@ -150,10 +152,8 @@ export function EinstellungenTabs({
       {tab === "integrationen" && (
         <div className="flex max-w-[820px] flex-col gap-8">
           <div>
-            <h2 className="text-lg font-semibold">Integrationen</h2>
-            <p className="text-sm text-gray-500">
-              API-Keys und Webhooks für externe Integrationen (z. B. Zapier, Make) dieses Mandanten.
-            </p>
+            <h2 className="text-lg font-semibold">{t("integrationsHeading")}</h2>
+            <p className="text-sm text-gray-500">{t("integrationsSubtitle")}</p>
           </div>
           <ApiKeysPanel apiKeys={apiKeys} />
           <WebhooksPanel webhooks={webhooks} />

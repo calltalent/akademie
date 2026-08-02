@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations, useFormatter } from "next-intl";
 import { createApiKey, revokeApiKey } from "@/lib/settings/actions";
 import { ApiKeyCreatedDialog } from "@/components/admin/api-key-created-dialog";
 
@@ -21,6 +22,9 @@ type ApiKeyRow = {
  * keine Logikänderung.
  */
 export function ApiKeysPanel({ apiKeys }: { apiKeys: ApiKeyRow[] }) {
+  const t = useTranslations("admin.settings.apiKeys");
+  const tSettings = useTranslations("admin.settings");
+  const format = useFormatter();
   const router = useRouter();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -52,23 +56,22 @@ export function ApiKeysPanel({ apiKeys }: { apiKeys: ApiKeyRow[] }) {
   return (
     <section className="flex flex-col gap-4 rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
       <div>
-        <div className="mb-1.5 text-[17px] font-bold">API-Keys</div>
+        <div className="mb-1.5 text-[17px] font-bold">{t("heading")}</div>
         <p className="text-sm" style={{ color: "#66679B" }}>
-          Für externe Integrationen (z. B. Zapier, Make) — Header{" "}
-          <code>Authorization: Bearer &lt;key&gt;</code> gegen <code>/api/v1/…</code>.
+          {t.rich("description", { code: (chunks) => <code>{chunks}</code> })}
         </p>
       </div>
 
       <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }} htmlFor="api-key-name">
-          Name
+          {tSettings("nameLabel")}
           <input
             id="api-key-name"
             type="text"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="z. B. Zapier-Integration"
+            placeholder={t("namePlaceholder")}
             className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
             style={{ borderColor: "#D8DAEA" }}
           />
@@ -79,7 +82,7 @@ export function ApiKeysPanel({ apiKeys }: { apiKeys: ApiKeyRow[] }) {
           className="rounded-[10px] px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50"
           style={{ background: "#5663AE" }}
         >
-          {pending ? "Wird erzeugt …" : "Neuen Key erzeugen"}
+          {pending ? t("addingButton") : t("addButton")}
         </button>
       </form>
       {error && (
@@ -98,8 +101,10 @@ export function ApiKeysPanel({ apiKeys }: { apiKeys: ApiKeyRow[] }) {
             <div className="flex flex-col">
               <span className="font-semibold">{key.name}</span>
               <span className="text-sm" style={{ color: "#66679B" }}>
-                {key.active ? "aktiv" : "deaktiviert"} — zuletzt genutzt:{" "}
-                {key.last_used ? new Date(key.last_used).toLocaleString("de-DE") : "nie"}
+                {key.active ? t("activeStatus") : t("inactiveStatus")} — {t("lastUsedPrefix")}{" "}
+                {key.last_used
+                  ? format.dateTime(new Date(key.last_used), { dateStyle: "medium", timeStyle: "short" })
+                  : t("neverUsed")}
               </span>
             </div>
             {key.active && (
@@ -110,14 +115,14 @@ export function ApiKeysPanel({ apiKeys }: { apiKeys: ApiKeyRow[] }) {
                 className="shrink-0 rounded-[10px] border bg-white px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
                 style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
               >
-                Deaktivieren
+                {t("revokeButton")}
               </button>
             )}
           </li>
         ))}
         {apiKeys.length === 0 && (
           <p className="text-base" style={{ color: "#A9AAC4" }}>
-            Noch keine API-Keys angelegt.
+            {t("empty")}
           </p>
         )}
       </ul>

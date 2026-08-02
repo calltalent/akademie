@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { copyToClipboard } from "@/lib/clipboard";
 
 /**
@@ -19,6 +20,8 @@ export function ApiKeyCreatedDialog({
   plaintext: string;
   onClose: () => void;
 }) {
+  const t = useTranslations("admin.settings.apiKeyCreatedDialog");
+  const tDialog = useTranslations("admin.settings.secretDialog");
   const ref = useRef<HTMLDialogElement>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "ok" | "failed">("idle");
 
@@ -41,21 +44,18 @@ export function ApiKeyCreatedDialog({
     >
       <div className="flex max-w-md flex-col gap-3">
         <h3 id="api-key-created-title" className="text-lg font-medium">
-          API-Key „{name}“ erzeugt
+          {t("createdTitle", { name })}
         </h3>
-        <p className="text-sm text-red-600">
-          Dieser Schlüssel wird jetzt nur einmalig angezeigt und ist danach nicht mehr abrufbar. Bitte
-          jetzt sicher speichern.
-        </p>
+        <p className="text-sm text-red-600">{t("warning")}</p>
         <code className="break-all rounded-md bg-gray-100 p-3 text-sm">{plaintext}</code>
         <div className="flex items-center gap-2">
           <button type="button" onClick={handleCopy} className="rounded-md border px-3 py-2 text-sm">
-            Kopieren
+            {tDialog("copyButton")}
           </button>
           <span role="status" aria-live="polite" className="text-sm">
-            {copyStatus === "ok" && <span className="text-green-700">Kopiert.</span>}
+            {copyStatus === "ok" && <span className="text-green-700">{tDialog("copiedStatus")}</span>}
             {copyStatus === "failed" && (
-              <span className="text-red-600">Kopieren fehlgeschlagen — bitte oben manuell markieren.</span>
+              <span className="text-red-600">{tDialog("copyFailedStatus")}</span>
             )}
           </span>
           <button
@@ -65,7 +65,7 @@ export function ApiKeyCreatedDialog({
             className="rounded-md px-3 py-2 text-sm text-white"
             style={{ background: "var(--color-primary)" }}
           >
-            Schließen
+            {tDialog("closeButton")}
           </button>
         </div>
       </div>

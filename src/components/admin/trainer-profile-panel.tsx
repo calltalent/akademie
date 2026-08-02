@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ChevronUp, ChevronDown, User as UserIcon } from "lucide-react";
 import {
   createTrainer,
@@ -35,6 +36,7 @@ type SubmitResult = { ok: boolean; error?: string };
  * Design-Tokens der übrigen Karte. Reine Optik, keine Logikänderung.
  */
 export function TrainerProfilePanel({ trainers }: { trainers: TrainerRow[] }) {
+  const t = useTranslations("admin.trainers");
   const router = useRouter();
 
   async function handleCreate(input: TrainerInput): Promise<SubmitResult> {
@@ -50,13 +52,12 @@ export function TrainerProfilePanel({ trainers }: { trainers: TrainerRow[] }) {
 
   return (
     <section className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
-      <div className="mb-1.5 text-[17px] font-bold">Trainer-Profil</div>
+      <div className="mb-1.5 text-[17px] font-bold">{t("heading")}</div>
       <div className="mb-4 text-sm" style={{ color: "#66679B" }}>
-        Wiederverwendbare Trainer-/Ansprechpersonen-Profile — Bild, Name, optionale Rolle und Bio. Im
-        Kurs-Editor pro Kurs als Autor auswählbar (Information-Tab).
+        {t("description")}
       </div>
 
-      <TrainerForm onSubmit={handleCreate} submitLabel="Trainer hinzufügen" />
+      <TrainerForm onSubmit={handleCreate} submitLabel={t("addButton")} />
 
       <ul className="mt-4 flex flex-col gap-2">
         {trainers.map((trainer, index) => (
@@ -70,7 +71,7 @@ export function TrainerProfilePanel({ trainers }: { trainers: TrainerRow[] }) {
         ))}
         {trainers.length === 0 && (
           <p className="text-sm" style={{ color: "#A9AAC4" }}>
-            Noch keine Trainer-Profile angelegt.
+            {t("empty")}
           </p>
         )}
       </ul>
@@ -89,6 +90,10 @@ function TrainerRowItem({
   isFirst: boolean;
   isLast: boolean;
 }) {
+  const t = useTranslations("admin.trainers");
+  const tSettings = useTranslations("admin.settings");
+  const tCommon = useTranslations("common");
+  const tPosition = useTranslations("admin.courseEditor.position");
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [moving, startMoving] = useTransition();
@@ -113,7 +118,7 @@ function TrainerRowItem({
         <TrainerForm
           initial={trainer}
           onSubmit={handleUpdate}
-          submitLabel="Speichern"
+          submitLabel={tCommon("save")}
           onCancel={() => setEditing(false)}
         />
       </li>
@@ -149,8 +154,8 @@ function TrainerRowItem({
       <div className="flex flex-none gap-2">
         <button
           type="button"
-          aria-label={`Position nach oben: ${trainer.name}`}
-          title="Nach oben"
+          aria-label={t("moveUpAria", { name: trainer.name })}
+          title={tPosition("moveUpTitle")}
           onClick={() => handleMove("up")}
           disabled={moving || isFirst}
           className="rounded-[9px] border bg-white px-2 py-1 text-sm disabled:opacity-30"
@@ -160,8 +165,8 @@ function TrainerRowItem({
         </button>
         <button
           type="button"
-          aria-label={`Position nach unten: ${trainer.name}`}
-          title="Nach unten"
+          aria-label={t("moveDownAria", { name: trainer.name })}
+          title={tPosition("moveDownTitle")}
           onClick={() => handleMove("down")}
           disabled={moving || isLast}
           className="rounded-[9px] border bg-white px-2 py-1 text-sm disabled:opacity-30"
@@ -176,7 +181,7 @@ function TrainerRowItem({
           className="rounded-[9px] border bg-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
           style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
-          Bearbeiten
+          {tSettings("editButton")}
         </button>
         <button
           type="button"
@@ -185,7 +190,7 @@ function TrainerRowItem({
           className="rounded-[9px] border bg-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
           style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
         >
-          Löschen
+          {tSettings("deleteButton")}
         </button>
       </div>
     </li>
@@ -203,6 +208,9 @@ function TrainerForm({
   onSubmit: (input: TrainerInput) => Promise<SubmitResult>;
   onCancel?: () => void;
 }) {
+  const t = useTranslations("admin.trainers");
+  const tAdminCommon = useTranslations("admin.common");
+  const tCommon = useTranslations("common");
   const [name, setName] = useState(initial?.name ?? "");
   const [role, setRole] = useState(initial?.role ?? "");
   const [bio, setBio] = useState(initial?.bio ?? "");
@@ -221,7 +229,7 @@ function TrainerForm({
         imageUrl: imageUrl ?? undefined,
       });
       if (!result.ok) {
-        setError(result.error ?? "Fehler.");
+        setError(result.error ?? t("genericError"));
         return;
       }
       if (!initial) {
@@ -241,8 +249,8 @@ function TrainerForm({
       <div className="flex items-start gap-3">
         <ThumbnailUpload
           initialUrl={imageUrl}
-          entityLabel="Trainerbild"
-          entityTitle={name || "Trainer"}
+          entityLabel={t("imageEntityLabel")}
+          entityTitle={name || t("imageEntityFallbackTitle")}
           onUpload={async (url) => {
             setImageUrl(url);
             return { error: null };
@@ -250,26 +258,26 @@ function TrainerForm({
         />
         <div className="flex flex-1 flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-            Name
+            {t("nameLabel")}
             <input
               type="text"
               required
               maxLength={150}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Max Mustermann"
+              placeholder={t("namePlaceholder")}
               className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
               style={{ borderColor: "#D8DAEA" }}
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-            Rolle (optional)
+            {t("roleLabel")}
             <input
               type="text"
               maxLength={150}
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              placeholder="Trainer, Ansprechpartner …"
+              placeholder={t("rolePlaceholder")}
               className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
               style={{ borderColor: "#D8DAEA" }}
             />
@@ -278,7 +286,7 @@ function TrainerForm({
       </div>
 
       <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-        Bio (optional)
+        {t("bioLabel")}
         <textarea
           maxLength={2000}
           rows={3}
@@ -302,7 +310,7 @@ function TrainerForm({
           className="self-start rounded-[10px] px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50"
           style={{ background: "#5663AE" }}
         >
-          {pending ? "Wird gespeichert …" : submitLabel}
+          {pending ? tAdminCommon("saving") : submitLabel}
         </button>
         {onCancel && (
           <button
@@ -312,7 +320,7 @@ function TrainerForm({
             className="rounded-[10px] border bg-white px-4 py-2.5 text-base font-semibold disabled:opacity-50"
             style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
           >
-            Abbrechen
+            {tCommon("cancel")}
           </button>
         )}
       </div>

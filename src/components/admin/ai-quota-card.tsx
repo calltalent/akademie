@@ -1,14 +1,10 @@
+import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 import { Sparkles, Wand2 } from "lucide-react";
 import { getTenant } from "@/lib/tenant/context";
 import { createClient } from "@/lib/supabase/server";
 import { PLAN_AI_LIMITS } from "@/lib/ai/config";
 import { remainingQuota } from "@/lib/ai/quota";
-
-const PLAN_LABEL: Record<string, string> = {
-  trial: "Trial",
-  komplett: "Komplett",
-  enterprise: "Enterprise",
-};
 
 /** Erster des laufenden Monats als ISO-Datum (yyyy-mm-dd) — Format der `usage_counters.month`-Spalte. */
 function currentMonthIso(): string {
@@ -44,6 +40,7 @@ function currentMonthIso(): string {
  * `PLAN_AI_LIMITS`) — reine Optik, keine Logikänderung.
  */
 export async function AiQuotaCard() {
+  const t = await getTranslations("admin.settings.aiQuota");
   const tenant = await getTenant();
   if (!tenant) return null;
 
@@ -75,17 +72,17 @@ export async function AiQuotaCard() {
         </span>
         <div>
           <h2 id="ai-quota-heading" className="text-[17px] font-bold" style={{ color: "#1A1A2E" }}>
-            KI-Kontingent
+            {t("heading")}
           </h2>
           <p className="text-[13px]" style={{ color: "#A9AAC4" }}>
-            Dieser Monat
+            {t("subtitle")}
           </p>
         </div>
       </div>
 
       <div className="flex flex-col gap-4">
-        <QuotaRow icon="chat" label="Tutor-Antworten" used={tutorUsed} limit={limits.tutorAnswers} />
-        <QuotaRow icon="wand" label="Kursgenerierungen" used={courseGenUsed} limit={limits.courseGens} />
+        <QuotaRow icon="chat" label={t("tutorAnswersLabel")} used={tutorUsed} limit={limits.tutorAnswers} />
+        <QuotaRow icon="wand" label={t("courseGensLabel")} used={courseGenUsed} limit={limits.courseGens} />
       </div>
 
       <p className="text-[13px]" style={{ color: "#A9AAC4" }}>
@@ -93,9 +90,9 @@ export async function AiQuotaCard() {
           className="inline-flex rounded-lg px-2.5 py-1 text-[12.5px] font-bold"
           style={{ color: "#5663AE", background: "#EEF0FA" }}
         >
-          {PLAN_LABEL[tenant.plan] ?? tenant.plan}
+          {t(`planLabels.${tenant.plan}`)}
         </span>{" "}
-        · Kontingent setzt sich monatlich zurück
+        · {t("resetNotice")}
       </p>
     </section>
   );
@@ -112,6 +109,7 @@ function QuotaRow({
   used: number;
   limit: number;
 }) {
+  const t = useTranslations("admin.settings.aiQuota");
   const remaining = remainingQuota(used, limit);
   const exhausted = remaining === 0;
   const pct = limit <= 0 ? 0 : Math.min(100, Math.round((used / limit) * 100));
@@ -129,7 +127,7 @@ function QuotaRow({
           style={{ color: exhausted ? "#B14A4A" : "#1A1A2E" }}
         >
           {used} / {limit}
-          {exhausted ? " — aufgebraucht" : ""}
+          {exhausted ? t("exhaustedSuffix") : ""}
         </span>
       </div>
       <div
@@ -137,7 +135,7 @@ function QuotaRow({
         aria-valuenow={used}
         aria-valuemin={0}
         aria-valuemax={limit}
-        aria-label={`${label}: ${used} von ${limit} verwendet`}
+        aria-label={t("usedOfLimitAria", { label, used, limit })}
         className="h-2 w-full overflow-hidden rounded-full"
         style={{ background: "#EEF0F7" }}
       >

@@ -2,19 +2,21 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { createWebhook, deleteWebhook } from "@/lib/settings/actions";
 import { WEBHOOK_EVENTS, type WebhookEvent } from "@/lib/webhooks/events";
 import { WebhookSecretCreatedDialog } from "@/components/admin/webhook-secret-created-dialog";
 
-const EVENT_LABELS: Record<WebhookEvent, string> = {
-  "user.created": "Nutzer angelegt",
-  "enrollment.created": "Einschreibung erstellt",
-  "lesson.completed": "Lektion abgeschlossen",
-  "course.completed": "Kurs abgeschlossen",
-  "quiz.passed": "Quiz bestanden",
-  "submission.created": "Abgabe eingereicht",
-  "order.paid": "Zahlung erhalten",
-};
+/** Schlüssel in messages/*.json — Punkte im Ereignisnamen sind dort keine gültigen Pfadtrenner. */
+const EVENT_LABEL_KEYS = {
+  "user.created": "userCreated",
+  "enrollment.created": "enrollmentCreated",
+  "lesson.completed": "lessonCompleted",
+  "course.completed": "courseCompleted",
+  "quiz.passed": "quizPassed",
+  "submission.created": "submissionCreated",
+  "order.paid": "orderPaid",
+} as const satisfies Record<WebhookEvent, string>;
 
 type WebhookRow = {
   id: string;
@@ -31,6 +33,9 @@ type WebhookRow = {
  * Reine Optik, keine Logikänderung.
  */
 export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
+  const t = useTranslations("admin.settings.webhooks");
+  const tEvents = useTranslations("admin.settings.webhooks.eventLabels");
+  const tSettings = useTranslations("admin.settings");
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [selectedEvents, setSelectedEvents] = useState<WebhookEvent[]>([]);
@@ -68,23 +73,22 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
   return (
     <section className="flex flex-col gap-4 rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
       <div>
-        <div className="mb-1.5 text-[17px] font-bold">Webhooks</div>
+        <div className="mb-1.5 text-[17px] font-bold">{t("heading")}</div>
         <p className="text-sm" style={{ color: "#66679B" }}>
-          Ausgehende Benachrichtigungen an eine eigene URL bei den unten gewählten Ereignissen — signiert
-          per HMAC-SHA256 (Header <code>X-Calltalent-Signature</code>).
+          {t.rich("description", { code: (chunks) => <code>{chunks}</code> })}
         </p>
       </div>
 
       <form onSubmit={handleCreate} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }} htmlFor="webhook-url">
-          Ziel-URL
+          {t("urlLabel")}
           <input
             id="webhook-url"
             type="url"
             required
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://hooks.example.com/calltalent"
+            placeholder={t("urlPlaceholder")}
             className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
             style={{ borderColor: "#D8DAEA" }}
           />
@@ -92,7 +96,7 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
 
         <fieldset className="flex flex-col gap-2">
           <legend className="text-sm font-semibold" style={{ color: "#3E3F66" }}>
-            Ereignisse
+            {t("eventsLegend")}
           </legend>
           {WEBHOOK_EVENTS.map((event) => (
             <label key={event} className="flex items-center gap-2 text-base" htmlFor={`webhook-event-${event}`}>
@@ -103,7 +107,7 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
                 onChange={() => toggleEvent(event)}
                 style={{ accentColor: "#5663AE" }}
               />
-              {EVENT_LABELS[event]}{" "}
+              {tEvents(EVENT_LABEL_KEYS[event])}{" "}
               <code className="text-sm" style={{ color: "#A9AAC4" }}>
                 ({event})
               </code>
@@ -117,7 +121,7 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
           className="self-start rounded-[10px] px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50"
           style={{ background: "#5663AE" }}
         >
-          {pending ? "Wird angelegt …" : "Webhook anlegen"}
+          {pending ? t("addingButton") : t("addButton")}
         </button>
       </form>
       {error && (
@@ -136,7 +140,12 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
             <div className="flex flex-col">
               <span className="break-all font-semibold">{hook.url}</span>
               <span className="text-sm" style={{ color: "#66679B" }}>
-                {hook.events.map((e) => EVENT_LABELS[e as WebhookEvent] ?? e).join(", ")}
+                {hook.events
+                  .map((e) => {
+                    const key = EVENT_LABEL_KEYS[e as WebhookEvent];
+                    return key ? tEvents(key) : e;
+                  })
+                  .join(", ")}
               </span>
             </div>
             <button
@@ -146,13 +155,13 @@ export function WebhooksPanel({ webhooks }: { webhooks: WebhookRow[] }) {
               className="shrink-0 rounded-[10px] border bg-white px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
               style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
             >
-              Löschen
+              {tSettings("deleteButton")}
             </button>
           </li>
         ))}
         {webhooks.length === 0 && (
           <p className="text-base" style={{ color: "#A9AAC4" }}>
-            Noch keine Webhooks angelegt.
+            {t("empty")}
           </p>
         )}
       </ul>

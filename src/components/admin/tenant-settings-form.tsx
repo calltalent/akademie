@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useTranslations } from "next-intl";
 import { updateTenantSettings } from "@/lib/tenant/actions";
 import { initialCourseActionState } from "@/lib/courses/state";
 import { DEFAULT_LOCALE, LOCALE_NAMES, SUPPORTED_LOCALES, type Locale } from "@/i18n/config";
@@ -71,6 +72,10 @@ export function TenantSettingsForm({
   enabledLocales: Locale[];
   defaultLocale: Locale;
 }) {
+  const t = useTranslations("admin.settings.tenantForm");
+  const tSettings = useTranslations("admin.settings");
+  const tAdminCommon = useTranslations("admin.common");
+  const tCommon = useTranslations("common");
   const [state, action, pending] = useActionState(updateTenantSettings, initialCourseActionState);
 
   // Client-seitiger Zustand NUR für die Sprachen-Karte (Rest des Formulars
@@ -94,13 +99,13 @@ export function TenantSettingsForm({
   return (
     <form action={action} className="flex flex-col gap-[22px]">
       <div className="rounded-[14px] border bg-white px-7 py-[26px]" style={{ borderColor: "#E7E8F2" }}>
-        <div className="mb-1 text-[17px] font-bold">Akademie</div>
+        <div className="mb-1 text-[17px] font-bold">{t("academyHeading")}</div>
         <div className="mb-5 text-sm" style={{ color: "#A9AAC4" }}>
-          Grunddaten der Plattform.
+          {t("academySubtitle")}
         </div>
         <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2">
           <label className="flex flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
-            Name
+            {tSettings("nameLabel")}
             <input
               name="name"
               type="text"
@@ -111,7 +116,7 @@ export function TenantSettingsForm({
             />
           </label>
           <label className="flex flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
-            Support-E-Mail
+            {t("supportEmailLabel")}
             <input
               name="supportEmail"
               type="email"
@@ -124,23 +129,23 @@ export function TenantSettingsForm({
       </div>
 
       <div className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
-        <div className="mb-1 text-[17px] font-bold">Plattform-Optionen</div>
+        <div className="mb-1 text-[17px] font-bold">{t("platformOptionsHeading")}</div>
         <ToggleRow
           name="selfSignup"
-          label="Selbstregistrierung erlauben"
-          desc="Teilnehmer können sich ohne Einladung anmelden."
+          label={t("selfSignupLabel")}
+          desc={t("selfSignupDesc")}
           defaultChecked={selfSignupEnabled}
         />
         <ToggleRow
           name="certificates"
-          label="Zertifikate ausstellen"
-          desc="Nach Kursabschluss automatisch ein Zertifikat erzeugen."
+          label={t("certificatesLabel")}
+          desc={t("certificatesDesc")}
           defaultChecked={certificatesEnabled}
         />
         <ToggleRow
           name="maintenance"
-          label="Wartungsmodus"
-          desc="Wird gespeichert, sperrt das Portal aktuell noch nicht (folgt in einem späteren Block)."
+          label={t("maintenanceLabel")}
+          desc={t("maintenanceDesc")}
           defaultChecked={maintenanceEnabled}
         />
       </div>
@@ -151,14 +156,14 @@ export function TenantSettingsForm({
           Entscheidung, Plan Kopf: Mandanten-Standardsprache statt
           individueller Nutzereinstellung). */}
       <div className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
-        <div className="mb-1 text-[17px] font-bold">Sprachen</div>
+        <div className="mb-1 text-[17px] font-bold">{t("languagesHeading")}</div>
         <div className="mb-5 text-sm" style={{ color: "#A9AAC4" }}>
-          Welche Sprachen Lernende in dieser Akademie wählen können.
+          {t("languagesSubtitle")}
         </div>
 
         <fieldset className="mb-5 border-0 p-0">
           <legend className="mb-2 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-            Freigeschaltete Sprachen
+            {t("enabledLocalesLegend")}
           </legend>
           <div className="flex flex-col gap-2.5">
             {/* Deutsch ist nie abwählbar (Plan Abschnitt 5) — als fest
@@ -168,9 +173,9 @@ export function TenantSettingsForm({
                 daneben. */}
             <label className="flex items-center gap-2.5 text-[15px]" style={{ color: "#3E3F66" }}>
               <input type="checkbox" checked disabled />
-              Deutsch
+              {LOCALE_NAMES[DEFAULT_LOCALE]}
               <span className="text-[13px]" style={{ color: "#A9AAC4" }}>
-                (immer aktiv)
+                {t("alwaysActiveSuffix")}
               </span>
             </label>
             <input type="hidden" name="enabledLocales" value={DEFAULT_LOCALE} />
@@ -199,7 +204,7 @@ export function TenantSettingsForm({
           style={{ color: "#3E3F66" }}
           htmlFor="default-locale-select"
         >
-          Standardsprache
+          {t("defaultLocaleLabel")}
           <select
             id="default-locale-select"
             name="defaultLocale"
@@ -216,7 +221,7 @@ export function TenantSettingsForm({
           </select>
         </label>
         <p className="mt-2 text-[13px]" style={{ color: "#A9AAC4" }}>
-          Sprache für automatische E-Mails und Zertifikate dieses Mandanten.
+          {t("defaultLocaleHint")}
         </p>
       </div>
 
@@ -227,7 +232,7 @@ export function TenantSettingsForm({
       )}
       {state.success && !state.error && (
         <p role="status" aria-live="polite" className="text-sm" style={{ color: "#1F8A5B" }}>
-          Gespeichert.
+          {t("savedNotice")}
         </p>
       )}
 
@@ -238,7 +243,7 @@ export function TenantSettingsForm({
           className="inline-flex rounded-[11px] px-6 py-[13px] text-[15px] font-bold text-white disabled:opacity-50"
           style={{ background: "#5663AE" }}
         >
-          {pending ? "Speichert …" : "Speichern"}
+          {pending ? tAdminCommon("saving") : tCommon("save")}
         </button>
       </div>
     </form>

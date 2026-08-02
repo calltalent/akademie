@@ -902,6 +902,154 @@
         "pending": "Ažurira se …"
       },
       "courseNotFound": "Kurs nije pronađen."
+    },
+    "settings": {
+      "accessDeniedNotAdmin": "Nemate pristup — postavke su dostupne samo vlasnicima i administratorima.",
+      "eyebrow": "Platforma · Postavke",
+      "title": "Postavke",
+      "editButton": "Uredi",
+      "deleteButton": "Obriši",
+      "nameLabel": "Naziv",
+      "tabs": {
+        "general": "Općenito",
+        "content": "Sadržaj",
+        "integrations": "Integracije"
+      },
+      "branding": {
+        "heading": "Standardni brend",
+        "subtitle": "Trenutne vrijednosti brenda ovog klijenta.",
+        "radiusLabel": "Radijus {radius}",
+        "fontLabel": "Font: {font}",
+        "manageTenantsLink": "Upravljaj klijentima →"
+      },
+      "integrationsHeading": "Integracije",
+      "integrationsSubtitle": "API ključevi i webhookovi za vanjske integracije (npr. Zapier, Make) ovog klijenta.",
+      "tenantForm": {
+        "academyHeading": "Akademija",
+        "academySubtitle": "Osnovni podaci platforme.",
+        "supportEmailLabel": "E-mail za podršku",
+        "platformOptionsHeading": "Opcije platforme",
+        "selfSignupLabel": "Dozvoli samostalnu registraciju",
+        "selfSignupDesc": "Polaznici se mogu prijaviti bez pozivnice.",
+        "certificatesLabel": "Izdavanje certifikata",
+        "certificatesDesc": "Automatski kreiraj certifikat nakon završetka kursa.",
+        "maintenanceLabel": "Način rada za održavanje",
+        "maintenanceDesc": "Sprema se, ali trenutno još ne zaključava portal (slijedi u narednom bloku).",
+        "languagesHeading": "Jezici",
+        "languagesSubtitle": "Koje jezike polaznici mogu birati u ovoj akademiji.",
+        "enabledLocalesLegend": "Aktivirani jezici",
+        "alwaysActiveSuffix": "(uvijek aktivno)",
+        "defaultLocaleLabel": "Podrazumijevani jezik",
+        "defaultLocaleHint": "Jezik za automatske e-mailove i certifikate ovog klijenta.",
+        "savedNotice": "Sačuvano."
+      },
+      "sidebarLinks": {
+        "heading": "Bočni linkovi",
+        "description": "Dodatni linkovi u sekciji \"LINKOVI\" bočne trake u dijelu za učenje, npr. vaš YouTube kanal ili link za zakazivanje razgovora za povratne informacije.",
+        "urlLabel": "URL",
+        "namePlaceholder": "Naš YouTube kanal",
+        "urlPlaceholder": "https://youtube.com/@calltalent",
+        "addButton": "Dodaj link",
+        "addingButton": "Kreira se …",
+        "empty": "Još nisu kreirani bočni linkovi.",
+        "moveUpAria": "Link prema gore: {label}",
+        "moveDownAria": "Link prema dolje: {label}"
+      },
+      "promoCards": {
+        "heading": "Pozicije",
+        "description": "Kartice u desnoj koloni pregleda kursa/lekcije — slika ili video, naslov, opis i opcionalni link.",
+        "addButton": "Dodaj poziciju",
+        "empty": "Još nisu kreirane pozicije.",
+        "moveUpAria": "Pozicija prema gore: {title}",
+        "moveDownAria": "Pozicija prema dolje: {title}",
+        "titleLabel": "Naslov",
+        "titlePlaceholder": "Zakažite besplatan uvodni razgovor",
+        "descriptionLabel": "Opis (opcionalno)",
+        "mediaLabel": "Medij",
+        "imageButton": "Slika",
+        "videoButton": "Video",
+        "linkLabel": "Link (opcionalno)",
+        "linkPlaceholder": "/kontakt ili https://…",
+        "imageEntityLabel": "Slika pozicije",
+        "imageEntityFallbackTitle": "Pozicija",
+        "genericError": "Greška."
+      },
+      "aiQuota": {
+        "heading": "KI kontingent",
+        "subtitle": "Ovaj mjesec",
+        "tutorAnswersLabel": "Odgovori tutora",
+        "courseGensLabel": "Generisanja kurseva",
+        "exhaustedSuffix": " — potrošeno",
+        "usedOfLimitAria": "{label}: iskorišteno {used} od {limit}",
+        "planLabels": {
+          "trial": "Trial",
+          "komplett": "Komplett",
+          "enterprise": "Enterprise"
+        },
+        "resetNotice": "Kontingent se mjesečno resetuje"
+      },
+      "webhooks": {
+        "heading": "Webhookovi",
+        "description": "Odlazna obavještenja na vlastiti URL prilikom dolje odabranih događaja — potpisano putem HMAC-SHA256 (zaglavlje <code>X-Calltalent-Signature</code>).",
+        "urlLabel": "Ciljni URL",
+        "urlPlaceholder": "https://hooks.example.com/calltalent",
+        "eventsLegend": "Događaji",
+        "addButton": "Kreiraj webhook",
+        "addingButton": "Kreira se …",
+        "empty": "Još nisu kreirani webhookovi.",
+        "eventLabels": {
+          "userCreated": "Korisnik kreiran",
+          "enrollmentCreated": "Upis kreiran",
+          "lessonCompleted": "Lekcija završena",
+          "courseCompleted": "Kurs završen",
+          "quizPassed": "Kviz položen",
+          "submissionCreated": "Predaja poslana",
+          "orderPaid": "Plaćanje primljeno"
+        }
+      },
+      "webhookSecretDialog": {
+        "createdTitle": "Webhook za <urlTag>{url}</urlTag> kreiran",
+        "warning": "Ovaj secret se sada prikazuje samo jednom i nakon toga više nije dostupan. Njime se svaka isporuka potpisuje putem HMAC-SHA256 (zaglavlje <code>X-Calltalent-Signature</code>) — molimo sačuvajte ga sada na sigurno mjesto."
+      },
+      "apiKeys": {
+        "heading": "API ključevi",
+        "description": "Za vanjske integracije (npr. Zapier, Make) — zaglavlje <code>Authorization: Bearer &lt;key&gt;</code> prema <code>/api/v1/…</code>.",
+        "namePlaceholder": "npr. Zapier integracija",
+        "addButton": "Kreiraj novi ključ",
+        "addingButton": "Kreira se …",
+        "empty": "Još nisu kreirani API ključevi.",
+        "activeStatus": "aktivno",
+        "inactiveStatus": "deaktivirano",
+        "lastUsedPrefix": "zadnje korišteno:",
+        "neverUsed": "nikad",
+        "revokeButton": "Deaktiviraj"
+      },
+      "apiKeyCreatedDialog": {
+        "createdTitle": "API ključ „{name}“ kreiran",
+        "warning": "Ovaj ključ se sada prikazuje samo jednom i nakon toga više nije dostupan. Molimo sačuvajte ga sada na sigurno mjesto."
+      },
+      "secretDialog": {
+        "copyButton": "Kopiraj",
+        "copiedStatus": "Kopirano.",
+        "copyFailedStatus": "Kopiranje nije uspjelo — molimo ručno označite iznad.",
+        "closeButton": "Zatvori"
+      }
+    },
+    "trainers": {
+      "heading": "Profil trenera",
+      "description": "Profili trenera/kontakt osoba za višekratnu upotrebu — slika, ime, opcionalna uloga i biografija. U uređivaču kursa se mogu odabrati kao autor po kursu (kartica „Informacije“).",
+      "addButton": "Dodaj trenera",
+      "empty": "Još nisu kreirani profili trenera.",
+      "moveUpAria": "Pozicija prema gore: {name}",
+      "moveDownAria": "Pozicija prema dolje: {name}",
+      "nameLabel": "Ime",
+      "namePlaceholder": "Marko Marković",
+      "roleLabel": "Uloga (opcionalno)",
+      "rolePlaceholder": "Trener, kontakt osoba …",
+      "bioLabel": "Biografija (opcionalno)",
+      "imageEntityLabel": "Slika trenera",
+      "imageEntityFallbackTitle": "Trener",
+      "genericError": "Greška."
     }
   },
   "portal": {

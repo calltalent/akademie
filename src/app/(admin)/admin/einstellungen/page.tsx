@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { checkAdminAccess } from "@/lib/auth/staff";
 import { checkPlatformAccess } from "@/lib/platform/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -32,15 +33,17 @@ import { DEFAULT_LOCALE, isSupportedLocale, resolveEnabledLocales } from "@/i18n
  * Client-Wrapper.
  */
 export default async function AdminEinstellungenPage() {
+  const t = await getTranslations("admin.settings");
+  const tTeilnehmer = await getTranslations("admin.teilnehmer");
   const access = await checkAdminAccess();
 
   if (!access.ok) {
     const text =
       access.reason === "not-admin"
-        ? "Kein Zugriff — Einstellungen sind nur für Inhaber und Administratoren."
+        ? t("accessDeniedNotAdmin")
         : access.reason === "not-authenticated"
-          ? "Bitte zuerst anmelden."
-          : "Kein Mandant zu diesem Host gefunden.";
+          ? tTeilnehmer("accessDeniedNotAuthenticated")
+          : tTeilnehmer("accessDeniedNoTenant");
     return (
       <div className="mx-auto max-w-3xl">
         <p className="text-base">{text}</p>
@@ -120,10 +123,10 @@ export default async function AdminEinstellungenPage() {
     <div className="flex flex-col gap-4">
       <header>
         <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
-          Plattform · Einstellungen
+          {t("eyebrow")}
         </div>
         <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
-          Einstellungen
+          {t("title")}
         </h1>
       </header>
 

@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ChevronUp, ChevronDown, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
 import {
   createPromoCard,
@@ -40,6 +41,7 @@ type SubmitResult = { ok: boolean; error?: string };
  * Design-Tokens der übrigen Karte. Reine Optik, keine Logikänderung.
  */
 export function PromoCardsPanel({ cards }: { cards: PromoCardRow[] }) {
+  const t = useTranslations("admin.settings.promoCards");
   const router = useRouter();
 
   async function handleCreate(input: PromoCardInput): Promise<SubmitResult> {
@@ -55,13 +57,12 @@ export function PromoCardsPanel({ cards }: { cards: PromoCardRow[] }) {
 
   return (
     <section className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
-      <div className="mb-1.5 text-[17px] font-bold">Positionen</div>
+      <div className="mb-1.5 text-[17px] font-bold">{t("heading")}</div>
       <div className="mb-4 text-sm" style={{ color: "#66679B" }}>
-        Kärtchen in der rechten Spalte der Kurs-/Lektionsansicht — Bild oder Video, Titel, Beschreibung und
-        optionaler Link.
+        {t("description")}
       </div>
 
-      <PromoCardForm onSubmit={handleCreate} submitLabel="Position hinzufügen" />
+      <PromoCardForm onSubmit={handleCreate} submitLabel={t("addButton")} />
 
       <ul className="mt-4 flex flex-col gap-2">
         {cards.map((card, index) => (
@@ -75,7 +76,7 @@ export function PromoCardsPanel({ cards }: { cards: PromoCardRow[] }) {
         ))}
         {cards.length === 0 && (
           <p className="text-sm" style={{ color: "#A9AAC4" }}>
-            Noch keine Positionen angelegt.
+            {t("empty")}
           </p>
         )}
       </ul>
@@ -94,6 +95,10 @@ function PromoCardRowItem({
   isFirst: boolean;
   isLast: boolean;
 }) {
+  const t = useTranslations("admin.settings.promoCards");
+  const tSettings = useTranslations("admin.settings");
+  const tCommon = useTranslations("common");
+  const tPosition = useTranslations("admin.courseEditor.position");
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [moving, startMoving] = useTransition();
@@ -115,7 +120,7 @@ function PromoCardRowItem({
   if (editing) {
     return (
       <li className="rounded-[10px] border px-4 py-3" style={{ borderColor: "#E7E8F2" }}>
-        <PromoCardForm initial={card} onSubmit={handleUpdate} submitLabel="Speichern" onCancel={() => setEditing(false)} />
+        <PromoCardForm initial={card} onSubmit={handleUpdate} submitLabel={tCommon("save")} onCancel={() => setEditing(false)} />
       </li>
     );
   }
@@ -158,8 +163,8 @@ function PromoCardRowItem({
       <div className="flex flex-none gap-2">
         <button
           type="button"
-          aria-label={`Position nach oben: ${card.title}`}
-          title="Nach oben"
+          aria-label={t("moveUpAria", { title: card.title })}
+          title={tPosition("moveUpTitle")}
           onClick={() => handleMove("up")}
           disabled={moving || isFirst}
           className="rounded-[9px] border bg-white px-2 py-1 text-sm disabled:opacity-30"
@@ -169,8 +174,8 @@ function PromoCardRowItem({
         </button>
         <button
           type="button"
-          aria-label={`Position nach unten: ${card.title}`}
-          title="Nach unten"
+          aria-label={t("moveDownAria", { title: card.title })}
+          title={tPosition("moveDownTitle")}
           onClick={() => handleMove("down")}
           disabled={moving || isLast}
           className="rounded-[9px] border bg-white px-2 py-1 text-sm disabled:opacity-30"
@@ -185,7 +190,7 @@ function PromoCardRowItem({
           className="rounded-[9px] border bg-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
           style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
-          Bearbeiten
+          {tSettings("editButton")}
         </button>
         <button
           type="button"
@@ -194,7 +199,7 @@ function PromoCardRowItem({
           className="rounded-[9px] border bg-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
           style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
         >
-          Löschen
+          {tSettings("deleteButton")}
         </button>
       </div>
     </li>
@@ -212,6 +217,9 @@ function PromoCardForm({
   onSubmit: (input: PromoCardInput) => Promise<SubmitResult>;
   onCancel?: () => void;
 }) {
+  const t = useTranslations("admin.settings.promoCards");
+  const tAdminCommon = useTranslations("admin.common");
+  const tCommon = useTranslations("common");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [mediaKind, setMediaKind] = useState<"image" | "video">(initial?.mediaKind ?? "image");
@@ -234,7 +242,7 @@ function PromoCardForm({
         linkUrl: linkUrl.trim() || undefined,
       });
       if (!result.ok) {
-        setError(result.error ?? "Fehler.");
+        setError(result.error ?? t("genericError"));
         return;
       }
       if (!initial) {
@@ -254,20 +262,20 @@ function PromoCardForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-        Titel
+        {t("titleLabel")}
         <input
           type="text"
           required
           maxLength={150}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Kostenloses Erstgespräch buchen"
+          placeholder={t("titlePlaceholder")}
           className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
           style={{ borderColor: "#D8DAEA" }}
         />
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-        Beschreibung (optional)
+        {t("descriptionLabel")}
         <textarea
           maxLength={500}
           rows={2}
@@ -279,7 +287,7 @@ function PromoCardForm({
       </label>
 
       <div className="flex flex-col gap-1.5 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-        Medium
+        {t("mediaLabel")}
         <div className="flex gap-2">
           <button
             type="button"
@@ -292,7 +300,7 @@ function PromoCardForm({
                 : { background: "#fff", color: "#3E3F66", borderColor: "#E7E8F2" }
             }
           >
-            <ImageIcon size={15} aria-hidden="true" /> Bild
+            <ImageIcon size={15} aria-hidden="true" /> {t("imageButton")}
           </button>
           <button
             type="button"
@@ -305,7 +313,7 @@ function PromoCardForm({
                 : { background: "#fff", color: "#3E3F66", borderColor: "#E7E8F2" }
             }
           >
-            <VideoIcon size={15} aria-hidden="true" /> Video
+            <VideoIcon size={15} aria-hidden="true" /> {t("videoButton")}
           </button>
         </div>
       </div>
@@ -313,8 +321,8 @@ function PromoCardForm({
       {mediaKind === "image" ? (
         <ThumbnailUpload
           initialUrl={imageUrl}
-          entityLabel="Positionsbild"
-          entityTitle={title || "Position"}
+          entityLabel={t("imageEntityLabel")}
+          entityTitle={title || t("imageEntityFallbackTitle")}
           onUpload={async (url) => {
             setImageUrl(url);
             return { error: null };
@@ -325,12 +333,12 @@ function PromoCardForm({
       )}
 
       <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-        Link (optional)
+        {t("linkLabel")}
         <input
           type="text"
           value={linkUrl}
           onChange={(e) => setLinkUrl(e.target.value)}
-          placeholder="/kontakt oder https://…"
+          placeholder={t("linkPlaceholder")}
           className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
           style={{ borderColor: "#D8DAEA" }}
         />
@@ -349,7 +357,7 @@ function PromoCardForm({
           className="self-start rounded-[10px] px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50"
           style={{ background: "#5663AE" }}
         >
-          {pending ? "Wird gespeichert …" : submitLabel}
+          {pending ? tAdminCommon("saving") : submitLabel}
         </button>
         {onCancel && (
           <button
@@ -359,7 +367,7 @@ function PromoCardForm({
             className="rounded-[10px] border bg-white px-4 py-2.5 text-base font-semibold disabled:opacity-50"
             style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
           >
-            Abbrechen
+            {tCommon("cancel")}
           </button>
         )}
       </div>

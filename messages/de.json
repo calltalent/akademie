@@ -902,6 +902,154 @@
         "pending": "Wird aktualisiert …"
       },
       "courseNotFound": "Kurs nicht gefunden."
+    },
+    "settings": {
+      "accessDeniedNotAdmin": "Kein Zugriff — Einstellungen sind nur für Inhaber und Administratoren.",
+      "eyebrow": "Plattform · Einstellungen",
+      "title": "Einstellungen",
+      "editButton": "Bearbeiten",
+      "deleteButton": "Löschen",
+      "nameLabel": "Name",
+      "tabs": {
+        "general": "Allgemein",
+        "content": "Inhalte",
+        "integrations": "Integrationen"
+      },
+      "branding": {
+        "heading": "Marken-Standard",
+        "subtitle": "Aktuelle Markenwerte dieses Mandanten.",
+        "radiusLabel": "Radius {radius}",
+        "fontLabel": "Schrift: {font}",
+        "manageTenantsLink": "Mandanten verwalten →"
+      },
+      "integrationsHeading": "Integrationen",
+      "integrationsSubtitle": "API-Keys und Webhooks für externe Integrationen (z. B. Zapier, Make) dieses Mandanten.",
+      "tenantForm": {
+        "academyHeading": "Akademie",
+        "academySubtitle": "Grunddaten der Plattform.",
+        "supportEmailLabel": "Support-E-Mail",
+        "platformOptionsHeading": "Plattform-Optionen",
+        "selfSignupLabel": "Selbstregistrierung erlauben",
+        "selfSignupDesc": "Teilnehmer können sich ohne Einladung anmelden.",
+        "certificatesLabel": "Zertifikate ausstellen",
+        "certificatesDesc": "Nach Kursabschluss automatisch ein Zertifikat erzeugen.",
+        "maintenanceLabel": "Wartungsmodus",
+        "maintenanceDesc": "Wird gespeichert, sperrt das Portal aktuell noch nicht (folgt in einem späteren Block).",
+        "languagesHeading": "Sprachen",
+        "languagesSubtitle": "Welche Sprachen Lernende in dieser Akademie wählen können.",
+        "enabledLocalesLegend": "Freigeschaltete Sprachen",
+        "alwaysActiveSuffix": "(immer aktiv)",
+        "defaultLocaleLabel": "Standardsprache",
+        "defaultLocaleHint": "Sprache für automatische E-Mails und Zertifikate dieses Mandanten.",
+        "savedNotice": "Gespeichert."
+      },
+      "sidebarLinks": {
+        "heading": "Sidebar-Links",
+        "description": "Zusätzliche Links im Bereich \"LINKS\" der Lernbereich-Sidebar, z. B. euer YouTube-Kanal oder ein Terminbuchungslink für Feedback-Gespräche.",
+        "urlLabel": "URL",
+        "namePlaceholder": "Unser YouTube-Kanal",
+        "urlPlaceholder": "https://youtube.com/@calltalent",
+        "addButton": "Link hinzufügen",
+        "addingButton": "Wird angelegt …",
+        "empty": "Noch keine Sidebar-Links angelegt.",
+        "moveUpAria": "Link nach oben: {label}",
+        "moveDownAria": "Link nach unten: {label}"
+      },
+      "promoCards": {
+        "heading": "Positionen",
+        "description": "Kärtchen in der rechten Spalte der Kurs-/Lektionsansicht — Bild oder Video, Titel, Beschreibung und optionaler Link.",
+        "addButton": "Position hinzufügen",
+        "empty": "Noch keine Positionen angelegt.",
+        "moveUpAria": "Position nach oben: {title}",
+        "moveDownAria": "Position nach unten: {title}",
+        "titleLabel": "Titel",
+        "titlePlaceholder": "Kostenloses Erstgespräch buchen",
+        "descriptionLabel": "Beschreibung (optional)",
+        "mediaLabel": "Medium",
+        "imageButton": "Bild",
+        "videoButton": "Video",
+        "linkLabel": "Link (optional)",
+        "linkPlaceholder": "/kontakt oder https://…",
+        "imageEntityLabel": "Positionsbild",
+        "imageEntityFallbackTitle": "Position",
+        "genericError": "Fehler."
+      },
+      "aiQuota": {
+        "heading": "KI-Kontingent",
+        "subtitle": "Dieser Monat",
+        "tutorAnswersLabel": "Tutor-Antworten",
+        "courseGensLabel": "Kursgenerierungen",
+        "exhaustedSuffix": " — aufgebraucht",
+        "usedOfLimitAria": "{label}: {used} von {limit} verwendet",
+        "planLabels": {
+          "trial": "Trial",
+          "komplett": "Komplett",
+          "enterprise": "Enterprise"
+        },
+        "resetNotice": "Kontingent setzt sich monatlich zurück"
+      },
+      "webhooks": {
+        "heading": "Webhooks",
+        "description": "Ausgehende Benachrichtigungen an eine eigene URL bei den unten gewählten Ereignissen — signiert per HMAC-SHA256 (Header <code>X-Calltalent-Signature</code>).",
+        "urlLabel": "Ziel-URL",
+        "urlPlaceholder": "https://hooks.example.com/calltalent",
+        "eventsLegend": "Ereignisse",
+        "addButton": "Webhook anlegen",
+        "addingButton": "Wird angelegt …",
+        "empty": "Noch keine Webhooks angelegt.",
+        "eventLabels": {
+          "userCreated": "Nutzer angelegt",
+          "enrollmentCreated": "Einschreibung erstellt",
+          "lessonCompleted": "Lektion abgeschlossen",
+          "courseCompleted": "Kurs abgeschlossen",
+          "quizPassed": "Quiz bestanden",
+          "submissionCreated": "Abgabe eingereicht",
+          "orderPaid": "Zahlung erhalten"
+        }
+      },
+      "webhookSecretDialog": {
+        "createdTitle": "Webhook für <urlTag>{url}</urlTag> angelegt",
+        "warning": "Dieses Secret wird jetzt nur einmalig angezeigt und ist danach nicht mehr abrufbar. Damit wird jede Zustellung per HMAC-SHA256 signiert (Header <code>X-Calltalent-Signature</code>) — bitte jetzt sicher speichern."
+      },
+      "apiKeys": {
+        "heading": "API-Keys",
+        "description": "Für externe Integrationen (z. B. Zapier, Make) — Header <code>Authorization: Bearer &lt;key&gt;</code> gegen <code>/api/v1/…</code>.",
+        "namePlaceholder": "z. B. Zapier-Integration",
+        "addButton": "Neuen Key erzeugen",
+        "addingButton": "Wird erzeugt …",
+        "empty": "Noch keine API-Keys angelegt.",
+        "activeStatus": "aktiv",
+        "inactiveStatus": "deaktiviert",
+        "lastUsedPrefix": "zuletzt genutzt:",
+        "neverUsed": "nie",
+        "revokeButton": "Deaktivieren"
+      },
+      "apiKeyCreatedDialog": {
+        "createdTitle": "API-Key „{name}“ erzeugt",
+        "warning": "Dieser Schlüssel wird jetzt nur einmalig angezeigt und ist danach nicht mehr abrufbar. Bitte jetzt sicher speichern."
+      },
+      "secretDialog": {
+        "copyButton": "Kopieren",
+        "copiedStatus": "Kopiert.",
+        "copyFailedStatus": "Kopieren fehlgeschlagen — bitte oben manuell markieren.",
+        "closeButton": "Schließen"
+      }
+    },
+    "trainers": {
+      "heading": "Trainer-Profil",
+      "description": "Wiederverwendbare Trainer-/Ansprechpersonen-Profile — Bild, Name, optionale Rolle und Bio. Im Kurs-Editor pro Kurs als Autor auswählbar (Information-Tab).",
+      "addButton": "Trainer hinzufügen",
+      "empty": "Noch keine Trainer-Profile angelegt.",
+      "moveUpAria": "Position nach oben: {name}",
+      "moveDownAria": "Position nach unten: {name}",
+      "nameLabel": "Name",
+      "namePlaceholder": "Max Mustermann",
+      "roleLabel": "Rolle (optional)",
+      "rolePlaceholder": "Trainer, Ansprechpartner …",
+      "bioLabel": "Bio (optional)",
+      "imageEntityLabel": "Trainerbild",
+      "imageEntityFallbackTitle": "Trainer",
+      "genericError": "Fehler."
     }
   },
   "portal": {
