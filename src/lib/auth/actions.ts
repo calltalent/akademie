@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -42,16 +43,36 @@ export async function signInWithPassword(
   _prevState: AuthActionState,
   formData: FormData,
 ): Promise<AuthActionState> {
+  const parsed = passwordSignInSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+
   // IP-basiert, da vor dem Login noch kein Nutzer/Mandant bekannt ist —
   // schützt gegen Passwort-Brute-Force (Security-Fix 11.07.2026).
   if (!(await checkRateLimit("auth-login", { maxRequests: 10, windowSeconds: 60 }))) {
     return { error: RATE_LIMIT_MESSAGE };
   }
 
-  const parsed = passwordSignInSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password"),
-  });
+  // Zusätzlich pro Zielkonto (Security-Fix 01.08.2026, security-reviewer-
+  // Audit MITTEL): das IP-Limit allein schützt nicht gegen verteilten
+  // Brute-Force über viele IPs gegen dasselbe Konto. Schlüssel ist ein
+  // sha256-Hash der normalisierten E-Mail, keine PII im rate_limits-Schlüssel.
+  if (parsed.success) {
+    const emailKey = createHash("sha256")
+      .update(parsed.data.email.trim().toLowerCase())
+      .digest("hex");
+    if (
+      !(await checkRateLimit("auth-login-email", {
+        maxRequests: 5,
+        windowSeconds: 300,
+        extraKey: emailKey,
+      }))
+    ) {
+      return { error: RATE_LIMIT_MESSAGE };
+    }
+  }
+
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
   }

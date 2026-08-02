@@ -99,6 +99,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const admin = createAdminClient();
 
+  // Idempotenz-Fix (security-reviewer-Audit 01.08.2026, MITTEL): Stripe
+  // garantiert nur "at least once" - dasselbe checkout.session.completed-
+  // Event kann erneut zugestellt werden. Der orders-Upsert selbst ist dank
+  // onConflict idempotent, die AUSGEHENDEN Mandanten-Webhooks unten waren es
+  // bisher nicht (sie feuerten bei jeder Verarbeitung erneut). Vorab pruefen,
+  // ob die Zeile schon existiert - nur bei einer echten Neuanlage dispatchen.
+  const { data: existingOrder } = await admin
+    .from("orders")
+    .select("id")
+    .eq("stripe_checkout_id", session.id)
+    .maybeSingle();
+  const isNewOrder = !existingOrder;
+
   const { data: order, error: orderError } = await admin
     .from("orders")
     .upsert(
@@ -124,14 +137,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   // Block 7 (Webhooks): order.paid direkt nach dem orders-Upsert, VOR
-  // enrollFromProduct() (fire-and-forget, siehe dispatch.ts).
-  dispatchWebhookEvent(tenantId, "order.paid", {
-    order_id: order.id,
-    user_id: userId,
-    product_id: productId,
-    amount_cents: session.amount_total ?? null,
-    currency: session.currency ?? "eur",
-  }).catch(() => {});
+  // enrollFromProduct() (fire-and-forget, siehe dispatch.ts). Nur bei
+  // Neuanlage - ein Stripe-Retry desselben Checkouts loest sonst ein
+  // doppeltes order.paid beim Mandanten-Webhook-Consumer aus.
+  if (isNewOrder) {
+    dispatchWebhookEvent(tenantId, "order.paid", {
+      order_id: order.id,
+      user_id: userId,
+      product_id: productId,
+      amount_cents: session.amount_total ?? null,
+      currency: session.currency ?? "eur",
+    }).catch(() => {});
+  }
 
   // Bei Abo zusaetzlich subscriptions-Zeile anlegen/aktualisieren.
   if (session.mode === "subscription" && typeof session.subscription === "string") {
@@ -180,6 +197,16 @@ async function enrollFromProduct(
   if (courseIds.length === 0) return; // Produkt ohne Kurs-Zuordnung - nichts einzuschreiben.
 
   for (const courseId of courseIds) {
+    // Gleicher Idempotenz-Fix wie bei orders oben: vor dem Upsert pruefen,
+    // ob die Einschreibung schon existiert (Stripe-Retry desselben Events).
+    const { data: existingEnrollment } = await admin
+      .from("enrollments")
+      .select("id")
+      .eq("course_id", courseId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    const isNewEnrollment = !existingEnrollment;
+
     const { error: enrollError } = await admin.from("enrollments").upsert(
       {
         tenant_id: tenantId,
@@ -193,13 +220,15 @@ async function enrollFromProduct(
       console.error("[stripe/webhook] Einschreibung fehlgeschlagen:", courseId, enrollError.message);
       continue;
     }
-    // Block 7 (Webhooks): enrollment.created fire-and-forget nach jeder
-    // erfolgreichen Einschreibung (siehe dispatch.ts).
-    dispatchWebhookEvent(tenantId, "enrollment.created", {
-      course_id: courseId,
-      user_id: userId,
-      source: "purchase",
-    }).catch(() => {});
+    // Block 7 (Webhooks): enrollment.created fire-and-forget, nur bei
+    // tatsaechlicher Neuanlage (siehe dispatch.ts + Idempotenz-Kommentar oben).
+    if (isNewEnrollment) {
+      dispatchWebhookEvent(tenantId, "enrollment.created", {
+        course_id: courseId,
+        user_id: userId,
+        source: "purchase",
+      }).catch(() => {});
+    }
   }
 }
 

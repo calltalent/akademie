@@ -74,6 +74,15 @@
     { "pattern": "www.salestalent.app/*", "zone_name": "salestalent.app" }
   ],
   "keep_vars": true,
+  // Sicherheitsfix (security-reviewer-Audit 01.08.2026, NIEDRIG): explizit
+  // aus, damit der Worker NUR über die oben eingetragenen Custom-Domains
+  // erreichbar ist, nie über die öffentliche *.workers.dev-URL. Relevant für
+  // src/lib/security/rate-limit.ts — der IP-Schlüssel verlässt sich auf
+  // `cf-connecting-ip` (von Cloudflares Edge gesetzt, clientseitig nicht
+  // fälschbar); der Fallback auf `x-forwarded-for` wäre nur über eine direkt
+  // erreichbare *.workers.dev-Route spoofbar. Wird erst mit dem nächsten
+  // `npm run deploy` wirksam (Freigabe Josip laut CLAUDE.md §4.6).
+  "workers_dev": false,
   "triggers": {
     // Alle 2 Minuten - ein ai_jobs-Schritt braucht typischerweise wenige
     // Sekunden bis niedrige zweistellige Sekunden (ein Claude-Sonnet-Aufruf),
