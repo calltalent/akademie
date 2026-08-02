@@ -1,11 +1,7 @@
+import { getFormatter, getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { OrdersTable, type OrderRow } from "@/components/admin/orders-table";
-
-/** Für die KPI-Summen oben — bewusst fest auf EUR: die App rechnet in der Praxis ausschließlich in Euro, ein Aufsummieren über potenziell verschiedene Währungen hinweg wäre ohnehin falsch. */
-function formatEuroCents(cents: number): string {
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
-}
 
 type DeltaTone = "up" | "down" | "neutral";
 
@@ -49,8 +45,15 @@ function deltaColor(tone: DeltaTone): string {
  *   Vorbild dafür in diesem Bereich, rein dekorativ ohne echte Daten.
  */
 export default async function AdminZahlungenPage() {
+  const t = await getTranslations("payments.admin");
+  const format = await getFormatter();
   const tenant = await getTenant();
   const supabase = await createClient();
+
+  /** Bewusst fest auf EUR: die App rechnet in der Praxis ausschließlich in Euro, ein Aufsummieren über potenziell verschiedene Währungen hinweg wäre ohnehin falsch. */
+  function formatEuroCents(cents: number): string {
+    return format.number(cents / 100, { style: "currency", currency: "EUR" });
+  }
 
   const { data: orderRows } = await supabase
     .from("orders")
@@ -76,7 +79,7 @@ export default async function AdminZahlungenPage() {
       createdAt: o.created_at,
       userEmail: profile?.email ?? null,
       userName: profile?.full_name ?? null,
-      productTitle: product?.title ?? "Unbekanntes Produkt",
+      productTitle: product?.title ?? t("unknownProduct"),
       productSlug: product?.slug ?? null,
     };
   });
@@ -111,24 +114,29 @@ export default async function AdminZahlungenPage() {
 
   const kpis: { label: string; value: string; delta: string; tone: DeltaTone }[] = [
     {
-      label: "Gesamtumsatz",
+      label: t("kpiRevenue"),
       value: formatEuroCents(totalRevenueCents),
-      delta: thisMonthRevenueCents > 0 ? `+${formatEuroCents(thisMonthRevenueCents)} diesen Monat` : "Kein Umsatz diesen Monat",
+      delta:
+        thisMonthRevenueCents > 0
+          ? t("kpiRevenueDeltaThisMonth", { amount: formatEuroCents(thisMonthRevenueCents) })
+          : t("kpiRevenueDeltaNone"),
       tone: thisMonthRevenueCents > 0 ? "up" : "neutral",
     },
     {
-      label: "Bestellungen",
+      label: t("orders"),
       value: String(allOrders.length),
-      delta: newOrdersThisWeek > 0 ? `+${newOrdersThisWeek} diese Woche` : "Keine neuen diese Woche",
+      delta: newOrdersThisWeek > 0 ? t("kpiOrdersDeltaThisWeek", { count: newOrdersThisWeek }) : t("kpiOrdersDeltaNone"),
       tone: newOrdersThisWeek > 0 ? "up" : "neutral",
     },
     {
-      label: "Ø Bestellwert",
+      label: t("kpiAvgOrder"),
       value: overallAvg !== null ? formatEuroCents(overallAvg) : "—",
       delta:
         thisMonthAvg !== null && lastMonthAvg !== null
-          ? `${thisMonthAvg >= lastMonthAvg ? "+" : "−"}${formatEuroCents(Math.abs(thisMonthAvg - lastMonthAvg))} vs. Vormonat`
-          : "Noch kein Vergleich möglich",
+          ? thisMonthAvg >= lastMonthAvg
+            ? t("kpiAvgDeltaUp", { amount: formatEuroCents(Math.abs(thisMonthAvg - lastMonthAvg)) })
+            : t("kpiAvgDeltaDown", { amount: formatEuroCents(Math.abs(thisMonthAvg - lastMonthAvg)) })
+          : t("kpiAvgDeltaNone"),
       tone:
         thisMonthAvg !== null && lastMonthAvg !== null ? (thisMonthAvg >= lastMonthAvg ? "up" : "down") : "neutral",
     },
@@ -139,10 +147,10 @@ export default async function AdminZahlungenPage() {
       <header className="flex items-center gap-[18px]">
         <div className="flex-1">
           <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
-            Auswertung · Zahlungen
+            {t("zahlungenEyebrow")}
           </div>
           <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
-            Zahlungen
+            {t("title")}
           </h1>
         </div>
       </header>
@@ -167,7 +175,7 @@ export default async function AdminZahlungenPage() {
       {/* Bestellungen */}
       <div className="overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
         <div className="p-[24px_28px_16px]">
-          <div className="text-[17px] font-bold">Bestellungen</div>
+          <div className="text-[17px] font-bold">{t("orders")}</div>
         </div>
         <OrdersTable orders={orders} />
       </div>

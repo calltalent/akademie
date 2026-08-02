@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useTranslations } from "next-intl";
 import { inviteSingleUser } from "@/lib/users/actions";
 import { initialCourseActionState } from "@/lib/courses/state";
 
@@ -10,6 +11,7 @@ import { initialCourseActionState } from "@/lib/courses/state";
  * Design-Tokens der übrigen Karten. Reine Optik, keine Logikänderung.
  */
 export function InviteUserForm() {
+  const t = useTranslations("admin.invite");
   const [state, action, pending] = useActionState(
     inviteSingleUser,
     initialCourseActionState,
@@ -18,10 +20,10 @@ export function InviteUserForm() {
   return (
     <form action={action} className="flex flex-col gap-3 rounded-[14px] border bg-white px-6 py-5" style={{ borderColor: "#E7E8F2" }}>
       <div className="text-[17px] font-bold" style={{ color: "#1A1A2E" }}>
-        Einzelne Person einladen
+        {t("singleHeading")}
       </div>
       <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-        E-Mail
+        {t("emailLabel")}
         <input
           name="email"
           type="email"
@@ -31,7 +33,7 @@ export function InviteUserForm() {
         />
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-        Name (optional)
+        {t("nameLabel")}
         <input
           name="fullName"
           type="text"
@@ -40,7 +42,7 @@ export function InviteUserForm() {
         />
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-        Kurs-Slug für automatische Zuweisung (optional)
+        {t("courseSlugLabel")}
         <input
           name="courseSlug"
           type="text"
@@ -55,7 +57,7 @@ export function InviteUserForm() {
       )}
       {state.success && (
         <p className="text-sm font-semibold" style={{ color: "#1F8A5B" }}>
-          Konto angelegt und als Mitglied aktiviert — Willkommensmail mit Login-Link wird verschickt.
+          {t("successMessage")}
         </p>
       )}
       <button
@@ -64,7 +66,7 @@ export function InviteUserForm() {
         className="self-start rounded-[10px] px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50"
         style={{ background: "#5663AE" }}
       >
-        {pending ? "Wird eingeladen …" : "Einladen"}
+        {pending ? t("inviting") : t("submitButton")}
       </button>
     </form>
   );

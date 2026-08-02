@@ -9,13 +9,22 @@ import { ExternalLink } from "lucide-react";
  *
  * `productSlug` kann bei einer Bestellung fehlen (verknüpftes Produkt
  * inzwischen gelöscht) — dann kein Link statt eines toten Verweises.
+ *
+ * `ariaLabel`/`title` kommen vorformatiert vom Aufrufer (Block C4, i18n):
+ * einer der beiden Aufrufer ist eine Client Component
+ * (`product-row.tsx`), der andere eine Server Component
+ * (`orders-table.tsx`) — ein eigener `useTranslations()`/`getTranslations()`-
+ * Aufruf hier würde diese Komponente an einen der beiden Component-Typen
+ * binden, gleiches Muster wie `PageChrome`s `brandName`-Props (Block C2).
  */
 export function PayLinkIcon({
   productSlug,
-  productTitle,
+  ariaLabel,
+  title,
 }: {
   productSlug: string | null;
-  productTitle: string;
+  ariaLabel: string;
+  title: string;
 }) {
   if (!productSlug) return null;
 
@@ -24,8 +33,8 @@ export function PayLinkIcon({
       href={`/kaufen/${productSlug}`}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label={`Zahlungsseite ansehen: ${productTitle}`}
-      title="Zahlungsseite ansehen"
+      aria-label={ariaLabel}
+      title={title}
       className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-[8px]"
       style={{ background: "#F4F5FA" }}
     >

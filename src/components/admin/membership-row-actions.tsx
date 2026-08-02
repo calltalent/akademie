@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   disableMembership,
   enableMembership,
@@ -26,6 +27,7 @@ export function MembershipRowActions({
   name: string;
   email: string;
 }) {
+  const t = useTranslations("admin.teilnehmer");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
@@ -54,7 +56,7 @@ export function MembershipRowActions({
   }
 
   function remove() {
-    if (!confirm(`Teilnehmer „${name}" (${email}) wirklich löschen? Kurs-Einschreibungen bleiben als Verlauf erhalten, der Zugang wird aber sofort entfernt.`)) {
+    if (!confirm(t("deleteConfirmDetail", { name, email }))) {
       return;
     }
     setError(null);
@@ -76,14 +78,14 @@ export function MembershipRowActions({
           disabled={pending}
           className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
         >
-          {status === "active" ? "Deaktivieren" : "Aktivieren"}
+          {status === "active" ? t("deactivateAction") : t("activateAction")}
         </button>
         <button
           onClick={resend}
           disabled={pending}
           className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
         >
-          Link erneut senden
+          {t("resendTitle")}
         </button>
         <button
           onClick={remove}
@@ -91,12 +93,12 @@ export function MembershipRowActions({
           className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
           style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
         >
-          Löschen
+          {t("deleteTitle")}
         </button>
       </div>
       {resent && (
         <p role="status" className="text-sm font-semibold" style={{ color: "#1F8A5B" }}>
-          Link verschickt.
+          {t("linkSent")}
         </p>
       )}
       {error && (

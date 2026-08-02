@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { checkAdminAccess } from "@/lib/auth/staff";
 import { createClient } from "@/lib/supabase/server";
 import { formatRelativeTime } from "@/lib/format/relative-time";
@@ -15,14 +16,15 @@ import { TeilnehmerListe, type TeilnehmerRow } from "./teilnehmer-liste";
  * /admin-Layouts), Daten zusätzlich per RLS.
  */
 export default async function TeilnehmerPage() {
+  const t = await getTranslations("admin.teilnehmer");
   const access = await checkAdminAccess();
   if (!access.ok) {
     const text =
       access.reason === "not-admin"
-        ? "Kein Zugriff — die Teilnehmerverwaltung ist nur für Inhaber und Administratoren."
+        ? t("accessDeniedNotAdmin")
         : access.reason === "not-authenticated"
-          ? "Bitte zuerst anmelden."
-          : "Kein Mandant zu diesem Host gefunden.";
+          ? t("accessDeniedNotAuthenticated")
+          : t("accessDeniedNoTenant");
     return (
       <div className="mx-auto max-w-3xl">
         <p className="text-base">{text}</p>

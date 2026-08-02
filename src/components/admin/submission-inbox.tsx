@@ -1,12 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import {
-  SUBMISSION_STATUSES,
-  SUBMISSION_STATUS_LABELS,
-  type SubmissionKind,
-  type SubmissionStatus,
-} from "@/lib/submissions/schema";
+import { useTranslations } from "next-intl";
+import { SUBMISSION_STATUSES, type SubmissionKind, type SubmissionStatus } from "@/lib/submissions/schema";
 import { GradeForm } from "@/components/admin/grade-form";
 import { formatRelativeTime } from "@/lib/format/relative-time";
 import { initialsFor } from "@/lib/format/initials";
@@ -45,10 +41,10 @@ const OVERDUE_MS = 48 * 60 * 60 * 1000;
 
 type BadgeKey = "offen" | "ueberfaellig" | "bewertet";
 
-const BADGE_META: Record<BadgeKey, { label: string; color: string; bg: string }> = {
-  offen: { label: "Offen", color: "#1A1A2E", bg: "#F7EED4" },
-  ueberfaellig: { label: "Überfällig", color: "#B24343", bg: "#F6E4E4" },
-  bewertet: { label: "Bewertet", color: "#1F8A5B", bg: "#E3F2EA" },
+const BADGE_COLORS: Record<BadgeKey, { color: string; bg: string }> = {
+  offen: { color: "#1A1A2E", bg: "#F7EED4" },
+  ueberfaellig: { color: "#B24343", bg: "#F6E4E4" },
+  bewertet: { color: "#1F8A5B", bg: "#E3F2EA" },
 };
 
 function badgeKeyFor(s: InboxSubmission): BadgeKey {
@@ -70,16 +66,24 @@ export function SubmissionInbox({
   submissions: InboxSubmission[];
   activeStatus: SubmissionStatus | null;
 }) {
+  const t = useTranslations("submissions.inbox");
+  const tStatuses = useTranslations("submissions.statuses");
   const [openId, setOpenId] = useState<string | null>(null);
 
+  const BADGE_LABELS: Record<BadgeKey, string> = {
+    offen: t("badgeOpen"),
+    ueberfaellig: t("badgeOverdue"),
+    bewertet: t("badgeGraded"),
+  };
+
   const filters: { value: SubmissionStatus | null; label: string }[] = [
-    { value: null, label: "Alle" },
-    ...SUBMISSION_STATUSES.map((s) => ({ value: s, label: SUBMISSION_STATUS_LABELS[s] })),
+    { value: null, label: t("filterAll") },
+    ...SUBMISSION_STATUSES.map((s) => ({ value: s, label: tStatuses(s) })),
   ];
 
   return (
     <div className="flex flex-col gap-4">
-      <nav aria-label="Nach Status filtern" className="flex flex-wrap gap-2">
+      <nav aria-label={t("filterAriaLabel")} className="flex flex-wrap gap-2">
         {filters.map((f) => (
           <a
             key={f.label}
@@ -99,7 +103,8 @@ export function SubmissionInbox({
 
       <div className="flex flex-col gap-3.5" style={{ maxWidth: 900 }}>
         {submissions.map((s) => {
-          const badge = BADGE_META[badgeKeyFor(s)];
+          const badgeKey = badgeKeyFor(s);
+          const badge = { label: BADGE_LABELS[badgeKey], ...BADGE_COLORS[badgeKey] };
           const isOpen = openId === s.id;
           return (
             <div
@@ -139,7 +144,7 @@ export function SubmissionInbox({
                   className="flex-none rounded-[10px] px-[18px] py-2.5 text-sm font-bold text-white"
                   style={{ background: "#5663AE" }}
                 >
-                  Bewerten
+                  {t("reviewButton")}
                 </span>
               </button>
 
@@ -153,7 +158,7 @@ export function SubmissionInbox({
         })}
         {submissions.length === 0 && (
           <p className="text-sm" style={{ color: "#A9AAC4" }}>
-            Keine Abgaben gefunden.
+            {t("empty")}
           </p>
         )}
       </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { InviteUserDialog } from "@/components/admin/invite-user-dialog";
 import { TeilnehmerRowActions } from "@/components/admin/teilnehmer-row-actions";
 
@@ -21,10 +22,10 @@ import { TeilnehmerRowActions } from "@/components/admin/teilnehmer-row-actions"
  * neue Aktion (Status ändern bleibt auf der Detailseite, `membership-row-
  * actions.tsx`).
  */
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  active: { label: "Aktiv", color: "#1F8A5B", bg: "#E3F2EA" },
-  invited: { label: "Eingeladen", color: "#8A6D1F", bg: "#F7EED4" },
-  deactivated: { label: "Deaktiviert", color: "#66679B", bg: "#EEF0F7" },
+const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
+  active: { color: "#1F8A5B", bg: "#E3F2EA" },
+  invited: { color: "#8A6D1F", bg: "#F7EED4" },
+  deactivated: { color: "#66679B", bg: "#EEF0F7" },
 };
 
 export type TeilnehmerRow = {
@@ -40,6 +41,7 @@ export type TeilnehmerRow = {
 const COLS = "1.8fr 1.3fr 0.7fr 0.8fr 0.9fr 1.4fr";
 
 export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
+  const t = useTranslations("admin.teilnehmer");
   const [q, setQ] = useState("");
   const query = q.trim().toLowerCase();
   const visible = query
@@ -50,20 +52,26 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
     : rows;
   const invitedCount = rows.filter((r) => r.status === "invited").length;
 
+  const statusLabels: Record<string, string> = {
+    active: t("statusActive"),
+    invited: t("statusInvited"),
+    deactivated: t("statusDeactivated"),
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-center gap-[18px]">
         <div className="flex-1">
           <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
-            Nutzer · Teilnehmer
+            {t("eyebrow")}
           </div>
           <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
-            Teilnehmer
+            {t("title")}
           </h1>
           <p className="mt-1 text-[13.5px]" style={{ color: "#A9AAC4" }}>
-            <b style={{ color: "#3E3F66" }}>{rows.length}</b> {rows.length === 1 ? "Teilnehmer" : "Teilnehmer"}
+            <b style={{ color: "#3E3F66" }}>{rows.length}</b> {t("participantsWord")}
             {" · "}
-            <b style={{ color: "#3E3F66" }}>{invitedCount}</b> {invitedCount === 1 ? "offene Einladung" : "offene Einladungen"}
+            <b style={{ color: "#3E3F66" }}>{invitedCount}</b> {t("openInvitationLabel", { count: invitedCount })}
           </p>
         </div>
         <div
@@ -88,8 +96,8 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Teilnehmer suchen …"
-            aria-label="Teilnehmer nach Name oder E-Mail suchen"
+            placeholder={t("searchPlaceholder")}
+            aria-label={t("searchAriaLabel")}
             className="w-full bg-transparent text-sm outline-none"
             style={{ color: "#1A1A2E" }}
           />
@@ -102,20 +110,21 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
           className="rgrid-header px-[26px] pb-3 pt-[18px] text-[13px] font-bold"
           style={{ "--rgrid-cols": COLS, color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" } as React.CSSProperties}
         >
-          <div>Name</div>
-          <div>E-Mail</div>
-          <div>Kurse</div>
-          <div>Beigetreten</div>
-          <div>Status</div>
+          <div>{t("columnName")}</div>
+          <div>{t("columnEmail")}</div>
+          <div>{t("columnCourses")}</div>
+          <div>{t("columnJoined")}</div>
+          <div>{t("columnStatus")}</div>
           <div />
         </div>
         {visible.length === 0 ? (
           <p className="px-[26px] py-6 text-sm" style={{ color: "#A9AAC4" }}>
-            {query ? "Keine Treffer für diese Suche." : "Noch keine Mitglieder."}
+            {query ? t("noResults") : t("empty")}
           </p>
         ) : (
           visible.map((r) => {
-            const meta = STATUS_META[r.status] ?? STATUS_META.active;
+            const colors = STATUS_COLORS[r.status] ?? STATUS_COLORS.active;
+            const label = statusLabels[r.status] ?? statusLabels.active;
             return (
             <div
               key={r.userId}
@@ -136,20 +145,20 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
                 {r.email}
               </div>
               <div>
-                <span className="rgrid-label">Kurse</span>
+                <span className="rgrid-label">{t("columnCourses")}</span>
                 <span style={{ color: "#3E3F66" }}>{r.courseCount}</span>
               </div>
               <div className="text-sm" style={{ color: "#66679B" }}>
-                <span className="rgrid-label">Beigetreten</span>
+                <span className="rgrid-label">{t("columnJoined")}</span>
                 {r.joined}
               </div>
               <div>
-                <span className="rgrid-label">Status</span>
+                <span className="rgrid-label">{t("columnStatus")}</span>
                 <span
                   className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
-                  style={{ color: meta.color, background: meta.bg }}
+                  style={{ color: colors.color, background: colors.bg }}
                 >
-                  {meta.label}
+                  {label}
                 </span>
               </div>
               <div className="flex items-center gap-3 lg:justify-end">
@@ -158,7 +167,7 @@ export function TeilnehmerListe({ rows }: { rows: TeilnehmerRow[] }) {
                   prefetch={false}
                   className="text-sm font-semibold no-underline"
                 >
-                  Profil
+                  {t("profileLink")}
                 </Link>
                 <TeilnehmerRowActions
                   userId={r.userId}

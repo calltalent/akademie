@@ -1,3 +1,4 @@
+import { getFormatter, getTranslations } from "next-intl/server";
 import { PayLinkIcon } from "@/components/admin/pay-link-icon";
 
 export type OrderRow = {
@@ -13,23 +14,12 @@ export type OrderRow = {
   productSlug: string | null;
 };
 
-const STATUS_META: Record<OrderRow["status"], { label: string; color: string; bg: string }> = {
-  paid: { label: "Bezahlt", color: "#1F8A5B", bg: "#E3F2EA" },
-  pending: { label: "Offen", color: "#B98A1E", bg: "#FBF1DC" },
-  refunded: { label: "Erstattet", color: "#B24343", bg: "#FBE7E7" },
-  failed: { label: "Fehlgeschlagen", color: "#B24343", bg: "#FBE7E7" },
+const STATUS_COLORS: Record<OrderRow["status"], { color: string; bg: string }> = {
+  paid: { color: "#1F8A5B", bg: "#E3F2EA" },
+  pending: { color: "#B98A1E", bg: "#FBF1DC" },
+  refunded: { color: "#B24343", bg: "#FBE7E7" },
+  failed: { color: "#B24343", bg: "#FBE7E7" },
 };
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
-}
-
-function formatAmount(cents: number | null, currency: string): string {
-  if (cents === null) return "—";
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency: currency.toUpperCase() }).format(
-    cents / 100,
-  );
-}
 
 /**
  * Bestellübersicht (Auftrag Punkt 11) — barrierefreie `<table>`-Struktur mit
@@ -44,11 +34,19 @@ function formatAmount(cents: number | null, currency: string): string {
  * gefiltert; eine Beschriftung, die nicht zum echten Verhalten passt, wäre
  * irreführend.
  */
-export function OrdersTable({ orders }: { orders: OrderRow[] }) {
+export async function OrdersTable({ orders }: { orders: OrderRow[] }) {
+  const t = await getTranslations("payments.admin");
+  const format = await getFormatter();
+
+  function formatAmount(cents: number | null, currency: string): string {
+    if (cents === null) return "—";
+    return format.number(cents / 100, { style: "currency", currency: currency.toUpperCase() });
+  }
+
   if (orders.length === 0) {
     return (
       <p className="px-[28px] py-6 text-sm" style={{ color: "#A9AAC4" }}>
-        Noch keine Bestellungen.
+        {t("noOrders")}
       </p>
     );
   }
@@ -56,52 +54,56 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-left text-[14px]">
-        <caption className="sr-only">Bestellungen dieses Mandanten</caption>
+        <caption className="sr-only">{t("ordersTableCaption")}</caption>
         <thead>
           <tr style={{ borderBottom: "1px solid #EEF0F7" }}>
             <th scope="col" className="px-[28px] pb-2.5 text-[13px] font-bold" style={{ color: "#A9AAC4" }}>
-              Datum
+              {t("dateColumn")}
             </th>
             <th scope="col" className="px-3 pb-2.5 text-[13px] font-bold" style={{ color: "#A9AAC4" }}>
-              Nutzer
+              {t("userColumn")}
             </th>
             <th scope="col" className="px-3 pb-2.5 text-[13px] font-bold" style={{ color: "#A9AAC4" }}>
-              Produkt
+              {t("productColumn")}
             </th>
             <th scope="col" className="px-3 pb-2.5 text-[13px] font-bold" style={{ color: "#A9AAC4" }}>
-              Status
+              {t("statusColumn")}
             </th>
             <th scope="col" className="px-3 pb-2.5 text-right text-[13px] font-bold" style={{ color: "#A9AAC4" }}>
-              Betrag
+              {t("amountColumn")}
             </th>
             <th scope="col" className="px-[28px] pb-2.5 text-right text-[13px] font-bold whitespace-nowrap" style={{ color: "#A9AAC4" }}>
-              neueste zuerst
+              {t("newestFirst")}
             </th>
           </tr>
         </thead>
         <tbody>
           {orders.map((o) => {
-            const meta = STATUS_META[o.status];
+            const colors = STATUS_COLORS[o.status];
             return (
               <tr key={o.id} style={{ borderBottom: "1px solid #F4F5FA" }}>
                 <td className="px-[28px] py-3.5" style={{ color: "#66679B" }}>
-                  {formatDate(o.createdAt)}
+                  {format.dateTime(new Date(o.createdAt), { dateStyle: "medium", timeStyle: "short" })}
                 </td>
-                <td className="px-3 py-3.5 font-semibold">{o.userName || o.userEmail || "Unbekannt"}</td>
+                <td className="px-3 py-3.5 font-semibold">{o.userName || o.userEmail || t("unknownUser")}</td>
                 <td className="px-3 py-3.5" style={{ color: "#3E3F66" }}>
                   {o.productTitle}
                 </td>
                 <td className="px-3 py-3.5">
                   <span
                     className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
-                    style={{ color: meta.color, background: meta.bg }}
+                    style={{ color: colors.color, background: colors.bg }}
                   >
-                    {meta.label}
+                    {t(`orderRowStatuses.${o.status}`)}
                   </span>
                 </td>
                 <td className="px-3 py-3.5 text-right font-bold">{formatAmount(o.amountCents, o.currency)}</td>
                 <td className="px-[28px] py-3.5 text-right">
-                  <PayLinkIcon productSlug={o.productSlug} productTitle={o.productTitle} />
+                  <PayLinkIcon
+                    productSlug={o.productSlug}
+                    ariaLabel={t("viewPayLinkAria", { title: o.productTitle })}
+                    title={t("viewPayLinkTitle")}
+                  />
                 </td>
               </tr>
             );

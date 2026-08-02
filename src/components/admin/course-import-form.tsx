@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { importCourseFromFile } from "@/lib/import/actions";
 import { initialImportActionState } from "@/lib/import/state";
 
@@ -18,34 +19,34 @@ import { initialImportActionState } from "@/lib/import/state";
  * `role="alert"`/`role="status"` für Fehler/Erfolg (CLAUDE.md §3.4).
  */
 export function CourseImportForm() {
+  const t = useTranslations("admin.import");
+  const tCommon = useTranslations("admin.common");
   const [state, action, pending] = useActionState(
     importCourseFromFile,
     initialImportActionState,
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [fileLabel, setFileLabel] = useState("Keine ausgewählt");
+  const [fileLabel, setFileLabel] = useState(t("noFileChosen"));
 
   useEffect(() => {
     if (state.success && fileInputRef.current) {
       fileInputRef.current.value = "";
-      setFileLabel("Keine ausgewählt");
+      setFileLabel(t("noFileChosen"));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `t` ist bei gleichbleibender Locale stabil, nur `state` soll den Effekt auslösen.
   }, [state]);
 
   return (
     <div className="rounded-[14px] border bg-white p-[28px]" style={{ borderColor: "#E7E8F2" }}>
-      <div className="mb-2.5 text-[17px] font-bold">Kurs aus JSON importieren</div>
+      <div className="mb-2.5 text-[17px] font-bold">{t("cardHeading")}</div>
       <p className="mb-5 text-[15px]" style={{ color: "#66679B" }}>
-        Für den Umzug eigener Altdaten (Kursstruktur mit Modulen, Lektionen und
-        Blöcken). Video-Blöcke können statt einer Bunny-Video-ID eine{" "}
-        <code
-          className="rounded-[5px] px-1.5 py-0.5 text-[13px]"
-          style={{ background: "#F4F5FA" }}
-        >
-          sourceUrl
-        </code>{" "}
-        enthalten — das Video wird dann automatisch zu Bunny übernommen.
-        Maximal 5 MB, maximal 50 Module, maximal 100 Lektionen je Modul.
+        {t.rich("description", {
+          code: (chunks) => (
+            <code className="rounded-[5px] px-1.5 py-0.5 text-[13px]" style={{ background: "#F4F5FA" }}>
+              {chunks}
+            </code>
+          ),
+        })}
       </p>
 
       <form action={action} className="flex flex-col items-start gap-[22px]">
@@ -55,7 +56,7 @@ export function CourseImportForm() {
             className="mb-2 block text-[13px] font-semibold"
             style={{ color: "#66679B" }}
           >
-            JSON-Datei
+            {t("fileLabel")}
           </label>
           <label
             htmlFor="import-file"
@@ -66,7 +67,7 @@ export function CourseImportForm() {
               className="shrink-0 rounded-lg px-3.5 py-[7px] text-[13px] font-bold"
               style={{ background: "#F4F5FA", color: "#3E3F66" }}
             >
-              Datei auswählen
+              {t("chooseFileButton")}
             </span>
             <span className="truncate text-sm" style={{ color: "#A9AAC4" }}>
               {fileLabel}
@@ -79,7 +80,7 @@ export function CourseImportForm() {
               accept=".json,application/json"
               required
               className="sr-only"
-              onChange={(e) => setFileLabel(e.target.files?.[0]?.name ?? "Keine ausgewählt")}
+              onChange={(e) => setFileLabel(e.target.files?.[0]?.name ?? t("noFileChosen"))}
             />
           </label>
         </div>
@@ -95,7 +96,7 @@ export function CourseImportForm() {
             <path d="m7 11 5 5 5-5"></path>
             <path d="M5 21h14"></path>
           </svg>
-          {pending ? "Importiere …" : "Import starten"}
+          {pending ? tCommon("importing") : tCommon("startImportButton")}
         </button>
       </form>
 
@@ -115,14 +116,17 @@ export function CourseImportForm() {
       {state.success && (
         <div role="status" className="mt-4 flex flex-col gap-1 text-sm" style={{ color: "#1F8A5B" }}>
           <p>
-            Import erfolgreich: {state.moduleCount} Modul(e), {state.lessonCount}{" "}
-            Lektion(en), {state.videoCount} Video(s) übernommen.
+            {t("successMessage", {
+              moduleCount: state.moduleCount ?? 0,
+              lessonCount: state.lessonCount ?? 0,
+              videoCount: state.videoCount ?? 0,
+            })}
           </p>
           <a
             href={`/admin/kurse/${state.courseId}`}
             className="underline focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
           >
-            Zum importierten Kurs
+            {t("goToCourseLink")}
           </a>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { ProductForm } from "@/components/admin/product-form";
@@ -16,6 +17,7 @@ import { ProductRow, PRODUCT_LIST_COLS } from "@/components/admin/product-row";
  * (Umsatz/Bestellungen), nicht zur Produktverwaltung selbst.
  */
 export default async function AdminProdukePage() {
+  const t = await getTranslations("payments.admin");
   const tenant = await getTenant();
   const supabase = await createClient();
 
@@ -41,10 +43,10 @@ export default async function AdminProdukePage() {
       <header className="flex items-center gap-[18px]">
         <div className="flex-1">
           <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
-            Inhalte · Produkte
+            {t("produkteEyebrow")}
           </div>
           <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
-            Produkte
+            {t("products")}
           </h1>
         </div>
       </header>
@@ -53,26 +55,26 @@ export default async function AdminProdukePage() {
         {/* Linke Spalte: Produktliste */}
         <div className="overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: "#E7E8F2" }}>
           <div className="p-[24px_28px_16px]">
-            <div className="text-[17px] font-bold">Produkte</div>
+            <div className="text-[17px] font-bold">{t("products")}</div>
           </div>
           <div
             className="rgrid-header px-[28px] pb-2.5 text-[13px] font-bold"
             style={{ "--rgrid-cols": PRODUCT_LIST_COLS, color: "#A9AAC4", borderBottom: "1px solid #EEF0F7" } as React.CSSProperties}
           >
-            <div>Produkt</div>
-            <div>Art</div>
-            <div>Preis</div>
-            <div>Status</div>
-            <div className="text-right">{allProducts.length} gesamt</div>
+            <div>{t("productColumn")}</div>
+            <div>{t("kindLabel")}</div>
+            <div>{t("priceColumn")}</div>
+            <div>{t("statusColumn")}</div>
+            <div className="text-right">{t("totalCountSuffix", { count: allProducts.length })}</div>
           </div>
           {allProducts.length === 0 ? (
             <p className="px-[28px] py-6 text-sm" style={{ color: "#A9AAC4" }}>
-              Noch keine Produkte angelegt.
+              {t("noProducts")}
             </p>
           ) : (
             allProducts.map((p) => {
               const courseId = (p.course_ids ?? [])[0] ?? null;
-              const courseTitle = courseId ? (courseTitleById.get(courseId) ?? "Kurs nicht gefunden") : "Kein verknüpfter Kurs";
+              const courseTitle = courseId ? (courseTitleById.get(courseId) ?? t("courseNotFound")) : t("noLinkedCourse");
               return <ProductRow key={p.id} product={p} courseOptions={courseOptions} courseTitle={courseTitle} />;
             })
           )}
@@ -80,7 +82,7 @@ export default async function AdminProdukePage() {
 
         {/* Rechte Spalte: Neues Produkt */}
         <div className="sticky top-4 self-start rounded-[14px] border bg-white p-[26px_28px]" style={{ borderColor: "#E7E8F2" }}>
-          <div className="mb-5 text-[17px] font-bold">Neues Produkt</div>
+          <div className="mb-5 text-[17px] font-bold">{t("newProduct")}</div>
           <ProductForm courses={courseOptions} />
         </div>
       </div>

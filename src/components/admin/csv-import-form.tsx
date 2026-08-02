@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations, useFormatter } from "next-intl";
 
 type ImportRowResult = { email: string; status: "created" | "linked" | "error"; message?: string };
 type ImportResponse = {
@@ -24,6 +25,9 @@ type ImportResponse = {
  * Design-Tokens der übrigen Karten. Reine Optik, keine Logikänderung.
  */
 export function CsvImportForm() {
+  const t = useTranslations("admin.invite");
+  const tCommon = useTranslations("admin.common");
+  const format = useFormatter();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ImportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +43,7 @@ export function CsvImportForm() {
 
     const file = fileInputRef.current?.files?.[0];
     if (!file) {
-      setError("Bitte eine CSV-Datei auswählen.");
+      setError(t("csvSelectFileError"));
       return;
     }
 
@@ -53,7 +57,7 @@ export function CsvImportForm() {
       });
       const data: ImportResponse = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Import fehlgeschlagen.");
+        setError(data.error ?? t("csvGenericError"));
         // Auch im Fehlerfall Zeilendetails zeigen (z. B. fehlende Kopfzeile,
         // ungültige E-Mails) — sonst bleibt die Ursache für den Nutzer unsichtbar.
         setParseErrors(data.parseErrors ?? []);
@@ -62,7 +66,7 @@ export function CsvImportForm() {
       setResult(data);
       router.refresh();
     } catch {
-      setError("Netzwerkfehler beim Import.");
+      setError(t("csvNetworkError"));
     } finally {
       setBusy(false);
     }
@@ -71,11 +75,10 @@ export function CsvImportForm() {
   return (
     <div className="flex flex-col gap-3 rounded-[14px] border bg-white px-6 py-5" style={{ borderColor: "#E7E8F2" }}>
       <div className="text-[17px] font-bold" style={{ color: "#1A1A2E" }}>
-        CSV-Import (Bulk)
+        {t("csvHeading")}
       </div>
       <p className="text-sm" style={{ color: "#66679B" }}>
-        Format: Kopfzeile <code>email,full_name,course_slug</code> — <code>course_slug</code>{" "}
-        optional. Maximal 500 Zeilen pro Import.
+        {t.rich("csvFormatHint", { code: (chunks) => <code>{chunks}</code> })}
       </p>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input ref={fileInputRef} type="file" accept=".csv,text/csv" required className="text-base" />
@@ -85,9 +88,7 @@ export function CsvImportForm() {
             {parseErrors.length > 0 && (
               <ul className="list-disc pl-5">
                 {parseErrors.map((pe, i) => (
-                  <li key={i}>
-                    Zeile {pe.line}: {pe.message}
-                  </li>
+                  <li key={i}>{t("csvLineError", { line: pe.line, message: pe.message })}</li>
                 ))}
               </ul>
             )}
@@ -99,31 +100,32 @@ export function CsvImportForm() {
           className="self-start rounded-[10px] px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50"
           style={{ background: "#5663AE" }}
         >
-          {busy ? "Importiere …" : "Import starten"}
+          {busy ? tCommon("importing") : tCommon("startImportButton")}
         </button>
       </form>
 
       {result && (
         <div className="mt-2 flex flex-col gap-2 text-sm">
           <p style={{ color: "#3E3F66" }}>
-            {result.total} Zeilen verarbeitet in {(result.elapsedMs / 1000).toFixed(1)} s —{" "}
-            {result.created} Konten neu angelegt, {result.linked} bestehenden Nutzern zugeordnet,{" "}
-            {result.errors} Fehler.
+            {t("csvSummary", {
+              total: result.total,
+              elapsed: format.number(result.elapsedMs / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+              created: result.created,
+              linked: result.linked,
+              errors: result.errors,
+            })}
           </p>
           <p className="text-xs" style={{ color: "#A9AAC4" }}>
-            Hinweis: Neu angelegte Konten erhalten automatisch eine Willkommensmail mit Login-Link.
-            Bereits bestehenden Nutzern (zugeordnet) wird keine erneute Mail verschickt.
+            {t("csvWelcomeHint")}
           </p>
           {result.parseErrors.length > 0 && (
             <details>
               <summary className="cursor-pointer font-semibold" style={{ color: "#8A6D1F" }}>
-                {result.parseErrors.length} Zeile(n) beim Einlesen übersprungen
+                {t("csvSkippedSummary", { count: result.parseErrors.length })}
               </summary>
               <ul className="mt-1 list-disc pl-5">
                 {result.parseErrors.map((pe, i) => (
-                  <li key={i}>
-                    Zeile {pe.line}: {pe.message}
-                  </li>
+                  <li key={i}>{t("csvLineError", { line: pe.line, message: pe.message })}</li>
                 ))}
               </ul>
             </details>
@@ -131,7 +133,7 @@ export function CsvImportForm() {
           {result.errors > 0 && (
             <details>
               <summary className="cursor-pointer font-semibold" style={{ color: "#B14A4A" }}>
-                {result.errors} Import-Fehler anzeigen
+                {t("csvErrorsSummary", { count: result.errors })}
               </summary>
               <ul className="mt-1 list-disc pl-5">
                 {result.results

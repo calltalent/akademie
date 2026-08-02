@@ -1,9 +1,10 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useTranslations } from "next-intl";
 import { gradeSubmission, getSubmissionDownloadUrl } from "@/lib/submissions/actions";
 import { initialGradeSubmissionActionState } from "@/lib/submissions/state";
-import { SUBMISSION_STATUS_LABELS, type SubmissionStatus } from "@/lib/submissions/schema";
+import type { SubmissionStatus } from "@/lib/submissions/schema";
 import type { InboxSubmission } from "@/components/admin/submission-inbox";
 
 const GRADABLE_STATUSES: SubmissionStatus[] = ["approved", "revision", "rejected"];
@@ -18,6 +19,10 @@ const GRADABLE_STATUSES: SubmissionStatus[] = ["approved", "revision", "rejected
  * `quiz-editor.tsx` für das Metadaten-Formular).
  */
 export function GradeForm({ submission }: { submission: InboxSubmission }) {
+  const t = useTranslations("submissions.inbox");
+  const tSubmissions = useTranslations("submissions");
+  const tStatuses = useTranslations("submissions.statuses");
+  const tCommon = useTranslations("admin.common");
   const boundGrade = gradeSubmission.bind(null, submission.id);
   const [state, formAction, pending] = useActionState(boundGrade, initialGradeSubmissionActionState);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -39,19 +44,19 @@ export function GradeForm({ submission }: { submission: InboxSubmission }) {
     <div className="flex flex-col gap-4">
       {submission.kind === "text" ? (
         <div>
-          <p className="mb-1 text-sm font-medium">Abgegebener Text</p>
+          <p className="mb-1 text-sm font-medium">{t("submittedTextHeading")}</p>
           <p className="whitespace-pre-wrap rounded-md border bg-gray-50 p-3 text-base">{submission.content}</p>
         </div>
       ) : (
         <div>
-          <p className="mb-1 text-sm font-medium">Datei-Abgabe</p>
+          <p className="mb-1 text-sm font-medium">{t("fileSubmissionHeading")}</p>
           <button
             type="button"
             onClick={handleDownload}
             disabled={downloadPending}
             className="rounded-md border px-3 py-1.5 text-sm underline disabled:opacity-50"
           >
-            {downloadPending ? "Link wird erzeugt …" : "Datei herunterladen (Link 5 Min. gültig)"}
+            {downloadPending ? t("downloadUrlGenerating") : t("download")}
           </button>
           {downloadError && (
             <p role="alert" className="mt-1 text-sm text-red-600">
@@ -63,7 +68,7 @@ export function GradeForm({ submission }: { submission: InboxSubmission }) {
 
       <form action={formAction} className="flex flex-col gap-3">
         <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-medium">Status</legend>
+          <legend className="text-sm font-medium">{tSubmissions("statusLabel")}</legend>
           {GRADABLE_STATUSES.map((s) => (
             <label key={s} className="flex items-center gap-2 text-base" htmlFor={`status-${submission.id}-${s}`}>
               <input
@@ -73,13 +78,13 @@ export function GradeForm({ submission }: { submission: InboxSubmission }) {
                 value={s}
                 defaultChecked={submission.status === s || (submission.status === "submitted" && s === "approved")}
               />
-              {SUBMISSION_STATUS_LABELS[s]}
+              {tStatuses(s)}
             </label>
           ))}
         </fieldset>
 
         <label className="flex flex-col gap-1 text-sm" htmlFor={`grade-${submission.id}`}>
-          Note/Bewertung (optional, Freitext)
+          {t("gradeLabel")}
           <input
             id={`grade-${submission.id}`}
             name="grade"
@@ -91,7 +96,7 @@ export function GradeForm({ submission }: { submission: InboxSubmission }) {
         </label>
 
         <label className="flex flex-col gap-1 text-sm" htmlFor={`feedback-${submission.id}`}>
-          Feedback für Lernende (optional)
+          {t("feedbackToLearner")}
           <textarea
             id={`feedback-${submission.id}`}
             name="feedback"
@@ -109,7 +114,7 @@ export function GradeForm({ submission }: { submission: InboxSubmission }) {
         )}
         {state.success && !state.error && (
           <p role="status" aria-live="polite" className="text-sm text-green-700">
-            Gespeichert — Lernende(r) wird per Mail benachrichtigt.
+            {t("saved")}
           </p>
         )}
 
@@ -119,7 +124,7 @@ export function GradeForm({ submission }: { submission: InboxSubmission }) {
           className="self-start rounded-md px-4 py-2 text-base text-white disabled:opacity-50"
           style={{ background: "var(--color-primary)" }}
         >
-          {pending ? "Speichert …" : "Bewertung speichern"}
+          {pending ? tCommon("saving") : t("save")}
         </button>
       </form>
     </div>

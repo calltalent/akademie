@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Plus, X } from "lucide-react";
 import { InviteUserForm } from "@/components/admin/invite-user-form";
 import { CsvImportForm } from "@/components/admin/csv-import-form";
@@ -25,6 +26,7 @@ import { CsvImportForm } from "@/components/admin/csv-import-form";
  * Design-Tokens wie die übrigen Karten (Kurse/Einstellungen).
  */
 export function InviteUserDialog() {
+  const t = useTranslations("admin.invite");
   const ref = useRef<HTMLDialogElement>(null);
 
   return (
@@ -36,7 +38,7 @@ export function InviteUserDialog() {
         style={{ background: "#5663AE" }}
       >
         <Plus aria-hidden="true" size={16} />
-        Einladen
+        {t("openButton")}
       </button>
       <dialog
         ref={ref}
@@ -47,12 +49,12 @@ export function InviteUserDialog() {
         <div className="flex h-full flex-col gap-5 overflow-y-auto bg-white px-7 py-6">
           <div className="flex items-center justify-between gap-4">
             <h2 id="invite-user-title" className="text-[19px] font-extrabold" style={{ color: "#1A1A2E" }}>
-              Teilnehmer einladen
+              {t("heading")}
             </h2>
             <button
               type="button"
               onClick={() => ref.current?.close()}
-              aria-label="Schließen"
+              aria-label={t("closeAria")}
               className="flex h-9 w-9 flex-none items-center justify-center rounded-[9px] border bg-white"
               style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
             >

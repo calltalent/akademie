@@ -1,13 +1,8 @@
+import { getTranslations } from "next-intl/server";
 import { checkStaffAccess } from "@/lib/auth/staff";
 import { checkPlatformAccess } from "@/lib/platform/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AdminShell } from "@/components/admin/admin-shell";
-
-const REASON_TEXT: Record<string, string> = {
-  "no-tenant": "Kein Mandant zu diesem Host gefunden.",
-  "not-authenticated": "Bitte zuerst anmelden.",
-  "not-staff": "Kein Zugriff — dieser Bereich ist nur für Team-Mitglieder (owner/admin/trainer).",
-};
 
 /**
  * Design-Block (12.07.2026, Claude-Design-Export Teil 2, siehe
@@ -23,13 +18,19 @@ export default async function AdminLayout({
   const access = await checkStaffAccess();
 
   if (!access.ok) {
+    const t = await getTranslations("admin.shell");
+    const reasonText: Record<string, string> = {
+      "no-tenant": t("reasonNoTenant"),
+      "not-authenticated": t("reasonNotAuthenticated"),
+      "not-staff": t("reasonNotStaff"),
+    };
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-start justify-center gap-4 px-6">
-        <h1 className="text-2xl font-semibold">Kein Zugriff</h1>
-        <p className="text-base">{REASON_TEXT[access.reason]}</p>
+        <h1 className="text-2xl font-semibold">{t("accessDeniedHeading")}</h1>
+        <p className="text-base">{reasonText[access.reason]}</p>
         {access.reason === "not-authenticated" && (
           <a href="/login" className="rounded-md bg-black px-4 py-2 text-base text-white">
-            Zur Anmeldung
+            {t("goToLoginButton")}
           </a>
         )}
       </main>

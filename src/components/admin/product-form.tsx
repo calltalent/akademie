@@ -2,10 +2,11 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
 import { createProduct, updateProduct, updateProductImageUrl } from "@/lib/stripe/products";
 import { initialProductActionState } from "@/lib/stripe/state";
-import { PRODUCT_KINDS, PRODUCT_KIND_LABELS, centsToEuroInputValue } from "@/lib/stripe/schema";
+import { PRODUCT_KINDS, centsToEuroInputValue } from "@/lib/stripe/schema";
 import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
 
 type CourseOption = { id: string; title: string };
@@ -62,6 +63,9 @@ export function ProductForm({
   courses: CourseOption[];
   product?: EditableProduct;
 }) {
+  const t = useTranslations("payments.admin");
+  const tKinds = useTranslations("payments.kinds");
+  const tCommon = useTranslations("admin.common");
   const isEdit = Boolean(product);
   const action = isEdit ? updateProduct.bind(null, product!.id) : createProduct;
   const [state, formAction, pending] = useActionState(action, initialProductActionState);
@@ -70,16 +74,13 @@ export function ProductForm({
   if (!isEdit && courses.length === 0) {
     return (
       <div className="text-sm" style={{ color: "#66679B" }}>
-        <p className="mb-3">
-          Ein Produkt muss mit einem bestehenden Kurs verknüpft werden — dieser Mandant hat
-          noch keinen Kurs.
-        </p>
+        <p className="mb-3">{t("courseRequiredHint")}</p>
         <Link
           href="/admin/kurse"
           className="inline-flex items-center justify-center gap-2 rounded-[11px] px-[18px] py-[13px] text-[15px] font-bold text-white no-underline"
           style={{ background: "#5663AE" }}
         >
-          Zuerst einen Kurs anlegen
+          {t("createCourseFirstLink")}
         </Link>
       </div>
     );
@@ -91,19 +92,19 @@ export function ProductForm({
         <div className="mb-4 flex items-center gap-3">
           <ThumbnailUpload
             initialUrl={product!.imageUrl}
-            entityLabel="Kaufseiten-Bild"
+            entityLabel={t("thumbnailEntityLabel")}
             entityTitle={product!.title}
             onUpload={updateProductImageUrl.bind(null, product!.id)}
           />
           <span className={labelClass} style={{ color: "#66679B", marginBottom: 0 }}>
-            Bild auf der Kaufseite
+            {t("imageOnBuyPageLabel")}
           </span>
         </div>
       )}
 
       <label htmlFor={`${idPrefix}-title`}>
         <span className={labelClass} style={{ color: "#66679B" }}>
-          Titel
+          {t("titleLabel")}
         </span>
         <input
           id={`${idPrefix}-title`}
@@ -118,7 +119,7 @@ export function ProductForm({
 
       <label htmlFor={`${idPrefix}-slug`}>
         <span className={labelClass} style={{ color: "#66679B" }}>
-          Slug (URL, z. B. einsteiger-kurs)
+          {t("slugLabel")}
         </span>
         <input
           id={`${idPrefix}-slug`}
@@ -134,7 +135,7 @@ export function ProductForm({
 
       <label htmlFor={`${idPrefix}-description`}>
         <span className={labelClass} style={{ color: "#66679B" }}>
-          Beschreibung (auf der Kaufseite sichtbar, optional)
+          {t("descriptionLabel")}
         </span>
         <textarea
           id={`${idPrefix}-description`}
@@ -142,7 +143,7 @@ export function ProductForm({
           rows={4}
           maxLength={2000}
           defaultValue={product?.description ?? undefined}
-          placeholder="Kurzer Text, der Kaufinteressenten auf /kaufen/… zeigt, was sie bekommen."
+          placeholder={t("descriptionPlaceholder")}
           className={`${fieldClass} mb-4 resize-y`}
           style={{ borderColor: "#E7E8F2", color: "#1A1A2E" }}
         />
@@ -150,7 +151,7 @@ export function ProductForm({
 
       <fieldset className="mb-4 flex flex-col gap-2.5">
         <legend className="mb-1.5 text-[13px] font-semibold" style={{ color: "#66679B" }}>
-          Art
+          {t("kindLabel")}
         </legend>
         {PRODUCT_KINDS.map((k) => (
           <label
@@ -166,14 +167,14 @@ export function ProductForm({
               defaultChecked={(product?.kind ?? "one_time") === k}
               style={{ accentColor: "#5663AE" }}
             />
-            {PRODUCT_KIND_LABELS[k]}
+            {tKinds(k)}
           </label>
         ))}
       </fieldset>
 
       <label htmlFor={`${idPrefix}-price`}>
         <span className={labelClass} style={{ color: "#66679B" }}>
-          Preis in Euro
+          {t("priceLabel")}
         </span>
         <input
           id={`${idPrefix}-price`}
@@ -182,7 +183,7 @@ export function ProductForm({
           inputMode="decimal"
           required
           defaultValue={product ? centsToEuroInputValue(product.priceCents) : undefined}
-          placeholder="9,90"
+          placeholder={t("pricePlaceholder")}
           className={`${fieldClass} mb-4`}
           style={{ borderColor: "#E7E8F2", color: "#1A1A2E" }}
         />
@@ -190,7 +191,7 @@ export function ProductForm({
 
       <label htmlFor={`${idPrefix}-course`}>
         <span className={labelClass} style={{ color: "#66679B" }}>
-          Verknüpfter Kurs
+          {t("courseLabel")}
         </span>
         <select
           id={`${idPrefix}-course`}
@@ -201,7 +202,7 @@ export function ProductForm({
           style={{ borderColor: "#E7E8F2", color: "#1A1A2E" }}
         >
           <option value="" disabled>
-            Kurs auswählen
+            {t("selectCoursePlaceholder")}
           </option>
           {courses.map((c) => (
             <option key={c.id} value={c.id}>
@@ -219,7 +220,7 @@ export function ProductForm({
           defaultChecked={product?.active ?? true}
           style={{ accentColor: "#5663AE" }}
         />
-        Aktiv (im Shop sichtbar)
+        {t("activeLabel")}
       </label>
 
       {state.error && (
@@ -229,7 +230,7 @@ export function ProductForm({
       )}
       {state.success && !state.error && (
         <p role="status" aria-live="polite" className="mb-3 text-sm font-semibold" style={{ color: "#1F8A5B" }}>
-          Gespeichert.
+          {t("saved")}
         </p>
       )}
 
@@ -240,7 +241,7 @@ export function ProductForm({
         style={{ background: "#5663AE" }}
       >
         {!isEdit && <Plus size={16} aria-hidden="true" />}
-        {pending ? "Speichert …" : isEdit ? "Änderungen speichern" : "Produkt anlegen"}
+        {pending ? tCommon("saving") : isEdit ? t("save") : t("create")}
       </button>
     </form>
   );

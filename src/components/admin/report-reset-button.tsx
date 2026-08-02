@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { RotateCcw } from "lucide-react";
 
 /**
@@ -22,6 +23,7 @@ export function ReportResetButton({
   confirmMessage: string;
   action: () => Promise<{ error: string | null; success?: boolean }>;
 }) {
+  const t = useTranslations("reporting");
   const [pending, startTransition] = useTransition();
 
   function handleClick() {
@@ -38,7 +40,7 @@ export function ReportResetButton({
       onClick={handleClick}
       disabled={pending}
       aria-label={label}
-      title="Bericht zurücksetzen"
+      title={t("resetButtonTitle")}
       className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] disabled:opacity-50"
       style={{ background: "#F4F5FA", color: "#B24343" }}
     >

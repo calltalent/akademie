@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Mail, Trash2 } from "lucide-react";
 import { resendInviteLink, deleteMembership } from "@/lib/users/actions";
 
@@ -29,6 +30,7 @@ export function TeilnehmerRowActions({
   email: string;
   courseCount: number;
 }) {
+  const t = useTranslations("admin.teilnehmer");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
@@ -48,11 +50,8 @@ export function TeilnehmerRowActions({
   }
 
   function handleDelete() {
-    const courseHint =
-      courseCount > 0
-        ? ` ${courseCount} Kurs-Einschreibung${courseCount === 1 ? "" : "en"} bleiben als Verlauf erhalten, der Zugang wird aber sofort entfernt.`
-        : "";
-    if (!confirm(`Teilnehmer „${name}" (${email}) wirklich löschen?${courseHint}`)) return;
+    const courseHint = courseCount > 0 ? ` ${t("deleteConfirmCourseHint", { count: courseCount })}` : "";
+    if (!confirm(`${t("deleteConfirmBase", { name, email })}${courseHint}`)) return;
     setError(null);
     startTransition(async () => {
       const result = await deleteMembership(userId);
@@ -71,8 +70,8 @@ export function TeilnehmerRowActions({
           type="button"
           onClick={handleResend}
           disabled={pending}
-          aria-label={`Einladungslink erneut senden: ${name || email}`}
-          title="Link erneut senden"
+          aria-label={t("resendAria", { name: name || email })}
+          title={t("resendTitle")}
           className="inline-flex h-9 w-9 items-center justify-center rounded-[9px] border bg-white disabled:opacity-50"
           style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
@@ -82,8 +81,8 @@ export function TeilnehmerRowActions({
           type="button"
           onClick={handleDelete}
           disabled={pending}
-          aria-label={`Teilnehmer löschen: ${name || email}`}
-          title="Löschen"
+          aria-label={t("deleteAria", { name: name || email })}
+          title={t("deleteTitle")}
           className="inline-flex h-9 w-9 items-center justify-center rounded-[9px] border bg-white disabled:opacity-50"
           style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
         >
@@ -92,7 +91,7 @@ export function TeilnehmerRowActions({
       </div>
       {resent && (
         <p role="status" className="text-xs font-semibold" style={{ color: "#1F8A5B" }}>
-          Link verschickt.
+          {t("linkSent")}
         </p>
       )}
       {error && (

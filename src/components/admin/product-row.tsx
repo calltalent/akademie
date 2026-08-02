@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations, useFormatter } from "next-intl";
 import { Pencil, Trash2 } from "lucide-react";
 import { deleteProduct } from "@/lib/stripe/products";
-import { PRODUCT_KIND_LABELS, type ProductKind } from "@/lib/stripe/schema";
+import type { ProductKind } from "@/lib/stripe/schema";
 import { PayLinkIcon } from "@/components/admin/pay-link-icon";
 import { ProductActiveToggle } from "@/components/admin/product-active-toggle";
 import { ProductForm } from "@/components/admin/product-form";
@@ -25,12 +26,6 @@ type Product = {
 
 /** Geteilt mit admin/produkte/page.tsx (Kopfzeile) — muss identisch bleiben, sonst laufen Spalten auseinander. */
 export const PRODUCT_LIST_COLS = "2fr 1fr 1fr 0.8fr 1fr";
-
-function formatPrice(cents: number, currency: string): string {
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency: currency.toUpperCase() }).format(
-    cents / 100,
-  );
-}
 
 /**
  * Eine Produktzeile in der Zahlungen-Übersicht (19.07.2026, Josips Auftrag:
@@ -56,16 +51,19 @@ export function ProductRow({
   courseOptions: CourseOption[];
   courseTitle: string;
 }) {
+  const t = useTranslations("payments.admin");
+  const tKinds = useTranslations("payments.kinds");
+  const format = useFormatter();
   const [expanded, setExpanded] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  function formatPrice(cents: number, currency: string): string {
+    return format.number(cents / 100, { style: "currency", currency: currency.toUpperCase() });
+  }
+
   function handleDelete() {
-    if (
-      !confirm(
-        `Produkt „${p.title}“ wirklich löschen? Bestehende Bestellungen bleiben erhalten (ohne Produktbezug), die Kaufseite ist danach nicht mehr erreichbar.`,
-      )
-    ) {
+    if (!confirm(t("deleteConfirm", { title: p.title }))) {
       return;
     }
     setError(null);
@@ -88,11 +86,11 @@ export function ProductRow({
           </div>
         </div>
         <div>
-          <span className="rgrid-label">Art</span>
-          <span style={{ color: "#3E3F66" }}>{PRODUCT_KIND_LABELS[p.kind as ProductKind]}</span>
+          <span className="rgrid-label">{t("kindLabel")}</span>
+          <span style={{ color: "#3E3F66" }}>{tKinds(p.kind as ProductKind)}</span>
         </div>
         <div>
-          <span className="rgrid-label">Preis</span>
+          <span className="rgrid-label">{t("priceColumn")}</span>
           <span className="font-semibold">{formatPrice(p.price_cents, p.currency)}</span>
         </div>
         <div>
@@ -100,17 +98,21 @@ export function ProductRow({
             className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
             style={p.active ? { color: "#1F8A5B", background: "#E3F2EA" } : { color: "#66679B", background: "#EEF0F7" }}
           >
-            {p.active ? "Aktiv" : "Inaktiv"}
+            {p.active ? t("active") : t("statusInactive")}
           </span>
         </div>
         <div className="flex items-center gap-2 lg:justify-end">
-          <PayLinkIcon productSlug={p.slug} productTitle={p.title} />
+          <PayLinkIcon
+            productSlug={p.slug}
+            ariaLabel={t("viewPayLinkAria", { title: p.title })}
+            title={t("viewPayLinkTitle")}
+          />
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
             aria-expanded={expanded}
-            aria-label={`Produkt bearbeiten: ${p.title}`}
-            title="Bearbeiten"
+            aria-label={t("editProductAria", { title: p.title })}
+            title={t("editButtonTitle")}
             className="inline-flex h-8 w-8 items-center justify-center rounded-[8px]"
             style={{ background: expanded ? "#EDEEF7" : "#F4F5FA", color: "#5663AE" }}
           >
@@ -120,8 +122,8 @@ export function ProductRow({
             type="button"
             onClick={handleDelete}
             disabled={pending}
-            aria-label={`Produkt löschen: ${p.title}`}
-            title="Löschen"
+            aria-label={t("deleteProductAria", { title: p.title })}
+            title={t("deleteButtonTitle")}
             className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] disabled:opacity-50"
             style={{ background: "#FBEAEA", color: "#B14A4A" }}
           >

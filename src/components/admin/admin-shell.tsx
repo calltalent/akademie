@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { getTranslations } from "next-intl/server";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { AdminMobileNav } from "@/components/layout/AdminMobileNav";
 import { HtmlBackgroundSync } from "@/components/shell/html-background-sync";
@@ -21,7 +22,7 @@ import { HtmlBackgroundSync } from "@/components/shell/html-background-sync";
  * `variant`-Prop). Gutter `px-10 py-8` gilt jetzt erst ab `lg`, mobil
  * `px-4 py-6` — auf 375px blieben sonst nur ~215px Inhaltsbreite übrig.
  */
-export function AdminShell({
+export async function AdminShell({
   children,
   tenantName,
   isPlatformAdmin = false,
@@ -32,6 +33,8 @@ export function AdminShell({
   isPlatformAdmin?: boolean;
   pendingSubmissions?: number;
 }) {
+  const t = await getTranslations("admin.shell");
+
   return (
     <>
       <AdminMobileNav isPlatformAdmin={isPlatformAdmin} pendingSubmissions={pendingSubmissions} />
@@ -42,7 +45,7 @@ export function AdminShell({
         <div className="min-w-0 flex-1 px-4 py-6 lg:px-10 lg:py-8">
           <div className="mb-6">
             <p className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-primary)" }}>
-              Administration
+              {t("eyebrow")}
             </p>
             <h1 className="text-2xl font-semibold" style={{ color: "var(--foreground)" }}>
               {tenantName}

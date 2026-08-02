@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { SUBMISSION_STATUSES, type SubmissionKind, type SubmissionStatus } from "@/lib/submissions/schema";
@@ -27,6 +28,7 @@ export default async function AdminAbgabenPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  const t = await getTranslations("submissions.inbox");
   const { status } = await searchParams;
   const tenant = await getTenant();
   // Zugriff ist über admin/layout.tsx (checkStaffAccess) gated; ohne Mandant
@@ -117,8 +119,8 @@ export default async function AdminAbgabenPage({
     const profile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
     return {
       id: s.id,
-      lessonTitle: lesson?.title ?? "Unbekannte Lektion",
-      courseTitle: (lesson?.module_id && courseTitleByModuleId.get(lesson.module_id)) || "Unbekannter Kurs",
+      lessonTitle: lesson?.title ?? t("unknownLesson"),
+      courseTitle: (lesson?.module_id && courseTitleByModuleId.get(lesson.module_id)) || t("unknownCourse"),
       userEmail: profile?.email ?? "",
       userName: profile?.full_name ?? null,
       kind: s.kind as SubmissionKind,
@@ -136,17 +138,17 @@ export default async function AdminAbgabenPage({
       <header className="flex items-center gap-[18px]">
         <div className="flex-1">
           <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
-            Inhalte · Abgaben
+            {t("eyebrow")}
           </div>
           <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
-            Abgaben
+            {t("title")}
           </h1>
         </div>
         <span
           className="inline-flex flex-none items-center gap-2 rounded-[10px] px-[15px] py-[9px] text-sm font-bold"
           style={{ background: "#F7EED4", color: "#1A1A2E" }}
         >
-          {openCount ?? 0} offen · {overdueCount ?? 0} überfällig
+          {t("badgeSummary", { open: openCount ?? 0, overdue: overdueCount ?? 0 })}
         </span>
       </header>
       <SubmissionInbox submissions={submissions} activeStatus={filterStatus} />

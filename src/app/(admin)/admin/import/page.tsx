@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { CourseImportForm } from "@/components/admin/course-import-form";
 
 /**
@@ -17,16 +18,17 @@ import { CourseImportForm } from "@/components/admin/course-import-form";
  * anderen bereits umgestellten Admin-Seiten — die liefert bereits AdminShell
  * (layout.tsx), kein Vorbild für eine zweite hier.
  */
-export default function AdminImportPage() {
+export default async function AdminImportPage() {
+  const t = await getTranslations("admin.import");
   return (
     <div className="flex flex-col gap-6">
       <header className="flex items-center gap-[18px]">
         <div className="flex-1">
           <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
-            Verwaltung · Import
+            {t("eyebrow")}
           </div>
           <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
-            Altdaten importieren
+            {t("title")}
           </h1>
         </div>
       </header>
