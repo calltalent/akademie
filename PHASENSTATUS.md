@@ -2813,4 +2813,53 @@ Bestätigt: Path-Traversal-Schutz (`isSupportedLocale()` vor dynamischem Import)
 
 **Eine nicht-blockierende Empfehlung:** einmaliger Konkurrenz-/Lasttest mit zwei parallelen Requests unterschiedlicher Mandanten-Locale gegen die echte Cloudflare-Workers-Deployment, um next-intls `cache()`-Requestisolation auch laufzeitseitig (nicht nur code-seitig) zu bestätigen — kein im Code auffindbarer Fehler, reine Hosting-Annahme außerhalb dieses Commits.
 
+## Bug gefunden (02.08.2026, Josips Fund): Magic Link bei Custom-Domain-Mandant landet auf falscher Domain
+
+**Symptom:** Beim Mandanten `salestalent` (`custom_domain: salestalent.app`) führte ein per Magic Link verschickter Login-Link nicht zu `salestalent.app`, sondern zu `academy.calltalent.ai/login#access_token=…` — Passwort-Setzen-Ziel nicht erreichbar.
+
+**Befund:** Kein Code-Bug. `tenant/url.ts`s `tenantOrigin()` und `signInWithMagicLink()` ([src/lib/auth/actions.ts:246](src/lib/auth/actions.ts:246)) bauen `redirectTo` korrekt aus `custom_domain` (per SQL gegen die `tenants`-Tabelle verifiziert: `salestalent` → `salestalent.app` ist korrekt gespeichert). Ursache liegt eine Ebene höher, in der Supabase-Projekt-Konfiguration selbst (Authentication → URL Configuration), nicht im Next.js-Code: Supabase prüft `redirectTo` bei `generateLink()`/`/auth/v1/verify` gegen die dort hinterlegte **Redirect-URL-Allowlist**. Steht eine Ziel-URL nicht darauf, verwirft Supabase sie und leitet stattdessen auf die projektweite **Site URL** um (Token-Fragment bleibt dabei angehängt) — exakt das Bild aus dem Screenshot. Dieselbe Fehlerklasse wie der bereits im Code gefixte `NEXT_PUBLIC_SITE_URL`-Fund (Kommentar in `actions.ts`), nur an einer zweiten, rein im Supabase-Dashboard liegenden Stelle, die beim damaligen Fix nicht mit angepasst wurde.
+
+**Offen (Supabase-Dashboard, Projekt `calltalent-akademie`/`vklqksdiyiijzoirntyt`, außerhalb des Repos, kein MCP-Tool für Auth-URL-Config verfügbar — muss Josip selbst im Dashboard erledigen):**
+1. Authentication → URL Configuration → **Site URL** prüfen/korrigieren (falls noch auf einer alten Domain wie `academy.calltalent.ai`).
+2. Authentication → URL Configuration → **Redirect URLs** ergänzen: `https://*.calltalent.ai/auth/callback` (Wildcard für alle `{slug}.calltalent.ai`-Mandanten) UND `https://salestalent.app/auth/callback` explizit (Custom Domains lassen sich nicht per Wildcard erfassen).
+3. **Strukturell zu bedenken für Phase 4 (Betreiber-Portal, „Mandant in 5 Minuten anlegen"):** jede künftige Custom Domain muss bei ihrer Anlage zusätzlich manuell in dieser Supabase-Allowlist eingetragen werden — kein automatischer Schritt im aktuellen Code/Workflow. Sollte bei der Portal-Mandantenanlage entweder dokumentiert (Checkliste) oder, falls Supabase das API-seitig erlaubt, automatisiert werden.
+
+## Bugfix (02.08.2026, Josips Fund: Mandanten-Standardsprache Bosnisch gesetzt, Admin-/Lernbereich bleiben Deutsch)
+
+**Befund:** Diesmal ein echter Code-Bug, nicht Konfiguration. `profiles.locale` hat in [0001_init.sql:33](supabase/migrations/0001_init.sql:33) einen harten Spalten-Default `'de'` — jede neu angelegte Profil-Zeile bekam ihn unabhängig vom Mandanten, weil kein Aufrufer `locale` beim Anlegen mitschrieb. `resolveLocale()` ([i18n/resolve.ts:14](src/i18n/resolve.ts:14)) gewichtet das `NEXT_LOCALE`-Cookie (bei jedem Login aus genau diesem `profiles.locale` gespiegelt, `mirrorProfileLocaleCookie()`) VOR dem Mandanten-Standard — Ändern der Mandanten-Standardsprache hatte für jeden bereits eingeloggten/bestehenden Nutzer dadurch effektiv keine Wirkung.
+
+**Fix (verifiziert: `npx tsc --noEmit` fehlerfrei, `npm run lint` fehlerfrei, `npm run test` 326/326 grün):**
+1. `ensureProfile()` ([auth/actions.ts](src/lib/auth/actions.ts:30)) schreibt jetzt optional `locale` mit; alle drei Aufrufstellen (`signInWithPassword`, `signUpWithPassword`, `setNewPassword`) übergeben `resolveTenantEmailLocale(tenant?.settings.default_locale)`. `ignoreDuplicates: true` unverändert — überschreibt nie eine bereits bestehende, ggf. selbst gewählte Locale eines Bestandsnutzers.
+2. CSV-Bulk-Import (`importUsers()`/`importOneUser()` in [users/import.ts](src/lib/users/import.ts:78)): Locale wird einmal aus `tenant.settings.default_locale` berechnet und durchgereicht, aber nur bei `status === "created"` (echte Neuanlage) in den Upsert geschrieben — dieser Upsert hat kein `ignoreDuplicates`, ein Re-Import/Verknüpfen eines bereits existierenden Nutzers (`status: "linked"`) darf dessen eigene Sprachwahl nicht zurücksetzen.
+3. **Bewusst unverändert:** `POST /api/v1/users` (REST-API, `route.ts`) kennt nur `tenantId`, nicht die volle `tenant.settings` — `locale` bleibt dort optional/weggelassen, ein zusätzlicher DB-Zugriff allein dafür auf einem API-Schreibpfad wäre unverhältnismäßig. Externe Integratoren legen Nutzer über diesen Weg weiterhin mit `'de'`-Default an; kein Teil dieses Fund-Scopes.
+4. Mandanten-Inhaber-Einladung (`inviteTenantOwner()`, `platform/actions.ts`) bewusst nicht angefasst — der Mandant hat zum Zeitpunkt dieses Aufrufs noch keine `settings`, `resolveTenantEmailLocale(undefined)` liefert ohnehin `'de'`, unverändertes Verhalten.
+
+**Nicht geprüft:** kein manueller Browser-Durchlauf (bräuchte einen echten Login-/Registrierungs-/CSV-Import-Zyklus gegen einen Test-Mandanten mit `default_locale: "bs"`) — reine Server-Action-/DB-Schreib-Logik, laut bestehendem Muster (siehe i18n-Blöcke oben) außerhalb einer reinen Code-Sitzung ohne laufenden Dev-Server mit echter Mandanten-/Login-Session. Empfehlung an `tester`: einen Nutzer bei `salestalent.app` (default_locale bereits „bs") neu registrieren/per CSV importieren und prüfen, dass `profiles.locale` direkt „bs" ist, nicht „de" mit nachträglicher Umschaltung nötig.
+
+**Nachtrag (02.08.2026, Josips Fund: Passwort-Reset bei `salestalent.app` zeigt denselben Fehler):** Ursache ist dieselbe Allowlist, aber ein Detail tiefer. Magic Link ruft `redirectTo` OHNE Query auf (`.../auth/callback`), Passwort-Reset dagegen MIT (`.../auth/callback?next=/passwort-setzen`, siehe `requestPasswordReset()` in `actions.ts:344`). Supabase matcht `redirectTo` als exakten String gegen die Allowlist-Einträge — ein ohne Wildcard eingetragenes `.../auth/callback` deckt den Passwort-Reset-Fall mit angehängtem Query NICHT ab (andere Zeichenkette). Laut Supabase-Doku (`/docs/guides/auth/redirect-urls#use-wildcards-in-redirect-urls`, per `search_docs` verifiziert) zählt `/` als Trennzeichen, an dem ein einzelnes `*` stoppt — das im Query-Wert enthaltene `/passwort-setzen` würde ein einzelnes `*` also ebenfalls nicht abdecken. Korrektur: die beiden Einträge aus Punkt 2 oben jeweils mit Globstar-Suffix (`**`, deckt beliebige Zeichen inkl. `/`/`?` ab, bleibt aber auf den Pfad beschränkt) statt exaktem Pfad eintragen:
+```
+https://salestalent.app/auth/callback**
+https://*.calltalent.ai/auth/callback**
+```
+Ein pauschales `https://salestalent.app/**` bewusst NICHT verwenden — unnötig weiter Open-Redirect-Radius über die gesamte Domain, wo `/auth/callback**` exakt auf die tatsächlich genutzten Callback-Ziele passt.
+
 **Damit ist Block C des Mehrsprachigkeits-Plans (Auth, Lernansicht, Portal, Admin, E-Mails) vollständig abgeschlossen und sicherheitsgeprüft.**
+
+## Mehrsprachigkeit: Englisch als dritte Sprache ergänzt (02.08.2026, Josips Auftrag)
+
+Bisher zwei unterstützte Sprachen (Deutsch, Bosnisch); config.ts kündigte Englisch als dritten, absehbaren Eintrag bereits an (siehe frühere Randnotiz zu `translate-captions.ts`, das unabhängig davon schon länger englische Video-Untertitel per Haiku-Übersetzung erzeugt — separate Funktion, nicht dasselbe wie diese UI-Sprache).
+
+**Umsetzung, genau nach dem im Code selbst dokumentierten Verfahren ("neue Sprache = neuer Eintrag in SUPPORTED_LOCALES + messages/<locale>.json, sonst nichts"):**
+1. [i18n/config.ts](src/i18n/config.ts:10): `SUPPORTED_LOCALES` um `"en"` ergänzt, `LOCALE_NAMES.en = "English"`.
+2. [messages/en.json](messages/en.json) neu angelegt — vollständige Übersetzung aller 1002 Schlüsselpfade, Struktur 1:1 gespiegelt von `de.json` (nicht von `bs.json`): Englisch nutzt wie Deutsch nur die ICU-Pluralkategorien "one"/"other" (Bosnisch zusätzlich "few"), alle ICU-Platzhalter (`{count}`, `{tenantName}` etc.) und eingebetteten Tags (`<b>`, `<code>`, `<urlTag>`) unverändert übernommen.
+3. [i18n/messages.test.ts](src/i18n/messages.test.ts): bisheriger bs-only-Test in eine wiederverwendbare `expectSameStructure()`-Funktion gezogen, jetzt für `bs` UND `en` aufgerufen — prüft Schlüsselmengen-Gleichheit und ICU-Platzhalter-Gleichheit gegen `de.json` als Referenz.
+
+**Geprüft, keine weiteren Code-Stellen betroffen:**
+- `tenant-settings-form.tsx` (Sprachen-Verwaltung in Admin-Einstellungen) iteriert bereits generisch über `SUPPORTED_LOCALES` — die Checkbox „English" erscheint dort automatisch, keine Änderung nötig.
+- Keine hartkodierten `"de"`/`"bs"`-Literalpaare außerhalb von Tests gefunden (Grep über `src/`), die eine dritte Sprache ausschließen würden.
+- `certificates/pdf.ts` (Zertifikats-PDF-Schrift) hat keine Locale-Verzweigung — betrifft nur Bosnisch-Diakritika, für Englisch nicht relevant.
+- `video/translate-captions.ts` (Bunny-Untertitel-Übersetzung DE→EN) ist funktional unabhängig von `SUPPORTED_LOCALES`, unverändert.
+
+**Verifiziert:** `npx tsc --noEmit` fehlerfrei, `npm run lint` fehlerfrei, `npm run test` **328/328 grün** (27 Testdateien, zwei neue Tests durch die en.json-Struktur-/Platzhalter-Prüfung). Kein manueller Browser-Durchlauf (kein laufender Dev-Server mit Mandanten-/Login-Session in dieser Sitzung, gleicher Grund wie bei den i18n-Blöcken oben).
+
+**Nicht geprüft/offen:** `email/templates.test.ts`s Mock-Helfer `getNamespace()` kennt bisher nur `bs`/`de` (wählt zwischen den beiden Bäumen); kein bestehender Testfall ruft ihn mit `locale: "en"` auf, daher kein Fehlschlag, aber auch keine Testabdeckung für englische E-Mail-Vorlagen. Empfehlung an `tester`: bei Gelegenheit einen `en`-Testfall ergänzen (gleiches Muster wie der bestehende `bs`-Fall in Block C5a) und/oder einen Mandanten mit `default_locale: "en"` einmal real durchklicken (Login, Lernbereich, Admin-Bereich, E-Mail-Versand).

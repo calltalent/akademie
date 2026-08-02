@@ -3,11 +3,16 @@ import { z } from "zod";
 /**
  * Einzige Locale-Liste des Projekts (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 5:
  * "kein Kürzel taucht sonst als Literal auf"). Neue Sprache = neuer Eintrag
- * hier + messages/<locale>.json, sonst nichts (siehe dortige Randnotiz zu
- * translate-captions.ts: "en" ist als dritter Eintrag bereits absehbar,
- * sobald messages/en.json existiert — hier bewusst noch nicht ergänzt).
+ * hier + messages/<locale>.json, sonst nichts.
+ *
+ * "en" ergänzt (02.08.2026, Josips Auftrag) — der dritte, bereits in der
+ * vorherigen Randnotiz hier angekündigte Eintrag (siehe translate-captions.ts,
+ * das unabhängig davon schon länger englische Video-Untertitel erzeugt).
+ * Englisch nutzt wie Deutsch nur die ICU-Pluralkategorien "one"/"other"
+ * (Bosnisch zusätzlich "few") — messages/en.json spiegelt deshalb strukturell
+ * de.json, nicht bs.json.
  */
-export const SUPPORTED_LOCALES = ["de", "bs"] as const;
+export const SUPPORTED_LOCALES = ["de", "bs", "en"] as const;
 
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
@@ -17,6 +22,7 @@ export const DEFAULT_LOCALE: Locale = "de";
 export const LOCALE_NAMES: Record<Locale, string> = {
   de: "Deutsch",
   bs: "Bosanski",
+  en: "English",
 };
 
 export function isSupportedLocale(value: string): value is Locale {

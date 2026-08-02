@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { CsvRow } from "@/lib/users/csv";
 import { sendEmail } from "@/lib/email/client";
 import { welcomeInvite } from "@/lib/email/templates";
-import { resolveTenantEmailLocale } from "@/i18n/config";
+import { resolveTenantEmailLocale, type Locale } from "@/i18n/config";
 import { DEFAULT_BRANDING, type PublicTenant } from "@/lib/tenant/types";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 import { tenantOrigin } from "@/lib/tenant/url";
@@ -83,11 +83,18 @@ export async function importUsers(
   const admin = createAdminClient();
   const results: ImportRowResult[] = [];
 
+  // Bugfix (02.08.2026, Josips Fund: Mandanten-Standardsprache Bosnisch
+  // gesetzt, importierte Nutzer sahen trotzdem Deutsch) — `profiles.locale`
+  // hat einen harten Spalten-Default `'de'` (0001_init.sql), an die
+  // Mandanten-Standardsprache weitergereicht werden muss, siehe
+  // importOneUser() unten.
+  const locale = resolveTenantEmailLocale(tenant.settings.default_locale);
+
   const BATCH_SIZE = 10;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.all(
-      batch.map((row) => importOneUserWithRetry(admin, tenant.id, row)),
+      batch.map((row) => importOneUserWithRetry(admin, tenant.id, row, locale)),
     );
     results.push(...batchResults);
   }
@@ -206,11 +213,12 @@ async function importOneUserWithRetry(
   admin: ReturnType<typeof createAdminClient>,
   tenantId: string,
   row: CsvRow,
+  locale: Locale,
 ): Promise<ImportRowResult> {
-  const first = await importOneUser(admin, tenantId, row);
+  const first = await importOneUser(admin, tenantId, row, locale);
   if (first.status !== "error") return first;
   await new Promise((resolve) => setTimeout(resolve, 300));
-  return importOneUser(admin, tenantId, row);
+  return importOneUser(admin, tenantId, row, locale);
 }
 
 /**
@@ -218,11 +226,20 @@ async function importOneUserWithRetry(
  * wiederverwendet (kleine, dokumentierte Abweichung vom Plan-Wortlaut
  * "keine bestehende Logik ändern", technisch zwingend und risikoarm: nur
  * `export` ergänzt, kein Verhalten geändert, siehe PHASENSTATUS.md Block 7).
+ *
+ * `locale` optional (Bugfix 02.08.2026, siehe Kopfkommentar zu
+ * importUsers()): der REST-API-Aufrufer (`POST /api/v1/users`) kennt nur
+ * `tenantId`, nicht die volle `tenant.settings` — ein zusätzlicher DB-Zugriff
+ * allein für dieses Feld auf einem API-Schreibpfad wäre unverhältnismäßig,
+ * bleibt dort deshalb bewusst beim bisherigen Verhalten (Spalten-Default
+ * `'de'`). Der CSV-Bulk-Import (`importUsers()` oben) hat den Mandanten
+ * ohnehin schon geladen und reicht die Locale durch.
  */
 export async function importOneUser(
   admin: ReturnType<typeof createAdminClient>,
   tenantId: string,
   row: CsvRow,
+  locale?: Locale,
 ): Promise<ImportRowResult> {
   try {
     let userId: string;
@@ -258,12 +275,18 @@ export async function importOneUser(
     }
 
     // profiles-Upsert (id = auth.users.id, kein RLS-Konflikt da service_role)
-    // `email` ist NOT NULL im Schema — daher immer mitschreiben.
+    // `email` ist NOT NULL im Schema — daher immer mitschreiben. `locale` nur
+    // bei status === "created" mitschreiben (Bugfix 02.08.2026, s. o.): dieser
+    // Upsert hat kein `ignoreDuplicates`, überschreibt bei "linked" (Nutzer
+    // existiert bereits, ggf. in einem anderen Mandanten oder mit selbst
+    // gewählter Sprache) also tatsächlich bestehende Spalten — ein
+    // Re-Import/Verknüpfen darf eine schon gewählte Locale nicht zurücksetzen.
     await admin.from("profiles").upsert(
       {
         id: userId,
         email: row.email,
         full_name: row.fullName ?? null,
+        ...(status === "created" && locale ? { locale } : {}),
       },
       { onConflict: "id" },
     );

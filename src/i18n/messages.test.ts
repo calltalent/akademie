@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import de from "../../messages/de.json";
 import bs from "../../messages/bs.json";
+import en from "../../messages/en.json";
 
 /**
  * Schlüsselmengen-Vergleich (Plan Abschnitt 2, A7-Ergänzung zu A4 / Abschnitt
@@ -30,22 +31,36 @@ function collectPlaceholders(value: string): string[] {
   return [...value.matchAll(/\{[a-zA-Z0-9_]+\}/g)].map((match) => match[0]).sort();
 }
 
-describe("messages/bs.json — Struktur-Abgleich mit messages/de.json", () => {
-  it("enthält exakt dieselben Schlüsselpfade wie de.json", () => {
-    expect(collectKeyPaths(bs).sort()).toEqual(collectKeyPaths(de).sort());
+/**
+ * Gemeinsame Struktur-Prüfung, wiederverwendet für jede weitere Sprachdatei
+ * (bs.json, seit 02.08.2026 auch en.json) — Assertions unverändert gegenüber
+ * dem ursprünglichen bs-only-Test, nur aus dem describe-Block herausgezogen,
+ * damit eine neue Sprache keinen vollständig duplizierten Testblock braucht.
+ */
+function expectSameStructure(name: string, messages: unknown) {
+  it(`${name}.json enthält exakt dieselben Schlüsselpfade wie de.json`, () => {
+    expect(collectKeyPaths(messages).sort()).toEqual(collectKeyPaths(de).sort());
   });
 
-  it("übernimmt ICU-Platzhalter je Schlüssel unverändert", () => {
+  it(`${name}.json übernimmt ICU-Platzhalter je Schlüssel unverändert`, () => {
     const stringPaths = collectKeyPaths(de).filter((path) => typeof getByPath(de, path) === "string");
 
     for (const path of stringPaths) {
       const deValue = getByPath(de, path) as string;
-      const bsValue = getByPath(bs, path);
-      expect(typeof bsValue, `Schlüssel fehlt oder ist kein String in bs.json: ${path}`).toBe("string");
+      const value = getByPath(messages, path);
+      expect(typeof value, `Schlüssel fehlt oder ist kein String in ${name}.json: ${path}`).toBe("string");
       expect(
-        collectPlaceholders(bsValue as string),
+        collectPlaceholders(value as string),
         `Platzhalter weichen ab bei "${path}"`,
       ).toEqual(collectPlaceholders(deValue));
     }
   });
+}
+
+describe("messages/bs.json — Struktur-Abgleich mit messages/de.json", () => {
+  expectSameStructure("bs", bs);
+});
+
+describe("messages/en.json — Struktur-Abgleich mit messages/de.json", () => {
+  expectSameStructure("en", en);
 });

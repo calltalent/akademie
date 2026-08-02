@@ -15,7 +15,7 @@ import {
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { getTenant } from "@/lib/tenant/context";
 import { tenantOrigin } from "@/lib/tenant/url";
-import { resolveTenantEmailLocale } from "@/i18n/config";
+import { resolveTenantEmailLocale, type Locale } from "@/i18n/config";
 import { translateAuthError } from "@/lib/auth/errors";
 import { sendEmail } from "@/lib/email/client";
 import { passwordReset, magicLinkEmail, confirmSignup } from "@/lib/email/templates";
@@ -26,17 +26,29 @@ export type AuthActionState = { error: string | null; success?: boolean; redirec
  * Legt bei Erstanmeldung die profiles-Zeile an, falls sie fehlt.
  * RLS-Policy `profiles_own` erlaubt dem Nutzer nur seine eigene Zeile
  * (id = auth.uid()) — kein Admin-Client nötig.
+ *
+ * BUGFIX (02.08.2026, Josips Fund: "Mandanten-Standardsprache auf Bosnisch
+ * gestellt, Admin-/Lernbereich bleiben trotzdem Deutsch"): `profiles.locale`
+ * hat in 0001_init.sql einen harten Spalten-Default `'de'` — jede neue Zeile
+ * bekam den bisher unabhängig vom Mandanten, weil kein Aufrufer `locale`
+ * mitschrieb. `resolveLocale()` (i18n/resolve.ts) gewichtet das Cookie (aus
+ * genau diesem `profiles.locale` gespiegelt) VOR dem Mandanten-Standard —
+ * ein frisch angelegter Nutzer eines bosnisch-Standard-Mandanten sah dadurch
+ * dauerhaft Deutsch, nicht nur einmalig. `ignoreDuplicates: true` bleibt
+ * unverändert (nur INSERT, nie ein Überschreiben einer bereits bestehenden,
+ * ggf. selbst gewählten Locale eines Bestandsnutzers).
  */
 async function ensureProfile(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   email: string,
   fullName?: string,
+  locale?: Locale,
 ) {
   await supabase
     .from("profiles")
     .upsert(
-      { id: userId, email, full_name: fullName ?? null },
+      { id: userId, email, full_name: fullName ?? null, ...(locale ? { locale } : {}) },
       { onConflict: "id", ignoreDuplicates: true },
     );
 }
@@ -85,7 +97,18 @@ export async function signInWithPassword(
     return { error: "E-Mail oder Passwort falsch." };
   }
 
-  await ensureProfile(supabase, data.user.id, data.user.email ?? parsed.data.email);
+  // getTenant() vorgezogen (vor ensureProfile() statt erst kurz vor dem
+  // Redirect unten) — liefert die Locale für eine neu angelegte profiles-Zeile
+  // (Bugfix 02.08.2026, siehe Kopfkommentar zu ensureProfile()). Kein
+  // zusätzlicher DB-Zugriff, da React-cache()-gebunden (s. Kommentar unten).
+  const tenant = await getTenant();
+  await ensureProfile(
+    supabase,
+    data.user.id,
+    data.user.email ?? parsed.data.email,
+    undefined,
+    resolveTenantEmailLocale(tenant?.settings.default_locale),
+  );
 
   // Performance-Fix (19.07.2026, Josips Fund: Anmeldung immer noch langsam
   // trotz getAuthUser()-Fix): redirect("/") lief für Mandanten-Logins immer
@@ -112,7 +135,6 @@ export async function signInWithPassword(
   // indem die Aktion das Ziel nur als Daten zurückgibt; die Navigation
   // übernimmt die Client-Komponente selbst (siehe login/page.tsx), außerhalb
   // von Next' eigener Redirect-Sonderbehandlung für Server Actions.
-  const tenant = await getTenant();
   return { error: null, redirectTo: tenant ? "/dashboard" : "/" };
 }
 
@@ -182,16 +204,19 @@ export async function signUpWithPassword(
   // `ensureProfile()` ohnehin erneut auf und legt die Zeile dann mit echter
   // Session an; dieser Aufruf hier ist rein ein zusätzliches, jetzt
   // zuverlässiges Sicherheitsnetz, keine neue Anforderung.
+  // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache,
+  // nicht die individuelle profiles.locale des Empfängers. Vorgezogen (stand
+  // bisher erst nach dem Upsert) — Bugfix 02.08.2026 (siehe Kopfkommentar zu
+  // ensureProfile()): dieselbe Locale muss jetzt auch in die neue Zeile,
+  // sonst greift wieder der harte `profiles.locale`-Spalten-Default `'de'`.
+  const locale = resolveTenantEmailLocale(tenant.settings.default_locale);
   await admin
     .from("profiles")
     .upsert(
-      { id: data.user.id, email: parsed.data.email, full_name: parsed.data.fullName },
+      { id: data.user.id, email: parsed.data.email, full_name: parsed.data.fullName, locale },
       { onConflict: "id", ignoreDuplicates: true },
     );
 
-  // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache,
-  // nicht die individuelle profiles.locale des Empfängers.
-  const locale = resolveTenantEmailLocale(tenant.settings.default_locale);
   const html = await confirmSignup({
     tenantName: tenant.name,
     recipientName: parsed.data.fullName,
@@ -407,7 +432,18 @@ export async function setNewPassword(
     return { error: "Passwort konnte nicht gesetzt werden: " + translateAuthError(error) };
   }
 
-  await ensureProfile(supabase, user.id, user.email ?? "");
+  // getTenant() hier neu (Bugfix 02.08.2026, siehe Kopfkommentar zu
+  // ensureProfile()) — für importierte/eingeladene Erstnutzer, die ihr erstes
+  // Passwort über diesen Weg setzen, braucht die neu angelegte profiles-Zeile
+  // die Mandanten-Standardsprache statt des harten Spalten-Defaults `'de'`.
+  const tenant = await getTenant();
+  await ensureProfile(
+    supabase,
+    user.id,
+    user.email ?? "",
+    undefined,
+    resolveTenantEmailLocale(tenant?.settings.default_locale),
+  );
   // BUGFIX (22.07.2026): gleicher Grund wie bei signInWithPassword() oben —
   // redirect() direkt aus einer JS-gebundenen Server Action heraus ist auf
   // dieser Plattform der langsame Pfad. Ziel als Daten zurückgeben, Client
