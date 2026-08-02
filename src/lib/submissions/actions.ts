@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireStaffTenant } from "@/lib/auth/staff";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { createSubmissionSchema, gradeSubmissionSchema } from "@/lib/submissions/schema";
 import { sendEmail } from "@/lib/email/client";
 import { submissionGraded } from "@/lib/email/templates";
+import { resolveTenantEmailLocale } from "@/i18n/config";
 import type { GradeSubmissionActionState } from "@/lib/submissions/state";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 import { translateDbError } from "@/lib/errors/db";
@@ -190,29 +192,37 @@ export async function gradeSubmission(
     // completeLesson()) — `revalidatePath`/Rückgabe warten NICHT mehr auf
     // den Mailversand.
     if (learnerProfile?.email) {
-      const html = submissionGraded({
-        tenantName: tenant.name,
-        recipientName: learnerProfile.full_name ?? undefined,
-        courseTitle,
-        lessonTitle: lessonRow?.title ?? "",
-        status: parsed.data.status,
-        feedback: parsed.data.feedback,
-        accentColor: tenant.branding.color_primary,
-      });
-      sendEmail({
-        to: learnerProfile.email,
-        subject: "Abgabe bewertet",
-        html,
-        tenant: { name: tenant.name },
-      })
-        .then((mailResult) => {
-          if (!mailResult.success) {
-            console.error("[submissions/actions] Bewertungsmail fehlgeschlagen (fail-soft):", mailResult.error);
-          }
-        })
-        .catch((mailError) => {
-          console.error("[submissions/actions] Ausnahme beim Bewertungsmail-Versand (fail-soft):", mailError);
+      const learnerEmail = learnerProfile.email;
+      // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache,
+      // nicht die individuelle profiles.locale des Empfängers.
+      const locale = resolveTenantEmailLocale(tenant.settings.default_locale);
+      // Fire-and-forget bleibt erhalten (siehe Kommentar oben) — `submissionGraded()`
+      // ist durch die Mehrsprachigkeit jetzt async, deshalb in einer eigenen
+      // async-IIFE statt eines direkten `sendEmail()`-Aufrufs.
+      (async () => {
+        const html = await submissionGraded({
+          tenantName: tenant.name,
+          recipientName: learnerProfile.full_name ?? undefined,
+          courseTitle,
+          lessonTitle: lessonRow?.title ?? "",
+          status: parsed.data.status,
+          feedback: parsed.data.feedback,
+          accentColor: tenant.branding.color_primary,
+          locale,
         });
+        const tSubject = await getTranslations({ locale, namespace: "email" });
+        const mailResult = await sendEmail({
+          to: learnerEmail,
+          subject: tSubject("submissionGraded.subject"),
+          html,
+          tenant: { name: tenant.name },
+        });
+        if (!mailResult.success) {
+          console.error("[submissions/actions] Bewertungsmail fehlgeschlagen (fail-soft):", mailResult.error);
+        }
+      })().catch((mailError) => {
+        console.error("[submissions/actions] Ausnahme beim Bewertungsmail-Versand (fail-soft):", mailError);
+      });
     }
 
     revalidatePath("/admin/abgaben");

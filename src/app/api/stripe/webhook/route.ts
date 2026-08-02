@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
+import { getTranslations } from "next-intl/server";
 import { createStripeClient } from "@/lib/stripe/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getServerEnv } from "@/lib/env";
 import { checkoutMetadataSchema } from "@/lib/stripe/schema";
 import { sendEmail } from "@/lib/email/client";
 import { orderPaid } from "@/lib/email/templates";
+import { resolveTenantEmailLocale } from "@/i18n/config";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 import { genericErrorMessage } from "@/lib/errors/generic";
 
@@ -243,7 +245,7 @@ async function sendOrderPaidMail(
   // setzen - Stripe wuerde sonst unnoetig retryen.
   try {
     const [{ data: tenant }, { data: product }, { data: profile }] = await Promise.all([
-      admin.from("tenants").select("name, branding").eq("id", tenantId).maybeSingle(),
+      admin.from("tenants").select("name, branding, settings").eq("id", tenantId).maybeSingle(),
       admin.from("products").select("title").eq("id", productId).maybeSingle(),
       admin.from("profiles").select("email, full_name").eq("id", userId).maybeSingle(),
     ]);
@@ -251,16 +253,23 @@ async function sendOrderPaidMail(
 
     const tenantName = tenant?.name ?? "Calltalent-Akademie";
     const accentColor = (tenant?.branding as { color_primary?: string } | null)?.color_primary;
+    // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache,
+    // nicht die individuelle profiles.locale des Empfängers.
+    const locale = resolveTenantEmailLocale(
+      (tenant?.settings as { default_locale?: string } | null)?.default_locale,
+    );
 
-    const html = orderPaid({
+    const html = await orderPaid({
       tenantName,
       recipientName: profile.full_name ?? undefined,
       productName: product.title,
       accentColor,
+      locale,
     });
+    const tSubject = await getTranslations({ locale, namespace: "email" });
     const result = await sendEmail({
       to: profile.email,
-      subject: "Zahlung erhalten",
+      subject: tSubject("orderPaid.subject"),
       html,
       tenant: { name: tenantName },
     });

@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTenant } from "@/lib/tenant/context";
@@ -12,6 +13,7 @@ import { createAnthropicClient } from "@/lib/ai/anthropic";
 import { AI_MODELS } from "@/lib/ai/config";
 import { sendEmail } from "@/lib/email/client";
 import { tutorEscalation } from "@/lib/email/templates";
+import { resolveTenantEmailLocale } from "@/i18n/config";
 import type { AskTutorResult, TutorSource } from "@/lib/tutor/state";
 
 /**
@@ -383,21 +385,27 @@ export async function escalateToTrainer(conversationId: string): Promise<{ succe
       .maybeSingle();
     const learnerName = learnerProfile?.full_name?.trim() || learnerProfile?.email || "Ein Lernender";
 
+    // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache,
+    // nicht die individuelle profiles.locale der jeweiligen Staff-Mitglieder.
+    const locale = resolveTenantEmailLocale(tenant.settings.default_locale);
+    const tSubject = await getTranslations({ locale, namespace: "email" });
+
     // Mail an jedes Staff-Mitglied — FAIL-SOFT (Vertrag email/client.ts): ein
     // Mailfehler darf die bereits gespeicherte Eskalation (escalated=true)
     // nicht rückgängig machen, nur geloggt.
     for (const staffProfile of staffProfiles) {
-      const html = tutorEscalation({
+      const html = await tutorEscalation({
         tenantName: tenant.name,
         recipientName: staffProfile.full_name ?? undefined,
         learnerName,
         courseTitle: courseRow?.title ?? "",
         conversationId,
         accentColor: tenant.branding.color_primary,
+        locale,
       });
       const mailResult = await sendEmail({
         to: staffProfile.email,
-        subject: "Tutor-Frage an Trainer weitergeleitet",
+        subject: tSubject("tutorEscalation.subject"),
         html,
         tenant: { name: tenant.name },
       });

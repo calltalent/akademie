@@ -1175,5 +1175,64 @@
         "activeDaysAgo": "aktivno prije {days, plural, one {# dan} few {# dana} other {# dana}}"
       }
     }
+  },
+  "email": {
+    "common": {
+      "greetingNamed": "Zdravo {name},",
+      "greetingGeneric": "Zdravo,",
+      "footerNotice": "Ovaj e-mail je automatski poslao {tenantName}."
+    },
+    "welcomeInvite": {
+      "subject": "Dobrodošao/la kod {tenantName}",
+      "heading": "Dobrodošao/la",
+      "body": "za tebe je kreiran nalog kod {tenantName}. Postavi sada svoju lozinku kako bi se mogao/la prijaviti.",
+      "button": "Postavi lozinku",
+      "notice": "Ovaj link važi samo jednom i nakon nekog vremena ističe. Ako više ne funkcioniše, u svakom trenutku možeš na stranici za prijavu iskoristiti „Zaboravljena lozinka“."
+    },
+    "submissionGraded": {
+      "subject": "Zadatak ocijenjen",
+      "heading": "Zadatak ocijenjen",
+      "statusApproved": "prihvaćeno",
+      "statusRejected": "odbijeno",
+      "body": "tvoj zadatak u {courseTitle} — lekcija {lessonTitle} je ocijenjen: {status}."
+    },
+    "certificateIssued": {
+      "subject": "Certifikat izdat",
+      "heading": "Certifikat izdat",
+      "body": "čestitamo! Uspješno si završio/la kurs {courseTitle} — tvoj certifikat je spreman.",
+      "hint": "Svoj certifikat pronalaziš u profilu pod „Certifikati“."
+    },
+    "tutorEscalation": {
+      "subject": "Pitanje tutoru proslijeđeno treneru",
+      "heading": "Pitanje tutoru proslijeđeno",
+      "body": "{learnerName} je proslijedio/la razgovor s tutorom u kursu {courseTitle} tebi kao treneru, jer AI asistent nije mogao odgovoriti na pitanje na osnovu sadržaja kursa.",
+      "conversationIdLabel": "ID razgovora: {conversationId}"
+    },
+    "passwordReset": {
+      "subject": "Resetovanje lozinke kod {tenantName}",
+      "heading": "Resetuj lozinku",
+      "body": "za tvoj nalog kod {tenantName} zatražena je nova lozinka. Klikni na dugme kako bi postavio/la novu lozinku.",
+      "button": "Postavi novu lozinku",
+      "notice": "Ovaj link važi samo jednom i nakon nekog vremena ističe. Ako ovo nisi zatražio/la, jednostavno možeš zanemariti ovaj e-mail."
+    },
+    "magicLinkEmail": {
+      "subject": "Tvoj link za prijavu za {tenantName}",
+      "heading": "Tvoj link za prijavu",
+      "body": "klikni na dugme kako bi se prijavio/la kod {tenantName}.",
+      "button": "Prijavi se",
+      "notice": "Ovaj link važi samo jednom i nakon nekog vremena ističe. Ako nisi zatražio/la ovu prijavu, jednostavno možeš zanemariti ovaj e-mail."
+    },
+    "confirmSignup": {
+      "subject": "Potvrdi svoju e-mail adresu kod {tenantName}",
+      "heading": "Potvrdi svoju e-mail adresu",
+      "body": "molimo potvrdi svoju e-mail adresu kako bi aktivirao/la svoj nalog kod {tenantName}.",
+      "button": "Potvrdi e-mail adresu",
+      "notice": "Ovaj link važi samo jednom i nakon nekog vremena ističe. Ako nisi kreirao/la ovaj nalog, jednostavno možeš zanemariti ovaj e-mail."
+    },
+    "orderPaid": {
+      "subject": "Uplata primljena",
+      "heading": "Uplata primljena",
+      "body": "hvala na kupovini {productName} kod {tenantName}. Uplata je primljena i tvoj pristup je otključan."
+    }
   }
 }

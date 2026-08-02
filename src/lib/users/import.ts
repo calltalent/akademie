@@ -1,8 +1,10 @@
 import "server-only";
+import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { CsvRow } from "@/lib/users/csv";
 import { sendEmail } from "@/lib/email/client";
 import { welcomeInvite } from "@/lib/email/templates";
+import { resolveTenantEmailLocale } from "@/i18n/config";
 import { DEFAULT_BRANDING, type PublicTenant } from "@/lib/tenant/types";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 import { tenantOrigin } from "@/lib/tenant/url";
@@ -39,8 +41,12 @@ export type ImportSummary = {
   results: ImportRowResult[];
 };
 
-/** Nur die Felder, die importUsers() für die Willkommensmail braucht — kein voller PublicTenant-Zwang an den Aufrufer. */
-export type ImportTenant = Pick<PublicTenant, "id" | "name" | "slug" | "custom_domain" | "branding">;
+/**
+ * Nur die Felder, die importUsers() für die Willkommensmail braucht — kein
+ * voller PublicTenant-Zwang an den Aufrufer. `settings` NEU (i18n Block
+ * C5a): Mandanten-Standardsprache für die Willkommensmail.
+ */
+export type ImportTenant = Pick<PublicTenant, "id" | "name" | "slug" | "custom_domain" | "branding" | "settings">;
 
 /**
  * Bulk-Import via service_role — UMGEHT RLS bewusst (siehe admin.ts).
@@ -133,17 +139,22 @@ async function sendWelcomeMail(
 ): Promise<void> {
   const loginUrl = await buildSetPasswordLink(admin, tenant, result.email);
   const accentColor = tenant.branding?.color_primary ?? DEFAULT_BRANDING.color_primary;
+  // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache,
+  // nicht die individuelle profiles.locale des Empfängers.
+  const locale = resolveTenantEmailLocale(tenant.settings.default_locale);
 
-  const html = welcomeInvite({
+  const html = await welcomeInvite({
     tenantName: tenant.name,
     recipientName: row.fullName,
     loginUrl,
     accentColor,
+    locale,
   });
+  const tSubject = await getTranslations({ locale, namespace: "email" });
 
   const sendResult = await sendEmail({
     to: result.email,
-    subject: `Willkommen bei ${tenant.name}`,
+    subject: tSubject("welcomeInvite.subject", { tenantName: tenant.name }),
     html,
     tenant: { name: tenant.name },
   });

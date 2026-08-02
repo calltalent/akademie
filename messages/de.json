@@ -1175,5 +1175,64 @@
         "activeDaysAgo": "aktiv vor {days, plural, one {# Tag} other {# Tagen}}"
       }
     }
+  },
+  "email": {
+    "common": {
+      "greetingNamed": "Hallo {name},",
+      "greetingGeneric": "Hallo,",
+      "footerNotice": "Diese E-Mail wurde automatisch von {tenantName} versendet."
+    },
+    "welcomeInvite": {
+      "subject": "Willkommen bei {tenantName}",
+      "heading": "Willkommen",
+      "body": "für dich wurde ein Konto bei {tenantName} angelegt. Lege jetzt dein Passwort fest, um dich anzumelden.",
+      "button": "Passwort festlegen",
+      "notice": "Dieser Link ist nur einmal gültig und läuft nach einiger Zeit ab. Falls er nicht mehr funktioniert, kannst du auf der Login-Seite jederzeit „Passwort vergessen“ nutzen."
+    },
+    "submissionGraded": {
+      "subject": "Abgabe bewertet",
+      "heading": "Abgabe bewertet",
+      "statusApproved": "angenommen",
+      "statusRejected": "abgelehnt",
+      "body": "deine Abgabe in {courseTitle} — Lektion {lessonTitle} wurde bewertet: {status}."
+    },
+    "certificateIssued": {
+      "subject": "Zertifikat ausgestellt",
+      "heading": "Zertifikat ausgestellt",
+      "body": "herzlichen Glückwunsch! Du hast den Kurs {courseTitle} erfolgreich abgeschlossen — dein Zertifikat ist bereit.",
+      "hint": "Du findest dein Zertifikat in deinem Profil unter „Zertifikate“."
+    },
+    "tutorEscalation": {
+      "subject": "Tutor-Frage an Trainer weitergeleitet",
+      "heading": "Tutor-Frage weitergeleitet",
+      "body": "{learnerName} hat eine Tutor-Konversation im Kurs {courseTitle} an dich als Trainer weitergeleitet, weil der KI-Assistent die Frage nicht aus dem Kursinhalt beantworten konnte.",
+      "conversationIdLabel": "Konversations-ID: {conversationId}"
+    },
+    "passwordReset": {
+      "subject": "Passwort zurücksetzen bei {tenantName}",
+      "heading": "Passwort zurücksetzen",
+      "body": "für dein Konto bei {tenantName} wurde ein neues Passwort angefordert. Klicke auf den Button, um ein neues Passwort festzulegen.",
+      "button": "Neues Passwort festlegen",
+      "notice": "Dieser Link ist nur einmal gültig und läuft nach einiger Zeit ab. Falls du das nicht angefordert hast, kannst du diese E-Mail einfach ignorieren."
+    },
+    "magicLinkEmail": {
+      "subject": "Dein Login-Link für {tenantName}",
+      "heading": "Dein Login-Link",
+      "body": "klicke auf den Button, um dich bei {tenantName} anzumelden.",
+      "button": "Anmelden",
+      "notice": "Dieser Link ist nur einmal gültig und läuft nach einiger Zeit ab. Falls du diese Anmeldung nicht angefordert hast, kannst du diese E-Mail einfach ignorieren."
+    },
+    "confirmSignup": {
+      "subject": "Bestätige deine E-Mail-Adresse bei {tenantName}",
+      "heading": "Bestätige deine E-Mail-Adresse",
+      "body": "bitte bestätige deine E-Mail-Adresse, um dein Konto bei {tenantName} zu aktivieren.",
+      "button": "E-Mail-Adresse bestätigen",
+      "notice": "Dieser Link ist nur einmal gültig und läuft nach einiger Zeit ab. Falls du dieses Konto nicht angelegt hast, kannst du diese E-Mail einfach ignorieren."
+    },
+    "orderPaid": {
+      "subject": "Zahlung erhalten",
+      "heading": "Zahlung erhalten",
+      "body": "vielen Dank für deinen Kauf von {productName} bei {tenantName}. Die Zahlung ist eingegangen und dein Zugang ist freigeschaltet."
+    }
   }
 }

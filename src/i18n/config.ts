@@ -50,3 +50,18 @@ export function resolveEnabledLocales(settings: { enabled_locales?: unknown }): 
     (value): value is Locale => typeof value === "string" && isSupportedLocale(value),
   );
 }
+
+/**
+ * Locale für serverseitig OHNE Request-Kontext erzeugte Inhalte — bislang nur
+ * E-Mails (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 6, "C5a"). Josips
+ * Entscheidung: Mandanten-Standardsprache (`tenant.settings.default_locale`),
+ * nicht die individuelle `profiles.locale` des Empfängers. `default_locale`
+ * kommt roh aus `tenants.settings` (jsonb, in `PublicTenant["settings"]`
+ * bislang als `string` typisiert) — zur Laufzeit nicht durch TypeScript
+ * abgesichert, deshalb hier defensiv geprüft statt vorausgesetzt: ein
+ * fehlendes/unbekanntes Kürzel fällt still auf DEFAULT_LOCALE zurück statt
+ * zu werfen (gleiche Linie wie `resolveEnabledLocales()` oben).
+ */
+export function resolveTenantEmailLocale(defaultLocale?: string | null): Locale {
+  return defaultLocale && isSupportedLocale(defaultLocale) ? defaultLocale : DEFAULT_LOCALE;
+}

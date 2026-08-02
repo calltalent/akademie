@@ -1,10 +1,12 @@
 import "server-only";
+import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { computeCourseProgress } from "@/lib/progress/compute";
 import { generateCertificateSerial } from "@/lib/certificates/serial";
 import { generateCertificatePdf } from "@/lib/certificates/pdf";
 import { sendEmail } from "@/lib/email/client";
 import { certificateIssued } from "@/lib/email/templates";
+import { resolveTenantEmailLocale } from "@/i18n/config";
 import { translateDbError } from "@/lib/errors/db";
 
 /**
@@ -46,7 +48,8 @@ export type IssueCertificateResult =
 
 type CourseSettings = { certificate_enabled?: boolean };
 type TenantBranding = { color_primary?: string };
-type TenantSettings = { certificates_enabled?: boolean };
+/** `default_locale` NEU (i18n Block C5a): Mandanten-Standardsprache für die Zertifikatsmail. */
+type TenantSettings = { certificates_enabled?: boolean; default_locale?: string };
 
 export async function issueCertificateIfEligible(
   courseId: string,
@@ -201,15 +204,20 @@ export async function issueCertificateIfEligible(
     // Mailfehler darf die bereits erfolgte Ausstellung nicht rückgängig
     // machen oder als Fehler nach oben gemeldet werden.
     if (profile?.email) {
-      const html = certificateIssued({
+      // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache,
+      // nicht die individuelle profiles.locale des Empfängers.
+      const locale = resolveTenantEmailLocale(tenantSettings.default_locale);
+      const html = await certificateIssued({
         tenantName,
         recipientName: profile.full_name ?? undefined,
         courseTitle: course.title,
         accentColor,
+        locale,
       });
+      const tSubject = await getTranslations({ locale, namespace: "email" });
       const mailResult = await sendEmail({
         to: profile.email,
-        subject: "Zertifikat ausgestellt",
+        subject: tSubject("certificateIssued.subject"),
         html,
         tenant: { name: tenantName },
       });

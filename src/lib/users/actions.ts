@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { requireAdminTenant } from "@/lib/auth/staff";
 import { csvRowSchema } from "@/lib/users/csv";
 import { importUsers, buildSetPasswordLink } from "@/lib/users/import";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/client";
 import { welcomeInvite } from "@/lib/email/templates";
+import { resolveTenantEmailLocale } from "@/i18n/config";
 import { DEFAULT_BRANDING } from "@/lib/tenant/types";
 import type { CourseActionState } from "@/lib/courses/state";
 import { translateDbError } from "@/lib/errors/db";
@@ -120,16 +122,21 @@ export async function resendInviteLink(userId: string): Promise<CourseActionStat
 
     const loginUrl = await buildSetPasswordLink(admin, tenant, profile.email);
     const accentColor = tenant.branding?.color_primary ?? DEFAULT_BRANDING.color_primary;
-    const html = welcomeInvite({
+    // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache,
+    // nicht die individuelle profiles.locale des Empfängers.
+    const locale = resolveTenantEmailLocale(tenant.settings.default_locale);
+    const html = await welcomeInvite({
       tenantName: tenant.name,
       recipientName: profile.full_name ?? undefined,
       loginUrl,
       accentColor,
+      locale,
     });
+    const tSubject = await getTranslations({ locale, namespace: "email" });
 
     const sendResult = await sendEmail({
       to: profile.email,
-      subject: `Willkommen bei ${tenant.name}`,
+      subject: tSubject("welcomeInvite.subject", { tenantName: tenant.name }),
       html,
       tenant: { name: tenant.name },
     });

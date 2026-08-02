@@ -2,6 +2,7 @@
 
 import { createHash } from "node:crypto";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -14,6 +15,7 @@ import {
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { getTenant } from "@/lib/tenant/context";
 import { tenantOrigin } from "@/lib/tenant/url";
+import { resolveTenantEmailLocale } from "@/i18n/config";
 import { translateAuthError } from "@/lib/auth/errors";
 import { sendEmail } from "@/lib/email/client";
 import { passwordReset, magicLinkEmail, confirmSignup } from "@/lib/email/templates";
@@ -187,15 +189,20 @@ export async function signUpWithPassword(
       { onConflict: "id", ignoreDuplicates: true },
     );
 
-  const html = confirmSignup({
+  // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache,
+  // nicht die individuelle profiles.locale des Empfängers.
+  const locale = resolveTenantEmailLocale(tenant.settings.default_locale);
+  const html = await confirmSignup({
     tenantName: tenant.name,
     recipientName: parsed.data.fullName,
     confirmUrl: data.properties.action_link,
     accentColor: tenant.branding?.color_primary,
+    locale,
   });
+  const tSubject = await getTranslations({ locale, namespace: "email" });
   const sendResult = await sendEmail({
     to: parsed.data.email,
-    subject: `Bestätige deine E-Mail-Adresse bei ${tenant.name}`,
+    subject: tSubject("confirmSignup.subject", { tenantName: tenant.name }),
     html,
     tenant: { name: tenant.name },
   });
@@ -264,15 +271,21 @@ export async function signInWithMagicLink(
     .eq("email", parsed.data.email)
     .maybeSingle();
 
-  const html = magicLinkEmail({
+  // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache,
+  // nicht die individuelle profiles.locale des Empfängers. Kein Mandant
+  // (Portal-Host) -> DEFAULT_LOCALE, wie schon der bisherige "Calltalent"-Fallback.
+  const locale = resolveTenantEmailLocale(tenant?.settings.default_locale);
+  const html = await magicLinkEmail({
     tenantName: tenant?.name ?? "Calltalent",
     recipientName: profile?.full_name ?? undefined,
     loginUrl: data.properties.action_link,
     accentColor: tenant?.branding?.color_primary,
+    locale,
   });
+  const tSubject = await getTranslations({ locale, namespace: "email" });
   const sendResult = await sendEmail({
     to: parsed.data.email,
-    subject: `Dein Login-Link für ${tenant?.name ?? "Calltalent"}`,
+    subject: tSubject("magicLinkEmail.subject", { tenantName: tenant?.name ?? "Calltalent" }),
     html,
     tenant: { name: tenant?.name ?? "Calltalent" },
   });
@@ -337,15 +350,20 @@ export async function requestPasswordReset(
         .eq("email", parsed.data.email)
         .maybeSingle();
 
-      const html = passwordReset({
+      // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache,
+      // nicht die individuelle profiles.locale des Empfängers.
+      const locale = resolveTenantEmailLocale(tenant?.settings.default_locale);
+      const html = await passwordReset({
         tenantName: tenant?.name ?? "Calltalent",
         recipientName: profile?.full_name ?? undefined,
         resetUrl: data.properties.action_link,
         accentColor: tenant?.branding?.color_primary,
+        locale,
       });
+      const tSubject = await getTranslations({ locale, namespace: "email" });
       await sendEmail({
         to: parsed.data.email,
-        subject: `Passwort zurücksetzen bei ${tenant?.name ?? "Calltalent"}`,
+        subject: tSubject("passwordReset.subject", { tenantName: tenant?.name ?? "Calltalent" }),
         html,
         tenant: { name: tenant?.name ?? "Calltalent" },
       });

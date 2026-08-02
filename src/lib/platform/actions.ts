@@ -12,9 +12,11 @@ import {
   tenantLogoUrlSchema,
   tenantLoginContentSchema,
 } from "@/lib/platform/schema";
+import { getTranslations } from "next-intl/server";
 import { buildSetPasswordLink, findUserByEmail, type ImportTenant } from "@/lib/users/import";
 import { sendEmail } from "@/lib/email/client";
 import { welcomeInvite } from "@/lib/email/templates";
+import { resolveTenantEmailLocale } from "@/i18n/config";
 import { translateDbError } from "@/lib/errors/db";
 import { translateAuthError } from "@/lib/auth/errors";
 import { genericErrorMessage } from "@/lib/errors/generic";
@@ -181,12 +183,19 @@ async function inviteTenantOwner(
       name: tenant.name,
       custom_domain: null,
       branding: {},
+      settings: {},
     };
     const loginUrl = await buildSetPasswordLink(admin, importTenant, ownerEmail);
-    const html = welcomeInvite({ tenantName: tenant.name, loginUrl });
+    // Locale-Quelle laut Plan (Abschnitt 6, C5a): Mandanten-Standardsprache.
+    // Der frisch angelegte Mandant hat noch keine `settings` gesetzt (siehe
+    // createTenant() oben, nur name/slug/plan) — resolveTenantEmailLocale()
+    // fällt dadurch unverändert auf DEFAULT_LOCALE zurück.
+    const locale = resolveTenantEmailLocale(undefined);
+    const html = await welcomeInvite({ tenantName: tenant.name, loginUrl, locale });
+    const tSubject = await getTranslations({ locale, namespace: "email" });
     const sendResult = await sendEmail({
       to: ownerEmail,
-      subject: `Willkommen bei ${tenant.name}`,
+      subject: tSubject("welcomeInvite.subject", { tenantName: tenant.name }),
       html,
       tenant: { name: tenant.name },
     });
