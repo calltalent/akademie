@@ -301,9 +301,11 @@
       "noAttempts": "—",
       "columnUser": "Korisnik",
       "columnBestScore": "Najbolji rezultat",
+      "columnBestScorePercent": "Najbolji rezultat (%)",
       "resetLabel": "Resetuj analizu kviza: {quiz} – {user}",
       "resetConfirm": "Resetovati analizu kviza „{quiz} – {user}“? Svi pokušaji ovog korisnika za ovaj kviz će biti obrisani. Ova radnja se ne može poništiti."
-    }
+    },
+    "courseNotFoundError": "Kurs nije pronađen."
   },
   "learn": {
     "shell": {

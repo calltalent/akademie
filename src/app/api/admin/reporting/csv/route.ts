@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireStaffTenant } from "@/lib/auth/staff";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { getCourseReport, getUserReport, getQuizReport } from "@/lib/reporting/queries";
@@ -13,10 +14,6 @@ const querySchema = z.object({
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function formatLastActivity(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString("de-DE") : "—";
 }
 
 /**
@@ -38,6 +35,10 @@ function formatLastActivity(iso: string | null): string {
  */
 export async function GET(request: Request) {
   try {
+    const t = await getTranslations("reporting");
+    const format = await getFormatter();
+    const formatLastActivity = (iso: string | null) => (iso ? format.dateTime(new Date(iso)) : t("users.noActivity"));
+
     const { tenant, supabase } = await requireStaffTenant();
 
     if (
@@ -71,7 +72,7 @@ export async function GET(request: Request) {
         .eq("tenant_id", tenant.id)
         .maybeSingle();
       if (!course) {
-        return NextResponse.json({ error: "Kurs nicht gefunden." }, { status: 404 });
+        return NextResponse.json({ error: t("courseNotFoundError") }, { status: 404 });
       }
     }
 
@@ -81,14 +82,21 @@ export async function GET(request: Request) {
     if (type === "courses") {
       const rows = await getCourseReport(tenant.id);
       csv = toCsv(
-        ["Kurs", "Eingeschrieben", "Aktiv", "Abschlussquote (%)"],
+        [t("courses.columnCourse"), t("courses.columnEnrolled"), t("courses.columnActive"), t("courses.columnCompletionRate")],
         rows.map((r) => [r.courseTitle, r.enrolledCount, r.activeCount, r.completionRatePct]),
       );
       filenamePrefix = "kursbericht";
     } else if (type === "users") {
       const rows = await getUserReport(tenant.id, courseId);
       csv = toCsv(
-        ["Name", "E-Mail", "Kurs", "Fortschritt (%)", "Abgeschlossene Lektionen", "Letzte Aktivität"],
+        [
+          t("users.columnName"),
+          t("users.columnEmail"),
+          t("users.columnCourse"),
+          t("users.columnProgress"),
+          t("users.columnCompletedLessons"),
+          t("users.columnLastActivity"),
+        ],
         rows.map((r) => [
           r.userName,
           r.userEmail,
@@ -105,8 +113,8 @@ export async function GET(request: Request) {
       // lib/reporting/queries.ts (QuizReportRow).
       const rows = await getQuizReport(tenant.id);
       csv = toCsv(
-        ["Quiz", "Kurs", "Nutzer", "Versuche", "Bestes Ergebnis (%)"],
-        rows.map((r) => [r.quizTitle, r.courseTitle, r.userName, r.attemptsCount, r.bestScorePct ?? "—"]),
+        [t("quiz.columnQuiz"), t("quiz.columnCourse"), t("quiz.columnUser"), t("quiz.columnAttempts"), t("quiz.columnBestScorePercent")],
+        rows.map((r) => [r.quizTitle, r.courseTitle, r.userName, r.attemptsCount, r.bestScorePct ?? t("quiz.noAttempts")]),
       );
       filenamePrefix = "quizauswertung";
     }

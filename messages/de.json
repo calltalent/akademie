@@ -301,9 +301,11 @@
       "noAttempts": "—",
       "columnUser": "Nutzer",
       "columnBestScore": "Bestes Ergebnis",
+      "columnBestScorePercent": "Bestes Ergebnis (%)",
       "resetLabel": "Quiz-Auswertung zurücksetzen: {quiz} – {user}",
       "resetConfirm": "Quiz-Auswertung für „{quiz} – {user}“ zurücksetzen? Alle Versuche dieses Nutzers für dieses Quiz werden gelöscht. Dieser Vorgang kann nicht rückgängig gemacht werden."
-    }
+    },
+    "courseNotFoundError": "Kurs nicht gefunden."
   },
   "learn": {
     "shell": {
