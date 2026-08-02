@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { checkAdminAccess } from "@/lib/auth/staff";
@@ -90,20 +91,21 @@ import { CourseListTable, type CourseListRow } from "@/components/admin/course-l
  * Schritt 1 des Assistenten — kein Zwischenformular mehr.
  */
 
-const TABS: { key: string; label: string; status: string | null }[] = [
-  { key: "alle", label: "Alle", status: null },
-  { key: "live", label: "Live", status: "published" },
-  { key: "entwurf", label: "Entwürfe", status: "draft" },
-  { key: "archiv", label: "Archiv", status: "archived" },
-];
-
 export default async function AdminKursePage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  const tRoot = await getTranslations("admin.courseEditor");
+  const t = await getTranslations("admin.courseEditor.list");
+  const TABS: { key: string; label: string; status: string | null }[] = [
+    { key: "alle", label: t("tabAll"), status: null },
+    { key: "live", label: t("tabLive"), status: "published" },
+    { key: "entwurf", label: t("tabDraft"), status: "draft" },
+    { key: "archiv", label: t("tabArchived"), status: "archived" },
+  ];
   const { status: statusParam } = await searchParams;
-  const activeKey = TABS.some((t) => t.key === statusParam) ? statusParam! : "alle";
+  const activeKey = TABS.some((tab) => tab.key === statusParam) ? statusParam! : "alle";
 
   const tenant = await getTenant();
   // Zugriff ist über admin/layout.tsx (checkStaffAccess) gated; ohne Mandant
@@ -180,7 +182,7 @@ export default async function AdminKursePage({
   }
 
   const allCourses = courses ?? [];
-  const activeStatus = TABS.find((t) => t.key === activeKey)!.status;
+  const activeStatus = TABS.find((tab) => tab.key === activeKey)!.status;
   const visibleCourses = activeStatus
     ? allCourses.filter((c) => c.status === activeStatus)
     : allCourses;
@@ -211,17 +213,17 @@ export default async function AdminKursePage({
       <header className="flex items-center gap-[18px]">
         <div className="flex-1">
           <div className="text-[13px] font-semibold" style={{ color: "#A9AAC4" }}>
-            Inhalte · Kurse
+            {tRoot("eyebrow")}
           </div>
           <h1 className="mt-0.5 text-[26px] font-extrabold" style={{ letterSpacing: "-0.01em" }}>
-            Kurse
+            {t("title")}
           </h1>
           <p className="mt-1 text-[13.5px]" style={{ color: "#A9AAC4" }}>
-            <b style={{ color: "#3E3F66" }}>{allCourses.length}</b> {allCourses.length === 1 ? "Kurs" : "Kurse"}
+            {t.rich("courseCount", { count: allCourses.length, b: (chunks) => <b style={{ color: "#3E3F66" }}>{chunks}</b> })}
             {" · "}
-            <b style={{ color: "#3E3F66" }}>{draftCount}</b> {draftCount === 1 ? "Entwurf" : "Entwürfe"}
+            {t.rich("draftCount", { count: draftCount, b: (chunks) => <b style={{ color: "#3E3F66" }}>{chunks}</b> })}
             {" · "}
-            <b style={{ color: "#3E3F66" }}>{totalMembers}</b> Teilnehmer insgesamt
+            {t.rich("totalMembersSuffix", { count: totalMembers, b: (chunks) => <b style={{ color: "#3E3F66" }}>{chunks}</b> })}
           </p>
         </div>
         <div className="flex flex-none items-center gap-2.5">
@@ -231,18 +233,18 @@ export default async function AdminKursePage({
       </header>
 
       <div className="flex flex-wrap gap-2.5">
-        {TABS.map((t) => (
+        {TABS.map((tab) => (
           <Link
-            key={t.key}
-            href={t.key === "alle" ? "/admin/kurse" : `/admin/kurse?status=${t.key}`}
+            key={tab.key}
+            href={tab.key === "alle" ? "/admin/kurse" : `/admin/kurse?status=${tab.key}`}
             className="inline-flex rounded-[10px] px-[15px] py-[9px] text-sm font-semibold no-underline"
             style={
-              t.key === activeKey
+              tab.key === activeKey
                 ? { background: "#5663AE", color: "#fff" }
                 : { background: "#fff", color: "#3E3F66", border: "1px solid #E7E8F2" }
             }
           >
-            {t.label}
+            {tab.label}
           </Link>
         ))}
       </div>

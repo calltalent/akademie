@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { CourseEditorSteps } from "@/components/admin/course-editor-steps";
@@ -65,6 +66,7 @@ export default async function CourseEditorPage({
 }) {
   const { id: courseId } = await params;
   const { lesson: activeLessonId } = await searchParams;
+  const t = await getTranslations("admin.courseEditor");
   const tenant = await getTenant();
   const supabase = await createClient();
 
@@ -78,7 +80,7 @@ export default async function CourseEditorPage({
   if (!course) {
     return (
       <div className="mx-auto max-w-3xl">
-        <p className="text-base">Kurs nicht gefunden.</p>
+        <p className="text-base">{t("courseNotFound")}</p>
       </div>
     );
   }

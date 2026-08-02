@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Pencil, Search } from "lucide-react";
 import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
 import { CourseCategorySelect } from "@/components/admin/publish-toggle";
@@ -23,10 +24,10 @@ export type CourseListRow = {
   isLast: boolean;
 };
 
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  published: { label: "Live", color: "#1F8A5B", bg: "#E3F2EA" },
-  draft: { label: "Entwurf", color: "#1A1A2E", bg: "#F7EED4" },
-  archived: { label: "Archiviert", color: "#66679B", bg: "#EEF0F7" },
+const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
+  published: { color: "#1F8A5B", bg: "#E3F2EA" },
+  draft: { color: "#1A1A2E", bg: "#F7EED4" },
+  archived: { color: "#66679B", bg: "#EEF0F7" },
 };
 
 const COURSE_LIST_COLS = "1.7fr 1.1fr 0.7fr 0.8fr 0.8fr 1.3fr";
@@ -51,6 +52,9 @@ export function CourseListTable({
   categories: CourseCategoryRow[];
   isAdmin: boolean;
 }) {
+  const t = useTranslations("admin.courseEditor.list");
+  const tRoot = useTranslations("admin.courseEditor");
+  const tStatuses = useTranslations("admin.courseEditor.courseStatuses");
   const [search, setSearch] = useState("");
   const visible = courses.filter((c) => c.title.toLowerCase().includes(search.trim().toLowerCase()));
 
@@ -61,12 +65,12 @@ export function CourseListTable({
         style={{ borderColor: "#E7E8F2" }}
       >
         <Search size={16} aria-hidden="true" style={{ color: "#A9AAC4" }} />
-        <span className="sr-only">Kurs suchen</span>
+        <span className="sr-only">{t("searchLabel")}</span>
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Kurs suchen …"
+          placeholder={t("searchPlaceholder")}
           className="w-full text-[14.5px] outline-none"
           style={{ color: "#1A1A2E" }}
         />
@@ -81,20 +85,20 @@ export function CourseListTable({
             borderBottom: "1px solid #EEF0F7",
           } as React.CSSProperties}
         >
-          <div>Kurs</div>
-          <div>Kategorie</div>
-          <div>Lektionen</div>
-          <div>Teilnehmer</div>
-          <div>Status</div>
+          <div>{t("colCourse")}</div>
+          <div>{t("colCategory")}</div>
+          <div>{t("colLessons")}</div>
+          <div>{t("colMembers")}</div>
+          <div>{t("colStatus")}</div>
           <div />
         </div>
         {visible.length === 0 ? (
           <p className="px-[26px] py-6 text-sm" style={{ color: "#A9AAC4" }}>
-            {courses.length === 0 ? "Keine Kurse in dieser Ansicht." : `Kein Kurs gefunden für „${search}“.`}
+            {courses.length === 0 ? t("emptyAll") : t("emptySearch", { search })}
           </p>
         ) : (
           visible.map((c) => {
-            const meta = STATUS_META[c.status] ?? STATUS_META.draft;
+            const colors = STATUS_COLORS[c.status] ?? STATUS_COLORS.draft;
             return (
               <div
                 key={c.id}
@@ -107,7 +111,7 @@ export function CourseListTable({
                 <div className="flex items-center gap-3.5">
                   <ThumbnailUpload
                     initialUrl={c.coverUrl}
-                    entityLabel="Kursbild"
+                    entityLabel={tRoot("steps.courseImageLabel")}
                     entityTitle={c.title}
                     onUpload={updateCourseCoverUrl.bind(null, c.id)}
                   />
@@ -121,7 +125,7 @@ export function CourseListTable({
                   </Link>
                 </div>
                 <div>
-                  <span className="rgrid-label">Kategorie</span>
+                  <span className="rgrid-label">{t("colCategory")}</span>
                   <CourseCategorySelect
                     courseId={c.id}
                     categoryId={c.categoryId}
@@ -131,27 +135,27 @@ export function CourseListTable({
                   />
                 </div>
                 <div>
-                  <span className="rgrid-label">Lektionen</span>
+                  <span className="rgrid-label">{t("colLessons")}</span>
                   <span style={{ color: "#3E3F66" }}>{c.lessons}</span>
                 </div>
                 <div>
-                  <span className="rgrid-label">Teilnehmer</span>
+                  <span className="rgrid-label">{t("colMembers")}</span>
                   <span style={{ color: "#3E3F66" }}>{c.members}</span>
                 </div>
                 <div>
                   <span
                     className="inline-flex rounded-lg px-3 py-1 text-[13px] font-bold"
-                    style={{ color: meta.color, background: meta.bg }}
+                    style={{ color: colors.color, background: colors.bg }}
                   >
-                    {meta.label}
+                    {tStatuses(c.status as "draft" | "published" | "archived")}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 lg:justify-end">
                   <Link
                     href={`/admin/kurse/${c.id}`}
                     prefetch={false}
-                    aria-label={`Kurs bearbeiten: ${c.title}`}
-                    title="Bearbeiten"
+                    aria-label={t("editAria", { title: c.title })}
+                    title={t("editTitle")}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-[9px] border bg-white no-underline"
                     style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
                   >

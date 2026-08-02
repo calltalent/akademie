@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ArrowLeft, Check } from "lucide-react";
 import { ModuleLessonTree, DeleteLessonButton, type ModuleRow } from "@/components/admin/module-lesson-tree";
 import { BlockEditor } from "@/components/editor/block-editor";
@@ -39,13 +40,7 @@ import type { Block } from "@/lib/courses/schema";
  * wenn über `?lesson=` bereits eine Lektion ausgewählt ist (Klick aus dem
  * Baum lädt die Seite serverseitig neu), sonst Schritt 1.
  */
-const STEPS = [
-  { n: 1 as const, label: "Grunddaten" },
-  { n: 2 as const, label: "Informationen" },
-  { n: 3 as const, label: "Inhalt & Struktur" },
-  { n: 4 as const, label: "Veröffentlichung" },
-];
-type StepNumber = (typeof STEPS)[number]["n"];
+type StepNumber = 1 | 2 | 3 | 4;
 
 export function CourseEditorSteps({
   courseId,
@@ -90,6 +85,7 @@ export function CourseEditorSteps({
   certificateCount: number;
   initialStep: StepNumber;
 }) {
+  const t = useTranslations("admin.courseEditor.steps");
   const [step, setStep] = useState<StepNumber>(initialStep);
   const router = useRouter();
 
@@ -102,7 +98,7 @@ export function CourseEditorSteps({
           style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
           <ArrowLeft size={16} aria-hidden="true" style={{ color: "#5663AE" }} />
-          Zurück zur Kursliste
+          {t("backToList")}
         </Link>
         <div className="min-w-0 flex-1 truncate text-[15px] font-semibold" style={{ color: "#A9AAC4" }}>
           {courseTitle}
@@ -113,9 +109,9 @@ export function CourseEditorSteps({
 
       {step === 1 && (
         <Panel
-          title="Grunddaten"
-          subtitle="Titel, Adresse, Kategorie und Kursbild — sichtbar in Kursliste und Katalog."
-          footer={<StepFoot onNext={() => setStep(2)} nextLabel="Weiter zu Informationen" />}
+          title={t("panel1Title")}
+          subtitle={t("panel1Subtitle")}
+          footer={<StepFoot onNext={() => setStep(2)} nextLabel={t("nextToInfo")} />}
         >
           <CourseTitleEditor
             courseId={courseId}
@@ -127,11 +123,11 @@ export function CourseEditorSteps({
             <CourseCategorySelect courseId={courseId} categoryId={courseCategoryId} categories={categories} />
             <div className="flex flex-col gap-1.5">
               <span className="text-[13px] font-bold" style={{ color: "#3E3F66" }}>
-                Kursbild
+                {t("courseImageLabel")}
               </span>
               <ThumbnailUpload
                 initialUrl={courseCoverUrl}
-                entityLabel="Kursbild"
+                entityLabel={t("courseImageLabel")}
                 entityTitle={courseTitle}
                 onUpload={updateCourseCoverUrl.bind(null, courseId)}
               />
@@ -142,9 +138,9 @@ export function CourseEditorSteps({
 
       {step === 2 && (
         <Panel
-          title="Informationen"
-          subtitle="Kursziele und der zuständige Trainer — erscheinen im Information-Tab der Lernansicht."
-          footer={<StepFoot onBack={() => setStep(1)} onNext={() => setStep(3)} nextLabel="Weiter zu Inhalt & Struktur" />}
+          title={t("panel2Title")}
+          subtitle={t("panel2Subtitle")}
+          footer={<StepFoot onBack={() => setStep(1)} onNext={() => setStep(3)} nextLabel={t("nextToContent")} />}
         >
           <CourseInfoEditor courseId={courseId} initialGoals={courseGoals} initialAuthorId={courseAuthorId} trainers={trainers} />
         </Panel>
@@ -152,9 +148,9 @@ export function CourseEditorSteps({
 
       {step === 3 && (
         <Panel
-          title="Inhalt & Struktur"
-          subtitle="Module, Sektionen und Lektionen anlegen und mit Inhalt füllen."
-          footer={<StepFoot onBack={() => setStep(2)} onNext={() => setStep(4)} nextLabel="Weiter zu Veröffentlichung" />}
+          title={t("panel3Title")}
+          subtitle={t("panel3Subtitle")}
+          footer={<StepFoot onBack={() => setStep(2)} onNext={() => setStep(4)} nextLabel={t("nextToPublish")} />}
         >
           <div className="flex flex-col gap-[18px] lg:grid lg:items-start lg:gap-[26px] lg:grid-cols-[300px_1fr]">
             <ModuleLessonTree courseId={courseId} modules={modules} activeLessonId={activeLessonId} />
@@ -178,7 +174,7 @@ export function CourseEditorSteps({
               </div>
             ) : (
               <p className="text-base" style={{ color: "#66679B" }}>
-                Lektion links auswählen oder anlegen, um Blöcke zu bearbeiten.
+                {t("noLessonSelected")}
               </p>
             )}
           </div>
@@ -187,13 +183,13 @@ export function CourseEditorSteps({
 
       {step === 4 && (
         <Panel
-          title="Veröffentlichung"
-          subtitle="Status setzen und letzte Prüfung vor dem Sichtbarwerden für Teilnehmer."
+          title={t("panel4Title")}
+          subtitle={t("panel4Subtitle")}
           footer={
             <StepFoot
               onBack={() => setStep(3)}
               onNext={() => router.push("/admin/kurse")}
-              nextLabel="Fertig — zur Kursliste"
+              nextLabel={t("finishButton")}
               finish
               extraRight={<ReembedCourseButton courseId={courseId} />}
             />
@@ -214,12 +210,10 @@ export function CourseEditorSteps({
           >
             <div className="min-w-[220px] flex-1">
               <div className="text-[14.5px] font-bold" style={{ color: "#B14A4A" }}>
-                Kurs löschen
+                {t("deleteCourseHeading")}
               </div>
               <div className="mt-0.5 text-[13px]" style={{ color: "#7A3535" }}>
-                Entfernt den Kurs inkl. aller Lektionen unwiderruflich. {enrollmentCount}{" "}
-                {enrollmentCount === 1 ? "Teilnehmer" : "Teilnehmer"} und {certificateCount}{" "}
-                {certificateCount === 1 ? "Zertifikat sind" : "Zertifikate sind"} betroffen.
+                {t("deleteCourseHint", { enrollmentCount, certificateCount })}
               </div>
             </div>
             <DeleteCourseButton
@@ -237,9 +231,16 @@ export function CourseEditorSteps({
 }
 
 function Stepper({ step, onSelect }: { step: StepNumber; onSelect: (n: StepNumber) => void }) {
+  const t = useTranslations("admin.courseEditor.steps");
+  const STEPS: { n: StepNumber; label: string }[] = [
+    { n: 1, label: t("step1Label") },
+    { n: 2, label: t("step2Label") },
+    { n: 3, label: t("step3Label") },
+    { n: 4, label: t("step4Label") },
+  ];
   return (
     <nav
-      aria-label="Kurs bearbeiten — Schritte"
+      aria-label={t("stepperAriaLabel")}
       className="flex flex-wrap items-center gap-x-3 gap-y-4 rounded-[14px] border bg-white px-6 py-5 sm:flex-nowrap sm:gap-0"
       style={{ borderColor: "#E7E8F2" }}
     >
@@ -270,7 +271,7 @@ function Stepper({ step, onSelect }: { step: StepNumber; onSelect: (n: StepNumbe
                   className="block text-[11.5px] font-bold uppercase tracking-wide"
                   style={{ color: state === "current" ? "#5663AE" : "#A9AAC4" }}
                 >
-                  Schritt {s.n}
+                  {t("stepPrefix", { n: s.n })}
                 </span>
                 <span
                   className="block truncate text-[14.5px] font-bold"
@@ -336,6 +337,7 @@ function StepFoot({
   /** Zusätzlicher Knopf links neben dem Abschluss-Knopf (nur Schritt 4: KI-Einbetten). */
   extraRight?: React.ReactNode;
 }) {
+  const t = useTranslations("admin.courseEditor.steps");
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5" style={{ borderColor: "#EEF0F7" }}>
       {onBack ? (
@@ -345,7 +347,7 @@ function StepFoot({
           className="rounded-[10px] border bg-white px-[18px] py-3 text-[15px] font-semibold"
           style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
-          ← Zurück
+          {t("backButton")}
         </button>
       ) : (
         <span />
@@ -384,23 +386,24 @@ function ReadinessChecklist({
   hasCover: boolean;
   hasCategory: boolean;
 }) {
+  const t = useTranslations("admin.courseEditor.readiness");
   const items: { ok: boolean; okText: string; warnText: string }[] = [
     {
       ok: lessonCount > 0,
-      okText: `${lessonCount} ${lessonCount === 1 ? "Lektion" : "Lektionen"} in ${moduleCount} ${moduleCount === 1 ? "Modul" : "Modulen"}`,
-      warnText: "Noch keine Lektionen angelegt",
+      okText: t("lessonsOk", { lessonCount, moduleCount }),
+      warnText: t("lessonsWarn"),
     },
-    { ok: hasCover, okText: "Kursbild gesetzt", warnText: "Noch kein Kursbild (Schritt 1)" },
+    { ok: hasCover, okText: t("coverOk"), warnText: t("coverWarn") },
     {
       ok: hasCategory,
-      okText: "Kategorie gesetzt",
-      warnText: "Keine Kategorie gewählt — Kurs erscheint im Katalog nur unter „Alle Kurse“ (Schritt 1)",
+      okText: t("categoryOk"),
+      warnText: t("categoryWarn"),
     },
   ];
   return (
     <div className="flex flex-col gap-2">
       <div className="text-[13px] font-bold" style={{ color: "#3E3F66" }}>
-        Prüfung vor Veröffentlichung
+        {t("heading")}
       </div>
       {items.map((item, i) => (
         <div key={i} className="flex items-center gap-2.5 text-[14px]" style={{ color: "#3E3F66" }}>

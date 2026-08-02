@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Trash2, X } from "lucide-react";
 import { CourseDeleteConfirm } from "@/components/admin/course-delete-confirm";
 
@@ -53,6 +54,7 @@ export function DeleteCourseIconButton({
   enrollmentCount: number;
   certificateCount: number;
 }) {
+  const t = useTranslations("admin.courseEditor.deleteCourse");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
 
@@ -72,8 +74,8 @@ export function DeleteCourseIconButton({
       <button
         type="button"
         onClick={openDialog}
-        aria-label={`Kurs löschen: ${title}`}
-        title="Löschen"
+        aria-label={t("triggerIconAria", { title })}
+        title={t("triggerIconTitle")}
         className="inline-flex h-9 w-9 items-center justify-center rounded-[9px] border bg-white"
         style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
       >
@@ -90,12 +92,12 @@ export function DeleteCourseIconButton({
         <div className="flex h-full flex-col gap-5 overflow-y-auto bg-white px-7 py-6">
           <div className="flex items-center justify-between gap-4">
             <h2 id={`delete-course-title-${courseId}`} className="text-[19px] font-extrabold" style={{ color: "#1A1A2E" }}>
-              Kurs löschen
+              {t("dialogTitle")}
             </h2>
             <button
               type="button"
               onClick={closeDialog}
-              aria-label="Schließen"
+              aria-label={t("closeAria")}
               className="flex h-9 w-9 flex-none items-center justify-center rounded-[9px] border bg-white"
               style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
             >
@@ -113,7 +115,7 @@ export function DeleteCourseIconButton({
                 certificateCount={certificateCount}
                 // Aus der Liste heraus gibt es keinen Status-Schalter „oben" —
                 // die Statusänderung sitzt bewusst nur im Editor.
-                archiveHintWhere="im Kurs-Editor („Bearbeiten“)"
+                archiveHintWhere={t("archiveWhereEditorPage")}
                 onCancel={closeDialog}
               />
             </div>

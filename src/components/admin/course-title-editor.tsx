@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { updateCourseTitle, updateCourseDescription } from "@/lib/courses/actions";
 
 /**
@@ -34,6 +35,9 @@ export function CourseTitleEditor({
   initialSlug: string;
   initialDescription: string;
 }) {
+  const t = useTranslations("admin.courseEditor.title");
+  const tRoot = useTranslations("admin.courseEditor");
+  const tCommon = useTranslations("admin.common");
   const [title, setTitle] = useState(initialTitle);
   const [savedTitle, setSavedTitle] = useState(initialTitle);
   const [slug, setSlug] = useState(initialSlug);
@@ -78,10 +82,10 @@ export function CourseTitleEditor({
   return (
     <div className="min-w-0 flex-1">
       <div className="text-[13px] font-semibold" style={{ color: "#66679B" }}>
-        Inhalte · Kurse
+        {tRoot("eyebrow")}
       </div>
       <label className="mt-1 flex flex-col gap-1.5 text-sm font-bold" style={{ color: "#3E3F66" }}>
-        Kurstitel
+        {t("titleLabel")}
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -92,7 +96,7 @@ export function CourseTitleEditor({
         />
       </label>
       <label className="mt-2.5 flex flex-col gap-1.5 text-sm font-bold" style={{ color: "#3E3F66" }}>
-        Kursbeschreibung (optional)
+        {t("descriptionLabel")}
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -100,7 +104,7 @@ export function CourseTitleEditor({
           disabled={descriptionPending}
           rows={2}
           maxLength={5000}
-          placeholder="Kurzer Text, der Kursteilnehmern auf der Lern-Übersichtsseite unter dem Titel angezeigt wird."
+          placeholder={t("descriptionPlaceholder")}
           className="w-full max-w-xl resize-y rounded-xl border px-4 py-2.5 text-[15px] font-normal disabled:opacity-60"
           style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
         />
@@ -113,11 +117,11 @@ export function CourseTitleEditor({
           className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           style={{ background: "#5663AE" }}
         >
-          {descriptionPending ? "Speichert…" : "Beschreibung speichern"}
+          {descriptionPending ? tCommon("saving") : t("saveDescriptionButton")}
         </button>
         {!descriptionPending && description === savedDescription && savedDescription && (
           <span role="status" className="text-sm font-semibold" style={{ color: "#3E8F5C" }}>
-            Gespeichert
+            {tRoot("savedStatus")}
           </span>
         )}
       </div>
@@ -127,12 +131,11 @@ export function CourseTitleEditor({
         </p>
       )}
       <p className="mt-1.5 text-sm" style={{ color: "#66679B" }}>
-        Lern-URL: <span className="font-mono">/kurs/{slug}</span>
+        {t("learnUrlLabel")} <span className="font-mono">/kurs/{slug}</span>
       </p>
       {slugChanged && (
         <p role="status" className="mt-1.5 max-w-xl text-sm font-semibold" style={{ color: "#B14A4A" }}>
-          Der Kurs wurde umbenannt — bereits geteilte Links auf die alte Lern-URL funktionieren jetzt
-          nicht mehr.
+          {t("slugChangedNotice")}
         </p>
       )}
       {error && (

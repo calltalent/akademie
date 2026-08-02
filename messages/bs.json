@@ -666,6 +666,242 @@
       "alreadyAppliedMessage": "Ovaj nacrt je već preuzet.",
       "applyButton": "Preuzmi kao kurs",
       "applying": "Preuzima se …"
+    },
+    "thumbnailUpload": {
+      "changeTitle": "Promijeni {label}",
+      "addTitle": "Dodaj {label}",
+      "changeAria": "Promijeni {label}: {title}",
+      "addAria": "Dodaj {label}: {title}",
+      "fileTypeNotAllowed": "Tip datoteke „{type}“ nije dozvoljen. Dozvoljeno: PNG, JPG, WebP, GIF.",
+      "fileTooLarge": "Datoteka je prevelika (maks. 8 MB).",
+      "uploadUrlFailed": "URL za prijenos nije moguće kreirati.",
+      "uploadFailed": "Prijenos datoteke nije uspio. Molimo pokušajte ponovo.",
+      "unknownFileType": "nepoznato"
+    },
+    "courseEditor": {
+      "eyebrow": "Sadržaj · Kursevi",
+      "saveButton": "Sačuvaj",
+      "savedStatus": "Sačuvano",
+      "list": {
+        "title": "Kursevi",
+        "courseCount": "{count, plural, one {<b>#</b> kurs} few {<b>#</b> kursa} other {<b>#</b> kurseva}}",
+        "draftCount": "{count, plural, one {<b>#</b> nacrt} few {<b>#</b> nacrta} other {<b>#</b> nacrta}}",
+        "totalMembersSuffix": "<b>{count}</b> polaznika ukupno",
+        "tabAll": "Svi",
+        "tabLive": "Live",
+        "tabDraft": "Nacrti",
+        "tabArchived": "Arhiva",
+        "searchLabel": "Pretraži kurs",
+        "searchPlaceholder": "Pretraži kurs …",
+        "colCourse": "Kurs",
+        "colCategory": "Kategorija",
+        "colLessons": "Lekcije",
+        "colMembers": "Polaznici",
+        "colStatus": "Status",
+        "emptyAll": "Nema kurseva u ovom prikazu.",
+        "emptySearch": "Nijedan kurs nije pronađen za „{search}“.",
+        "editAria": "Uredi kurs: {title}",
+        "editTitle": "Uredi"
+      },
+      "categories": {
+        "manageButton": "Upravljaj kategorijama",
+        "dialogTitle": "Kategorije kurseva",
+        "empty": "Još nema kategorija.",
+        "nameLabel": "Naziv kategorije „{name}“",
+        "deleteConfirmWithCourses": "{count, plural, one {Ukloniti iz # kursa?} few {Ukloniti iz # kursa?} other {Ukloniti iz # kurseva?}}",
+        "deleteConfirmSimple": "Zaista obrisati?",
+        "confirmYes": "Da",
+        "confirmNo": "Ne",
+        "deleteAria": "Obriši kategoriju: {name}",
+        "deleteTitle": "Obriši",
+        "addLabel": "Nova kategorija",
+        "addButton": "Kreiraj",
+        "closeButton": "Zatvori"
+      },
+      "position": {
+        "moveUpAria": "Kurs prema gore: {title}",
+        "moveUpTitle": "Prema gore",
+        "moveDownAria": "Kurs prema dolje: {title}",
+        "moveDownTitle": "Prema dolje"
+      },
+      "newCourse": {
+        "button": "Novi kurs",
+        "pending": "Kreira se …"
+      },
+      "courseStatuses": {
+        "draft": "Nacrt",
+        "published": "Live",
+        "archived": "Arhivirano"
+      },
+      "lessonStatuses": {
+        "draft": "Nacrt",
+        "published": "Objavljeno"
+      },
+      "categorySelect": {
+        "label": "Kategorija",
+        "noCategoryOption": "Bez kategorije",
+        "compactAria": "Kategorija: {title}"
+      },
+      "statusSelect": {
+        "label": "Status"
+      },
+      "lessonPublishToggle": {
+        "setDraftButton": "Postavi na nacrt",
+        "publishButton": "Objavi"
+      },
+      "steps": {
+        "backToList": "Nazad na listu kurseva",
+        "stepperAriaLabel": "Uređivanje kursa — koraci",
+        "stepPrefix": "Korak {n}",
+        "step1Label": "Osnovni podaci",
+        "step2Label": "Informacije",
+        "step3Label": "Sadržaj i struktura",
+        "step4Label": "Objavljivanje",
+        "panel1Title": "Osnovni podaci",
+        "panel1Subtitle": "Naslov, adresa, kategorija i slika kursa — vidljivi u listi kurseva i katalogu.",
+        "panel2Title": "Informacije",
+        "panel2Subtitle": "Ciljevi kursa i nadležni trener — prikazuju se na kartici „Informacije“ u pregledu učenja.",
+        "panel3Title": "Sadržaj i struktura",
+        "panel3Subtitle": "Kreirajte module, sekcije i lekcije i popunite ih sadržajem.",
+        "panel4Title": "Objavljivanje",
+        "panel4Subtitle": "Postavite status i izvršite posljednju provjeru prije nego kurs postane vidljiv polaznicima.",
+        "courseImageLabel": "Slika kursa",
+        "noLessonSelected": "Odaberite lekciju lijevo ili kreirajte novu za uređivanje blokova.",
+        "backButton": "← Nazad",
+        "nextToInfo": "Dalje na informacije",
+        "nextToContent": "Dalje na sadržaj i strukturu",
+        "nextToPublish": "Dalje na objavljivanje",
+        "finishButton": "Gotovo — na listu kurseva",
+        "deleteCourseHeading": "Obriši kurs",
+        "deleteCourseHint": "Trajno uklanja kurs uključujući sve lekcije. Zahvaćeno je {enrollmentCount} polaznika i {certificateCount, plural, one {# certifikat} few {# certifikata} other {# certifikata}}."
+      },
+      "readiness": {
+        "heading": "Provjera prije objavljivanja",
+        "lessonsOk": "{lessonCount, plural, one {# lekcija} few {# lekcije} other {# lekcija}} u {moduleCount, plural, one {# modulu} few {# modula} other {# modula}}",
+        "lessonsWarn": "Još nisu kreirane lekcije",
+        "coverOk": "Slika kursa je postavljena",
+        "coverWarn": "Još nema slike kursa (korak 1)",
+        "categoryOk": "Kategorija je postavljena",
+        "categoryWarn": "Nije odabrana kategorija — kurs se u katalogu pojavljuje samo pod „Svi kursevi“ (korak 1)"
+      },
+      "deleteConfirm": {
+        "heading": "Trajno obrisati kurs „{title}“?",
+        "body": "Trajno briše {lessonCount, plural, one {# lekciju} few {# lekcije} other {# lekcija}}, {enrollmentCount} upisanih polaznika i {certificateCount} izdatih certifikata.",
+        "certWarning": "Pažnja: {count, plural, one {# već izdati certifikat nestaje} few {# već izdata certifikata nestaju} other {# već izdatih certifikata nestaje}} trajno — polaznici ga/ih nakon toga više ne mogu preuzeti.",
+        "archiveHint": "Obično je bolji izbor: postaviti kurs {where} na status „Arhivirano“ — kurs ostaje potpuno sačuvan, ali više nije vidljiv polaznicima.",
+        "confirmLabel": "Za potvrdu unesite naziv kursa: {title}",
+        "deleteButton": "Trajno obriši",
+        "deletingButton": "Briše se …"
+      },
+      "deleteCourse": {
+        "triggerButton": "Obriši kurs",
+        "triggerIconAria": "Obriši kurs: {title}",
+        "triggerIconTitle": "Obriši",
+        "dialogTitle": "Obriši kurs",
+        "closeAria": "Zatvori",
+        "archiveWhereEditorTop": "gore",
+        "archiveWhereEditorPage": "u uređivaču kursa („Uredi“)"
+      },
+      "info": {
+        "heading": "Informacije o kursu (kartica „Informacije“)",
+        "subtitle": "Ciljevi kursa i trener prikazuju se na kartici „Informacije“ u pregledu učenja.",
+        "goalsHeading": "Ciljevi kursa",
+        "goalLabel": "Cilj kursa {n}",
+        "goalPlaceholder": "npr. sigurno vođenje razgovora s klijentima",
+        "removeGoalAria": "Ukloni cilj kursa {n}",
+        "addGoalButton": "+ Dodaj cilj",
+        "saveGoalsButton": "Sačuvaj ciljeve kursa",
+        "authorLabel": "Autor",
+        "noAuthorOption": "— bez autora —"
+      },
+      "title": {
+        "titleLabel": "Naslov kursa",
+        "descriptionLabel": "Opis kursa (opcionalno)",
+        "descriptionPlaceholder": "Kratak tekst koji se polaznicima prikazuje ispod naslova na pregledu učenja.",
+        "saveDescriptionButton": "Sačuvaj opis",
+        "learnUrlLabel": "URL za učenje:",
+        "slugChangedNotice": "Kurs je preimenovan — već podijeljeni linkovi na stari URL više ne funkcionišu."
+      },
+      "tree": {
+        "moduleImageLabel": "Slika modula",
+        "moduleUpAria": "Modul prema gore",
+        "moduleDownAria": "Modul prema dolje",
+        "moduleDeleteAria": "Obriši modul",
+        "moduleDeleteConfirm": "Zaista obrisati modul „{title}“?",
+        "moduleDescriptionPlaceholder": "Kratak opis ispod naslova modula (opcionalno) …",
+        "looseLessonsHeading": "Lekcije bez sekcije",
+        "sectionUpAria": "Sekcija prema gore",
+        "sectionDownAria": "Sekcija prema dolje",
+        "sectionDeleteAria": "Obriši sekciju",
+        "sectionDeleteConfirmWithLessons": "Obrisati sekciju „{title}“? {count, plural, one {# lekcija ostaje sačuvana i prelazi u modul (bez sekcije).} few {# lekcije ostaju sačuvane i prelaze u modul (bez sekcije).} other {# lekcija ostaje sačuvano i prelazi u modul (bez sekcije).}}",
+        "sectionDeleteConfirmSimple": "Zaista obrisati sekciju „{title}“?",
+        "sectionDescriptionPlaceholder": "Kratak opis ispod naslova sekcije (opcionalno) …",
+        "errorSaving": "Greška pri čuvanju",
+        "newModuleLabel": "Naslov novog modula",
+        "newModulePlaceholder": "Novi modul …",
+        "newModuleButton": "Modul",
+        "newSectionLabel": "Naslov nove sekcije",
+        "newSectionPlaceholder": "Nova sekcija …",
+        "newSectionButton": "Sekcija",
+        "newLessonLabel": "Naslov nove lekcije",
+        "newLessonPlaceholder": "Nova lekcija …",
+        "newLessonButton": "Dodaj",
+        "deleteLessonConfirm": "Zaista obrisati lekciju „{title}“?",
+        "deleteLessonButton": "Obriši lekciju"
+      },
+      "quiz": {
+        "metaHeading": "Metapodaci",
+        "titleLabel": "Naslov",
+        "kindLabel": "Vrsta",
+        "passPctLabel": "Prag prolaska (%)",
+        "attemptsLabel": "Dozvoljeni pokušaji (prazno = neograničeno)",
+        "timeLimitLabel": "Vremensko ograničenje u sekundama (prazno = bez limita — samo prikaz, nije serverski primijenjeno)",
+        "shuffleLabel": "Miješaj redoslijed pitanja za polaznike",
+        "savedNotice": "Sačuvano.",
+        "deleteQuizButton": "Obriši kviz",
+        "deleteQuizConfirm": "Zaista obrisati kviz „{title}“? Sva pitanja i pokušaji bit će uklonjeni.",
+        "questionsHeading": "Pitanja ({count})",
+        "noPromptText": "(bez teksta)",
+        "moveUpAria": "Pitanje prema gore",
+        "moveDownAria": "Pitanje prema dolje",
+        "editButton": "Uredi",
+        "deleteButton": "Obriši",
+        "deleteQuestionConfirm": "Zaista obrisati pitanje?",
+        "noQuestionsText": "Još nisu kreirana pitanja.",
+        "addQuestionButton": "+ Dodaj pitanje",
+        "quizNotFound": "Kviz nije pronađen.",
+        "backToEditor": "Nazad na uređivanje kursa",
+        "heading": "Kviz: {title}"
+      },
+      "question": {
+        "kindLabel": "Tip pitanja",
+        "promptLabel": "Pitanje",
+        "pointsLabel": "Bodovi",
+        "optionsLegendSingle": "Ponuđeni odgovori (jedan tačan)",
+        "optionsLegendMulti": "Ponuđeni odgovori (jedan ili više tačnih)",
+        "optionCorrectAria": "Opcija {n} je tačna",
+        "optionTextLabel": "Tekst opcije {n}",
+        "optionPlaceholder": "Opcija {n}",
+        "optionRemoveAria": "Ukloni opciju {n}",
+        "addOptionButton": "+ Opcija",
+        "openAnswerHint": "Pitanja slobodnog tipa se ne ocjenjuju automatski (ne ulaze u broj bodova).",
+        "saveButton": "Sačuvaj pitanje",
+        "gapFieldsLegend": "Prihvaćeni odgovori",
+        "gapModeLabel": "Poređenje",
+        "gapModeExact": "Tačan tekst (velika/mala slova i razmaci se toleriraju)",
+        "gapModeRegex": "Regularni izraz",
+        "gapValuesLabelExact": "Prihvaćeni odgovori (jedan po redu)",
+        "gapValuesLabelRegex": "Obrasci (dovoljno je jedno poklapanje, jedan po redu)"
+      },
+      "reembed": {
+        "button": "Ugradi kurs za KI pretragu",
+        "pending": "Ugrađuje se …"
+      },
+      "refreshTranscript": {
+        "button": "Ažuriraj transkript",
+        "pending": "Ažurira se …"
+      },
+      "courseNotFound": "Kurs nije pronađen."
     }
   },
   "portal": {
@@ -732,9 +968,18 @@
       "certificateFallbackTitle": "Kurs",
       "notifications": {
         "groups": {
-          "courses": { "title": "Kursevi", "description": "Novi sadržaji i podsjetnici za učenje." },
-          "submissions": { "title": "Zadaci", "description": "Povratne informacije i rokovi za tvoje zadatke." },
-          "other": { "title": "Ostalo", "description": "Novosti o proizvodu i savjeti." }
+          "courses": {
+            "title": "Kursevi",
+            "description": "Novi sadržaji i podsjetnici za učenje."
+          },
+          "submissions": {
+            "title": "Zadaci",
+            "description": "Povratne informacije i rokovi za tvoje zadatke."
+          },
+          "other": {
+            "title": "Ostalo",
+            "description": "Novosti o proizvodu i savjeti."
+          }
         },
         "rows": {
           "newLesson": "Nova lekcija dostupna",

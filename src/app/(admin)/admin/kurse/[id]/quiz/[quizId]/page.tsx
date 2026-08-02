@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { questionRecordSchema, type Question, type QuizKind } from "@/lib/quiz/schema";
@@ -19,6 +20,7 @@ export default async function QuizEditorPage({
   params: Promise<{ id: string; quizId: string }>;
 }) {
   const { id: courseId, quizId } = await params;
+  const t = await getTranslations("admin.courseEditor.quiz");
   const tenant = await getTenant();
   const supabase = await createClient();
 
@@ -32,9 +34,9 @@ export default async function QuizEditorPage({
   if (!quiz) {
     return (
       <div className="mx-auto max-w-3xl">
-        <p className="text-base">Quiz nicht gefunden.</p>
+        <p className="text-base">{t("quizNotFound")}</p>
         <a href={`/admin/kurse/${courseId}`} className="text-sm underline">
-          Zurück zum Kurs-Editor
+          {t("backToEditor")}
         </a>
       </div>
     );
@@ -62,9 +64,9 @@ export default async function QuizEditorPage({
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Quiz: {quiz.title}</h1>
+        <h1 className="text-2xl font-semibold">{t("heading", { title: quiz.title })}</h1>
         <a href={`/admin/kurse/${courseId}`} className="text-sm underline">
-          Zurück zum Kurs-Editor
+          {t("backToEditor")}
         </a>
       </div>
 

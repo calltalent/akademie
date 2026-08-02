@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { Check } from "lucide-react";
 import { updateCourseStatus, updateCourseCategory, updateLessonStatus } from "@/lib/courses/actions";
 import type { CourseCategoryRow } from "@/lib/courses/categories";
@@ -27,11 +28,12 @@ export function CourseStatusSelect({
   courseId: string;
   status: string;
 }) {
+  const t = useTranslations("admin.courseEditor");
   const [pending, startTransition] = useTransition();
 
   return (
     <label className="flex flex-col gap-1.5 text-[13px] font-bold" style={{ color: "#3E3F66" }}>
-      Status
+      {t("statusSelect.label")}
       <select
         value={status}
         disabled={pending}
@@ -44,9 +46,9 @@ export function CourseStatusSelect({
         className="min-w-[150px] rounded-[11px] border bg-white px-3 py-2.5 text-[15px] font-semibold disabled:opacity-50"
         style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
       >
-        <option value="draft">Entwurf</option>
-        <option value="published">Live</option>
-        <option value="archived">Archiviert</option>
+        <option value="draft">{t("courseStatuses.draft")}</option>
+        <option value="published">{t("courseStatuses.published")}</option>
+        <option value="archived">{t("courseStatuses.archived")}</option>
       </select>
     </label>
   );
@@ -91,13 +93,14 @@ export function CourseCategorySelect({
   /** Kurstitel, nur für den `aria-label` im `compact`-Fall genutzt. */
   title?: string;
 }) {
+  const t = useTranslations("admin.courseEditor.categorySelect");
   const [pending, startTransition] = useTransition();
 
   const select = (
     <select
       value={categoryId ?? ""}
       disabled={pending}
-      aria-label={compact ? `Kategorie: ${title ?? ""}` : undefined}
+      aria-label={compact ? t("compactAria", { title: title ?? "" }) : undefined}
       onChange={(e) => {
         const next = e.target.value || null;
         startTransition(() => {
@@ -111,7 +114,7 @@ export function CourseCategorySelect({
       }
       style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
     >
-      <option value="">Keine Kategorie</option>
+      <option value="">{t("noCategoryOption")}</option>
       {categories.map((c) => (
         <option key={c.id} value={c.id}>
           {c.name}
@@ -124,7 +127,7 @@ export function CourseCategorySelect({
 
   return (
     <label className="flex flex-col gap-1.5 text-[13px] font-bold" style={{ color: "#3E3F66" }}>
-      Kategorie
+      {t("label")}
       {select}
     </label>
   );
@@ -139,6 +142,7 @@ export function LessonPublishToggle({
   courseId: string;
   status: string;
 }) {
+  const t = useTranslations("admin.courseEditor.lessonPublishToggle");
   const [pending, startTransition] = useTransition();
   const isPublished = status === "published";
 
@@ -159,7 +163,7 @@ export function LessonPublishToggle({
       }
     >
       {!isPublished && <Check size={16} aria-hidden="true" />}
-      {isPublished ? "Auf Entwurf setzen" : "Veröffentlichen"}
+      {isPublished ? t("setDraftButton") : t("publishButton")}
     </button>
   );
 }

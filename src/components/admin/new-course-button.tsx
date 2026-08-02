@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
 import { createDraftCourse } from "@/lib/courses/actions";
 
@@ -21,6 +22,7 @@ import { createDraftCourse } from "@/lib/courses/actions";
  * course-editor-steps.tsx), nicht mehr vorher in einem Modal.
  */
 export function NewCourseButton() {
+  const t = useTranslations("admin.courseEditor.newCourse");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -45,7 +47,7 @@ export function NewCourseButton() {
         style={{ background: "#5663AE" }}
       >
         <Plus aria-hidden="true" size={16} />
-        {pending ? "Wird angelegt …" : "Neuer Kurs"}
+        {pending ? t("pending") : t("button")}
       </button>
       {error && (
         <p role="alert" className="text-sm font-semibold" style={{ color: "#B14A4A" }}>

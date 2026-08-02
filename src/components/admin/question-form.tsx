@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { upsertQuestion } from "@/lib/quiz/actions";
 import {
   createEmptyQuestionDraft,
   QUESTION_KINDS,
-  QUESTION_KIND_LABELS,
   type Question,
   type QuestionInput,
   type QuestionKind,
@@ -40,6 +40,10 @@ export function QuestionForm({
   onDone: () => void;
   onCancel: () => void;
 }) {
+  const t = useTranslations("admin.courseEditor.question");
+  const tCommon = useTranslations("common");
+  const tAdminCommon = useTranslations("admin.common");
+  const tQuestionKinds = useTranslations("quiz.questionKinds");
   const [draft, setDraft] = useState<QuestionInput>(() => toDraft(initial));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -71,7 +75,7 @@ export function QuestionForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <label className="flex flex-col gap-1 text-sm" htmlFor="question-kind">
-        Fragetyp
+        {t("kindLabel")}
         <select
           id="question-kind"
           value={draft.kind}
@@ -80,14 +84,14 @@ export function QuestionForm({
         >
           {QUESTION_KINDS.map((k) => (
             <option key={k} value={k}>
-              {QUESTION_KIND_LABELS[k]}
+              {tQuestionKinds(k)}
             </option>
           ))}
         </select>
       </label>
 
       <label className="flex flex-col gap-1 text-sm" htmlFor="question-prompt">
-        Frage
+        {t("promptLabel")}
         <textarea
           id="question-prompt"
           value={draft.prompt}
@@ -99,7 +103,7 @@ export function QuestionForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm" htmlFor="question-points">
-        Punkte
+        {t("pointsLabel")}
         <input
           id="question-points"
           type="number"
@@ -118,9 +122,7 @@ export function QuestionForm({
       {draft.kind === "gap" && <GapFields draft={draft} onChange={setDraft} />}
 
       {draft.kind === "open" && (
-        <p className="text-sm text-gray-500">
-          Freitext-Fragen werden nicht automatisch bewertet (fließen nicht in die Punktzahl ein).
-        </p>
+        <p className="text-sm text-gray-500">{t("openAnswerHint")}</p>
       )}
 
       {error && (
@@ -136,10 +138,10 @@ export function QuestionForm({
           className="rounded-md px-4 py-2 text-base text-white disabled:opacity-50"
           style={{ background: "var(--color-primary)" }}
         >
-          {pending ? "Speichert …" : "Frage speichern"}
+          {pending ? tAdminCommon("saving") : t("saveButton")}
         </button>
         <button type="button" onClick={onCancel} className="text-sm underline">
-          Abbrechen
+          {tCommon("cancel")}
         </button>
       </div>
     </form>
@@ -153,6 +155,7 @@ function OptionsFields({
   draft: Extract<QuestionInput, { kind: "single" | "multi" }>;
   onChange: (next: QuestionInput) => void;
 }) {
+  const t = useTranslations("admin.courseEditor.question");
   function updateOptionText(optionId: string, text: string) {
     onChange({
       ...draft,
@@ -195,7 +198,7 @@ function OptionsFields({
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="text-sm font-medium">
-        Antwortoptionen ({draft.kind === "single" ? "eine richtige" : "eine oder mehrere richtige"})
+        {draft.kind === "single" ? t("optionsLegendSingle") : t("optionsLegendMulti")}
       </legend>
       {draft.options.map((option, idx) => (
         <div key={option.id} className="flex items-center gap-2">
@@ -206,7 +209,7 @@ function OptionsFields({
               name="correct-option"
               checked={draft.answer.correctOptionId === option.id}
               onChange={() => setCorrectSingle(option.id)}
-              aria-label={`Option ${idx + 1} ist richtig`}
+              aria-label={t("optionCorrectAria", { n: idx + 1 })}
             />
           ) : (
             <input
@@ -214,23 +217,23 @@ function OptionsFields({
               id={`correct-${option.id}`}
               checked={draft.answer.correctOptionIds.includes(option.id)}
               onChange={(e) => toggleCorrectMulti(option.id, e.target.checked)}
-              aria-label={`Option ${idx + 1} ist richtig`}
+              aria-label={t("optionCorrectAria", { n: idx + 1 })}
             />
           )}
           <label htmlFor={`option-text-${option.id}`} className="sr-only">
-            Optionstext {idx + 1}
+            {t("optionTextLabel", { n: idx + 1 })}
           </label>
           <input
             id={`option-text-${option.id}`}
             value={option.text}
             onChange={(e) => updateOptionText(option.id, e.target.value)}
-            placeholder={`Option ${idx + 1}`}
+            placeholder={t("optionPlaceholder", { n: idx + 1 })}
             required
             className="flex-1 rounded-md border px-3 py-2 text-base"
           />
           <button
             type="button"
-            aria-label={`Option ${idx + 1} entfernen`}
+            aria-label={t("optionRemoveAria", { n: idx + 1 })}
             disabled={draft.options.length <= 2}
             onClick={() => removeOption(option.id)}
             className="text-sm text-red-600 disabled:opacity-30"
@@ -245,7 +248,7 @@ function OptionsFields({
         disabled={draft.options.length >= 10}
         className="self-start rounded-md border px-3 py-1 text-sm disabled:opacity-30"
       >
-        + Option
+        {t("addOptionButton")}
       </button>
     </fieldset>
   );
@@ -258,23 +261,24 @@ function GapFields({
   draft: Extract<QuestionInput, { kind: "gap" }>;
   onChange: (next: QuestionInput) => void;
 }) {
+  const t = useTranslations("admin.courseEditor.question");
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="text-sm font-medium">Akzeptierte Antworten</legend>
+      <legend className="text-sm font-medium">{t("gapFieldsLegend")}</legend>
       <label className="flex flex-col gap-1 text-sm" htmlFor="gap-mode">
-        Abgleich
+        {t("gapModeLabel")}
         <select
           id="gap-mode"
           value={draft.answer.mode}
           onChange={(e) => onChange({ ...draft, answer: { ...draft.answer, mode: e.target.value as "exact" | "regex" } })}
           className="rounded-md border px-3 py-2 text-base"
         >
-          <option value="exact">Exakter Text (Groß-/Kleinschreibung und Leerzeichen werden toleriert)</option>
-          <option value="regex">Regulärer Ausdruck</option>
+          <option value="exact">{t("gapModeExact")}</option>
+          <option value="regex">{t("gapModeRegex")}</option>
         </select>
       </label>
       <label className="flex flex-col gap-1 text-sm" htmlFor="gap-values">
-        {draft.answer.mode === "regex" ? "Muster (ein Treffer genügt, eines pro Zeile)" : "Akzeptierte Antworten (eine pro Zeile)"}
+        {draft.answer.mode === "regex" ? t("gapValuesLabelRegex") : t("gapValuesLabelExact")}
         <textarea
           id="gap-values"
           value={draft.answer.values.join("\n")}

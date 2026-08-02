@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Trash2 } from "lucide-react";
 import { CourseDeleteConfirm } from "@/components/admin/course-delete-confirm";
 
@@ -39,6 +40,7 @@ export function DeleteCourseButton({
   enrollmentCount: number;
   certificateCount: number;
 }) {
+  const t = useTranslations("admin.courseEditor.deleteCourse");
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef(false);
@@ -75,7 +77,7 @@ export function DeleteCourseButton({
         style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
       >
         <Trash2 size={15} aria-hidden="true" />
-        Kurs löschen
+        {t("triggerButton")}
       </button>
     );
   }
@@ -92,7 +94,7 @@ export function DeleteCourseButton({
         enrollmentCount={enrollmentCount}
         certificateCount={certificateCount}
         // Der Status-Schalter steht im Editor auf derselben Seite weiter oben.
-        archiveHintWhere="oben"
+        archiveHintWhere={t("archiveWhereEditorTop")}
         onCancel={() => {
           returnFocusRef.current = true;
           setOpen(false);

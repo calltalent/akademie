@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
 import { updateCourseGoals, updateCourseAuthor } from "@/lib/courses/actions";
 
@@ -28,11 +29,12 @@ export function CourseInfoEditor({
   initialAuthorId: string | null;
   trainers: { id: string; name: string }[];
 }) {
+  const t = useTranslations("admin.courseEditor.info");
   return (
     <section className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
-      <div className="mb-1.5 text-[17px] font-bold">Kursinformation (Information-Tab)</div>
+      <div className="mb-1.5 text-[17px] font-bold">{t("heading")}</div>
       <div className="mb-4 text-sm" style={{ color: "#66679B" }}>
-        Kursziele und Autor erscheinen im „Information“-Tab der Lernansicht.
+        {t("subtitle")}
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
@@ -44,6 +46,9 @@ export function CourseInfoEditor({
 }
 
 function GoalsEditor({ courseId, initialGoals }: { courseId: string; initialGoals: string[] }) {
+  const t = useTranslations("admin.courseEditor.info");
+  const tRoot = useTranslations("admin.courseEditor");
+  const tCommon = useTranslations("admin.common");
   const [goals, setGoals] = useState<string[]>(initialGoals.length > 0 ? initialGoals : [""]);
   const [saved, setSaved] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,13 +86,13 @@ function GoalsEditor({ courseId, initialGoals }: { courseId: string; initialGoal
   return (
     <div className="min-w-0 flex-1">
       <div className="mb-2 text-[13px] font-bold" style={{ color: "#3E3F66" }}>
-        Kursziele
+        {t("goalsHeading")}
       </div>
       <div className="flex flex-col gap-2">
         {goals.map((goal, index) => (
           <div key={index} className="flex items-center gap-2">
             <label className="sr-only" htmlFor={`goal-${courseId}-${index}`}>
-              Kursziel {index + 1}
+              {t("goalLabel", { n: index + 1 })}
             </label>
             <input
               id={`goal-${courseId}-${index}`}
@@ -95,13 +100,13 @@ function GoalsEditor({ courseId, initialGoals }: { courseId: string; initialGoal
               maxLength={300}
               value={goal}
               onChange={(e) => updateGoal(index, e.target.value)}
-              placeholder="z. B. Kundengespräche sicher führen"
+              placeholder={t("goalPlaceholder")}
               className="w-full rounded-[10px] border px-3 py-2 text-[15px]"
               style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
             />
             <button
               type="button"
-              aria-label={`Kursziel ${index + 1} entfernen`}
+              aria-label={t("removeGoalAria", { n: index + 1 })}
               onClick={() => removeGoal(index)}
               className="flex-none rounded-md border px-2 py-2 text-sm"
               style={{ borderColor: "#D8DAEA", color: "#66679B" }}
@@ -119,7 +124,7 @@ function GoalsEditor({ courseId, initialGoals }: { courseId: string; initialGoal
           className="rounded-[10px] border px-4 py-2 text-sm font-semibold"
           style={{ borderColor: "#D8DAEA", color: "#3E3F66" }}
         >
-          + Ziel hinzufügen
+          {t("addGoalButton")}
         </button>
         <button
           type="button"
@@ -128,11 +133,11 @@ function GoalsEditor({ courseId, initialGoals }: { courseId: string; initialGoal
           className="rounded-[10px] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           style={{ background: "#5663AE" }}
         >
-          {pending ? "Speichert…" : "Kursziele speichern"}
+          {pending ? tCommon("saving") : t("saveGoalsButton")}
         </button>
         {!pending && saved && (
           <span role="status" className="text-sm font-semibold" style={{ color: "#3E8F5C" }}>
-            Gespeichert
+            {tRoot("savedStatus")}
           </span>
         )}
       </div>
@@ -154,6 +159,7 @@ function AuthorSelect({
   initialAuthorId: string | null;
   trainers: { id: string; name: string }[];
 }) {
+  const t = useTranslations("admin.courseEditor.info");
   const [authorId, setAuthorId] = useState(initialAuthorId ?? "");
   const [pending, startTransition] = useTransition();
 
@@ -162,7 +168,7 @@ function AuthorSelect({
       className="flex w-full max-w-[260px] flex-none flex-col gap-1.5 text-[13px] font-bold"
       style={{ color: "#3E3F66" }}
     >
-      Autor
+      {t("authorLabel")}
       <select
         value={authorId}
         disabled={pending}
@@ -176,7 +182,7 @@ function AuthorSelect({
         className="min-w-[150px] rounded-[11px] border bg-white px-3 py-2.5 text-[15px] font-semibold disabled:opacity-50"
         style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
       >
-        <option value="">— kein Autor —</option>
+        <option value="">{t("noAuthorOption")}</option>
         {trainers.map((t) => (
           <option key={t.id} value={t.id}>
             {t.name}

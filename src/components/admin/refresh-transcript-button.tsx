@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { refreshLessonTranscript } from "@/lib/video/actions";
 
 /**
@@ -9,6 +10,7 @@ import { refreshLessonTranscript } from "@/lib/video/actions";
  * Muster wie `ReembedCourseButton` (Block 2/3).
  */
 export function RefreshTranscriptButton({ lessonId }: { lessonId: string }) {
+  const t = useTranslations("admin.courseEditor.refreshTranscript");
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
 
@@ -27,7 +29,7 @@ export function RefreshTranscriptButton({ lessonId }: { lessonId: string }) {
         className="inline-flex items-center rounded-[10px] border bg-white px-[18px] py-3 text-[15px] font-semibold disabled:opacity-50"
         style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
       >
-        {pending ? "Wird aktualisiert …" : "Transkript aktualisieren"}
+        {pending ? t("pending") : t("button")}
       </button>
       {message ? (
         <span role="status" className="text-xs font-semibold" style={{ color: "#66679B" }}>

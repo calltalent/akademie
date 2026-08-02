@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useActionState, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ChevronDown, ChevronUp, ImageIcon, Plus, Save, Trash2, Video } from "lucide-react";
 import {
   createModule,
@@ -70,9 +71,9 @@ export type ModuleRow = {
  * (Migration 20260719090000) statt `courses.cover_url` — beide teilen sich
  * `components/admin/thumbnail-upload.tsx`.
  */
-const LESSON_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  published: { label: "Veröffentlicht", color: "#1F8A5B", bg: "#E3F2EA" },
-  draft: { label: "Entwurf", color: "#1A1A2E", bg: "#F7EED4" },
+const LESSON_STATUS_COLORS: Record<string, { color: string; bg: string }> = {
+  published: { color: "#1F8A5B", bg: "#E3F2EA" },
+  draft: { color: "#1A1A2E", bg: "#F7EED4" },
 };
 
 export function ModuleLessonTree({
@@ -114,29 +115,30 @@ function ModuleBlock({
   isLast: boolean;
   activeLessonId?: string;
 }) {
+  const t = useTranslations("admin.courseEditor.tree");
   return (
     <div className="rounded-[14px] border bg-white p-3.5" style={{ borderColor: "#E7E8F2" }}>
       <div className="mb-3 flex items-center gap-2.5">
         <ThumbnailUpload
           initialUrl={mod.coverUrl}
-          entityLabel="Modulbild"
+          entityLabel={t("moduleImageLabel")}
           entityTitle={mod.title}
           onUpload={updateModuleCoverUrl.bind(null, mod.id, courseId)}
         />
         <span className="min-w-0 flex-1 break-words text-[16px] font-extrabold" style={{ color: "#1A1A2E" }}>
           {mod.title}
         </span>
-        <IconButton label="Modul nach oben" disabled={isFirst} onClick={() => moveModule(mod.id, courseId, "up")}>
+        <IconButton label={t("moduleUpAria")} disabled={isFirst} onClick={() => moveModule(mod.id, courseId, "up")}>
           <ChevronUp size={15} aria-hidden="true" />
         </IconButton>
-        <IconButton label="Modul nach unten" disabled={isLast} onClick={() => moveModule(mod.id, courseId, "down")}>
+        <IconButton label={t("moduleDownAria")} disabled={isLast} onClick={() => moveModule(mod.id, courseId, "down")}>
           <ChevronDown size={15} aria-hidden="true" />
         </IconButton>
         <IconButton
-          label="Modul löschen"
+          label={t("moduleDeleteAria")}
           danger
           onClick={() => {
-            if (confirm(`Modul „${mod.title}" wirklich löschen?`)) {
+            if (confirm(t("moduleDeleteConfirm", { title: mod.title }))) {
               deleteModule(mod.id, courseId);
             }
           }}
@@ -147,7 +149,7 @@ function ModuleBlock({
 
       <DescriptionField
         initialValue={mod.description}
-        placeholder="Kurze Beschreibung unter dem Modultitel (optional) …"
+        placeholder={t("moduleDescriptionPlaceholder")}
         onSave={(value) => updateModuleDescription(mod.id, courseId, value)}
       />
 
@@ -167,7 +169,7 @@ function ModuleBlock({
         {mod.looseLessons.length > 0 && (
           <div className="rounded-[10px] p-2.5" style={{ background: "#FBF6EA" }}>
             <div className="mb-1.5 text-[12px] font-bold" style={{ color: "#8A6D2F" }}>
-              Lektionen ohne Sektion
+              {t("looseLessonsHeading")}
             </div>
             <LessonList
               courseId={courseId}
@@ -200,6 +202,7 @@ function SectionBlock({
   isLast: boolean;
   activeLessonId?: string;
 }) {
+  const t = useTranslations("admin.courseEditor.tree");
   return (
     <div className="rounded-[11px] border p-2.5" style={{ borderColor: "#EEF0F7", background: "#FAFAFD" }}>
       <div className="mb-2 flex items-center gap-1.5">
@@ -213,7 +216,7 @@ function SectionBlock({
         </span>
         <IconButton
           small
-          label="Sektion nach oben"
+          label={t("sectionUpAria")}
           disabled={isFirst}
           onClick={() => moveSection(section.id, moduleId, courseId, "up")}
         >
@@ -221,7 +224,7 @@ function SectionBlock({
         </IconButton>
         <IconButton
           small
-          label="Sektion nach unten"
+          label={t("sectionDownAria")}
           disabled={isLast}
           onClick={() => moveSection(section.id, moduleId, courseId, "down")}
         >
@@ -229,13 +232,13 @@ function SectionBlock({
         </IconButton>
         <IconButton
           small
-          label="Sektion löschen"
+          label={t("sectionDeleteAria")}
           danger
           onClick={() => {
             const msg =
               section.lessons.length > 0
-                ? `Sektion „${section.title}" löschen? ${section.lessons.length} ${section.lessons.length === 1 ? "Lektion bleibt" : "Lektionen bleiben"} erhalten und rutscht/rutschen ins Modul (ohne Sektion).`
-                : `Sektion „${section.title}" wirklich löschen?`;
+                ? t("sectionDeleteConfirmWithLessons", { title: section.title, count: section.lessons.length })
+                : t("sectionDeleteConfirmSimple", { title: section.title });
             if (confirm(msg)) {
               deleteSection(section.id, courseId);
             }
@@ -247,7 +250,7 @@ function SectionBlock({
 
       <DescriptionField
         initialValue={section.description}
-        placeholder="Kurze Beschreibung unter der Sektionsüberschrift (optional) …"
+        placeholder={t("sectionDescriptionPlaceholder")}
         onSave={(value) => updateSectionDescription(section.id, courseId, value)}
       />
 
@@ -287,6 +290,9 @@ function DescriptionField({
   placeholder: string;
   onSave: (value: string) => Promise<{ error: string | null }>;
 }) {
+  const tRoot = useTranslations("admin.courseEditor");
+  const tCommon = useTranslations("admin.common");
+  const tTree = useTranslations("admin.courseEditor.tree");
   const [value, setValue] = useState(initialValue ?? "");
   const [savedValue, setSavedValue] = useState(initialValue ?? "");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -326,16 +332,16 @@ function DescriptionField({
             style={{ borderColor: "#D8DAEA", color: "#5663AE" }}
           >
             <Save size={12} aria-hidden="true" />
-            {status === "saving" ? "Speichert …" : "Speichern"}
+            {status === "saving" ? tCommon("saving") : tRoot("saveButton")}
           </button>
           {status === "saved" && !dirty && (
             <span className="text-xs font-semibold" style={{ color: "#1F8A5B" }}>
-              Gespeichert
+              {tRoot("savedStatus")}
             </span>
           )}
           {status === "error" && (
             <span role="alert" className="text-xs font-semibold" style={{ color: "#B14A4A" }}>
-              Fehler beim Speichern
+              {tTree("errorSaving")}
             </span>
           )}
         </div>
@@ -389,12 +395,14 @@ function LessonList({
   lessons: LessonRow[];
   activeLessonId?: string;
 }) {
+  const t = useTranslations("admin.courseEditor.lessonStatuses");
   if (lessons.length === 0) return null;
   return (
     <ul className="flex flex-col gap-1.5">
       {lessons.map((lesson) => {
         const isActive = activeLessonId === lesson.id;
-        const meta = LESSON_STATUS_META[lesson.status] ?? LESSON_STATUS_META.draft;
+        const statusKey = lesson.status === "published" ? "published" : "draft";
+        const colors = LESSON_STATUS_COLORS[statusKey];
         return (
           <li key={lesson.id}>
             <a
@@ -413,9 +421,9 @@ function LessonList({
               </span>
               <span
                 className="flex-none rounded-[7px] px-2 py-0.5 text-[11px] font-bold"
-                style={{ color: meta.color, background: meta.bg }}
+                style={{ color: colors.color, background: colors.bg }}
               >
-                {meta.label}
+                {t(statusKey)}
               </span>
             </a>
           </li>
@@ -457,6 +465,7 @@ function IconButton({
 }
 
 function NewModuleForm({ courseId }: { courseId: string }) {
+  const t = useTranslations("admin.courseEditor.tree");
   const boundAction = createModule.bind(null, courseId);
   const [state, action, pending] = useActionState(boundAction, initialCourseActionState);
 
@@ -467,8 +476,8 @@ function NewModuleForm({ courseId }: { courseId: string }) {
           name="title"
           type="text"
           required
-          aria-label="Titel des neuen Moduls"
-          placeholder="Neues Modul …"
+          aria-label={t("newModuleLabel")}
+          placeholder={t("newModulePlaceholder")}
           className="min-w-0 flex-1 rounded-[11px] border bg-white px-3.5 py-2.5 text-[15px]"
           style={{ borderColor: "#D8DAEA" }}
         />
@@ -479,7 +488,7 @@ function NewModuleForm({ courseId }: { courseId: string }) {
           style={{ background: "#5663AE" }}
         >
           <Plus size={15} aria-hidden="true" />
-          Modul
+          {t("newModuleButton")}
         </button>
       </div>
       {state.error && (
@@ -492,6 +501,7 @@ function NewModuleForm({ courseId }: { courseId: string }) {
 }
 
 function NewSectionForm({ courseId, moduleId }: { courseId: string; moduleId: string }) {
+  const t = useTranslations("admin.courseEditor.tree");
   const boundAction = createSection.bind(null, moduleId, courseId);
   const [state, action, pending] = useActionState(boundAction, initialCourseActionState);
 
@@ -502,8 +512,8 @@ function NewSectionForm({ courseId, moduleId }: { courseId: string; moduleId: st
           name="title"
           type="text"
           required
-          aria-label="Titel der neuen Sektion"
-          placeholder="Neue Sektion …"
+          aria-label={t("newSectionLabel")}
+          placeholder={t("newSectionPlaceholder")}
           className="min-w-0 flex-1 rounded-[10px] border bg-white px-2.5 py-2 text-sm"
           style={{ borderColor: "#D8DAEA" }}
         />
@@ -514,7 +524,7 @@ function NewSectionForm({ courseId, moduleId }: { courseId: string; moduleId: st
           style={{ borderColor: "#5663AE", color: "#5663AE" }}
         >
           <Plus size={13} aria-hidden="true" />
-          Sektion
+          {t("newSectionButton")}
         </button>
       </div>
       {state.error && (
@@ -527,6 +537,7 @@ function NewSectionForm({ courseId, moduleId }: { courseId: string; moduleId: st
 }
 
 function NewLessonForm({ courseId, sectionId }: { courseId: string; sectionId: string }) {
+  const t = useTranslations("admin.courseEditor.tree");
   const boundAction = createLesson.bind(null, sectionId, courseId);
   const [state, action, pending] = useActionState(boundAction, initialCourseActionState);
 
@@ -537,8 +548,8 @@ function NewLessonForm({ courseId, sectionId }: { courseId: string; sectionId: s
           name="title"
           type="text"
           required
-          aria-label="Titel der neuen Lektion"
-          placeholder="Neue Lektion …"
+          aria-label={t("newLessonLabel")}
+          placeholder={t("newLessonPlaceholder")}
           className="min-w-0 flex-1 rounded-[10px] border bg-white px-2.5 py-2 text-sm"
           style={{ borderColor: "#D8DAEA" }}
         />
@@ -549,7 +560,7 @@ function NewLessonForm({ courseId, sectionId }: { courseId: string; sectionId: s
           style={{ background: "#5663AE" }}
         >
           <Plus size={13} aria-hidden="true" />
-          Hinzu
+          {t("newLessonButton")}
         </button>
       </div>
       {state.error && (
@@ -570,11 +581,12 @@ export function DeleteLessonButton({
   courseId: string;
   title: string;
 }) {
+  const t = useTranslations("admin.courseEditor.tree");
   return (
     <button
       type="button"
       onClick={() => {
-        if (confirm(`Lektion „${title}" wirklich löschen?`)) {
+        if (confirm(t("deleteLessonConfirm", { title }))) {
           deleteLesson(lessonId, courseId);
         }
       }}
@@ -582,7 +594,7 @@ export function DeleteLessonButton({
       style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
     >
       <Trash2 size={15} aria-hidden="true" />
-      Lektion löschen
+      {t("deleteLessonButton")}
     </button>
   );
 }

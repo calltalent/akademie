@@ -666,6 +666,242 @@
       "alreadyAppliedMessage": "Dieser Entwurf wurde bereits übernommen.",
       "applyButton": "Als Kurs übernehmen",
       "applying": "Wird übernommen …"
+    },
+    "thumbnailUpload": {
+      "changeTitle": "{label} ändern",
+      "addTitle": "{label} hinzufügen",
+      "changeAria": "{label} ändern: {title}",
+      "addAria": "{label} hinzufügen: {title}",
+      "fileTypeNotAllowed": "Dateityp „{type}“ nicht erlaubt. Erlaubt: PNG, JPG, WebP, GIF.",
+      "fileTooLarge": "Datei zu groß (max. 8 MB).",
+      "uploadUrlFailed": "Upload-URL konnte nicht erzeugt werden.",
+      "uploadFailed": "Datei-Upload fehlgeschlagen. Bitte versuche es erneut.",
+      "unknownFileType": "unbekannt"
+    },
+    "courseEditor": {
+      "eyebrow": "Inhalte · Kurse",
+      "saveButton": "Speichern",
+      "savedStatus": "Gespeichert",
+      "list": {
+        "title": "Kurse",
+        "courseCount": "{count, plural, one {<b>#</b> Kurs} other {<b>#</b> Kurse}}",
+        "draftCount": "{count, plural, one {<b>#</b> Entwurf} other {<b>#</b> Entwürfe}}",
+        "totalMembersSuffix": "<b>{count}</b> Teilnehmer insgesamt",
+        "tabAll": "Alle",
+        "tabLive": "Live",
+        "tabDraft": "Entwürfe",
+        "tabArchived": "Archiv",
+        "searchLabel": "Kurs suchen",
+        "searchPlaceholder": "Kurs suchen …",
+        "colCourse": "Kurs",
+        "colCategory": "Kategorie",
+        "colLessons": "Lektionen",
+        "colMembers": "Teilnehmer",
+        "colStatus": "Status",
+        "emptyAll": "Keine Kurse in dieser Ansicht.",
+        "emptySearch": "Kein Kurs gefunden für „{search}“.",
+        "editAria": "Kurs bearbeiten: {title}",
+        "editTitle": "Bearbeiten"
+      },
+      "categories": {
+        "manageButton": "Kategorien verwalten",
+        "dialogTitle": "Kurskategorien",
+        "empty": "Noch keine Kategorien.",
+        "nameLabel": "Name der Kategorie „{name}“",
+        "deleteConfirmWithCourses": "{count, plural, one {Bei # Kurs entfernen?} other {Bei # Kursen entfernen?}}",
+        "deleteConfirmSimple": "Wirklich löschen?",
+        "confirmYes": "Ja",
+        "confirmNo": "Nein",
+        "deleteAria": "Kategorie löschen: {name}",
+        "deleteTitle": "Löschen",
+        "addLabel": "Neue Kategorie",
+        "addButton": "Anlegen",
+        "closeButton": "Schließen"
+      },
+      "position": {
+        "moveUpAria": "Kurs nach oben: {title}",
+        "moveUpTitle": "Nach oben",
+        "moveDownAria": "Kurs nach unten: {title}",
+        "moveDownTitle": "Nach unten"
+      },
+      "newCourse": {
+        "button": "Neuer Kurs",
+        "pending": "Wird angelegt …"
+      },
+      "courseStatuses": {
+        "draft": "Entwurf",
+        "published": "Live",
+        "archived": "Archiviert"
+      },
+      "lessonStatuses": {
+        "draft": "Entwurf",
+        "published": "Veröffentlicht"
+      },
+      "categorySelect": {
+        "label": "Kategorie",
+        "noCategoryOption": "Keine Kategorie",
+        "compactAria": "Kategorie: {title}"
+      },
+      "statusSelect": {
+        "label": "Status"
+      },
+      "lessonPublishToggle": {
+        "setDraftButton": "Auf Entwurf setzen",
+        "publishButton": "Veröffentlichen"
+      },
+      "steps": {
+        "backToList": "Zurück zur Kursliste",
+        "stepperAriaLabel": "Kurs bearbeiten — Schritte",
+        "stepPrefix": "Schritt {n}",
+        "step1Label": "Grunddaten",
+        "step2Label": "Informationen",
+        "step3Label": "Inhalt & Struktur",
+        "step4Label": "Veröffentlichung",
+        "panel1Title": "Grunddaten",
+        "panel1Subtitle": "Titel, Adresse, Kategorie und Kursbild — sichtbar in Kursliste und Katalog.",
+        "panel2Title": "Informationen",
+        "panel2Subtitle": "Kursziele und der zuständige Trainer — erscheinen im Information-Tab der Lernansicht.",
+        "panel3Title": "Inhalt & Struktur",
+        "panel3Subtitle": "Module, Sektionen und Lektionen anlegen und mit Inhalt füllen.",
+        "panel4Title": "Veröffentlichung",
+        "panel4Subtitle": "Status setzen und letzte Prüfung vor dem Sichtbarwerden für Teilnehmer.",
+        "courseImageLabel": "Kursbild",
+        "noLessonSelected": "Lektion links auswählen oder anlegen, um Blöcke zu bearbeiten.",
+        "backButton": "← Zurück",
+        "nextToInfo": "Weiter zu Informationen",
+        "nextToContent": "Weiter zu Inhalt & Struktur",
+        "nextToPublish": "Weiter zu Veröffentlichung",
+        "finishButton": "Fertig — zur Kursliste",
+        "deleteCourseHeading": "Kurs löschen",
+        "deleteCourseHint": "Entfernt den Kurs inkl. aller Lektionen unwiderruflich. {enrollmentCount} Teilnehmer und {certificateCount, plural, one {# Zertifikat} other {# Zertifikate}} sind betroffen."
+      },
+      "readiness": {
+        "heading": "Prüfung vor Veröffentlichung",
+        "lessonsOk": "{lessonCount, plural, one {# Lektion} other {# Lektionen}} in {moduleCount, plural, one {# Modul} other {# Modulen}}",
+        "lessonsWarn": "Noch keine Lektionen angelegt",
+        "coverOk": "Kursbild gesetzt",
+        "coverWarn": "Noch kein Kursbild (Schritt 1)",
+        "categoryOk": "Kategorie gesetzt",
+        "categoryWarn": "Keine Kategorie gewählt — Kurs erscheint im Katalog nur unter „Alle Kurse“ (Schritt 1)"
+      },
+      "deleteConfirm": {
+        "heading": "Kurs „{title}“ unwiderruflich löschen?",
+        "body": "Löscht {lessonCount, plural, one {# Lektion} other {# Lektionen}}, {enrollmentCount} eingeschriebene Teilnehmer und {certificateCount} ausgestellte Zertifikate dauerhaft.",
+        "certWarning": "Achtung: {count, plural, one {# bereits ausgestelltes Zertifikat verschwindet} other {# bereits ausgestellte Zertifikate verschwinden}} dabei unwiderruflich — Teilnehmer können es/sie danach nicht mehr abrufen.",
+        "archiveHint": "Meist die bessere Wahl: Kurs {where} auf Status „Archiviert“ setzen — der Kurs bleibt vollständig erhalten, ist für Lernende aber nicht mehr sichtbar.",
+        "confirmLabel": "Zum Bestätigen den Kursnamen eingeben: {title}",
+        "deleteButton": "Endgültig löschen",
+        "deletingButton": "Wird gelöscht …"
+      },
+      "deleteCourse": {
+        "triggerButton": "Kurs löschen",
+        "triggerIconAria": "Kurs löschen: {title}",
+        "triggerIconTitle": "Löschen",
+        "dialogTitle": "Kurs löschen",
+        "closeAria": "Schließen",
+        "archiveWhereEditorTop": "oben",
+        "archiveWhereEditorPage": "im Kurs-Editor („Bearbeiten“)"
+      },
+      "info": {
+        "heading": "Kursinformation (Information-Tab)",
+        "subtitle": "Kursziele und Autor erscheinen im „Information“-Tab der Lernansicht.",
+        "goalsHeading": "Kursziele",
+        "goalLabel": "Kursziel {n}",
+        "goalPlaceholder": "z. B. Kundengespräche sicher führen",
+        "removeGoalAria": "Kursziel {n} entfernen",
+        "addGoalButton": "+ Ziel hinzufügen",
+        "saveGoalsButton": "Kursziele speichern",
+        "authorLabel": "Autor",
+        "noAuthorOption": "— kein Autor —"
+      },
+      "title": {
+        "titleLabel": "Kurstitel",
+        "descriptionLabel": "Kursbeschreibung (optional)",
+        "descriptionPlaceholder": "Kurzer Text, der Kursteilnehmern auf der Lern-Übersichtsseite unter dem Titel angezeigt wird.",
+        "saveDescriptionButton": "Beschreibung speichern",
+        "learnUrlLabel": "Lern-URL:",
+        "slugChangedNotice": "Der Kurs wurde umbenannt — bereits geteilte Links auf die alte Lern-URL funktionieren jetzt nicht mehr."
+      },
+      "tree": {
+        "moduleImageLabel": "Modulbild",
+        "moduleUpAria": "Modul nach oben",
+        "moduleDownAria": "Modul nach unten",
+        "moduleDeleteAria": "Modul löschen",
+        "moduleDeleteConfirm": "Modul „{title}“ wirklich löschen?",
+        "moduleDescriptionPlaceholder": "Kurze Beschreibung unter dem Modultitel (optional) …",
+        "looseLessonsHeading": "Lektionen ohne Sektion",
+        "sectionUpAria": "Sektion nach oben",
+        "sectionDownAria": "Sektion nach unten",
+        "sectionDeleteAria": "Sektion löschen",
+        "sectionDeleteConfirmWithLessons": "Sektion „{title}“ löschen? {count, plural, one {# Lektion bleibt erhalten und rutscht ins Modul (ohne Sektion).} other {# Lektionen bleiben erhalten und rutschen ins Modul (ohne Sektion).}}",
+        "sectionDeleteConfirmSimple": "Sektion „{title}“ wirklich löschen?",
+        "sectionDescriptionPlaceholder": "Kurze Beschreibung unter der Sektionsüberschrift (optional) …",
+        "errorSaving": "Fehler beim Speichern",
+        "newModuleLabel": "Titel des neuen Moduls",
+        "newModulePlaceholder": "Neues Modul …",
+        "newModuleButton": "Modul",
+        "newSectionLabel": "Titel der neuen Sektion",
+        "newSectionPlaceholder": "Neue Sektion …",
+        "newSectionButton": "Sektion",
+        "newLessonLabel": "Titel der neuen Lektion",
+        "newLessonPlaceholder": "Neue Lektion …",
+        "newLessonButton": "Hinzu",
+        "deleteLessonConfirm": "Lektion „{title}“ wirklich löschen?",
+        "deleteLessonButton": "Lektion löschen"
+      },
+      "quiz": {
+        "metaHeading": "Metadaten",
+        "titleLabel": "Titel",
+        "kindLabel": "Art",
+        "passPctLabel": "Bestehensgrenze (%)",
+        "attemptsLabel": "Erlaubte Versuche (leer = unbegrenzt)",
+        "timeLimitLabel": "Zeitlimit in Sekunden (leer = kein Limit — nur Anzeige, nicht serverseitig durchgesetzt)",
+        "shuffleLabel": "Reihenfolge der Fragen für Lernende mischen",
+        "savedNotice": "Gespeichert.",
+        "deleteQuizButton": "Quiz löschen",
+        "deleteQuizConfirm": "Quiz „{title}“ wirklich löschen? Alle Fragen und Versuche werden entfernt.",
+        "questionsHeading": "Fragen ({count})",
+        "noPromptText": "(ohne Text)",
+        "moveUpAria": "Frage nach oben",
+        "moveDownAria": "Frage nach unten",
+        "editButton": "Bearbeiten",
+        "deleteButton": "Löschen",
+        "deleteQuestionConfirm": "Frage wirklich löschen?",
+        "noQuestionsText": "Noch keine Fragen angelegt.",
+        "addQuestionButton": "+ Frage hinzufügen",
+        "quizNotFound": "Quiz nicht gefunden.",
+        "backToEditor": "Zurück zum Kurs-Editor",
+        "heading": "Quiz: {title}"
+      },
+      "question": {
+        "kindLabel": "Fragetyp",
+        "promptLabel": "Frage",
+        "pointsLabel": "Punkte",
+        "optionsLegendSingle": "Antwortoptionen (eine richtige)",
+        "optionsLegendMulti": "Antwortoptionen (eine oder mehrere richtige)",
+        "optionCorrectAria": "Option {n} ist richtig",
+        "optionTextLabel": "Optionstext {n}",
+        "optionPlaceholder": "Option {n}",
+        "optionRemoveAria": "Option {n} entfernen",
+        "addOptionButton": "+ Option",
+        "openAnswerHint": "Freitext-Fragen werden nicht automatisch bewertet (fließen nicht in die Punktzahl ein).",
+        "saveButton": "Frage speichern",
+        "gapFieldsLegend": "Akzeptierte Antworten",
+        "gapModeLabel": "Abgleich",
+        "gapModeExact": "Exakter Text (Groß-/Kleinschreibung und Leerzeichen werden toleriert)",
+        "gapModeRegex": "Regulärer Ausdruck",
+        "gapValuesLabelExact": "Akzeptierte Antworten (eine pro Zeile)",
+        "gapValuesLabelRegex": "Muster (ein Treffer genügt, eines pro Zeile)"
+      },
+      "reembed": {
+        "button": "Kurs für KI-Suche einbetten",
+        "pending": "Wird eingebettet …"
+      },
+      "refreshTranscript": {
+        "button": "Transkript aktualisieren",
+        "pending": "Wird aktualisiert …"
+      },
+      "courseNotFound": "Kurs nicht gefunden."
     }
   },
   "portal": {
@@ -732,9 +968,18 @@
       "certificateFallbackTitle": "Kurs",
       "notifications": {
         "groups": {
-          "courses": { "title": "Kurse", "description": "Neue Inhalte und Lernerinnerungen." },
-          "submissions": { "title": "Abgaben", "description": "Feedback und Fristen zu deinen Einsendungen." },
-          "other": { "title": "Sonstiges", "description": "Produktneuigkeiten und Tipps." }
+          "courses": {
+            "title": "Kurse",
+            "description": "Neue Inhalte und Lernerinnerungen."
+          },
+          "submissions": {
+            "title": "Abgaben",
+            "description": "Feedback und Fristen zu deinen Einsendungen."
+          },
+          "other": {
+            "title": "Sonstiges",
+            "description": "Produktneuigkeiten und Tipps."
+          }
         },
         "rows": {
           "newLesson": "Neue Lektion verfügbar",

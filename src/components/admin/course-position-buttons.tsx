@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { moveCourse } from "@/lib/courses/actions";
 
@@ -28,12 +29,13 @@ export function CoursePositionButtons({
   isFirst: boolean;
   isLast: boolean;
 }) {
+  const t = useTranslations("admin.courseEditor.position");
   return (
     <>
       <button
         type="button"
-        aria-label={`Kurs nach oben: ${title}`}
-        title="Nach oben"
+        aria-label={t("moveUpAria", { title })}
+        title={t("moveUpTitle")}
         disabled={isFirst}
         onClick={() => moveCourse(courseId, "up")}
         className="inline-flex h-9 w-9 items-center justify-center rounded-[9px] border bg-white disabled:opacity-30"
@@ -43,8 +45,8 @@ export function CoursePositionButtons({
       </button>
       <button
         type="button"
-        aria-label={`Kurs nach unten: ${title}`}
-        title="Nach unten"
+        aria-label={t("moveDownAria", { title })}
+        title={t("moveDownTitle")}
         disabled={isLast}
         onClick={() => moveCourse(courseId, "down")}
         className="inline-flex h-9 w-9 items-center justify-center rounded-[9px] border bg-white disabled:opacity-30"

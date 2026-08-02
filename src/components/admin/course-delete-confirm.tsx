@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { deleteCourse } from "@/lib/courses/actions";
 
@@ -50,6 +51,8 @@ export function CourseDeleteConfirm({
   archiveHintWhere: string;
   onCancel: () => void;
 }) {
+  const t = useTranslations("admin.courseEditor.deleteConfirm");
+  const tCommon = useTranslations("common");
   const [confirmValue, setConfirmValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -88,27 +91,17 @@ export function CourseDeleteConfirm({
           style={{ color: "#B14A4A" }}
         />
         <div className="text-[15px]" style={{ color: "#7A3535" }}>
-          <p className="font-bold">Kurs „{title}&quot; unwiderruflich löschen?</p>
-          <p className="mt-1">
-            Löscht {lessonCount} {lessonCount === 1 ? "Lektion" : "Lektionen"}, {enrollmentCount}{" "}
-            eingeschriebene Teilnehmer und {certificateCount} ausgestellte Zertifikate dauerhaft.
-          </p>
+          <p className="font-bold">{t("heading", { title })}</p>
+          <p className="mt-1">{t("body", { lessonCount, enrollmentCount, certificateCount })}</p>
           {certificateCount > 0 && (
-            <p className="mt-1 font-bold">
-              Achtung: {certificateCount} bereits ausgestellte{" "}
-              {certificateCount === 1 ? "Zertifikat verschwindet" : "Zertifikate verschwinden"}{" "}
-              dabei unwiderruflich — Teilnehmer können es/sie danach nicht mehr abrufen.
-            </p>
+            <p className="mt-1 font-bold">{t("certWarning", { count: certificateCount })}</p>
           )}
-          <p className="mt-2">
-            Meist die bessere Wahl: Kurs {archiveHintWhere} auf Status „Archiviert&quot; setzen — der
-            Kurs bleibt vollständig erhalten, ist für Lernende aber nicht mehr sichtbar.
-          </p>
+          <p className="mt-2">{t("archiveHint", { where: archiveHintWhere })}</p>
         </div>
       </div>
 
       <label className="flex flex-col gap-1.5 text-sm font-bold" style={{ color: "#7A3535" }}>
-        Zum Bestätigen den Kursnamen eingeben: {title}
+        {t("confirmLabel", { title })}
         <input
           ref={inputRef}
           type="text"
@@ -136,7 +129,7 @@ export function CourseDeleteConfirm({
           style={{ background: "#B14A4A" }}
         >
           <Trash2 size={15} aria-hidden="true" />
-          {pending ? "Wird gelöscht …" : "Endgültig löschen"}
+          {pending ? t("deletingButton") : t("deleteButton")}
         </button>
         <button
           type="button"
@@ -145,7 +138,7 @@ export function CourseDeleteConfirm({
           className="inline-flex items-center rounded-[10px] border bg-white px-[18px] py-3 text-[15px] font-semibold disabled:opacity-60"
           style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
         >
-          Abbrechen
+          {tCommon("cancel")}
         </button>
       </div>
     </>

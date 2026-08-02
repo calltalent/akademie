@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { Tags, Trash2 } from "lucide-react";
 import {
   createCourseCategory,
@@ -29,6 +30,7 @@ export type ManagedCourseCategory = {
  * betroffene Kursanzahl direkt in der Zeile statt in einem separaten Dialog.
  */
 export function CourseCategoryManager({ categories }: { categories: ManagedCourseCategory[] }) {
+  const t = useTranslations("admin.courseEditor.categories");
   const ref = useRef<HTMLDialogElement>(null);
 
   return (
@@ -40,7 +42,7 @@ export function CourseCategoryManager({ categories }: { categories: ManagedCours
         style={{ borderColor: "#E7E8F2", color: "#3E3F66" }}
       >
         <Tags aria-hidden="true" size={16} />
-        Kategorien verwalten
+        {t("manageButton")}
       </button>
       <dialog
         ref={ref}
@@ -49,12 +51,12 @@ export function CourseCategoryManager({ categories }: { categories: ManagedCours
         style={{ borderRadius: "var(--radius)" }}
       >
         <h2 id="course-category-manager-title" className="mb-4 text-lg font-medium">
-          Kurskategorien
+          {t("dialogTitle")}
         </h2>
         <ul className="flex flex-col gap-2">
           {categories.length === 0 && (
             <li className="text-sm" style={{ color: "#A9AAC4" }}>
-              Noch keine Kategorien.
+              {t("empty")}
             </li>
           )}
           {categories.map((c) => (
@@ -67,7 +69,7 @@ export function CourseCategoryManager({ categories }: { categories: ManagedCours
           onClick={() => ref.current?.close()}
           className="mt-4 text-sm underline"
         >
-          Schließen
+          {t("closeButton")}
         </button>
       </dialog>
     </>
@@ -75,6 +77,7 @@ export function CourseCategoryManager({ categories }: { categories: ManagedCours
 }
 
 function CategoryRow({ category }: { category: ManagedCourseCategory }) {
+  const t = useTranslations("admin.courseEditor.categories");
   const [name, setName] = useState(category.name);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -82,7 +85,7 @@ function CategoryRow({ category }: { category: ManagedCourseCategory }) {
   return (
     <li className="flex items-center gap-2 rounded-md border px-3 py-2" style={{ borderRadius: "var(--radius)" }}>
       <label className="sr-only" htmlFor={`category-name-${category.id}`}>
-        Name der Kategorie „{category.name}&quot;
+        {t("nameLabel", { name: category.name })}
       </label>
       <input
         id={`category-name-${category.id}`}
@@ -106,8 +109,8 @@ function CategoryRow({ category }: { category: ManagedCourseCategory }) {
         <div className="flex flex-none items-center gap-2 text-sm">
           <span style={{ color: "#B14A4A" }}>
             {category.courseCount > 0
-              ? `Bei ${category.courseCount} ${category.courseCount === 1 ? "Kurs" : "Kursen"} entfernen?`
-              : "Wirklich löschen?"}
+              ? t("deleteConfirmWithCourses", { count: category.courseCount })
+              : t("deleteConfirmSimple")}
           </span>
           <button
             type="button"
@@ -120,18 +123,18 @@ function CategoryRow({ category }: { category: ManagedCourseCategory }) {
             className="font-semibold underline disabled:opacity-50"
             style={{ color: "#B14A4A" }}
           >
-            Ja
+            {t("confirmYes")}
           </button>
           <button type="button" onClick={() => setConfirmingDelete(false)} className="underline">
-            Nein
+            {t("confirmNo")}
           </button>
         </div>
       ) : (
         <button
           type="button"
           onClick={() => setConfirmingDelete(true)}
-          aria-label={`Kategorie löschen: ${category.name}`}
-          title="Löschen"
+          aria-label={t("deleteAria", { name: category.name })}
+          title={t("deleteTitle")}
           className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-[9px] border bg-white"
           style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
         >
@@ -143,6 +146,7 @@ function CategoryRow({ category }: { category: ManagedCourseCategory }) {
 }
 
 function AddCategoryForm() {
+  const t = useTranslations("admin.courseEditor.categories");
   const [state, action, pending] = useActionState(createCourseCategory, initialCourseActionState);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -156,7 +160,7 @@ function AddCategoryForm() {
   return (
     <form ref={formRef} action={action} className="mt-4 flex flex-col gap-1.5 border-t pt-4">
       <label className="flex flex-col gap-1 text-sm" htmlFor="new-category-name">
-        Neue Kategorie
+        {t("addLabel")}
       </label>
       <div className="flex gap-2">
         <input
@@ -173,7 +177,7 @@ function AddCategoryForm() {
           className="flex-none rounded-md px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           style={{ background: "var(--color-primary)" }}
         >
-          Anlegen
+          {t("addButton")}
         </button>
       </div>
       {state.error && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { ImagePlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import {
@@ -50,6 +51,7 @@ export function ThumbnailUpload({
   /** Zusätzliche Felder im Upload-URL-Request-Body, z. B. `{ tenantId }`. */
   extraUploadFields?: Record<string, string>;
 }) {
+  const t = useTranslations("admin.thumbnailUpload");
   const [url, setUrl] = useState(initialUrl);
   const [state, setState] = useState<UploadState>({ status: "idle" });
 
@@ -57,12 +59,12 @@ export function ThumbnailUpload({
     if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.type as (typeof ALLOWED_IMAGE_MIME_TYPES)[number])) {
       setState({
         status: "error",
-        message: `Dateityp „${file.type || "unbekannt"}" nicht erlaubt. Erlaubt: PNG, JPG, WebP, GIF.`,
+        message: t("fileTypeNotAllowed", { type: file.type || t("unknownFileType") }),
       });
       return;
     }
     if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
-      setState({ status: "error", message: "Datei zu groß (max. 8 MB)." });
+      setState({ status: "error", message: t("fileTooLarge") });
       return;
     }
 
@@ -80,7 +82,7 @@ export function ThumbnailUpload({
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setState({ status: "error", message: body.error ?? "Upload-URL konnte nicht erzeugt werden." });
+      setState({ status: "error", message: body.error ?? t("uploadUrlFailed") });
       return;
     }
     const { path, token } = (await res.json()) as { path: string; token: string };
@@ -91,7 +93,7 @@ export function ThumbnailUpload({
       .uploadToSignedUrl(path, token, file);
     if (uploadError) {
       console.error("[thumbnail-upload] Datei-Upload fehlgeschlagen.", uploadError);
-      setState({ status: "error", message: "Datei-Upload fehlgeschlagen. Bitte versuche es erneut." });
+      setState({ status: "error", message: t("uploadFailed") });
       return;
     }
 
@@ -112,7 +114,7 @@ export function ThumbnailUpload({
       <label
         className="relative flex h-8 w-14 flex-none cursor-pointer items-center justify-center overflow-hidden rounded-[8px]"
         style={{ background: "#DFE2F4" }}
-        title={url ? `${entityLabel} ändern` : `${entityLabel} hinzufügen`}
+        title={url ? t("changeTitle", { label: entityLabel }) : t("addTitle", { label: entityLabel })}
       >
         {url ? (
           // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
@@ -137,7 +139,11 @@ export function ThumbnailUpload({
           type="file"
           accept={ALLOWED_IMAGE_MIME_TYPES.join(",")}
           disabled={pending}
-          aria-label={url ? `${entityLabel} ändern: ${entityTitle}` : `${entityLabel} hinzufügen: ${entityTitle}`}
+          aria-label={
+            url
+              ? t("changeAria", { label: entityLabel, title: entityTitle })
+              : t("addAria", { label: entityLabel, title: entityTitle })
+          }
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) handleFile(file);

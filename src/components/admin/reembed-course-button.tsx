@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { Sparkles } from "lucide-react";
 import { reembedCourse } from "@/lib/ai/actions";
 
@@ -20,6 +21,7 @@ import { reembedCourse } from "@/lib/ai/actions";
  * gleich starke primäre Aktionen nebeneinander.
  */
 export function ReembedCourseButton({ courseId }: { courseId: string }) {
+  const t = useTranslations("admin.courseEditor.reembed");
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
 
@@ -39,7 +41,7 @@ export function ReembedCourseButton({ courseId }: { courseId: string }) {
         style={{ borderColor: "#5663AE", color: "#5663AE" }}
       >
         <Sparkles size={16} aria-hidden="true" />
-        {pending ? "Wird eingebettet …" : "Kurs für KI-Suche einbetten"}
+        {pending ? t("pending") : t("button")}
       </button>
       {message ? (
         <span role="status" className="text-xs font-semibold" style={{ color: "#66679B" }}>
