@@ -232,7 +232,29 @@
   "learn": {
     "shell": {
       "role": "Polaznik kursa",
-      "welcomeBack": "Dobrodošao/la nazad, {name}"
+      "welcomeBack": "Dobrodošao/la nazad, {name}",
+      "mainNavAriaLabel": "Glavna navigacija",
+      "searchButton": "Pretraži …",
+      "collapseLabel": "Suzi bočnu traku",
+      "expandLabel": "Proširi bočnu traku",
+      "navLernenLabel": "Učenje",
+      "navDashboardLabel": "Moji kursevi",
+      "navBookmarksLabel": "Zabilješke",
+      "navCatalogLabel": "Katalog kurseva",
+      "navLinksLabel": "Linkovi",
+      "navAccountLabel": "Nalog",
+      "navAdminAreaLabel": "Admin panel",
+      "navTenantAreaLabel": "Portal klijenata",
+      "navHelpContact": "Pomoć i kontakt",
+      "menuOpenLabel": "Otvori meni",
+      "menuCloseLabel": "Zatvori meni",
+      "notificationsLabel": "Obavještenja",
+      "notificationsMarkAllRead": "Označi sve kao pročitano",
+      "notificationsEmpty": "Još nema obavještenja.",
+      "notificationsUnreadTab": "Nepročitano",
+      "notificationsReadTab": "Pročitano",
+      "profileMenuAriaLabel": "Meni profila: {name}",
+      "profileViewLink": "Pogledaj profil"
     },
     "shared": {
       "myCoursesBreadcrumb": "Učenje · Moji kursevi",
@@ -415,6 +437,121 @@
       "totalLabel": "UKUPAN IZNOS",
       "perMonthSuffix": " / mjesečno",
       "secureBadge": "Sigurno plaćanje putem Stripe-a"
+    }
+  },
+  "portal": {
+    "dashboard": {
+      "continueBannerLabel": "NASTAVI UČENJE",
+      "continueLessonMeta": "Lekcija {current} od {total} · {title}",
+      "continueButton": "Nastavi",
+      "myCoursesHeading": "Moji kursevi",
+      "viewCatalogLink": "Pogledaj katalog kurseva",
+      "notStarted": "Nije započeto",
+      "progressLabel": "Napredak",
+      "progressCompletedSuffix": " — završeno 🎉",
+      "empty": "Još nema objavljenih kurseva u ovoj akademiji."
+    },
+    "kurskatalog": {
+      "breadcrumb": "Učenje · Katalog kurseva",
+      "title": "Katalog kurseva",
+      "allCategories": "Svi kursevi",
+      "emptyNoCourses": "Još nema objavljenih kurseva.",
+      "emptyNoCategoryMatch": "Nema kurseva u ovoj kategoriji.",
+      "ctaContinue": "Nastavi",
+      "ctaView": "Idi na kurs",
+      "durationMeta": "{lessons} · {hours} h"
+    },
+    "settings": {
+      "title": "Postavke",
+      "breadcrumb": "Nalog · Postavke",
+      "tabs": {
+        "allgemein": "Opće",
+        "geraete": "Uređaji"
+      },
+      "language": "Jezik",
+      "languageDescription": "Na kojem jeziku se prikazuje korisnički interfejs.",
+      "languageChanged": "Jezik promijenjen.",
+      "avatar": {
+        "heading": "Profilna slika",
+        "hint": "JPG ili PNG, maks. 2 MB.",
+        "uploadPending": "Učitavanje …",
+        "uploadButton": "Otpremi sliku",
+        "updated": "Profilna slika ažurirana.",
+        "alt": "Profilna slika"
+      },
+      "fields": {
+        "firstName": "Ime",
+        "lastName": "Prezime",
+        "phone": "Telefon",
+        "city": "Grad",
+        "email": "E-mail",
+        "emailAriaLabel": "E-mail (promjenjivo putem „Promijeni e-mail“)",
+        "position": "Pozicija",
+        "about": "O meni"
+      },
+      "profileSaved": "Izmjene sačuvane.",
+      "changeEmailButton": "Promijeni e-mail",
+      "changePasswordLink": "Promijeni lozinku",
+      "savePending": "Spremanje u toku …",
+      "saveButton": "Sačuvaj izmjene",
+      "newEmailLabel": "Nova e-mail adresa",
+      "sendConfirmationButton": "Pošalji link za potvrdu",
+      "emailChangeSuccess": "Link za potvrdu poslan na novu adresu. Izmjena stupa na snagu nakon potvrde.",
+      "dataHeading": "Moji podaci",
+      "dataDescription": "Preuzmi strukturisanu JSON datoteku sa svim podacima sačuvanim o tebi (čl. 15/20 GDPR).",
+      "dataExportLink": "Izvezi moje podatke",
+      "certificateFallbackTitle": "Kurs",
+      "notifications": {
+        "groups": {
+          "courses": { "title": "Kursevi", "description": "Novi sadržaji i podsjetnici za učenje." },
+          "submissions": { "title": "Zadaci", "description": "Povratne informacije i rokovi za tvoje zadatke." },
+          "other": { "title": "Ostalo", "description": "Novosti o proizvodu i savjeti." }
+        },
+        "rows": {
+          "newLesson": "Nova lekcija dostupna",
+          "liveQa": "Podsjetnik za Live Q&A",
+          "weeklyDigest": "Sedmični sažetak učenja",
+          "feedback": "Povratna informacija o zadacima",
+          "deadlineReminder": "Podsjetnik za otvorene rokove",
+          "tips": "Savjeti i ponude"
+        },
+        "pushHeading": "Obavještenje preglednika",
+        "pushDescription": "Primi obavještenje čim u potpunosti završiš kurs."
+      },
+      "push": {
+        "notConfigured": "Obavještenja trenutno nisu konfigurisana na ovoj platformi.",
+        "unsupported": "Tvoj preglednik ne podržava push obavještenja.",
+        "permissionDenied": "Dozvola nije data.",
+        "activating": "Obrada u toku …",
+        "enable": "Aktiviraj obavještenja",
+        "disable": "Deaktiviraj obavještenja",
+        "enabled": "Obavještenja aktivirana.",
+        "enableFailed": "Aktivacija nije uspjela.",
+        "disabled": "Obavještenja deaktivirana.",
+        "disableFailed": "Deaktivacija nije uspjela."
+      },
+      "deleteAccount": {
+        "heading": "Brisanje naloga",
+        "pendingNotice": "Zahtjev za brisanje od {date} je zaprimljen, u obradi je.",
+        "description": "Zatraži brisanje svog naloga. Brisanje se izvršava nakon ručne provjere i nije trenutno.",
+        "reasonLabel": "Razlog (opcionalno)",
+        "submitPending": "Slanje u toku …",
+        "submitButton": "Zatraži brisanje",
+        "submitted": "Zahtjev za brisanje je poslan — u obradi je."
+      },
+      "devices": {
+        "empty": "Nema pronađenih aktivnih sesija.",
+        "currentBadge": "Ovaj uređaj",
+        "revoke": "Odjava",
+        "revokePending": "…",
+        "unknownDevice": "Nepoznat uređaj",
+        "browserFallback": "Preglednik",
+        "lastActiveUnknown": "posljednja aktivnost nepoznata",
+        "activeNow": "aktivno upravo sada",
+        "activeMinutesAgo": "aktivno prije {minutes} min.",
+        "activeHoursAgo": "aktivno prije {hours} h",
+        "activeDaysAgo": "aktivno prije {days, plural, one {# dan} few {# dana} other {# dana}}"
+      }
     }
   }
 }

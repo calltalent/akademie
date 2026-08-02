@@ -45,6 +45,16 @@ import { NotificationsMenu, ProfileMenu, useExclusiveMenu, type NotificationItem
  * andere Seiten (Dashboard/Kurskatalog/Einstellungen, die KEINE eigene
  * Titel-Anzeige haben) unverändert gerendert.
  */
+/**
+ * i18n Block C3 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 6): bewusst NICHT
+ * auf t() umgestellt. Einziger Aufrufer ist app-shell.tsx, der IMMER einen
+ * echten `user` und `notifications={[]}` übergibt (siehe dortigen
+ * Kopfkommentar) — diese Defaults greifen also in Produktion nie, sie
+ * dienen ausschließlich einer isolierten Komponentenvorschau (Referenz-
+ * Mockup-Daten aus TopBar.dc.html). Da kein Nutzer sie je zu Gesicht
+ * bekommt, bleibt die Übersetzung hier eine bewusste Abgrenzung statt
+ * totem Übersetzungsaufwand für unerreichbaren Code.
+ */
 const DEFAULT_USER: TopBarUser = {
   name: "Jonas Weber",
   role: "Kursteilnehmer",

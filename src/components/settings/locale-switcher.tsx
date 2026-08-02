@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { setLocale } from "@/lib/account/actions";
 import { LOCALE_NAMES, type Locale } from "@/i18n/config";
 
@@ -29,6 +30,7 @@ export function LocaleSwitcher({
   enabledLocales: Locale[];
   currentLocale: Locale;
 }) {
+  const t = useTranslations("portal.settings");
   const router = useRouter();
   const selectRef = useRef<HTMLSelectElement>(null);
   const [pending, startTransition] = useTransition();
@@ -49,7 +51,7 @@ export function LocaleSwitcher({
         setMessage({ text: result.error, kind: "error" });
         return;
       }
-      setMessage({ text: "Sprache geändert.", kind: "success" });
+      setMessage({ text: t("languageChanged"), kind: "success" });
       // Serverkomponenten (u. a. das <html lang>-Attribut in layout.tsx) lesen
       // die Locale aus dem x-locale-Header von middleware.ts — der wertet das
       // soeben gesetzte NEXT_LOCALE-Cookie erst beim NÄCHSTEN Request aus.
@@ -62,7 +64,7 @@ export function LocaleSwitcher({
   return (
     <div className="flex flex-col gap-[7px]">
       <label htmlFor="locale-switcher" className="text-sm font-semibold text-navy">
-        Sprache
+        {t("language")}
       </label>
       <select
         id="locale-switcher"

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { getAuthUser } from "@/lib/auth/context";
@@ -20,7 +21,13 @@ import { AppShell } from "@/components/learn/app-shell";
  */
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const [user, tenant] = await Promise.all([getAuthUser(), getTenant()]);
+  const [user, tenant, t, tShell, tShared] = await Promise.all([
+    getAuthUser(),
+    getTenant(),
+    getTranslations("portal.dashboard"),
+    getTranslations("learn.shell"),
+    getTranslations("learn.shared"),
+  ]);
 
   // Kein Mandant (Dev-Root/localhost): der Hinweis lebt an `/` — dorthin
   // zurück. Nicht angemeldet → Login. Beide Fälle spiegeln app/page.tsx.
@@ -80,7 +87,7 @@ export default async function DashboardPage() {
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
     profile?.full_name?.trim() ||
-    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : "zurück");
+    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : tShared("fallbackUserName"));
   // Begrüßung nur mit Vornamen (Referenz: „Willkommen zurück, Jonas"), der
   // Profil-Chip in der TopBar zeigt weiterhin den vollen Namen.
   const firstName = displayName.split(/\s+/)[0] || displayName;
@@ -138,7 +145,7 @@ export default async function DashboardPage() {
       isStaff={Boolean(isStaff)}
       userName={displayName}
       userEmail={user.email ?? undefined}
-      title={`Willkommen zurück, ${firstName}`}
+      title={tShell("welcomeBack", { name: firstName })}
     >
       {continueCourse && continueCourse.nextLesson && (
         <a
@@ -148,19 +155,22 @@ export default async function DashboardPage() {
         >
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-semibold" style={{ color: "#B9BBDA", letterSpacing: "0.04em" }}>
-              WEITERLERNEN
+              {t("continueBannerLabel")}
             </div>
             <div className="mt-1 mb-0.5 text-[22px] font-bold text-white">{continueCourse.course.title}</div>
             <div className="text-[15px]" style={{ color: "#D6D7EC" }}>
-              Lektion {continueCourse.progress.completed + 1} von {continueCourse.progress.total} ·{" "}
-              {continueCourse.nextLesson.title}
+              {t("continueLessonMeta", {
+                current: continueCourse.progress.completed + 1,
+                total: continueCourse.progress.total,
+                title: continueCourse.nextLesson.title,
+              })}
             </div>
           </div>
           <span
             className="inline-flex shrink-0 items-center gap-[9px] rounded-[11px] px-[22px] py-[13px] text-[15px] font-bold"
             style={{ background: "#F7EED4", color: "#1A1A2E" }}
           >
-            Fortsetzen
+            {t("continueButton")}
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1A1A2E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14"></path>
               <path d="m13 6 6 6-6 6"></path>
@@ -171,10 +181,10 @@ export default async function DashboardPage() {
 
       <div className="mb-[18px] flex items-baseline justify-between">
         <h2 className="m-0 text-xl font-bold" style={{ color: "#1A1A2E" }}>
-          Meine Kurse
+          {t("myCoursesHeading")}
         </h2>
         <a href="/kurskatalog" className="text-sm font-semibold no-underline">
-          Kurskatalog ansehen
+          {t("viewCatalogLink")}
         </a>
       </div>
 
@@ -240,14 +250,14 @@ export default async function DashboardPage() {
                           style={{ background: "#3E3F66" }}
                           aria-hidden="true"
                         />
-                        Nicht gestartet
+                        {t("notStarted")}
                       </span>
                     ) : (
                       <>
                         <div className="mb-2 flex justify-between text-[13px] font-semibold">
                           <span style={{ color: "#66679B" }}>
-                            Fortschritt
-                            {progress.isComplete && " — abgeschlossen 🎉"}
+                            {t("progressLabel")}
+                            {progress.isComplete && t("progressCompletedSuffix")}
                           </span>
                           <span style={{ color: "#5663AE" }}>{progress.percent}%</span>
                         </div>
@@ -267,7 +277,7 @@ export default async function DashboardPage() {
         })}
         {(!courses || courses.length === 0) && (
           <p className="text-base text-gray-500">
-            Noch keine veröffentlichten Kurse in dieser Akademie.
+            {t("empty")}
           </p>
         )}
       </ul>

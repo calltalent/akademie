@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 /**
  * Client-Teil des Kurskatalogs (Referenz: Kurskatalog.dc.html): Filter-Chips
@@ -24,8 +25,6 @@ export type CatalogItem = {
   tint: string;
 };
 
-const ALL = "Alle Kurse";
-
 /**
  * `categories` (22.07.2026, Migration course_categories): ersetzt den
  * früheren globalen `COURSE_CATEGORIES`-Const — die Filter-Chips zeigen
@@ -38,6 +37,12 @@ export function KurskatalogGrid({
   items: CatalogItem[];
   categories: string[];
 }) {
+  const t = useTranslations("portal.kurskatalog");
+  // i18n Block C3: `ALL` muss NACH dem Hook stehen (Regeln der Hooks
+  // gelten nur für useState/useTranslations selbst, nicht für abgeleitete
+  // Konstanten — verschoben in den Funktionskörper, da t() erst hier
+  // verfügbar ist, analog zu app-shell.tsx/locale-switcher.tsx).
+  const ALL = t("allCategories");
   const [active, setActive] = useState<string>(ALL);
 
   const filters = [ALL, ...categories];
@@ -73,8 +78,8 @@ export function KurskatalogGrid({
       {filtered.length === 0 ? (
         <div className="rounded-2xl border border-border-100 bg-white px-6 py-10 text-center text-sm text-muted-400">
           {items.length === 0
-            ? "Noch keine veröffentlichten Kurse."
-            : "Keine Kurse in dieser Kategorie."}
+            ? t("emptyNoCourses")
+            : t("emptyNoCategoryMatch")}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-[repeat(auto-fill,minmax(260px,320px))]">
@@ -117,7 +122,7 @@ export function KurskatalogGrid({
                     c.enrolled ? "bg-primary text-white" : "bg-cream text-ink"
                   }`}
                 >
-                  {c.enrolled ? "Weiterlernen" : "Zum Kurs"}
+                  {c.enrolled ? t("ctaContinue") : t("ctaView")}
                 </span>
               </div>
             </a>

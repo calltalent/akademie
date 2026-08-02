@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Search,
   HelpCircle,
@@ -91,15 +92,15 @@ import {
  */
 export type SidebarItemId = "dashboard" | "catalog" | "bookmarks";
 
-type NavItem = { id: SidebarItemId; label: string; href: string; badge?: string; icon: LucideIcon };
+type NavItem = { id: SidebarItemId; labelKey: "navDashboardLabel" | "navBookmarksLabel" | "navCatalogLabel"; href: string; badge?: string; icon: LucideIcon };
 
 /** Admin-verwaltbarer "LINKS"-Bereich (Josips Auftrag, 23.07.2026) — siehe app-shell.tsx/sidebar-links-panel.tsx. */
 export type SidebarLink = { id: string; label: string; url: string };
 
 const LERNEN: NavItem[] = [
-  { id: "dashboard", label: "Meine Kurse", href: "/dashboard", icon: LayoutGrid },
-  { id: "bookmarks", label: "Lesezeichen", href: "/lesezeichen", icon: Bookmark },
-  { id: "catalog", label: "Kurskatalog", href: "/kurskatalog", icon: Search },
+  { id: "dashboard", labelKey: "navDashboardLabel", href: "/dashboard", icon: LayoutGrid },
+  { id: "bookmarks", labelKey: "navBookmarksLabel", href: "/lesezeichen", icon: Bookmark },
+  { id: "catalog", labelKey: "navCatalogLabel", href: "/kurskatalog", icon: Search },
 ];
 
 /** Leitet den aktiven Menüpunkt aus der Route ab (Semantik wie shell/nav-link.tsx). */
@@ -130,6 +131,8 @@ export function Sidebar({
   tenantName?: string;
   logoUrl?: string | null;
 }) {
+  const t = useTranslations("learn.shell");
+  const tAuthShared = useTranslations("auth.shared");
   const [expanded, setExpanded] = useState(true);
   const pathname = usePathname();
   const activeId = active ?? activeFromPath(pathname);
@@ -147,13 +150,14 @@ export function Sidebar({
   function renderItem(item: NavItem) {
     const isActive = activeId === item.id;
     const Icon = item.icon;
+    const label = t(item.labelKey);
     return (
       <Link
         key={item.id}
         href={item.href}
         prefetch={false}
         aria-current={isActive ? "page" : undefined}
-        title={!showLabels ? item.label : undefined}
+        title={!showLabels ? label : undefined}
         className={[
           "mb-[3px] flex items-center gap-3 rounded-sm px-3 py-[11px] text-[15px] no-underline transition-colors",
           !showLabels ? "justify-center" : "",
@@ -163,7 +167,7 @@ export function Sidebar({
         ].join(" ")}
       >
         <Icon size={20} aria-hidden="true" className="flex-shrink-0" />
-        {showLabels && <span className="flex-1">{item.label}</span>}
+        {showLabels && <span className="flex-1">{label}</span>}
         {showLabels && item.badge && (
           <span className="flex h-5 min-w-5 items-center justify-center rounded-[10px] bg-primary px-1.5 text-[11px] font-bold text-white">
             {item.badge}
@@ -201,7 +205,7 @@ export function Sidebar({
           : "hidden flex-shrink-0 flex-col border-r border-border-100 bg-white py-[26px] font-sans transition-[width] duration-[180ms] ease-out lg:sticky lg:top-0 lg:flex lg:h-screen"
       }
       style={{ width: isPanel ? "100%" : expanded ? "264px" : "84px" }}
-      aria-label="Hauptnavigation"
+      aria-label={t("mainNavAriaLabel")}
     >
       {!isPanel && (
         <>
@@ -247,7 +251,7 @@ export function Sidebar({
                   {tenantName.toUpperCase()}
                 </span>
                 <span className="block text-[11px] font-semibold tracking-[0.28em] text-muted-500">
-                  AKADEMIE
+                  {tAuthShared("brandSuffix")}
                 </span>
               </span>
             )}
@@ -260,13 +264,13 @@ export function Sidebar({
               type="button"
               onClick={() => setExpanded((v) => !v)}
               aria-expanded={expanded}
-              aria-label={expanded ? "Sidebar einklappen" : "Sidebar ausklappen"}
+              aria-label={expanded ? t("collapseLabel") : t("expandLabel")}
               className={`flex w-full items-center gap-3 rounded-sm border border-border-100 bg-bg px-[13px] py-[11px] text-[15px] text-muted-500 ${
                 expanded ? "" : "justify-center"
               }`}
             >
               <Search size={19} aria-hidden="true" className="flex-shrink-0 text-accent" />
-              {expanded && <span>Suchen …</span>}
+              {expanded && <span>{t("searchButton")}</span>}
             </button>
           </div>
         </>
@@ -282,7 +286,7 @@ export function Sidebar({
       <nav className={isPanel ? "px-4" : "min-h-0 flex-1 overflow-hidden px-4"}>
         {showLabels && (
           <p className="mb-[9px] px-3 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-400">
-            Lernen
+            {t("navLernenLabel")}
           </p>
         )}
         {LERNEN.map(renderItem)}
@@ -292,7 +296,7 @@ export function Sidebar({
             <div className="h-5" />
             {showLabels && (
               <p className="mb-[9px] px-3 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-400">
-                Links
+                {t("navLinksLabel")}
               </p>
             )}
             {customLinks.map(renderCustomLink)}
@@ -306,44 +310,44 @@ export function Sidebar({
           <>
             {showLabels && (
               <p className="mb-[9px] px-3 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-400">
-                Konto
+                {t("navAccountLabel")}
               </p>
             )}
             {isStaff && (
               <a
                 href="/admin"
-                title={!showLabels ? "Admin-Bereich" : undefined}
+                title={!showLabels ? t("navAdminAreaLabel") : undefined}
                 className={`flex items-center gap-3 rounded-sm px-3 py-[10px] text-[15px] font-medium text-muted-500 no-underline ${
                   showLabels ? "" : "justify-center"
                 }`}
               >
                 <ShieldCheck size={19} aria-hidden="true" className="flex-shrink-0" />
-                {showLabels && <span>Admin-Bereich</span>}
+                {showLabels && <span>{t("navAdminAreaLabel")}</span>}
               </a>
             )}
             {isPlatformAdmin && (
               <a
                 href={portalMandantenUrl}
-                title={!showLabels ? "Mandantenbereich" : undefined}
+                title={!showLabels ? t("navTenantAreaLabel") : undefined}
                 className={`flex items-center gap-3 rounded-sm px-3 py-[10px] text-[15px] font-medium text-muted-500 no-underline ${
                   showLabels ? "" : "justify-center"
                 }`}
               >
                 <Building2 size={19} aria-hidden="true" className="flex-shrink-0" />
-                {showLabels && <span>Mandantenbereich</span>}
+                {showLabels && <span>{t("navTenantAreaLabel")}</span>}
               </a>
             )}
           </>
         )}
         <a
           href="mailto:support@calltalent.ai"
-          title={!showLabels ? "Hilfe & Kontakt" : undefined}
+          title={!showLabels ? t("navHelpContact") : undefined}
           className={`flex items-center gap-3 rounded-sm px-3 py-[10px] text-[15px] font-medium text-muted-500 no-underline ${
             showLabels ? "" : "justify-center"
           }`}
         >
           <HelpCircle size={19} aria-hidden="true" className="flex-shrink-0" />
-          {showLabels && <span>Hilfe &amp; Kontakt</span>}
+          {showLabels && <span>{t("navHelpContact")}</span>}
         </a>
       </div>
     </aside>

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { AppShell } from "@/components/learn/app-shell";
@@ -22,11 +23,14 @@ import { KurskatalogGrid, type CatalogItem } from "./kurskatalog-grid";
  */
 export default async function KurskatalogPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [{ data: { user } }, tenant, t, tShared, format] = await Promise.all([
+    supabase.auth.getUser(),
+    getTenant(),
+    getTranslations("portal.kurskatalog"),
+    getTranslations("learn.shared"),
+    getFormatter(),
+  ]);
   if (!user) redirect("/login");
-  const tenant = await getTenant();
   if (!tenant) redirect("/");
 
   // `course_categories(name)` (Migration 20260722180000_course_categories.sql)
@@ -80,7 +84,7 @@ export default async function KurskatalogPage() {
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
     profile?.full_name?.trim() ||
-    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : "zurück");
+    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : tShared("fallbackUserName"));
 
   // Helle Periwinkle-Tönungen mit Diagonalstreifen (wie Dashboard/Referenz).
   const THUMB_TINTS = ["#DFE2F4", "#E7E9F6", "#EDE7F5", "#E4E6F5", "#E9E6F3", "#DDE0F2"];
@@ -99,10 +103,15 @@ export default async function KurskatalogPage() {
 
     // „X Lektionen · Y Std" — die Stundenangabe nur, wenn es echte
     // Video-Laufzeit gibt (kein erfundener Wert für reine Text-Lektionen).
-    const lessonLabel = `${lessonCount} ${lessonCount === 1 ? "Lektion" : "Lektionen"}`;
+    // i18n Block C3: ICU-Plural aus learn.shared (Block C2) statt eigenem
+    // Text; Dezimalstunden über getFormatter() statt hartkodiertem
+    // ".".replace(",") (Plan Abschnitt 6, hartkodierte "de-DE"-Fundstelle).
+    const lessonLabel = tShared("lessonsCount", { count: lessonCount });
     const hours = durationSec / 3600;
     const meta =
-      hours > 0 ? `${lessonLabel} · ${hours.toFixed(1).replace(".", ",")} Std` : lessonLabel;
+      hours > 0
+        ? t("durationMeta", { lessons: lessonLabel, hours: format.number(hours, { maximumFractionDigits: 1 }) })
+        : lessonLabel;
 
     return {
       id: course.id,
@@ -126,8 +135,8 @@ export default async function KurskatalogPage() {
       isStaff={Boolean(isStaff)}
       userName={displayName}
       userEmail={user.email ?? undefined}
-      breadcrumb="Lernen · Kurskatalog"
-      title="Kurskatalog"
+      breadcrumb={t("breadcrumb")}
+      title={t("title")}
     >
       <KurskatalogGrid items={items} categories={categoryNames} />
     </AppShell>

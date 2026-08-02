@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { subscribeToPush, unsubscribeFromPush } from "@/lib/push/actions";
 
 type Props = { vapidPublicKey: string | null };
@@ -18,6 +19,7 @@ type Props = { vapidPublicKey: string | null };
  * Button (kein Absturz) — siehe PHASENSTATUS.md Block-5-Plan Punkt 7.
  */
 export function PushToggle({ vapidPublicKey }: Props) {
+  const t = useTranslations("portal.settings.push");
   const [supported, setSupported] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -43,13 +45,13 @@ export function PushToggle({ vapidPublicKey }: Props) {
   if (!vapidPublicKey) {
     return (
       <p className="text-sm text-gray-500">
-        Benachrichtigungen sind auf dieser Plattform aktuell nicht konfiguriert.
+        {t("notConfigured")}
       </p>
     );
   }
 
   if (!supported) {
-    return <p className="text-sm text-gray-500">Dein Browser unterstützt keine Push-Benachrichtigungen.</p>;
+    return <p className="text-sm text-gray-500">{t("unsupported")}</p>;
   }
 
   function handleSubscribe() {
@@ -58,7 +60,7 @@ export function PushToggle({ vapidPublicKey }: Props) {
       try {
         const permission = await Notification.requestPermission();
         if (permission !== "granted") {
-          setMessage("Berechtigung nicht erteilt.");
+          setMessage(t("permissionDenied"));
           return;
         }
 
@@ -75,9 +77,9 @@ export function PushToggle({ vapidPublicKey }: Props) {
         }
 
         setSubscribed(true);
-        setMessage("Benachrichtigungen aktiviert.");
+        setMessage(t("enabled"));
       } catch {
-        setMessage("Aktivierung fehlgeschlagen.");
+        setMessage(t("enableFailed"));
       }
     });
   }
@@ -93,9 +95,9 @@ export function PushToggle({ vapidPublicKey }: Props) {
           await subscription.unsubscribe();
         }
         setSubscribed(false);
-        setMessage("Benachrichtigungen deaktiviert.");
+        setMessage(t("disabled"));
       } catch {
-        setMessage("Deaktivierung fehlgeschlagen.");
+        setMessage(t("disableFailed"));
       }
     });
   }
@@ -111,10 +113,10 @@ export function PushToggle({ vapidPublicKey }: Props) {
         style={{ background: "var(--color-primary)", borderRadius: "var(--radius)" }}
       >
         {pending
-          ? "Wird verarbeitet …"
+          ? t("activating")
           : subscribed
-            ? "Benachrichtigungen deaktivieren"
-            : "Benachrichtigungen aktivieren"}
+            ? t("disable")
+            : t("enable")}
       </button>
       {message && (
         <p role="status" aria-live="polite" className="text-sm text-gray-600">

@@ -232,7 +232,29 @@
   "learn": {
     "shell": {
       "role": "Kursteilnehmer",
-      "welcomeBack": "Willkommen zurück, {name}"
+      "welcomeBack": "Willkommen zurück, {name}",
+      "mainNavAriaLabel": "Hauptnavigation",
+      "searchButton": "Suchen …",
+      "collapseLabel": "Sidebar einklappen",
+      "expandLabel": "Sidebar ausklappen",
+      "navLernenLabel": "Lernen",
+      "navDashboardLabel": "Meine Kurse",
+      "navBookmarksLabel": "Lesezeichen",
+      "navCatalogLabel": "Kurskatalog",
+      "navLinksLabel": "Links",
+      "navAccountLabel": "Konto",
+      "navAdminAreaLabel": "Admin-Bereich",
+      "navTenantAreaLabel": "Mandantenbereich",
+      "navHelpContact": "Hilfe & Kontakt",
+      "menuOpenLabel": "Menü öffnen",
+      "menuCloseLabel": "Menü schließen",
+      "notificationsLabel": "Benachrichtigungen",
+      "notificationsMarkAllRead": "Alle gelesen",
+      "notificationsEmpty": "Noch keine Benachrichtigungen.",
+      "notificationsUnreadTab": "Ungelesen",
+      "notificationsReadTab": "Gelesen",
+      "profileMenuAriaLabel": "Profilmenü: {name}",
+      "profileViewLink": "Profil ansehen"
     },
     "shared": {
       "myCoursesBreadcrumb": "Lernen · Meine Kurse",
@@ -415,6 +437,121 @@
       "totalLabel": "GESAMTBETRAG",
       "perMonthSuffix": " / Monat",
       "secureBadge": "Sichere Zahlung über Stripe"
+    }
+  },
+  "portal": {
+    "dashboard": {
+      "continueBannerLabel": "WEITERLERNEN",
+      "continueLessonMeta": "Lektion {current} von {total} · {title}",
+      "continueButton": "Fortsetzen",
+      "myCoursesHeading": "Meine Kurse",
+      "viewCatalogLink": "Kurskatalog ansehen",
+      "notStarted": "Nicht gestartet",
+      "progressLabel": "Fortschritt",
+      "progressCompletedSuffix": " — abgeschlossen 🎉",
+      "empty": "Noch keine veröffentlichten Kurse in dieser Akademie."
+    },
+    "kurskatalog": {
+      "breadcrumb": "Lernen · Kurskatalog",
+      "title": "Kurskatalog",
+      "allCategories": "Alle Kurse",
+      "emptyNoCourses": "Noch keine veröffentlichten Kurse.",
+      "emptyNoCategoryMatch": "Keine Kurse in dieser Kategorie.",
+      "ctaContinue": "Weiterlernen",
+      "ctaView": "Zum Kurs",
+      "durationMeta": "{lessons} · {hours} Std"
+    },
+    "settings": {
+      "title": "Einstellungen",
+      "breadcrumb": "Konto · Einstellungen",
+      "tabs": {
+        "allgemein": "Allgemein",
+        "geraete": "Geräte"
+      },
+      "language": "Sprache",
+      "languageDescription": "In welcher Sprache die Oberfläche angezeigt wird.",
+      "languageChanged": "Sprache geändert.",
+      "avatar": {
+        "heading": "Profilbild",
+        "hint": "JPG oder PNG, max. 2 MB.",
+        "uploadPending": "Lädt …",
+        "uploadButton": "Bild hochladen",
+        "updated": "Profilbild aktualisiert.",
+        "alt": "Profilbild"
+      },
+      "fields": {
+        "firstName": "Vorname",
+        "lastName": "Nachname",
+        "phone": "Telefon",
+        "city": "Stadt",
+        "email": "E-Mail",
+        "emailAriaLabel": "E-Mail (über „E-Mail ändern“ änderbar)",
+        "position": "Position",
+        "about": "Über mich"
+      },
+      "profileSaved": "Änderungen gespeichert.",
+      "changeEmailButton": "E-Mail ändern",
+      "changePasswordLink": "Passwort ändern",
+      "savePending": "Speichert …",
+      "saveButton": "Änderungen speichern",
+      "newEmailLabel": "Neue E-Mail-Adresse",
+      "sendConfirmationButton": "Bestätigungslink senden",
+      "emailChangeSuccess": "Bestätigungslink an die neue Adresse gesendet. Die Änderung greift nach Bestätigung.",
+      "dataHeading": "Meine Daten",
+      "dataDescription": "Lade eine strukturierte JSON-Datei mit allen zu dir gespeicherten Daten herunter (Art. 15/20 DSGVO).",
+      "dataExportLink": "Meine Daten exportieren",
+      "certificateFallbackTitle": "Kurs",
+      "notifications": {
+        "groups": {
+          "courses": { "title": "Kurse", "description": "Neue Inhalte und Lernerinnerungen." },
+          "submissions": { "title": "Abgaben", "description": "Feedback und Fristen zu deinen Einsendungen." },
+          "other": { "title": "Sonstiges", "description": "Produktneuigkeiten und Tipps." }
+        },
+        "rows": {
+          "newLesson": "Neue Lektion verfügbar",
+          "liveQa": "Live-Q&A-Erinnerung",
+          "weeklyDigest": "Wöchentliche Lern-Zusammenfassung",
+          "feedback": "Feedback zu Abgaben",
+          "deadlineReminder": "Erinnerung an offene Fristen",
+          "tips": "Tipps & Angebote"
+        },
+        "pushHeading": "Browser-Benachrichtigung",
+        "pushDescription": "Erhalte eine Benachrichtigung, sobald du einen Kurs vollständig abgeschlossen hast."
+      },
+      "push": {
+        "notConfigured": "Benachrichtigungen sind auf dieser Plattform aktuell nicht konfiguriert.",
+        "unsupported": "Dein Browser unterstützt keine Push-Benachrichtigungen.",
+        "permissionDenied": "Berechtigung nicht erteilt.",
+        "activating": "Wird verarbeitet …",
+        "enable": "Benachrichtigungen aktivieren",
+        "disable": "Benachrichtigungen deaktivieren",
+        "enabled": "Benachrichtigungen aktiviert.",
+        "enableFailed": "Aktivierung fehlgeschlagen.",
+        "disabled": "Benachrichtigungen deaktiviert.",
+        "disableFailed": "Deaktivierung fehlgeschlagen."
+      },
+      "deleteAccount": {
+        "heading": "Konto löschen",
+        "pendingNotice": "Löschantrag vom {date} eingegangen, wird geprüft.",
+        "description": "Beantrage die Löschung deines Kontos. Die Löschung erfolgt nach manueller Prüfung und ist nicht sofort.",
+        "reasonLabel": "Grund (optional)",
+        "submitPending": "Wird gesendet …",
+        "submitButton": "Löschung beantragen",
+        "submitted": "Löschantrag eingereicht — wird geprüft."
+      },
+      "devices": {
+        "empty": "Keine aktiven Sitzungen gefunden.",
+        "currentBadge": "Dieses Gerät",
+        "revoke": "Abmelden",
+        "revokePending": "…",
+        "unknownDevice": "Unbekanntes Gerät",
+        "browserFallback": "Browser",
+        "lastActiveUnknown": "zuletzt aktiv unbekannt",
+        "activeNow": "aktiv jetzt",
+        "activeMinutesAgo": "aktiv vor {minutes} Min.",
+        "activeHoursAgo": "aktiv vor {hours} Std.",
+        "activeDaysAgo": "aktiv vor {days, plural, one {# Tag} other {# Tagen}}"
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import {
   updateProfile,
   uploadAvatar,
@@ -25,11 +26,6 @@ import type { Locale } from "@/i18n/config";
  * beim Umzug von /profil nichts verlorengeht.
  */
 type Tab = "allgemein" | "benachrichtigungen" | "geraete";
-const TAB_LABELS: Record<Tab, string> = {
-  allgemein: "Allgemein",
-  benachrichtigungen: "Benachrichtigungen",
-  geraete: "Geräte",
-};
 
 export type SettingsProfile = {
   first_name: string | null;
@@ -49,32 +45,36 @@ export type CertificateInfo = {
   downloadUrl: string | null;
 };
 
+/**
+ * i18n Block C3: Struktur (Keys/Defaults) bleibt eine Modul-Konstante — nur
+ * die Anzeigetexte (title/desc/label) kommen jetzt aus `t()`, deshalb ohne
+ * sie hier, aufgelöst innerhalb von `BenachrichtigungenTab()` (Hooks lassen
+ * sich nicht auf Modulebene aufrufen).
+ */
+type NotifRowLabelKey = "newLesson" | "liveQa" | "weeklyDigest" | "feedback" | "deadlineReminder" | "tips";
+
 const NOTIF_GROUPS: {
-  title: string;
-  desc: string;
-  rows: { key: string; label: string; default: boolean }[];
+  titleKey: "courses" | "submissions" | "other";
+  rows: { key: string; labelKey: NotifRowLabelKey; default: boolean }[];
 }[] = [
   {
-    title: "Kurse",
-    desc: "Neue Inhalte und Lernerinnerungen.",
+    titleKey: "courses",
     rows: [
-      { key: "neueLektion", label: "Neue Lektion verfügbar", default: true },
-      { key: "liveqa", label: "Live-Q&A-Erinnerung", default: true },
-      { key: "wochenmail", label: "Wöchentliche Lern-Zusammenfassung", default: false },
+      { key: "neueLektion", labelKey: "newLesson", default: true },
+      { key: "liveqa", labelKey: "liveQa", default: true },
+      { key: "wochenmail", labelKey: "weeklyDigest", default: false },
     ],
   },
   {
-    title: "Abgaben",
-    desc: "Feedback und Fristen zu deinen Einsendungen.",
+    titleKey: "submissions",
     rows: [
-      { key: "feedback", label: "Feedback zu Abgaben", default: true },
-      { key: "abgabeFrist", label: "Erinnerung an offene Fristen", default: true },
+      { key: "feedback", labelKey: "feedback", default: true },
+      { key: "abgabeFrist", labelKey: "deadlineReminder", default: true },
     ],
   },
   {
-    title: "Sonstiges",
-    desc: "Produktneuigkeiten und Tipps.",
-    rows: [{ key: "tipps", label: "Tipps & Angebote", default: false }],
+    titleKey: "other",
+    rows: [{ key: "tipps", labelKey: "tips", default: false }],
   },
 ];
 
@@ -106,19 +106,26 @@ export function EinstellungenTabs({
   enabledLocales: Locale[];
   currentLocale: Locale;
 }) {
+  const t = useTranslations("portal.settings");
+  const tNotif = useTranslations("learn.shell");
+  const TAB_LABELS: Record<Tab, string> = {
+    allgemein: t("tabs.allgemein"),
+    benachrichtigungen: tNotif("notificationsLabel"),
+    geraete: t("tabs.geraete"),
+  };
   const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
     <div className="max-w-[920px]">
       {/* Tabs */}
       <div className="mb-[30px] flex gap-1.5 border-b border-border-200">
-        {(Object.keys(TAB_LABELS) as Tab[]).map((t) => {
-          const active = t === tab;
+        {(Object.keys(TAB_LABELS) as Tab[]).map((tabId) => {
+          const active = tabId === tab;
           return (
             <button
-              key={t}
+              key={tabId}
               type="button"
-              onClick={() => setTab(t)}
+              onClick={() => setTab(tabId)}
               aria-current={active ? "page" : undefined}
               className="-mb-px px-[18px] py-3 text-[15px]"
               style={{
@@ -127,14 +134,14 @@ export function EinstellungenTabs({
                 borderBottom: active ? "2px solid #5663AE" : "2px solid transparent",
               }}
             >
-              {TAB_LABELS[t]}
+              {TAB_LABELS[tabId]}
             </button>
           );
         })}
       </div>
 
       <div className="mb-[22px] text-[13px] font-semibold text-muted-400">
-        Einstellungen &nbsp;›&nbsp; <span style={{ color: "#5663AE" }}>{TAB_LABELS[tab]}</span>
+        {t("title")} &nbsp;›&nbsp; <span style={{ color: "#5663AE" }}>{TAB_LABELS[tab]}</span>
       </div>
 
       {tab === "allgemein" && (
@@ -175,6 +182,8 @@ function AllgemeinTab({
   enabledLocales: Locale[];
   currentLocale: Locale;
 }) {
+  const t = useTranslations("portal.settings");
+  const tCert = useTranslations("certificates");
   const [avatarState, avatarAction, avatarPending] = useActionState(uploadAvatar, initialState);
   const [profileState, profileAction, profilePending] = useActionState(updateProfile, initialState);
   const [emailState, emailAction, emailPending] = useActionState(changeEmail, initialState);
@@ -189,7 +198,7 @@ function AllgemeinTab({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={profile.avatar_url}
-              alt="Profilbild"
+              alt={t("avatar.alt")}
               className="h-[76px] w-[76px] flex-shrink-0 rounded-[16px] object-cover"
             />
           ) : (
@@ -202,8 +211,8 @@ function AllgemeinTab({
             </span>
           )}
           <div>
-            <div className="text-lg font-bold text-ink">Profilbild</div>
-            <div className="mb-2.5 text-sm text-muted-500">JPG oder PNG, max. 2 MB.</div>
+            <div className="text-lg font-bold text-ink">{t("avatar.heading")}</div>
+            <div className="mb-2.5 text-sm text-muted-500">{t("avatar.hint")}</div>
             <form action={avatarAction} className="flex flex-wrap items-center gap-2">
               <input
                 type="file"
@@ -217,33 +226,33 @@ function AllgemeinTab({
                 disabled={avatarPending}
                 className="rounded-sm border border-border-300 bg-white px-4 py-2 text-sm font-semibold text-navy disabled:opacity-50"
               >
-                {avatarPending ? "Lädt …" : "Bild hochladen"}
+                {avatarPending ? t("avatar.uploadPending") : t("avatar.uploadButton")}
               </button>
             </form>
             {avatarState.error && <p className="mt-1 text-sm text-[#B24343]">{avatarState.error}</p>}
-            {avatarState.success && <p className="mt-1 text-sm text-[#1F8A5B]">Profilbild aktualisiert.</p>}
+            {avatarState.success && <p className="mt-1 text-sm text-[#1F8A5B]">{t("avatar.updated")}</p>}
           </div>
         </div>
 
         {/* Profilfelder */}
         <form action={profileAction}>
           <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
-            <Field name="first_name" label="Vorname" defaultValue={profile.first_name} />
-            <Field name="last_name" label="Nachname" defaultValue={profile.last_name} />
-            <Field name="phone" label="Telefon" defaultValue={profile.phone} type="tel" />
-            <Field name="city" label="Stadt" defaultValue={profile.city} />
+            <Field name="first_name" label={t("fields.firstName")} defaultValue={profile.first_name} />
+            <Field name="last_name" label={t("fields.lastName")} defaultValue={profile.last_name} />
+            <Field name="phone" label={t("fields.phone")} defaultValue={profile.phone} type="tel" />
+            <Field name="city" label={t("fields.city")} defaultValue={profile.city} />
             <div>
-              <label className="mb-[7px] block text-sm font-semibold text-navy">E-Mail</label>
+              <label className="mb-[7px] block text-sm font-semibold text-navy">{t("fields.email")}</label>
               <input
                 value={email}
                 readOnly
-                aria-label="E-Mail (über „E-Mail ändern“ änderbar)"
+                aria-label={t("fields.emailAriaLabel")}
                 className="w-full rounded-sm border border-border-300 bg-bg px-[15px] py-[13px] text-base text-muted-500"
               />
             </div>
-            <Field name="job_position" label="Position" defaultValue={profile.job_position} />
+            <Field name="job_position" label={t("fields.position")} defaultValue={profile.job_position} />
             <div className="sm:col-span-2">
-              <label className="mb-[7px] block text-sm font-semibold text-navy">Über mich</label>
+              <label className="mb-[7px] block text-sm font-semibold text-navy">{t("fields.about")}</label>
               <textarea
                 name="about"
                 defaultValue={profile.about ?? ""}
@@ -253,7 +262,7 @@ function AllgemeinTab({
           </div>
 
           {profileState.error && <p className="mt-4 text-sm text-[#B24343]">{profileState.error}</p>}
-          {profileState.success && <p className="mt-4 text-sm text-[#1F8A5B]">Änderungen gespeichert.</p>}
+          {profileState.success && <p className="mt-4 text-sm text-[#1F8A5B]">{t("profileSaved")}</p>}
 
           <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-[#EEF0F7] pt-6">
             <button
@@ -261,20 +270,20 @@ function AllgemeinTab({
               onClick={() => setShowEmail((v) => !v)}
               className="rounded-sm border border-border-300 bg-white px-[18px] py-3 text-[15px] font-semibold text-navy"
             >
-              E-Mail ändern
+              {t("changeEmailButton")}
             </button>
             <a
               href="/passwort-vergessen"
               className="rounded-sm border border-border-300 bg-white px-[18px] py-3 text-[15px] font-semibold text-navy no-underline"
             >
-              Passwort ändern
+              {t("changePasswordLink")}
             </a>
             <button
               type="submit"
               disabled={profilePending}
               className="ml-auto rounded-sm bg-primary px-[22px] py-3 text-[15px] font-bold text-white disabled:opacity-50"
             >
-              {profilePending ? "Speichert …" : "Änderungen speichern"}
+              {profilePending ? t("savePending") : t("saveButton")}
             </button>
           </div>
         </form>
@@ -282,7 +291,7 @@ function AllgemeinTab({
         {/* E-Mail ändern (Bestätigungslink) */}
         {showEmail && (
           <form action={emailAction} className="mt-5 border-t border-[#EEF0F7] pt-5">
-            <label className="mb-[7px] block text-sm font-semibold text-navy">Neue E-Mail-Adresse</label>
+            <label className="mb-[7px] block text-sm font-semibold text-navy">{t("newEmailLabel")}</label>
             <div className="flex flex-wrap gap-2">
               <input
                 name="email"
@@ -296,13 +305,13 @@ function AllgemeinTab({
                 disabled={emailPending}
                 className="rounded-sm bg-primary px-[18px] py-3 text-[15px] font-bold text-white disabled:opacity-50"
               >
-                Bestätigungslink senden
+                {t("sendConfirmationButton")}
               </button>
             </div>
             {emailState.error && <p className="mt-2 text-sm text-[#B24343]">{emailState.error}</p>}
             {emailState.success && (
               <p className="mt-2 text-sm text-[#1F8A5B]">
-                Bestätigungslink an die neue Adresse gesendet. Die Änderung greift nach Bestätigung.
+                {t("emailChangeSuccess")}
               </p>
             )}
           </form>
@@ -318,9 +327,9 @@ function AllgemeinTab({
           gated, damit kein leerer Kartenrahmen übrigbleibt. */}
       {enabledLocales.length > 1 && (
         <div className="rounded-[14px] border border-border-100 bg-white p-[30px]">
-          <h2 className="text-lg font-bold text-ink">Sprache</h2>
+          <h2 className="text-lg font-bold text-ink">{t("language")}</h2>
           <p className="mt-2 mb-4 text-sm text-muted-500">
-            In welcher Sprache die Oberfläche angezeigt wird.
+            {t("languageDescription")}
           </p>
           <LocaleSwitcher enabledLocales={enabledLocales} currentLocale={currentLocale} />
         </div>
@@ -328,23 +337,23 @@ function AllgemeinTab({
 
       {/* Bestehende echte Konto-Funktionen (aus /profil übernommen) */}
       <div className="rounded-[14px] border border-border-100 bg-white p-[30px]">
-        <h2 className="text-lg font-bold text-ink">Meine Zertifikate</h2>
+        <h2 className="text-lg font-bold text-ink">{tCert("profileCertificatesTitle")}</h2>
         {certificates.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-500">Noch keine Zertifikate ausgestellt.</p>
+          <p className="mt-2 text-sm text-muted-500">{tCert("empty")}</p>
         ) : (
           <ul className="mt-3 flex flex-col gap-3">
             {certificates.map((cert) => (
               <li key={cert.id} className="rounded-xl border border-border-100 p-3">
                 <p className="text-base font-medium text-ink">{cert.title}</p>
                 <p className="text-xs text-muted-500">
-                  Ausgestellt am {cert.issuedAt} — Seriennummer {cert.serial}
+                  {tCert("issuedOn", { date: cert.issuedAt })} — {tCert("serialLabel")} {cert.serial}
                 </p>
                 {cert.downloadUrl ? (
                   <a href={cert.downloadUrl} className="mt-2 inline-block text-sm font-semibold no-underline">
-                    Zertifikat herunterladen (PDF)
+                    {tCert("download")}
                   </a>
                 ) : (
-                  <p className="mt-2 text-xs text-muted-500">Download aktuell nicht verfügbar.</p>
+                  <p className="mt-2 text-xs text-muted-500">{tCert("downloadUnavailable")}</p>
                 )}
               </li>
             ))}
@@ -353,30 +362,29 @@ function AllgemeinTab({
       </div>
 
       <div className="rounded-[14px] border border-border-100 bg-white p-[30px]">
-        <h2 className="text-lg font-bold text-ink">Meine Daten</h2>
+        <h2 className="text-lg font-bold text-ink">{t("dataHeading")}</h2>
         <p className="mt-2 text-sm text-muted-500">
-          Lade eine strukturierte JSON-Datei mit allen zu dir gespeicherten Daten herunter (Art. 15/20 DSGVO).
+          {t("dataDescription")}
         </p>
         <a
           href="/profil/export"
           className="mt-2 inline-block text-sm font-semibold no-underline"
           style={{ color: "var(--color-primary)" }}
         >
-          Meine Daten exportieren
+          {t("dataExportLink")}
         </a>
       </div>
 
       <div className="rounded-[14px] border border-border-100 bg-white p-[30px]">
-        <h2 className="text-lg font-bold text-ink">Konto löschen</h2>
+        <h2 className="text-lg font-bold text-ink">{t("deleteAccount.heading")}</h2>
         {pendingDeletionDate ? (
           <p className="mt-2 text-sm text-muted-500">
-            Löschantrag vom {pendingDeletionDate} eingegangen, wird geprüft.
+            {t("deleteAccount.pendingNotice", { date: pendingDeletionDate })}
           </p>
         ) : (
           <>
             <p className="mt-2 text-sm text-muted-500">
-              Beantrage die Löschung deines Kontos. Die Löschung erfolgt nach manueller Prüfung und ist
-              nicht sofort.
+              {t("deleteAccount.description")}
             </p>
             <div className="mt-3">
               <DeletionRequestForm />
@@ -421,6 +429,7 @@ function BenachrichtigungenTab({
   notificationPrefs: Record<string, boolean>;
   vapidPublicKey: string | null;
 }) {
+  const t = useTranslations("portal.settings.notifications");
   const [prefs, setPrefs] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     for (const g of NOTIF_GROUPS) for (const r of g.rows) init[r.key] = notificationPrefs[r.key] ?? r.default;
@@ -439,26 +448,29 @@ function BenachrichtigungenTab({
   return (
     <div className="flex flex-col gap-[22px]">
       {NOTIF_GROUPS.map((group) => (
-        <div key={group.title} className="rounded-[14px] border border-border-100 bg-white px-7 py-6">
-          <div className="text-base font-bold text-ink">{group.title}</div>
-          <div className="mb-[18px] text-sm text-muted-400">{group.desc}</div>
-          {group.rows.map((row) => (
-            <div
-              key={row.key}
-              className="flex items-center justify-between border-t border-[#F2F3F9] py-[13px]"
-            >
-              <span className="text-[15px] font-medium text-ink">{row.label}</span>
-              <Toggle on={prefs[row.key]} onToggle={() => toggle(row.key)} label={row.label} />
-            </div>
-          ))}
+        <div key={group.titleKey} className="rounded-[14px] border border-border-100 bg-white px-7 py-6">
+          <div className="text-base font-bold text-ink">{t(`groups.${group.titleKey}.title`)}</div>
+          <div className="mb-[18px] text-sm text-muted-400">{t(`groups.${group.titleKey}.description`)}</div>
+          {group.rows.map((row) => {
+            const label = t(`rows.${row.labelKey}`);
+            return (
+              <div
+                key={row.key}
+                className="flex items-center justify-between border-t border-[#F2F3F9] py-[13px]"
+              >
+                <span className="text-[15px] font-medium text-ink">{label}</span>
+                <Toggle on={prefs[row.key]} onToggle={() => toggle(row.key)} label={label} />
+              </div>
+            );
+          })}
         </div>
       ))}
 
       {/* Bestehender echter Browser-Push (nicht verlieren). */}
       <div className="rounded-[14px] border border-border-100 bg-white px-7 py-6">
-        <div className="text-base font-bold text-ink">Browser-Benachrichtigung</div>
+        <div className="text-base font-bold text-ink">{t("pushHeading")}</div>
         <div className="mb-[18px] text-sm text-muted-400">
-          Erhalte eine Benachrichtigung, sobald du einen Kurs vollständig abgeschlossen hast.
+          {t("pushDescription")}
         </div>
         <PushToggle vapidPublicKey={vapidPublicKey} />
       </div>
@@ -488,10 +500,11 @@ function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; la
 /* ----------------------------------------------------------------- Geräte */
 
 function GeraeteTab({ sessions }: { sessions: SessionInfo[] }) {
+  const t = useTranslations("portal.settings.devices");
   return (
     <div className="rounded-[14px] border border-border-100 bg-white px-7 py-1">
       {sessions.length === 0 ? (
-        <p className="py-6 text-sm text-muted-500">Keine aktiven Sitzungen gefunden.</p>
+        <p className="py-6 text-sm text-muted-500">{t("empty")}</p>
       ) : (
         sessions.map((s, i) => (
           <div
@@ -514,7 +527,7 @@ function GeraeteTab({ sessions }: { sessions: SessionInfo[] }) {
                     className="ml-1.5 rounded-lg px-2 py-0.5 text-xs font-bold text-ink"
                     style={{ background: "#F7EED4" }}
                   >
-                    Dieses Gerät
+                    {t("currentBadge")}
                   </span>
                 )}
               </div>
@@ -529,6 +542,7 @@ function GeraeteTab({ sessions }: { sessions: SessionInfo[] }) {
 }
 
 function RevokeButton({ sessionId }: { sessionId: string }) {
+  const t = useTranslations("portal.settings.devices");
   const [pending, startTransition] = useTransition();
   return (
     <button
@@ -538,7 +552,7 @@ function RevokeButton({ sessionId }: { sessionId: string }) {
       className="flex-shrink-0 rounded-[10px] border bg-white px-4 py-2 text-sm font-semibold disabled:opacity-50"
       style={{ borderColor: "#E3C0C0", color: "#B24343" }}
     >
-      {pending ? "…" : "Abmelden"}
+      {pending ? t("revokePending") : t("revoke")}
     </button>
   );
 }

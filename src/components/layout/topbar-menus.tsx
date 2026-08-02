@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Bell, ChevronDown, CircleUserRound } from "lucide-react";
 
 export type NotificationItem = { text: string; time: string };
@@ -55,6 +56,7 @@ export function NotificationsMenu({
   onToggle: () => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("learn.shell");
   const wrapRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const [panelTop, setPanelTop] = useState<number>();
@@ -80,7 +82,7 @@ export function NotificationsMenu({
         }}
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label="Benachrichtigungen"
+        aria-label={t("notificationsLabel")}
         className="relative flex h-[46px] w-[46px] items-center justify-center rounded-md border border-border-100 bg-white"
       >
         <Bell size={21} aria-hidden="true" className="text-navy" />
@@ -101,22 +103,22 @@ export function NotificationsMenu({
           role="menu"
         >
           <div className="flex items-center justify-between px-[18px] pb-3 pt-4">
-            <span className="text-[16px] font-bold text-ink">Benachrichtigungen</span>
+            <span className="text-[16px] font-bold text-ink">{t("notificationsLabel")}</span>
             {unread > 0 && (
               <button type="button" className="text-[13px] font-semibold text-primary">
-                Alle gelesen
+                {t("notificationsMarkAllRead")}
               </button>
             )}
           </div>
           {unread === 0 ? (
             <div className="border-t border-[#EEF0F7] px-[18px] py-10 text-center text-sm text-muted-400">
-              Noch keine Benachrichtigungen.
+              {t("notificationsEmpty")}
             </div>
           ) : (
             <>
               <div className="flex gap-1.5 border-b border-[#EEF0F7] px-[18px] pb-3">
-                <span className="border-b-2 border-primary pb-2 text-sm font-bold text-primary">Ungelesen</span>
-                <span className="px-2 pb-2 text-sm font-medium text-muted-400">Gelesen</span>
+                <span className="border-b-2 border-primary pb-2 text-sm font-bold text-primary">{t("notificationsUnreadTab")}</span>
+                <span className="px-2 pb-2 text-sm font-medium text-muted-400">{t("notificationsReadTab")}</span>
               </div>
               <div className="max-h-[320px] overflow-auto">
                 {notifications.map((n, i) => (
@@ -152,6 +154,7 @@ export function ProfileMenu({
   onToggle: () => void;
   onClose: () => void;
 }) {
+  const t = useTranslations();
   const wrapRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const signOutFormRef = useRef<HTMLFormElement>(null);
@@ -177,7 +180,7 @@ export function ProfileMenu({
         }}
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label={compact ? `Profilmenü: ${user.name}` : undefined}
+        aria-label={compact ? t("learn.shell.profileMenuAriaLabel", { name: user.name }) : undefined}
         className={
           compact
             ? "flex h-[46px] w-[46px] items-center justify-center rounded-md border border-border-100 bg-white"
@@ -238,7 +241,7 @@ export function ProfileMenu({
             className="flex items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-medium text-navy no-underline"
           >
             <span className="h-2 w-2 rounded-[2px] bg-primary" />
-            Profil ansehen
+            {t("learn.shell.profileViewLink")}
           </Link>
           <Link
             href="/einstellungen"
@@ -251,7 +254,7 @@ export function ProfileMenu({
             className="flex items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-medium text-navy no-underline"
           >
             <span className="h-2 w-2 rounded-[2px] bg-primary" />
-            Einstellungen
+            {t("portal.settings.title")}
           </Link>
           <Link
             href="/einstellungen?tab=benachrichtigungen"
@@ -264,7 +267,7 @@ export function ProfileMenu({
             className="flex items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-medium text-navy no-underline"
           >
             <span className="h-2 w-2 rounded-[2px] bg-primary" />
-            Benachrichtigungen
+            {t("learn.shell.notificationsLabel")}
           </Link>
           <div className="mx-1 my-1.5 h-px bg-[#EEF0F7]" />
           <form ref={signOutFormRef} action="/auth/signout" method="post">
@@ -287,7 +290,7 @@ export function ProfileMenu({
               className="flex w-full items-center gap-[11px] rounded-[10px] px-3 py-[10px] text-[14px] font-semibold text-[#B24343]"
             >
               <span className="h-2 w-2 rounded-[2px] bg-[#B24343]" />
-              Abmelden
+              {t("auth.logout")}
             </button>
           </form>
         </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Menu, X } from "lucide-react";
 import { Sidebar, type SidebarLink } from "@/components/layout/Sidebar";
 import { NotificationsMenu, ProfileMenu, useExclusiveMenu, type NotificationItem, type TopBarUser } from "@/components/layout/topbar-menus";
@@ -45,6 +46,8 @@ export function LearnMobileNav({
   tenantName?: string;
   logoUrl?: string | null;
 }) {
+  const t = useTranslations("learn.shell");
+  const tAuthShared = useTranslations("auth.shared");
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const [prevPathname, setPrevPathname] = useState(pathname);
@@ -76,7 +79,7 @@ export function LearnMobileNav({
                 <span className="block truncate text-[13px] font-extrabold tracking-[0.02em] text-ink">
                   {tenantName.toUpperCase()}
                 </span>
-                <span className="block text-[9px] font-semibold tracking-[0.24em] text-muted-500">AKADEMIE</span>
+                <span className="block text-[9px] font-semibold tracking-[0.24em] text-muted-500">{tAuthShared("brandSuffix")}</span>
               </span>
             </>
           )}
@@ -111,7 +114,7 @@ export function LearnMobileNav({
             }}
             aria-expanded={open}
             aria-controls="learn-mobile-menu"
-            aria-label={open ? "Menü schließen" : "Menü öffnen"}
+            aria-label={open ? t("menuCloseLabel") : t("menuOpenLabel")}
             className="flex h-10 w-10 flex-none items-center justify-center rounded-md text-navy focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
             {open ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}

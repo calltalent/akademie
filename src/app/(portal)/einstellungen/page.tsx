@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { publicEnv } from "@/lib/env";
@@ -20,35 +21,39 @@ type CertificateRow = {
   courses: { title: string } | { title: string }[] | null;
 };
 
-function courseTitle(courses: CertificateRow["courses"]): string {
-  if (!courses) return "Kurs";
-  if (Array.isArray(courses)) return courses[0]?.title ?? "Kurs";
-  return courses.title ?? "Kurs";
+function courseTitle(courses: CertificateRow["courses"], fallback: string): string {
+  if (!courses) return fallback;
+  if (Array.isArray(courses)) return courses[0]?.title ?? fallback;
+  return courses.title ?? fallback;
 }
 
-function formatDateDe(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+type Formatter = Awaited<ReturnType<typeof getFormatter>>;
+type DevicesTranslator = Awaited<ReturnType<typeof getTranslations<"portal.settings.devices">>>;
+
+/** i18n Block C3: hartkodiertes "de-DE" (Plan Abschnitt 6) durch getFormatter() ersetzt. */
+function formatDate(format: Formatter, iso: string): string {
+  return format.dateTime(new Date(iso), { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-function browserFromUA(ua: string | null): string {
-  if (!ua) return "Unbekanntes Gerät";
+function browserFromUA(ua: string | null, t: DevicesTranslator): string {
+  if (!ua) return t("unknownDevice");
   if (ua.includes("Edg")) return "Edge";
   if (ua.includes("OPR") || ua.includes("Opera")) return "Opera";
   if (ua.includes("Firefox")) return "Firefox";
   if (ua.includes("Chrome")) return "Chrome";
   if (ua.includes("Safari")) return "Safari";
-  return "Browser";
+  return t("browserFallback");
 }
 
-function relativeActive(iso: string | null): string {
-  if (!iso) return "zuletzt aktiv unbekannt";
+function relativeActive(iso: string | null, t: DevicesTranslator): string {
+  if (!iso) return t("lastActiveUnknown");
   const diffMin = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (diffMin < 2) return "aktiv jetzt";
-  if (diffMin < 60) return `aktiv vor ${diffMin} Min.`;
+  if (diffMin < 2) return t("activeNow");
+  if (diffMin < 60) return t("activeMinutesAgo", { minutes: diffMin });
   const diffH = Math.round(diffMin / 60);
-  if (diffH < 24) return `aktiv vor ${diffH} Std.`;
+  if (diffH < 24) return t("activeHoursAgo", { hours: diffH });
   const diffD = Math.round(diffH / 24);
-  return `aktiv vor ${diffD} ${diffD === 1 ? "Tag" : "Tagen"}`;
+  return t("activeDaysAgo", { days: diffD });
 }
 
 /**
@@ -75,11 +80,24 @@ export default async function EinstellungenPage({
     rawTab === "benachrichtigungen" ? "benachrichtigungen" : rawTab === "geraete" ? "geraete" : "allgemein";
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [
+    {
+      data: { user },
+    },
+    tenant,
+    t,
+    tShared,
+    tDevices,
+    format,
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    getTenant(),
+    getTranslations("portal.settings"),
+    getTranslations("learn.shared"),
+    getTranslations("portal.settings.devices"),
+    getFormatter(),
+  ]);
   if (!user) redirect("/login");
-  const tenant = await getTenant();
   if (!tenant) redirect("/");
 
   const { data: profile } = await supabase
@@ -109,7 +127,7 @@ export default async function EinstellungenPage({
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
   const displayName =
     profile?.full_name?.trim() ||
-    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : "zurück");
+    (emailLocalPart ? emailLocalPart[0].toUpperCase() + emailLocalPart.slice(1) : tShared("fallbackUserName"));
   const initials =
     [profile?.first_name, profile?.last_name]
       .filter(Boolean)
@@ -122,8 +140,8 @@ export default async function EinstellungenPage({
   const { data: sessionRows } = await supabase.rpc("my_sessions");
   const sessions: SessionInfo[] = ((sessionRows ?? []) as Array<Record<string, unknown>>).map((s) => ({
     id: String(s.id),
-    browser: browserFromUA(s.user_agent as string | null),
-    lastActive: relativeActive(s.updated_at as string | null),
+    browser: browserFromUA(s.user_agent as string | null, tDevices),
+    lastActive: relativeActive(s.updated_at as string | null, tDevices),
     isCurrent: Boolean(s.is_current),
   }));
 
@@ -144,8 +162,8 @@ export default async function EinstellungenPage({
       }
       return {
         id: cert.id,
-        title: courseTitle(cert.courses),
-        issuedAt: formatDateDe(cert.issued_at),
+        title: courseTitle(cert.courses, t("certificateFallbackTitle")),
+        issuedAt: formatDate(format, cert.issued_at),
         serial: cert.serial,
         downloadUrl,
       };
@@ -165,8 +183,8 @@ export default async function EinstellungenPage({
       isStaff={Boolean(isStaff)}
       userName={displayName}
       userEmail={user.email ?? undefined}
-      breadcrumb="Konto · Einstellungen"
-      title="Einstellungen"
+      breadcrumb={t("breadcrumb")}
+      title={t("title")}
     >
       <EinstellungenTabs
         profile={{
@@ -183,7 +201,7 @@ export default async function EinstellungenPage({
         notificationPrefs={(profile?.notification_prefs as Record<string, boolean> | null) ?? {}}
         sessions={sessions}
         certificates={certificates}
-        pendingDeletionDate={pendingDeletion ? formatDateDe(pendingDeletion.requested_at) : null}
+        pendingDeletionDate={pendingDeletion ? formatDate(format, pendingDeletion.requested_at) : null}
         vapidPublicKey={publicEnv.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
         initialTab={initialTab}
         enabledLocales={enabledLocales}

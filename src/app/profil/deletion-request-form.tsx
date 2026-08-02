@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useTranslations } from "next-intl";
 import { requestDeletion } from "./actions";
 import type { ProfilActionState } from "./actions";
 
@@ -15,12 +16,13 @@ const initialState: ProfilActionState = { error: null };
  * wie der Rest von `/profil` — NICHT das dunkle Portal-Schema.
  */
 export function DeletionRequestForm() {
+  const t = useTranslations("portal.settings.deleteAccount");
   const [state, formAction, pending] = useActionState(requestDeletion, initialState);
 
   if (state.success && !state.error) {
     return (
       <p role="status" aria-live="polite" className="text-sm text-gray-700">
-        Löschantrag eingereicht — wird geprüft.
+        {t("submitted")}
       </p>
     );
   }
@@ -28,7 +30,7 @@ export function DeletionRequestForm() {
   return (
     <form action={formAction} className="flex flex-col gap-3">
       <label className="flex flex-col gap-1 text-sm" htmlFor="deletion-reason">
-        Grund (optional)
+        {t("reasonLabel")}
         <textarea
           id="deletion-reason"
           name="reason"
@@ -51,7 +53,7 @@ export function DeletionRequestForm() {
         className="w-fit rounded-md px-4 py-2 text-base font-medium text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
         style={{ background: "var(--color-primary)", borderRadius: "var(--radius)" }}
       >
-        {pending ? "Wird gesendet …" : "Löschung beantragen"}
+        {pending ? t("submitPending") : t("submitButton")}
       </button>
     </form>
   );
