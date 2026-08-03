@@ -25,11 +25,15 @@ import { HtmlBackgroundSync } from "@/components/shell/html-background-sync";
 export async function AdminShell({
   children,
   tenantName,
+  logoUrl = null,
   isPlatformAdmin = false,
   pendingSubmissions = 0,
 }: {
   children: ReactNode;
   tenantName: string;
+  /** Mandanten-Logo (03.08.2026, Josips Fund: "oben links im Admin-Bereich
+   * kommt immer noch das Calltalent-Logo") — siehe AdminSidebar.tsx. */
+  logoUrl?: string | null;
   isPlatformAdmin?: boolean;
   pendingSubmissions?: number;
 }) {
@@ -37,10 +41,20 @@ export async function AdminShell({
 
   return (
     <>
-      <AdminMobileNav isPlatformAdmin={isPlatformAdmin} pendingSubmissions={pendingSubmissions} />
+      <AdminMobileNav
+        tenantName={tenantName}
+        logoUrl={logoUrl}
+        isPlatformAdmin={isPlatformAdmin}
+        pendingSubmissions={pendingSubmissions}
+      />
       <div className="flex min-h-screen" style={{ background: "#F4F5FA" }}>
         <HtmlBackgroundSync color="#F4F5FA" />
-        <AdminSidebar isPlatformAdmin={isPlatformAdmin} pendingSubmissions={pendingSubmissions} />
+        <AdminSidebar
+          tenantName={tenantName}
+          logoUrl={logoUrl}
+          isPlatformAdmin={isPlatformAdmin}
+          pendingSubmissions={pendingSubmissions}
+        />
 
         <div className="min-w-0 flex-1 px-4 py-6 lg:px-10 lg:py-8">
           <div className="mb-6">

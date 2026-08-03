@@ -5,16 +5,21 @@ import type { ContactActionState } from "@/lib/contact/state";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { sendEmail } from "@/lib/email/client";
 import { contactFormNotification } from "@/lib/email/templates";
+import { getTenant } from "@/lib/tenant/context";
 
 /**
  * Design-Block 4 (12.07.2026) — Server Action für /kontakt (Kontakt.dc.html).
  *
- * Empfänger bewusst `office@calltalent.ai` (real, in Resend verifiziert —
- * siehe PHASENSTATUS.md "Block 5 — Resend Produktions-Domain"), NICHT die
- * im Mockup gezeigte Platzhalteradresse `support@calltalent-akademie.de`
- * (existiert nicht/keine echte Subdomain-Verifizierung). Gleiches Muster
- * wie an anderer Stelle im Projekt dokumentiert: keine erfundenen Werte aus
- * dem Mockup übernehmen, nur echte Daten.
+ * Empfänger NEU (03.08.2026, Josips Auftrag "eigene Kontaktdaten und
+ * Support" pro Mandant): `settings.support_email` des über `getTenant()`
+ * aufgelösten Mandanten (Admin-Einstellungen, tenant/types.ts), NICHT mehr
+ * hart `office@calltalent.ai`. `getTenant()` liest aus den von middleware.ts
+ * gesetzten Request-Headern und funktioniert dadurch auch innerhalb einer
+ * Server Action (derselbe Request). Fällt zurück auf `office@calltalent.ai`
+ * (real, in Resend verifiziert — PHASENSTATUS.md "Block 5 — Resend
+ * Produktions-Domain"), wenn kein Mandant ermittelt werden kann (Portal-
+ * Host) oder der Mandant noch keine eigene Support-Adresse hinterlegt hat —
+ * damit geht keine Anfrage ins Leere.
  *
  * Rate-Limit IP-basiert (kein Login vorausgesetzt, wie bei den
  * Auth-Formularen) — verhindert Formular-Spam auf eine öffentlich
@@ -41,10 +46,14 @@ export async function submitContactForm(
 
   const { firstName, lastName, email, subject, message } = parsed.data;
 
+  const tenant = await getTenant();
+  const recipient = tenant?.settings?.support_email?.trim() || "office@calltalent.ai";
+  const tenantName = tenant?.name || "Calltalent";
+
   const result = await sendEmail({
-    to: "office@calltalent.ai",
+    to: recipient,
     subject: `Kontaktformular: ${subject} — ${firstName} ${lastName}`,
-    html: contactFormNotification({ firstName, lastName, email, subject, message }),
+    html: contactFormNotification({ firstName, lastName, email, subject, message, tenantName }),
   });
 
   // sendEmail() ist FAIL-SOFT (siehe email/client.ts) und wirft nie — bei

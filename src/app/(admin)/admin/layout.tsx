@@ -49,6 +49,7 @@ export default async function AdminLayout({
   return (
     <AdminShell
       tenantName={access.tenant.name}
+      logoUrl={access.tenant.branding?.logo_url ?? null}
       isPlatformAdmin={platformAccess.ok}
       pendingSubmissions={pendingSubmissions ?? 0}
     >

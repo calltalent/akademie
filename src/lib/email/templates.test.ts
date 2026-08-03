@@ -258,6 +258,7 @@ describe("contactFormNotification", () => {
       email: "max@example.com",
       subject: "Frage zum Angebot",
       message: "Wie viel kostet der Enterprise-Plan?",
+      tenantName: "Calltalent",
     });
     expect(html).toContain("Max");
     expect(html).toContain("Mustermann");
@@ -268,6 +269,18 @@ describe("contactFormNotification", () => {
     expect(html).toContain('<html lang="de">');
   });
 
+  it("verwendet den Mandantennamen im Kopf/Fuß statt fest Calltalent", () => {
+    const html = contactFormNotification({
+      firstName: "Max",
+      lastName: "Mustermann",
+      email: "max@example.com",
+      subject: "Frage zum Angebot",
+      message: "Wie viel kostet der Enterprise-Plan?",
+      tenantName: "SalesTalent",
+    });
+    expect(html).toContain("SalesTalent");
+  });
+
   it("escaped eine bösartige Nachricht statt sie auszuführen", () => {
     const html = contactFormNotification({
       firstName: "Max",
@@ -275,6 +288,7 @@ describe("contactFormNotification", () => {
       email: "max@example.com",
       subject: "Betreff",
       message: "<img src=x onerror=alert(1)>",
+      tenantName: "Calltalent",
     });
     expect(html).not.toContain("<img src=x onerror=alert(1)>");
     expect(html).toContain("&lt;img");

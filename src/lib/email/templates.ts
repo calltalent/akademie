@@ -18,9 +18,13 @@ import type { Locale } from "@/i18n/config";
  * (`tenant.settings.default_locale`), nicht `profiles.locale` des einzelnen
  * Empfängers — siehe Aufrufstellen (auth/actions.ts, certificates/issue.ts,
  * stripe/webhook/route.ts, platform/actions.ts, users/actions.ts,
- * users/import.ts, tutor/actions.ts). Ausnahme bewusst unverändert:
- * `contactFormNotification()` bleibt Deutsch (kein Mandantenkontext, geht an
- * den Calltalent-Betrieb selbst).
+ * users/import.ts, tutor/actions.ts). Ausnahme weiterhin Deutsch (kein
+ * `locale`-Parameter): `contactFormNotification()` — die interne
+ * Benachrichtigung geht an den Support-Posteingang, dessen Sprache das
+ * Team selbst bestimmt, nicht an den anfragenden Endnutzer. Der Absender
+ * ist aber seit 03.08.2026 (Josips Auftrag "eigene Kontaktdaten und
+ * Support" pro Mandant) namentlich mandantenbezogen: `tenantName` kommt aus
+ * `getTenant()` (contact/actions.ts), Fallback "Calltalent" ohne Mandant.
  *
  * Sicherheitsregel unverändert: JEDE eingefügte Nutzereingabe (Namen,
  * Kurstitel, Feedback-Freitext, Login-URL) läuft durch `escapeHtml()`. Diese
@@ -336,10 +340,12 @@ export async function magicLinkEmail({
  *
  * BEWUSSTE AUSNAHME von der Mehrsprachigkeit (i18n Block C5a,
  * PLAN_Mehrsprachigkeit-i18n.md Abschnitt 6, Josips Entscheidung): geht an
- * den Calltalent-Betrieb selbst, nicht an einen Mandanten-Nutzer — es gibt
- * hier keinen Mandantenkontext, aus dem eine Standardsprache abgeleitet
- * werden könnte. Bleibt deshalb fest Deutsch, kein `locale`-Parameter, kein
- * `getTranslations()`.
+ * den Support-Posteingang des Mandanten (oder Calltalent selbst ohne
+ * Mandantenkontext), nicht an einen Endnutzer, dessen Sprache man aus
+ * `default_locale` ableiten müsste. Bleibt deshalb fest Deutsch, kein
+ * `locale`-Parameter, kein `getTranslations()`. `tenantName` (NEU,
+ * 03.08.2026) macht nur Absender-Kopf/-Fußzeile mandantenbezogen — siehe
+ * Kopfkommentar dieser Datei.
  */
 export function contactFormNotification({
   firstName,
@@ -347,13 +353,16 @@ export function contactFormNotification({
   email,
   subject,
   message,
+  tenantName,
 }: {
   firstName: string;
   lastName: string;
   email: string;
   subject: string;
   message: string;
+  tenantName: string;
 }): string {
+  const safeTenantName = escapeHtml(tenantName);
   const bodyHtml = `
     <p style="margin:0 0 12px 0;"><strong>Von:</strong> ${escapeHtml(firstName)} ${escapeHtml(lastName)} (${escapeHtml(email)})</p>
     <p style="margin:0 0 12px 0;"><strong>Betreff:</strong> ${escapeHtml(subject)}</p>
@@ -368,7 +377,7 @@ export function contactFormNotification({
           <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:8px;border-top:4px solid ${DEFAULT_ACCENT_COLOR};overflow:hidden;">
             <tr>
               <td style="padding:24px 32px 0 32px;">
-                <p style="margin:0;font-size:14px;color:#6b7280;">Calltalent</p>
+                <p style="margin:0;font-size:14px;color:#6b7280;">${safeTenantName}</p>
               </td>
             </tr>
             <tr>
@@ -384,7 +393,7 @@ export function contactFormNotification({
             <tr>
               <td style="padding:16px 32px;border-top:1px solid #e5e7eb;">
                 <p style="margin:0;font-size:12px;color:#9ca3af;">
-                  Diese E-Mail wurde automatisch von Calltalent versendet.
+                  Diese E-Mail wurde automatisch von ${safeTenantName} versendet.
                 </p>
               </td>
             </tr>

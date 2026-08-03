@@ -140,11 +140,19 @@ export function AdminSidebar({
   isPlatformAdmin = false,
   pendingSubmissions = 0,
   variant = "rail",
+  tenantName = "Calltalent",
+  logoUrl = null,
 }: {
   active?: AdminSidebarItemId;
   isPlatformAdmin?: boolean;
   pendingSubmissions?: number;
   variant?: "rail" | "panel";
+  /** Mandanten-Wortmarke/-Logo (03.08.2026, Josips Fund: "Logo im Admin-
+   * Bereich ist immer noch Calltalent") — gleiches Muster wie Sidebar.tsx
+   * (26.07.2026). Default bewahrt das bisherige Calltalent-Aussehen für
+   * Mandanten ohne eigenes Logo. */
+  tenantName?: string;
+  logoUrl?: string | null;
 }) {
   const pathname = usePathname();
   const activeId = active ?? activeFromPath(pathname);
@@ -196,19 +204,37 @@ export function AdminSidebar({
       {variant === "rail" && (
         <>
           {/* Wortmarke */}
-          <Link href="/admin" prefetch={false} className="mb-2 flex items-center gap-3 px-[22px] no-underline">
-            <span
-              className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] bg-accent text-[18px] font-extrabold text-cream"
-              aria-hidden="true"
-            >
-              C
-            </span>
-            <span className="leading-[1.15]">
-              <span className="block text-[15px] font-extrabold tracking-[0.02em] text-white">CALLTALENT</span>
-              <span className="block text-[11px] font-semibold" style={{ color: "#B9BBDA", letterSpacing: "0.24em" }}>
-                ADMIN
-              </span>
-            </span>
+          <Link href="/admin" prefetch={false} className="mb-2 flex min-h-[34px] items-center gap-3 px-[22px] no-underline">
+            {logoUrl ? (
+              // Weiße Kachel wie login-form.tsx/kontakt-form.tsx: ein Logo mit
+              // dunklem Text/Icon wäre auf dem dunklen Marken-Panel sonst kaum
+              // lesbar (gleicher Fund wie dort, siehe Kopfkommentar).
+              <div className="flex h-[34px] flex-none items-center rounded-[8px] bg-white px-2">
+                {/* eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert */}
+                <img
+                  src={logoUrl}
+                  alt={tenantName}
+                  className="h-[22px] w-auto max-w-[170px] object-contain"
+                />
+              </div>
+            ) : (
+              <>
+                <span
+                  className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] bg-accent text-[18px] font-extrabold text-cream"
+                  aria-hidden="true"
+                >
+                  {tenantName.charAt(0).toUpperCase()}
+                </span>
+                <span className="min-w-0 leading-[1.15]">
+                  <span className="block truncate text-[15px] font-extrabold tracking-[0.02em] text-white">
+                    {tenantName.toUpperCase()}
+                  </span>
+                  <span className="block text-[11px] font-semibold" style={{ color: "#B9BBDA", letterSpacing: "0.24em" }}>
+                    ADMIN
+                  </span>
+                </span>
+              </>
+            )}
           </Link>
 
           <div
