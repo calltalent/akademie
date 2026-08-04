@@ -24,6 +24,14 @@ const publicSchema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().min(1).default("portal.localhost"),
   ),
+  // Marketplace M4 (03.08.2026, Plan Abschnitt 4): Host, unter dem der
+  // zentrale, mandantenübergreifende Marketplace erreichbar ist — exaktes
+  // Vorbild NEXT_PUBLIC_PORTAL_HOST oben. Dev-Default marketplace.localhost,
+  // Prod z. B. marketplace.calltalent.ai (Plan Abschnitt 10.3).
+  NEXT_PUBLIC_MARKETPLACE_HOST: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(1).default("marketplace.localhost"),
+  ),
   // Phase 4, Block 5 (PWA/Web-Push): der öffentliche VAPID-Schlüssel darf im
   // Client-Bundle landen (er identifiziert nur den Absender gegenüber dem
   // Push-Dienst, ist kein Geheimnis) — das Gegenstück
@@ -64,6 +72,7 @@ function parsePublicEnv() {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_PORTAL_HOST: process.env.NEXT_PUBLIC_PORTAL_HOST,
+    NEXT_PUBLIC_MARKETPLACE_HOST: process.env.NEXT_PUBLIC_MARKETPLACE_HOST,
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
   });
   if (!result.success) {

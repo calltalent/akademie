@@ -52,6 +52,7 @@ export default async function AdminLayout({
       logoUrl={access.tenant.branding?.logo_url ?? null}
       isPlatformAdmin={platformAccess.ok}
       pendingSubmissions={pendingSubmissions ?? 0}
+      marketplaceEnabled={access.tenant.settings.marketplace_enabled === true}
     >
       {children}
     </AdminShell>

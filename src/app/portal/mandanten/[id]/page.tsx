@@ -99,16 +99,26 @@ export default async function MandantDetailPage({
 
   // Polarität wie an den jeweiligen Gate-Stellen geprüft (siehe
   // updateTenantFeatures-Kopfkommentar): payments_enabled ist "an, außer
-  // explizit false", tutor_enabled/course_generator_enabled sind "aus,
-  // außer explizit true".
+  // explizit false", tutor_enabled/course_generator_enabled/
+  // marketplace_enabled sind "aus, außer explizit true".
   const tenantSettings = (tenant.settings ?? {}) as {
     payments_enabled?: boolean;
     tutor_enabled?: boolean;
     course_generator_enabled?: boolean;
+    marketplace_enabled?: boolean;
+    marketplace_commission_bp?: number;
   };
   const paymentsEnabled = tenantSettings.payments_enabled !== false;
   const tutorEnabled = tenantSettings.tutor_enabled === true;
   const courseGeneratorEnabled = tenantSettings.course_generator_enabled === true;
+  const marketplaceEnabled = tenantSettings.marketplace_enabled === true;
+  // Bp -> Prozent-String fürs Formularfeld (z. B. 1750 -> "17,5"), leer wenn
+  // kein mandantenspezifischer Satz gesetzt ist (Formular zeigt dann den
+  // globalen Standardsatz nur als Platzhalter-Hinweistext, siehe unten).
+  const marketplaceCommissionPercent =
+    typeof tenantSettings.marketplace_commission_bp === "number"
+      ? (tenantSettings.marketplace_commission_bp / 100).toString().replace(".", ",")
+      : "";
 
   const branding = (tenant.branding ?? {}) as {
     color_primary?: string;
@@ -153,6 +163,7 @@ export default async function MandantDetailPage({
     { data: usageRow },
     { data: aiJobs },
     { data: tenantDomains },
+    { data: platformSettings },
   ] = await Promise.all([
     admin
       .from("memberships")
@@ -178,7 +189,13 @@ export default async function MandantDetailPage({
       .select("id, domain")
       .eq("tenant_id", id)
       .order("created_at"),
+    // Marketplace M3 (03.08.2026): globaler Standard-Provisionssatz als
+    // Platzhalter-Hinweis im Formular (siehe TenantFeaturesForm).
+    admin.from("platform_settings").select("commission_rate_bp").eq("id", true).maybeSingle(),
   ]);
+  const defaultCommissionPercent = ((platformSettings?.commission_rate_bp ?? 2000) / 100)
+    .toString()
+    .replace(".", ",");
 
   const jobs = aiJobs ?? [];
   const costByKind = new Map<string, number>();
@@ -253,7 +270,14 @@ export default async function MandantDetailPage({
           status: tenant.status as TenantStatus,
           customDomain: tenant.custom_domain,
         }}
-        features={{ paymentsEnabled, tutorEnabled, courseGeneratorEnabled }}
+        features={{
+          paymentsEnabled,
+          tutorEnabled,
+          courseGeneratorEnabled,
+          marketplaceEnabled,
+          marketplaceCommissionPercent,
+          defaultCommissionPercent,
+        }}
         domains={tenantDomains ?? []}
         brandingInitial={brandingInitial}
         tenantName={tenant.name}

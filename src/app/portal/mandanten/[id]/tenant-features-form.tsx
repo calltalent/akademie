@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { updateTenantFeatures } from "@/lib/platform/actions";
 import type { PlatformActionState } from "@/lib/platform/actions";
 
@@ -18,20 +18,38 @@ const initialState: PlatformActionState = { error: null };
  * (`#0f172a`-Karten), der helle Pill-Toggle dort ist auf diesem Hintergrund
  * nicht zu erkennen. Gleiches Muster wie die Plan-/Status-Radios in
  * `mandant-edit-form.tsx` (native Eingabe + `accentColor`).
+ *
+ * ERWEITERT (Marketplace M3, 03.08.2026, Plan Abschnitt 6/7): vierter
+ * Schalter "Marketplace freischalten" (`marketplace_enabled`, gleiche
+ * "aus, außer explizit true"-Polarität wie KI-Tutor/KI-Kursgenerator) plus
+ * ein Provisionssatz-Feld, das nur bei aktiviertem Marketplace sichtbar ist
+ * — lokaler `useState` statt eines zweiten Formulars/Absendens, da beide
+ * Felder im selben Absenden (`updateTenantFeatures`) geschrieben werden.
+ * Leeres Feld = Standardsatz aus `platform_settings` gilt (Platzhaltertext
+ * zeigt den aktuellen globalen Wert an, keine Vorbelegung — ein Platzhalter
+ * würde beim Absenden sonst fälschlich als "explizit gewählter Wert"
+ * missverstanden werden können).
  */
 export function TenantFeaturesForm({
   tenantId,
   paymentsEnabled,
   tutorEnabled,
   courseGeneratorEnabled,
+  marketplaceEnabled,
+  marketplaceCommissionPercent,
+  defaultCommissionPercent,
 }: {
   tenantId: string;
   paymentsEnabled: boolean;
   tutorEnabled: boolean;
   courseGeneratorEnabled: boolean;
+  marketplaceEnabled: boolean;
+  marketplaceCommissionPercent: string;
+  defaultCommissionPercent: string;
 }) {
   const boundUpdate = updateTenantFeatures.bind(null, tenantId);
   const [state, formAction, pending] = useActionState(boundUpdate, initialState);
+  const [marketplaceChecked, setMarketplaceChecked] = useState(marketplaceEnabled);
 
   return (
     <form
@@ -65,6 +83,34 @@ export function TenantFeaturesForm({
           desc="PDF-Upload → automatischer Kursentwurf unter /admin/ki."
           defaultChecked={courseGeneratorEnabled}
         />
+        <FeatureCheckbox
+          name="marketplaceEnabled"
+          label="Marketplace freischalten"
+          desc="Mandant darf Kurse im zentralen Calltalent-Marketplace einreichen."
+          defaultChecked={marketplaceEnabled}
+          onChange={setMarketplaceChecked}
+        />
+        {marketplaceChecked && (
+          <div className="ml-[30px] flex flex-col gap-1.5">
+            <label htmlFor="marketplaceCommissionPercent" className="text-sm font-semibold text-slate-200">
+              Provisionssatz (%)
+            </label>
+            <input
+              id="marketplaceCommissionPercent"
+              name="marketplaceCommissionPercent"
+              type="text"
+              inputMode="decimal"
+              defaultValue={marketplaceCommissionPercent}
+              placeholder={`Standard: ${defaultCommissionPercent} %`}
+              className="w-40 rounded-lg border bg-transparent px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
+              style={{ borderColor: "#1e293b" }}
+              aria-describedby="marketplaceCommissionPercent-hint"
+            />
+            <p id="marketplaceCommissionPercent-hint" className="text-[13px]" style={{ color: "#64748B" }}>
+              Leer lassen, um den Standardsatz von {defaultCommissionPercent} % zu verwenden.
+            </p>
+          </div>
+        )}
       </div>
 
       {state.error && (
@@ -95,11 +141,17 @@ function FeatureCheckbox({
   label,
   desc,
   defaultChecked,
+  onChange,
 }: {
   name: string;
   label: string;
   desc: string;
   defaultChecked: boolean;
+  /** NEU (Marketplace M3): optionaler Callback, damit `marketplaceEnabled`
+   * das Provisionssatz-Feld ein-/ausblenden kann, ohne selbst kontrolliert
+   * (`checked`+`onChange`-Pflichtpaar) zu werden — die restlichen drei
+   * Checkboxen bleiben unverändert unkontrolliert (`defaultChecked` allein). */
+  onChange?: (checked: boolean) => void;
 }) {
   return (
     <label className="flex items-start gap-3 text-sm" htmlFor={`feat-${name}`}>
@@ -108,6 +160,7 @@ function FeatureCheckbox({
         type="checkbox"
         name={name}
         defaultChecked={defaultChecked}
+        onChange={onChange ? (e) => onChange(e.target.checked) : undefined}
         className="mt-[3px] flex-none"
         style={{ accentColor: "#5663AE" }}
       />

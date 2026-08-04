@@ -1050,6 +1050,56 @@
       "imageEntityLabel": "Trainer image",
       "imageEntityFallbackTitle": "Trainer",
       "genericError": "Error."
+    },
+    "marketplace": {
+      "eyebrow": "Content · Marketplace",
+      "title": "Marketplace",
+      "listingsHeading": "Listings",
+      "newListing": "New listing",
+      "empty": "No marketplace listings yet.",
+      "noCoursesAvailable": "No published course without an existing listing available. Publish a course first.",
+      "createCourseFirstLink": "Go to courses",
+      "courseColumn": "Course",
+      "priceColumn": "Price",
+      "statusColumn": "Status",
+      "visibleColumn": "Visible",
+      "totalCountSuffix": "{count} total",
+      "courseNotFound": "Course not found",
+      "free": "Free",
+      "status": {
+        "draft": "Not listed",
+        "submitted": "Under review",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "suspended": "Suspended by operator"
+      },
+      "courseLabel": "Course",
+      "selectCoursePlaceholder": "Select a course …",
+      "headlineLabel": "Headline (optional)",
+      "headlinePlaceholder": "Short, promotional title for the marketplace",
+      "summaryLabel": "Description (optional)",
+      "summaryPlaceholder": "Short description for the detail page",
+      "coverUrlLabel": "Cover image URL (optional)",
+      "priceLabel": "Price in euros (0 = free)",
+      "pricePlaceholder": "e.g. 9.90 or 0",
+      "create": "Create listing",
+      "save": "Save changes",
+      "saved": "Saved.",
+      "editAria": "Edit listing: {title}",
+      "editButtonTitle": "Edit",
+      "editLockedHint": "Editing is possible again once the listing has been withdrawn or is no longer submitted.",
+      "reviewNoteLabel": "Operator's reason",
+      "submitAction": "Submit for review",
+      "submitPending": "Submitting …",
+      "withdrawAction": "Withdraw",
+      "withdrawPending": "Withdrawing …",
+      "enabledLabel": "Visible",
+      "disabledLabel": "Hidden",
+      "visibleOnlyWhenApproved": "Only changeable once the operator has approved the listing.",
+      "statusCardHeading": "Marketplace",
+      "statusCardNotListed": "Not listed",
+      "statusCardLinkManage": "Manage marketplace",
+      "statusCardLinkCreate": "List on marketplace"
     }
   },
   "portal": {
@@ -1232,7 +1282,102 @@
     "orderPaid": {
       "subject": "Payment received",
       "heading": "Payment received",
-      "body": "thank you for your purchase of {productName} at {tenantName}. The payment has been received and your access is now active."
+      "body": "thank you for your purchase of {productName} at {tenantName}. The payment has been received and your access is now active.",
+      "actionButton": "Go to course"
+    }
+  },
+  "marketplace": {
+    "shell": {
+      "metaTitle": "Calltalent Marketplace",
+      "subLabel": "MARKETPLACE",
+      "footerCopyright": "© {year} Calltalent Ltd.",
+      "footerNavLabel": "Legal",
+      "footerImpressum": "Legal notice",
+      "footerDatenschutz": "Privacy policy",
+      "footerAgb": "Terms"
+    },
+    "catalog": {
+      "eyebrow": "Calltalent Marketplace",
+      "title": "Courses from independent providers",
+      "subtitle": "Discover courses that Calltalent Academy tenants have released for open sale.",
+      "empty": "No courses in the marketplace yet.",
+      "free": "Free",
+      "bySeller": "Offered by {seller}",
+      "viewCourse": "View course"
+    },
+    "detail": {
+      "offeredBy": "Offered by {seller}",
+      "modulesLabel": "Modules",
+      "lessonsLabel": "Lessons",
+      "durationLabel": "Video content",
+      "minutesValue": "{minutes} min.",
+      "free": "Free",
+      "buyButton": "Buy",
+      "acquireButton": "Get for free",
+      "buyPending": "Preparing …",
+      "loginRequired": "Please sign in to get this course.",
+      "loginButton": "Sign in",
+      "noAccountHint": "No account yet? Email us at office@calltalent.ai.",
+      "dataTransferNotice": "When you buy, your name, email address and learning progress are transferred to {seller}, since the course takes place there."
+    },
+    "thankYou": {
+      "heading": "Thank you for your purchase",
+      "body": "Your access to \"{course}\" is now active.",
+      "goToCourse": "Go to course",
+      "loginHint": "If you need to sign in again on the course page, the same credentials work there."
+    },
+    "login": {
+      "eyebrow": "Calltalent Marketplace",
+      "heading": "Sign in",
+      "passwordFormAriaLabel": "Sign in with password",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "submitButton": "Sign in",
+      "orDivider": "or",
+      "magicLinkFormAriaLabel": "Sign in with magic link",
+      "magicLinkEmailLabel": "Email for magic link",
+      "magicLinkSuccess": "Link sent. Please check your inbox.",
+      "magicLinkSubmitButton": "Send magic link",
+      "noAccountHint": "No account yet? Email us at office@calltalent.ai."
+    },
+    "legal": {
+      "impressum": {
+        "title": "Legal notice",
+        "companyHeading": "Company details (§ 5 DDG)",
+        "companyName": "Calltalent Ltd.",
+        "companyForm": "Private limited company, registered in England and Wales",
+        "companyNumber": "Company number: 16591113",
+        "address": "71-75 Shelton Street, Covent Garden, London, WC2H 9JQ, United Kingdom",
+        "contactHeading": "Contact",
+        "email": "Email: office@calltalent.ai",
+        "representativeHeading": "Authorised representative",
+        "representativeText": "The management of Calltalent Ltd.",
+        "registerHeading": "Register entry",
+        "registerText": "Companies House (England and Wales), registration number 16591113"
+      },
+      "datenschutz": {
+        "title": "Privacy policy",
+        "controllerHeading": "Data controller",
+        "controllerText": "Calltalent Ltd., 71-75 Shelton Street, Covent Garden, London, WC2H 9JQ, United Kingdom, office@calltalent.ai.",
+        "dataHeading": "Data we process",
+        "dataText": "When you visit this page: technical access data (server logs). When you buy: name, email address, payment data (via Stripe) and your learning progress with the respective provider tenant.",
+        "purposeHeading": "Purpose and legal basis",
+        "purposeText": "Performance of a contract (Art. 6(1)(b) GDPR) — operating the marketplace catalogue and processing a purchase.",
+        "recipientsHeading": "Recipients",
+        "recipientsText": "When you buy, the offering tenant receives your name, email address and learning progress, since the purchased course takes place with that tenant.",
+        "rightsHeading": "Your rights",
+        "rightsText": "Access, rectification, erasure, restriction, data portability and objection under Art. 15–21 GDPR. Contact office@calltalent.ai."
+      },
+      "agb": {
+        "title": "Terms and conditions",
+        "scopeHeading": "Scope",
+        "scopeText": "These terms apply to the purchase of courses via the Calltalent Marketplace. The contracting party for a purchase is Calltalent Ltd.",
+        "contentHeading": "Subject matter",
+        "contentText": "Digital course content, offered by independent Calltalent Academy tenants and brokered via the marketplace.",
+        "withdrawalHeading": "Withdrawal notice for digital content",
+        "withdrawalText": "For courses with immediate access, the right of withdrawal ends upon explicit consent to immediate performance — details follow once purchasing is introduced.",
+        "pendingNotice": "Purchasing itself is not yet enabled on this page. These terms will be completed with the full purchase and withdrawal text before it is enabled."
+      }
     }
   }
 }

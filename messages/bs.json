@@ -1050,6 +1050,56 @@
       "imageEntityLabel": "Slika trenera",
       "imageEntityFallbackTitle": "Trener",
       "genericError": "Greška."
+    },
+    "marketplace": {
+      "eyebrow": "Sadržaj · Marketplace",
+      "title": "Marketplace",
+      "listingsHeading": "Oglasi",
+      "newListing": "Novi oglas",
+      "empty": "Još nema marketplace oglasa.",
+      "noCoursesAvailable": "Nema objavljenog kursa bez postojećeg oglasa. Prvo objavi jedan kurs.",
+      "createCourseFirstLink": "Idi na kurseve",
+      "courseColumn": "Kurs",
+      "priceColumn": "Cijena",
+      "statusColumn": "Status",
+      "visibleColumn": "Vidljivo",
+      "totalCountSuffix": "{count} ukupno",
+      "courseNotFound": "Kurs nije pronađen",
+      "free": "Besplatno",
+      "status": {
+        "draft": "Nije objavljeno",
+        "submitted": "U provjeri",
+        "approved": "Odobreno",
+        "rejected": "Odbijeno",
+        "suspended": "Deaktivirao operater"
+      },
+      "courseLabel": "Kurs",
+      "selectCoursePlaceholder": "Odaberi kurs …",
+      "headlineLabel": "Naslov (opcionalno)",
+      "headlinePlaceholder": "Kratak, promotivni naslov za marketplace",
+      "summaryLabel": "Opis (opcionalno)",
+      "summaryPlaceholder": "Kratak opis za stranicu detalja",
+      "coverUrlLabel": "URL naslovne slike (opcionalno)",
+      "priceLabel": "Cijena u eurima (0 = besplatno)",
+      "pricePlaceholder": "npr. 9,90 ili 0",
+      "create": "Kreiraj oglas",
+      "save": "Sačuvaj izmjene",
+      "saved": "Sačuvano.",
+      "editAria": "Uredi oglas: {title}",
+      "editButtonTitle": "Uredi",
+      "editLockedHint": "Uređivanje je ponovo moguće nakon što oglas bude povučen ili više nije poslan na provjeru.",
+      "reviewNoteLabel": "Obrazloženje operatera",
+      "submitAction": "Pošalji na provjeru",
+      "submitPending": "Slanje …",
+      "withdrawAction": "Povuci",
+      "withdrawPending": "Povlačenje …",
+      "enabledLabel": "Vidljivo",
+      "disabledLabel": "Skriveno",
+      "visibleOnlyWhenApproved": "Moguće promijeniti tek nakon što operater odobri oglas.",
+      "statusCardHeading": "Marketplace",
+      "statusCardNotListed": "Nije objavljeno",
+      "statusCardLinkManage": "Upravljaj marketplace-om",
+      "statusCardLinkCreate": "Objavi na marketplace-u"
     }
   },
   "portal": {
@@ -1232,7 +1282,102 @@
     "orderPaid": {
       "subject": "Uplata primljena",
       "heading": "Uplata primljena",
-      "body": "hvala na kupovini {productName} kod {tenantName}. Uplata je primljena i tvoj pristup je otključan."
+      "body": "hvala na kupovini {productName} kod {tenantName}. Uplata je primljena i tvoj pristup je otključan.",
+      "actionButton": "Idi na kurs"
+    }
+  },
+  "marketplace": {
+    "shell": {
+      "metaTitle": "Calltalent Marketplace",
+      "subLabel": "MARKETPLACE",
+      "footerCopyright": "© {year} Calltalent Ltd.",
+      "footerNavLabel": "Pravne informacije",
+      "footerImpressum": "Impresum",
+      "footerDatenschutz": "Zaštita podataka",
+      "footerAgb": "Uslovi korištenja"
+    },
+    "catalog": {
+      "eyebrow": "Calltalent Marketplace",
+      "title": "Kursevi od nezavisnih ponuđača",
+      "subtitle": "Otkrij kurseve koje su mandanti Calltalent Akademije objavili za slobodnu prodaju.",
+      "empty": "Još nema kurseva na Marketplace-u.",
+      "free": "Besplatno",
+      "bySeller": "Nudi {seller}",
+      "viewCourse": "Pogledaj kurs"
+    },
+    "detail": {
+      "offeredBy": "Nudi {seller}",
+      "modulesLabel": "Moduli",
+      "lessonsLabel": "Lekcije",
+      "durationLabel": "Video sadržaj",
+      "minutesValue": "{minutes} min.",
+      "free": "Besplatno",
+      "buyButton": "Kupi",
+      "acquireButton": "Besplatno preuzmi",
+      "buyPending": "Priprema se …",
+      "loginRequired": "Prijavi se da bi preuzeo/la ovaj kurs.",
+      "loginButton": "Prijava",
+      "noAccountHint": "Još nemaš nalog? Piši nam na office@calltalent.ai.",
+      "dataTransferNotice": "Kupovinom se tvoje ime, e-mail adresa i napredak u učenju prenose ponuđaču {seller}, jer se kurs odvija kod njega."
+    },
+    "thankYou": {
+      "heading": "Hvala na kupovini",
+      "body": "Tvoj pristup kursu „{course}“ je otključan.",
+      "goToCourse": "Idi na kurs",
+      "loginHint": "Ako se na stranici kursa moraš ponovo prijaviti, vrijede iste pristupne podatke."
+    },
+    "login": {
+      "eyebrow": "Calltalent Marketplace",
+      "heading": "Prijava",
+      "passwordFormAriaLabel": "Prijava s lozinkom",
+      "emailLabel": "E-mail",
+      "passwordLabel": "Lozinka",
+      "submitButton": "Prijava",
+      "orDivider": "ili",
+      "magicLinkFormAriaLabel": "Prijava putem Magic Link-a",
+      "magicLinkEmailLabel": "E-mail za Magic Link",
+      "magicLinkSuccess": "Link poslan. Provjeri svoje sanduče.",
+      "magicLinkSubmitButton": "Pošalji Magic Link",
+      "noAccountHint": "Još nemaš nalog? Piši nam na office@calltalent.ai."
+    },
+    "legal": {
+      "impressum": {
+        "title": "Impresum",
+        "companyHeading": "Podaci prema § 5 DDG",
+        "companyName": "Calltalent Ltd.",
+        "companyForm": "Private Limited Company, registrovana u Engleskoj i Walesu",
+        "companyNumber": "Registarski broj: 16591113",
+        "address": "71-75 Shelton Street, Covent Garden, London, WC2H 9JQ, Ujedinjeno Kraljevstvo",
+        "contactHeading": "Kontakt",
+        "email": "E-mail: office@calltalent.ai",
+        "representativeHeading": "Zastupanje",
+        "representativeText": "Uprava društva Calltalent Ltd.",
+        "registerHeading": "Registarski upis",
+        "registerText": "Companies House (Engleska i Wales), registarski broj 16591113"
+      },
+      "datenschutz": {
+        "title": "Izjava o zaštiti podataka",
+        "controllerHeading": "Odgovorna instanca",
+        "controllerText": "Calltalent Ltd., 71-75 Shelton Street, Covent Garden, London, WC2H 9JQ, Ujedinjeno Kraljevstvo, office@calltalent.ai.",
+        "dataHeading": "Koje podatke obrađujemo",
+        "dataText": "Prilikom posjete ove stranice: tehnički pristupni podaci (server logovi). Kod kupovine dodatno: ime, e-mail adresa, podaci o plaćanju (putem Stripe-a) i napredak u učenju kod dotičnog mandanta-ponuđača.",
+        "purposeHeading": "Svrha i pravni osnov",
+        "purposeText": "Izvršenje i priprema ugovora (član 6 stav 1 tačka b GDPR-a) — pružanje kataloga Marketplace-a i obrada kupovine.",
+        "recipientsHeading": "Primaoci",
+        "recipientsText": "Kod kupovine ponuđač-mandant prima ime, e-mail adresu i napredak u učenju, jer se kupljeni kurs odvija kod njega.",
+        "rightsHeading": "Tvoja prava",
+        "rightsText": "Pristup, ispravka, brisanje, ograničenje, prenosivost podataka i prigovor prema članovima 15–21 GDPR-a. Za ostvarivanje prava obrati se na office@calltalent.ai."
+      },
+      "agb": {
+        "title": "Opći uslovi poslovanja",
+        "scopeHeading": "Područje primjene",
+        "scopeText": "Ovi uslovi vrijede za kupovinu kurseva putem Calltalent Marketplace-a. Ugovorna strana za kupovinu je Calltalent Ltd.",
+        "contentHeading": "Predmet ugovora",
+        "contentText": "Digitalni sadržaji kurseva, koje nude nezavisni mandanti Calltalent Akademije i posreduje Marketplace.",
+        "withdrawalHeading": "Pouka o odustanku kod digitalnih sadržaja",
+        "withdrawalText": "Kod kurseva s trenutnim pristupom pravo na odustanak prestaje izričitom saglasnošću za trenutni početak — detalji slijede uvođenjem kupovine.",
+        "pendingNotice": "Kupovina na ovoj stranici još nije omogućena. Ovi uslovi će prije omogućavanja biti dopunjeni potpunim tekstom o kupovini i odustanku."
+      }
     }
   }
 }

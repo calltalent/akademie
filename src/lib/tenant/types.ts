@@ -82,6 +82,37 @@ export type PublicTenant = {
      * unverändertes Verhalten.
      */
     enabled_locales?: Locale[];
+    /**
+     * NEU (Marketplace M2, 03.08.2026, Plan
+     * "ich-möchte-einen-eigenen-groovy-toast.md" Abschnitt 6): steuert, ob
+     * der "Marketplace"-Menüpunkt im Mandanten-Admin sichtbar ist. Anders
+     * als `payments_enabled`/`self_signup_enabled`/`certificates_enabled`
+     * (dort: fehlend/undefined = "an", nur explizites `false` schaltet ab)
+     * ist die Polarität hier bewusst UMGEKEHRT: fehlend/undefined = AUS.
+     * Begründung: der eigentliche Freigabe-Schalter je Mandant kommt erst
+     * mit dem Betreiber-Portal in M3 (tenant-features-form.tsx) — bis dahin
+     * hat KEIN Bestandsmandant je einen Wert für dieses Feld gesetzt, ein
+     * "an außer explizit aus"-Default würde den Menüpunkt also sofort für
+     * JEDEN Mandanten einblenden, ohne dass der Betreiber das je aktiviert
+     * hätte. Zusätzlich hängt am Marketplace eine grenzüberschreitende
+     * Datenweitergabe (DSGVO, Plan Abschnitt 9) — ein Opt-in-Default ist
+     * hier die sicherere Wahl als ein Opt-out-Default. Sobald M3 den
+     * echten Schalter im Betreiber-Portal einführt, bleibt diese Polarität
+     * unverändert (dort wird dann aktiv auf `true` gesetzt).
+     */
+    marketplace_enabled?: boolean;
+    /**
+     * NEU (Marketplace M3, 03.08.2026, Betreiber-Portal-Moderation):
+     * mandantenspezifischer Provisionssatz in Basispunkten (1 bp = 0,01 %),
+     * überschreibt für diesen Mandanten den globalen Standardsatz aus
+     * `platform_settings.commission_rate_bp` (Default 2000 bp = 20 %, Plan
+     * Abschnitt 1.3). Fehlt der Wert (Regelfall), gilt der globale Satz.
+     * Nur vom Betreiber-Portal geschrieben (`updateTenantFeatures()`,
+     * `platform/actions.ts`) — keine eigene Migration nötig, lebt im
+     * bereits bestehenden `settings`-JSONB-Feld, exakt wie
+     * `marketplace_enabled` selbst.
+     */
+    marketplace_commission_bp?: number;
   };
 };
 

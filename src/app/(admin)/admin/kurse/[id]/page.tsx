@@ -4,6 +4,7 @@ import { getTenant } from "@/lib/tenant/context";
 import { CourseEditorSteps } from "@/components/admin/course-editor-steps";
 import { blocksSchema, type Block } from "@/lib/courses/schema";
 import { getVideoThumbnailUrl } from "@/lib/bunny/client";
+import type { MarketplaceListingStatus } from "@/lib/marketplace/schema";
 
 /**
  * Josips Auftrag (23.07.2026): direkt nach dem Hochladen eines Video- oder
@@ -138,6 +139,24 @@ export default async function CourseEditorPage({
     .select("id", { count: "exact", head: true })
     .eq("course_id", courseId);
 
+  // Marketplace M2 (03.08.2026, Plan Abschnitt 6): Statuskarte im
+  // Veröffentlichen-Schritt. RLS (`ml_staff_select`) filtert automatisch auf
+  // den eigenen Mandanten — die `.eq("tenant_id", …)` ist zusätzliche
+  // Defense-in-Depth, gleiches Muster wie überall in dieser Datei.
+  // `unique(course_id)` in marketplace_listings -> höchstens eine Zeile.
+  const { data: marketplaceListingRow } = await supabase
+    .from("marketplace_listings")
+    .select("status, review_note")
+    .eq("course_id", courseId)
+    .eq("tenant_id", tenant!.id)
+    .maybeSingle();
+  const marketplaceListing = marketplaceListingRow
+    ? {
+        status: marketplaceListingRow.status as MarketplaceListingStatus,
+        reviewNote: marketplaceListingRow.review_note as string | null,
+      }
+    : null;
+
   const modulesWithLessons = (modules ?? []).map((m) => ({
     id: m.id,
     title: m.title,
@@ -197,6 +216,7 @@ export default async function CourseEditorPage({
       lessonCount={(lessons ?? []).length}
       enrollmentCount={enrollmentCount ?? 0}
       certificateCount={certificateCount ?? 0}
+      marketplaceListing={marketplaceListing}
       initialStep={activeLessonId ? 3 : 1}
     />
   );

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, Building2, ShieldCheck, LogOut } from "lucide-react";
+import { Menu, X, LayoutDashboard, Building2, Store, Wallet, ShieldCheck, LogOut } from "lucide-react";
 import { BrandLogo } from "@/components/shell/brand-logo";
 import { NavLink } from "@/components/shell/nav-link";
 import { SectionLabel } from "@/components/shell/section-label";
@@ -30,7 +30,14 @@ import { SectionLabel } from "@/components/shell/section-label";
  * WÄHREND des Renderns verglichen, `setOpen`/`setPrevPathname` laufen direkt
  * im Funktionskörper, nicht in einem Effekt.
  */
-export function PortalMobileNav({ ownAdminUrl }: { ownAdminUrl?: string }) {
+export function PortalMobileNav({
+  ownAdminUrl,
+  pendingMarketplaceCount = 0,
+}: {
+  ownAdminUrl?: string;
+  /** Marketplace M3 (03.08.2026) — siehe portal-shell.tsx-Kommentar. */
+  pendingMarketplaceCount?: number;
+}) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const [prevPathname, setPrevPathname] = useState(pathname);
@@ -76,6 +83,23 @@ export function PortalMobileNav({ ownAdminUrl }: { ownAdminUrl?: string }) {
             variant="dark"
             icon={<Building2 aria-hidden="true" size={18} />}
           />
+          <NavLink
+            href="/portal/marketplace"
+            label="Marketplace"
+            variant="dark"
+            icon={<Store aria-hidden="true" size={18} />}
+            badge={pendingMarketplaceCount > 0 ? String(pendingMarketplaceCount) : undefined}
+          />
+          {/* NEU (Marketplace M6, 04.08.2026) — siehe Begründung in
+             portal-shell.tsx, identisches Muster für die mobile Navigation. */}
+          <div className="pl-3">
+            <NavLink
+              href="/portal/marketplace/auszahlungen"
+              label="Auszahlungen"
+              variant="dark"
+              icon={<Wallet aria-hidden="true" size={18} />}
+            />
+          </div>
 
           <div className="mt-3 flex flex-col gap-1 border-t border-slate-800 pt-3">
             {ownAdminUrl && (

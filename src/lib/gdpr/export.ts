@@ -8,7 +8,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * hinweg, bei denen er Mitglied ist — genau die Tabellen aus dem
  * Security-Review (Phase 1, Block 7) als DSGVO-relevant vorgemerkt:
  * profiles, memberships, progress, submissions, attempts, certificates,
- * orders, tutor_conversations, tutor_messages.
+ * orders, tutor_conversations, tutor_messages. Ergänzt (Marketplace-
+ * Gesamtaudit, 04.08.2026, security-reviewer-Fund): enrollments — fehlte
+ * hier seit Phase 4, wurde durch den Marketplace (Block M5) relevant, da ein
+ * KOSTENLOSER Marketplace-Erwerb (src/lib/marketplace/acquire.ts) KEINE
+ * orders-Zeile erzeugt; die enrollments-Zeile (source='marketplace') ist
+ * dort der einzige Nachweis der Transaktion und muss deshalb Teil der
+ * DSGVO-Selbstauskunft sein.
  *
  * WICHTIG (Sicherheitsregel, siehe PHASENSTATUS.md Block-3-Plan):
  * Diese Funktion prüft SELBST KEINE Berechtigung. `userId` MUSS vom
@@ -36,6 +42,7 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
   const [
     profileRes,
     membershipsRes,
+    enrollmentsRes,
     progressRes,
     submissionsRes,
     attemptsRes,
@@ -45,6 +52,7 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
     supabase.from("memberships").select("*").eq("user_id", userId),
+    supabase.from("enrollments").select("*").eq("user_id", userId),
     supabase.from("progress").select("*").eq("user_id", userId),
     supabase.from("submissions").select("*").eq("user_id", userId),
     supabase.from("attempts").select("*").eq("user_id", userId),
@@ -69,6 +77,7 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
     exported_at: new Date().toISOString(),
     profile: profileRes.data ?? null,
     memberships: membershipsRes.data ?? [],
+    enrollments: enrollmentsRes.data ?? [],
     progress: progressRes.data ?? [],
     submissions: submissionsRes.data ?? [],
     attempts: attemptsRes.data ?? [],

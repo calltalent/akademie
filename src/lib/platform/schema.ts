@@ -156,3 +156,95 @@ export const tenantLoginContentSchema = z.object({
   loginSubheading: optionalTrimmedText(500),
   loginCopyright: optionalTrimmedText(200),
 });
+
+/**
+ * NEU (Marketplace M3, 03.08.2026, Plan Abschnitt 6/7): Provisionssatz je
+ * Mandant, Eingabe als Prozentzahl (für Josip als Endnutzer verständlicher
+ * als Basispunkte, gleiche Erwägung wie die Euro→Cent-Formulare in
+ * `stripe/schema.ts`/`marketplace/schema.ts`). Leeres Feld -> `undefined` ->
+ * `updateTenantFeatures()` entfernt `marketplace_commission_bp` aus
+ * `tenants.settings` wieder, der Mandant fällt dann auf den globalen
+ * Standardsatz aus `platform_settings.commission_rate_bp` zurück.
+ *
+ * Umrechnung Prozent -> Basispunkte direkt im Schema (`.transform`), analog
+ * zu `listingFormSchema`s `priceEuro -> priceCents`. Zwei Nachkommastellen
+ * erlaubt (1 bp = 0,01 %), Komma ODER Punkt als Dezimaltrenner (gleiche
+ * Toleranz wie `priceEuroSchema` in marketplace/schema.ts).
+ */
+const COMMISSION_PERCENT_PATTERN = /^\d{1,3}([.,]\d{1,2})?$/;
+
+// `v == null` zusätzlich zum leeren String (anders als bei
+// `optionalTrimmedText` oben): das Provisionssatz-Feld wird im Formular NUR
+// bei aktiviertem Marketplace-Schalter überhaupt gerendert
+// (tenant-features-form.tsx) — ist der Schalter aus, liefert
+// `formData.get("marketplaceCommissionPercent")` `null` (Feld fehlt im DOM),
+// nicht `""`.
+export const tenantMarketplaceCommissionSchema = z.preprocess(
+  (v) => (v == null || (typeof v === "string" && v.trim() === "") ? undefined : v),
+  z
+    .string()
+    .trim()
+    .regex(
+      COMMISSION_PERCENT_PATTERN,
+      "Provisionssatz als Prozentzahl angeben, z. B. 20 oder 17,5 — leer lassen für den Standardsatz.",
+    )
+    .transform((v) => Math.round(parseFloat(v.replace(",", ".")) * 100))
+    .refine((bp) => bp <= 10000, "Provisionssatz darf höchstens 100 % betragen.")
+    .optional(),
+);
+
+/**
+ * NEU (Marketplace M3): Pflicht-Begründung beim Ablehnen/Sperren eines
+ * Listings im Betreiber-Portal (Plan Abschnitt 7: "Ablehnung mit
+ * Pflicht-Begründung"). Auch für `suspendListing()` genutzt — bewusste
+ * Design-Entscheidung (Plan nennt eine Begründung dort nicht explizit als
+ * Pflicht, siehe PHASENSTATUS.md): ein Sperren eines bereits laufenden,
+ * öffentlich sichtbaren Listings ist genauso begründungspflichtig wie eine
+ * Ablehnung, damit der betroffene Mandant im Formular (`review_note`) immer
+ * einen nachvollziehbaren Grund sieht statt eines stillen Verschwindens.
+ */
+export const platformReviewNoteSchema = z
+  .string()
+  .trim()
+  .min(5, "Begründung muss mindestens 5 Zeichen haben.")
+  .max(1000, "Begründung darf höchstens 1000 Zeichen haben.");
+
+/**
+ * NEU (Marketplace M6, 04.08.2026, Plan Abschnitt 7): Auszahlungsreferenz
+ * beim manuellen "Als ausgezahlt markieren" im Betreiber-Portal
+ * (`markPayoutPaid()` in `platform/marketplace.ts`). Freitext ohne feste
+ * Struktur — unterschiedliche Banken/Buchhaltungssysteme liefern
+ * unterschiedliche Referenzformate (z. B. "SEPA-Überweisung Ref. XY",
+ * IBAN-Auszug-Nr., interne Belegnummer) — nur Mindest-/Maximallänge wie
+ * `platformReviewNoteSchema` oben, keine Regex-Formvorgabe.
+ */
+export const payoutReferenceSchema = z
+  .string()
+  .trim()
+  .min(3, "Auszahlungsreferenz muss mindestens 3 Zeichen haben.")
+  .max(200, "Auszahlungsreferenz darf höchstens 200 Zeichen haben.");
+
+/**
+ * NEU (Marketplace M6): Filter-Query-Parameter für die Auszahlungs-Ansicht
+ * (`/portal/marketplace/auszahlungen`) und ihren CSV-Export
+ * (`.../auszahlungen/export`). `from`/`to` sind reine Datumsfelder
+ * (`<input type="date">`, Plan Abschnitt 7: "einfache Datumsfelder reichen
+ * nicht nötig kein komplexes Datepicker-Widget") im Format JJJJ-MM-TT.
+ *
+ * Die Umwandlung in eine tatsächliche `created_at`-Grenze (inkl. Tagesende
+ * bei `to`, damit der gewählte Tag selbst mitgezählt wird) passiert bewusst
+ * NICHT hier, sondern in `getPayoutRows()` (`platform/marketplace.ts`) —
+ * dieses Schema prüft nur das Eingabeformat, die Anwendungslogik (wie ein
+ * Datum zu einer Zeitgrenze wird) gehört dorthin, wo der eigentliche
+ * `created_at`-Vergleich stattfindet.
+ */
+const isoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Datum im Format JJJJ-MM-TT angeben.");
+
+export const payoutFilterQuerySchema = z.object({
+  tenantId: z.string().uuid().optional(),
+  from: isoDateSchema.optional(),
+  to: isoDateSchema.optional(),
+});
+export type PayoutFilterQuery = z.infer<typeof payoutFilterQuerySchema>;

@@ -93,18 +93,25 @@ export default async function PortalLayout({
   // "academy.calltalent.ai" — folgt automatisch, falls sich `custom_domain`
   // dieses Mandanten je ändert, ohne Code-Änderung hier.
   const admin = createAdminClient();
-  const { data: ownTenant } = await admin
-    .from("tenants")
-    .select("slug, custom_domain")
-    .eq("slug", OWN_TENANT_SLUG)
-    .maybeSingle();
+  // Marketplace M3 (03.08.2026): Badge-Zahl offener Einreichungen für den
+  // "Marketplace"-Menüpunkt (siehe PortalShell/PortalMobileNav) — direkt hier
+  // per Admin-Client abgefragt statt über eine zusätzliche
+  // `requirePlatformAdmin()`-Runde in `platform/marketplace.ts`: der Zugriff
+  // ist an dieser Stelle bereits über `checkPlatformAccess()` oben bestätigt,
+  // eine zweite Prüfung wäre nur redundante Zusatzlast.
+  const [{ data: ownTenant }, { count: pendingMarketplaceCount }] = await Promise.all([
+    admin.from("tenants").select("slug, custom_domain").eq("slug", OWN_TENANT_SLUG).maybeSingle(),
+    admin.from("marketplace_listings").select("id", { count: "exact", head: true }).eq("status", "submitted"),
+  ]);
   const ownAdminUrl = ownTenant ? `${tenantOrigin(ownTenant)}/admin` : undefined;
 
   return (
     <>
       {PORTAL_BODY_BACKGROUND_OVERRIDE}
       <div className="min-h-screen bg-slate-950 text-slate-50">
-        <PortalShell ownAdminUrl={ownAdminUrl}>{children}</PortalShell>
+        <PortalShell ownAdminUrl={ownAdminUrl} pendingMarketplaceCount={pendingMarketplaceCount ?? 0}>
+          {children}
+        </PortalShell>
       </div>
     </>
   );

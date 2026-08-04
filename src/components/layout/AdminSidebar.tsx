@@ -8,6 +8,7 @@ import {
   Sparkles,
   ClipboardCheck,
   Package,
+  Store,
   BarChart3,
   CreditCard,
   Users,
@@ -69,6 +70,7 @@ export type AdminSidebarItemId =
   | "ki"
   | "submissions"
   | "products"
+  | "marketplace"
   | "reporting"
   | "payments"
   | "members"
@@ -83,6 +85,13 @@ type AdminNavItem = {
   icon: LucideIcon;
   /** Nur für Plattform-Admins sichtbar (Betreiber-Portal). */
   platformOnly?: boolean;
+  /**
+   * Nur sichtbar, wenn der Mandant den Marketplace freigeschaltet hat
+   * (`tenant.settings.marketplace_enabled === true`, siehe
+   * src/lib/tenant/types.ts — bewusst umgekehrte Polarität ggü.
+   * `payments_enabled` & Co., Begründung dort).
+   */
+  marketplaceOnly?: boolean;
 };
 
 const GROUPS: { title: string; items: AdminNavItem[] }[] = [
@@ -94,6 +103,7 @@ const GROUPS: { title: string; items: AdminNavItem[] }[] = [
       { id: "ki", label: "KI-Generator", href: "/admin/ki", icon: Sparkles },
       { id: "submissions", label: "Abgaben", href: "/admin/abgaben", icon: ClipboardCheck },
       { id: "products", label: "Produkte", href: "/admin/produkte", icon: Package },
+      { id: "marketplace", label: "Marketplace", href: "/admin/marketplace", icon: Store, marketplaceOnly: true },
     ],
   },
   {
@@ -126,6 +136,7 @@ function activeFromPath(pathname: string): AdminSidebarItemId | undefined {
   if (pathname.startsWith("/admin/ki")) return "ki";
   if (pathname.startsWith("/admin/abgaben")) return "submissions";
   if (pathname.startsWith("/admin/produkte")) return "products";
+  if (pathname.startsWith("/admin/marketplace")) return "marketplace";
   if (pathname.startsWith("/admin/reporting")) return "reporting";
   if (pathname.startsWith("/admin/zahlungen")) return "payments";
   if (pathname.startsWith("/admin/teilnehmer")) return "members";
@@ -142,6 +153,7 @@ export function AdminSidebar({
   variant = "rail",
   tenantName = "Calltalent",
   logoUrl = null,
+  marketplaceEnabled = false,
 }: {
   active?: AdminSidebarItemId;
   isPlatformAdmin?: boolean;
@@ -153,6 +165,11 @@ export function AdminSidebar({
    * Mandanten ohne eigenes Logo. */
   tenantName?: string;
   logoUrl?: string | null;
+  /** Marketplace M2 (03.08.2026) — steuert Sichtbarkeit des "Marketplace"-
+   * Menüpunkts, siehe `marketplaceOnly` oben und tenant/types.ts. Default
+   * `false` (Opt-in), anders als `isPlatformAdmin`s eigentliche Bedeutung
+   * (Rollen-Gate) bewusst analog zu dessen technischem Muster genutzt. */
+  marketplaceEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const activeId = active ?? activeFromPath(pathname);
@@ -256,7 +273,9 @@ export function AdminSidebar({
           Bereich, statt selbst intern zu scrollen. */}
       <nav className="min-h-0 flex-1 overflow-y-auto px-4">
         {GROUPS.map((group) => {
-          const items = group.items.filter((i) => !i.platformOnly || isPlatformAdmin);
+          const items = group.items.filter(
+            (i) => (!i.platformOnly || isPlatformAdmin) && (!i.marketplaceOnly || marketplaceEnabled),
+          );
           if (items.length === 0) return null;
           return (
             <div key={group.title}>

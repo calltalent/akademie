@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { decideRouting, isApiPath, isAuthPath } from "./routing";
+import { decideRouting, isApiPath, isAuthPath, isSameHost } from "./routing";
 
 const PORTAL_HOST = "portal.calltalent.ai";
+const MARKETPLACE_HOST = "marketplace.calltalent.ai";
 
 describe("isApiPath", () => {
   it("erkennt /api und /api/...", () => {
@@ -143,6 +144,122 @@ describe("decideRouting — Portal-Host", () => {
     expect(
       decideRouting({ host: PORTAL_HOST, pathname: "/portal", portalHost: PORTAL_HOST }).servedPath,
     ).toBe("/portal");
+  });
+});
+
+describe("decideRouting — Marketplace-Host (Marketplace M4)", () => {
+  // Analog zu den Portal-Host-Regressionsschutz-Tests oben — gleiche
+  // Rewrite-Achse (prefixRewrite()), anderes Präfix.
+  it("schreibt normale Seiten auf /marketplace/... um", () => {
+    expect(
+      decideRouting({
+        host: MARKETPLACE_HOST,
+        pathname: "/kurs/beispiel-kurs",
+        portalHost: PORTAL_HOST,
+        marketplaceHost: MARKETPLACE_HOST,
+      }),
+    ).toEqual({ servedPath: "/marketplace/kurs/beispiel-kurs", resolveTenant: false, rewrite: true });
+  });
+
+  it("schreibt die Wurzel um", () => {
+    expect(
+      decideRouting({
+        host: MARKETPLACE_HOST,
+        pathname: "/",
+        portalHost: PORTAL_HOST,
+        marketplaceHost: MARKETPLACE_HOST,
+      }).servedPath,
+    ).toBe("/marketplace/");
+  });
+
+  it("schreibt /api/... NIEMALS auf /marketplace/api/... um", () => {
+    expect(
+      decideRouting({
+        host: MARKETPLACE_HOST,
+        pathname: "/api/stripe/webhook",
+        portalHost: PORTAL_HOST,
+        marketplaceHost: MARKETPLACE_HOST,
+      }),
+    ).toEqual({ servedPath: "/api/stripe/webhook", resolveTenant: false, rewrite: false });
+  });
+
+  it("schreibt /auth/... NIEMALS auf /marketplace/auth/... um", () => {
+    expect(
+      decideRouting({
+        host: MARKETPLACE_HOST,
+        pathname: "/auth/callback",
+        portalHost: PORTAL_HOST,
+        marketplaceHost: MARKETPLACE_HOST,
+      }),
+    ).toEqual({ servedPath: "/auth/callback", resolveTenant: false, rewrite: false });
+  });
+
+  it("vermeidet einen Doppel-Rewrite bei bereits vorangestelltem /marketplace", () => {
+    expect(
+      decideRouting({
+        host: MARKETPLACE_HOST,
+        pathname: "/marketplace/kurs/beispiel-kurs",
+        portalHost: PORTAL_HOST,
+        marketplaceHost: MARKETPLACE_HOST,
+      }).servedPath,
+    ).toBe("/marketplace/kurs/beispiel-kurs");
+  });
+
+  it("versucht auf dem Marketplace-Host keine Mandanten-Auflösung", () => {
+    const decision = decideRouting({
+      host: MARKETPLACE_HOST,
+      pathname: "/kurs/beispiel-kurs",
+      portalHost: PORTAL_HOST,
+      marketplaceHost: MARKETPLACE_HOST,
+    });
+    expect(decision.resolveTenant).toBe(false);
+  });
+
+  it("lässt einen normalen Mandanten-Host unverändert, wenn marketplaceHost gesetzt ist", () => {
+    expect(
+      decideRouting({
+        host: "academy.calltalent.ai",
+        pathname: "/admin/kurse",
+        portalHost: PORTAL_HOST,
+        marketplaceHost: MARKETPLACE_HOST,
+      }),
+    ).toEqual({ servedPath: "/admin/kurse", resolveTenant: true, rewrite: false });
+  });
+
+  it("ohne übergebenen marketplaceHost bleibt ein Host, der zufällig 'marketplace...' heißt, ein normaler Mandanten-Host", () => {
+    // Regressionsschutz für die bewusst optionale Signatur (siehe
+    // decideRouting()-Kommentar): fehlt marketplaceHost, greift die
+    // Marketplace-Prüfung gar nicht erst — bestehende Aufrufer ohne diesen
+    // Parameter verhalten sich exakt wie vor M4.
+    expect(
+      decideRouting({ host: MARKETPLACE_HOST, pathname: "/", portalHost: PORTAL_HOST }),
+    ).toEqual({ servedPath: "/", resolveTenant: true, rewrite: false });
+  });
+
+  // Plan Abschnitt 4.1, letzter Satz: bei (hypothetisch) identischer
+  // Konfiguration beider Sonder-Hosts gewinnt der Portal-Host, weil er in
+  // decideRouting() zuerst geprüft wird.
+  it("Portal-Host gewinnt bei identischer Konfiguration beider Sonder-Hosts", () => {
+    const sameHost = "sonder.calltalent.ai";
+    expect(
+      decideRouting({
+        host: sameHost,
+        pathname: "/mandanten",
+        portalHost: sameHost,
+        marketplaceHost: sameHost,
+      }).servedPath,
+    ).toBe("/portal/mandanten");
+  });
+});
+
+describe("isSameHost", () => {
+  it("ignoriert den Port auf beiden Seiten", () => {
+    expect(isSameHost("portal.localhost:3000", "portal.localhost:3000")).toBe(true);
+    expect(isSameHost("portal.localhost:3000", "portal.localhost")).toBe(true);
+  });
+
+  it("unterscheidet unterschiedliche Hostnamen", () => {
+    expect(isSameHost("marketplace.calltalent.ai", "portal.calltalent.ai")).toBe(false);
   });
 });
 

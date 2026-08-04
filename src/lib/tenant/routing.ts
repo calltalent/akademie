@@ -27,6 +27,18 @@
  * verdrahtet war, konnte ein Fix an der einen Achse die andere still kippen.
  * Als reine Funktion ist beides gemeinsam testbar, und routing.test.ts hält
  * beide Regeln gleichzeitig fest.
+ *
+ * ERWEITERUNG (Marketplace M4, 03.08.2026, Plan
+ * "ich-möchte-einen-eigenen-groovy-toast.md" Abschnitt 4): zweiter
+ * host-loser Sonder-Host `marketplace.calltalent.ai` neben dem bestehenden
+ * Betreiber-Portal-Host — exakt dieselbe Rewrite-Achse (Pfad bekommt ein
+ * Präfix, kein Mandant wird aufgelöst), nur ein anderes Präfix. Die
+ * Portal-Rewrite-Logik ist deshalb zu `prefixRewrite()` extrahiert und wird
+ * für BEIDE Sonder-Hosts wiederverwendet — kein zweiter, kopierter
+ * Regelsatz, der beim nächsten Fix wieder auseinanderlaufen könnte (genau
+ * die Lehre von oben, jetzt einmal mehr angewendet). Prüfreihenfolge im
+ * Zweifel (beide Hosts identisch konfiguriert, reine Fehlkonfiguration):
+ * Portal-Host gewinnt, da er zuerst geprüft wird.
  */
 
 export type RoutingDecision = {
@@ -41,6 +53,17 @@ export type RoutingDecision = {
 /** Port abtrennen — analog extractTenantSlugFromHost(). */
 function hostnameOf(host: string): string {
   return host.split(":")[0];
+}
+
+/**
+ * Host-Vergleich ohne Port (Marketplace M4) — exportiert, weil
+ * middleware.ts denselben Vergleich zusätzlich für den `x-marketplace-host`-
+ * Marker-Header braucht (Host-Spoofing-Schutz für src/app/marketplace/layout.tsx,
+ * siehe dortiger Kopfkommentar). Vorher inline in decideRouting() dupliziert
+ * (zweimal `hostnameOf(a) === hostnameOf(b)`) — jetzt eine einzige Stelle.
+ */
+export function isSameHost(hostA: string, hostB: string): boolean {
+  return hostnameOf(hostA) === hostnameOf(hostB);
 }
 
 export function isApiPath(pathname: string): boolean {
@@ -66,34 +89,57 @@ export function isAuthPath(pathname: string): boolean {
   return pathname === "/auth" || pathname.startsWith("/auth/");
 }
 
+/**
+ * Gemeinsame Rewrite-Regel für BEIDE mandantenlosen Sonder-Hosts (Portal,
+ * Marketplace): `/api/...` und `/auth/...` bleiben unangetastet (Regel 1,
+ * siehe Kopfkommentar), jeder andere Pfad bekommt `prefix` vorangestellt,
+ * doppelter Rewrite wird vermieden, falls der Pfad bereits mit `prefix`
+ * beginnt. `resolveTenant` ist für beide Sonder-Hosts immer `false` — es
+ * gibt per Definition keinen Mandanten auf `portal.calltalent.ai` oder
+ * `marketplace.calltalent.ai`.
+ */
+function prefixRewrite(pathname: string, prefix: string): RoutingDecision {
+  if (isApiPath(pathname) || isAuthPath(pathname)) {
+    return { servedPath: pathname, resolveTenant: false, rewrite: false };
+  }
+  const alreadyPrefixed = pathname === prefix || pathname.startsWith(`${prefix}/`);
+  return {
+    servedPath: alreadyPrefixed ? pathname : `${prefix}${pathname}`,
+    resolveTenant: false,
+    rewrite: true,
+  };
+}
+
 export function decideRouting(params: {
   /** Host-Header der Anfrage, mit oder ohne Port. */
   host: string;
   pathname: string;
   /** NEXT_PUBLIC_PORTAL_HOST, mit oder ohne Port. */
   portalHost: string;
+  /**
+   * NEXT_PUBLIC_MARKETPLACE_HOST, mit oder ohne Port (Marketplace M4).
+   * Bewusst OPTIONAL statt eines dritten Pflichtparameters: middleware.ts
+   * übergibt in Produktion immer einen echten Wert (env.ts liefert einen
+   * Default), aber die rund 15 bestehenden Testfälle in routing.test.ts, die
+   * mit dem Marketplace-Host gar nichts zu tun haben, mussten dadurch nicht
+   * alle angefasst werden — funktional identisch zu einem Pflichtparameter,
+   * sobald ein Wert übergeben wird.
+   */
+  marketplaceHost?: string;
 }): RoutingDecision {
   const { pathname } = params;
-  const isPortalHost = hostnameOf(params.host) === hostnameOf(params.portalHost);
-  const api = isApiPath(pathname);
 
-  // Betreiber-Portal-Host: hat per Definition keinen Mandanten.
-  if (isPortalHost) {
-    // API bleibt unangetastet (Regel 1) — kein Rewrite, keine Auflösung.
-    // /auth/... ebenso (siehe isAuthPath()-Kommentar) — beide liegen
-    // außerhalb von src/app/portal/..., ein Rewrite auf /portal/... träfe
-    // in beiden Fällen eine nicht existierende Route.
-    if (api || isAuthPath(pathname)) {
-      return { servedPath: pathname, resolveTenant: false, rewrite: false };
-    }
-    // Doppel-Rewrite vermeiden, falls der Pfad bereits mit /portal beginnt
-    // (im Normalbetrieb nie der Fall, aber sauber behandelt).
-    const alreadyPortalPath = pathname === "/portal" || pathname.startsWith("/portal/");
-    return {
-      servedPath: alreadyPortalPath ? pathname : `/portal${pathname}`,
-      resolveTenant: false,
-      rewrite: true,
-    };
+  // Betreiber-Portal-Host zuerst geprüft (Plan Abschnitt 4.1, letzter Satz:
+  // bei hypothetisch identischer Konfiguration beider Sonder-Hosts gewinnt
+  // der Portal-Host).
+  if (isSameHost(params.host, params.portalHost)) {
+    return prefixRewrite(pathname, "/portal");
+  }
+
+  // Marketplace-Host: gleiche Rewrite-Achse wie der Portal-Host, siehe
+  // prefixRewrite()-Kommentar oben.
+  if (params.marketplaceHost && isSameHost(params.host, params.marketplaceHost)) {
+    return prefixRewrite(pathname, "/marketplace");
   }
 
   // Mandanten-Host: Mandant IMMER auflösen, auch für /api/... (Regel 2).

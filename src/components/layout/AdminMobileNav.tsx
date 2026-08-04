@@ -25,6 +25,7 @@ export function AdminMobileNav({
   pendingSubmissions = 0,
   tenantName = "Calltalent",
   logoUrl = null,
+  marketplaceEnabled = false,
 }: {
   isPlatformAdmin?: boolean;
   pendingSubmissions?: number;
@@ -32,6 +33,8 @@ export function AdminMobileNav({
    * Bereich ist immer noch Calltalent") — siehe AdminSidebar.tsx. */
   tenantName?: string;
   logoUrl?: string | null;
+  /** Marketplace M2 (03.08.2026) — siehe AdminSidebar.tsx. */
+  marketplaceEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -85,7 +88,12 @@ export function AdminMobileNav({
           className="max-h-[75vh] overflow-y-auto"
           style={{ borderTop: "1px solid rgba(255,255,255,0.12)" }}
         >
-          <AdminSidebar variant="panel" isPlatformAdmin={isPlatformAdmin} pendingSubmissions={pendingSubmissions} />
+          <AdminSidebar
+            variant="panel"
+            isPlatformAdmin={isPlatformAdmin}
+            pendingSubmissions={pendingSubmissions}
+            marketplaceEnabled={marketplaceEnabled}
+          />
         </div>
       )}
     </div>

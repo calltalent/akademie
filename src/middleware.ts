@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env";
 import { resolveTenantByHost } from "@/lib/tenant/resolve";
-import { decideRouting } from "@/lib/tenant/routing";
+import { decideRouting, isSameHost } from "@/lib/tenant/routing";
 import type { PublicTenant } from "@/lib/tenant/types";
 import { resolveEnabledLocales } from "@/i18n/config";
 import { resolveLocale } from "@/i18n/resolve";
@@ -63,6 +63,7 @@ export async function middleware(request: NextRequest) {
     host,
     pathname: request.nextUrl.pathname,
     portalHost: publicEnv.NEXT_PUBLIC_PORTAL_HOST,
+    marketplaceHost: publicEnv.NEXT_PUBLIC_MARKETPLACE_HOST,
   });
   const servedPath = routing.servedPath;
 
@@ -112,6 +113,32 @@ export async function middleware(request: NextRequest) {
   // Randfall eines direkten Zugriffs auf /portal/... über einen
   // Mandanten-Host statt den Portal-Host ab.
   requestHeaders.set("x-portal-pathname", servedPath);
+
+  // Marketplace M4 (03.08.2026, Host-Spoofing-Schutz für
+  // src/app/marketplace/layout.tsx): dieser Header ist die EINZIGE Prüfung,
+  // die verhindert, dass /marketplace/... auch über einen beliebigen
+  // Mandanten-Host direkt erreichbar wäre (Next.js kennt Ordnerpfade
+  // unabhängig vom Host — ohne dieses Gate würde z. B.
+  // irgendein-mandant.calltalent.ai/marketplace/impressum einfach rendern).
+  // Anders als x-portal-pathname (das nur zur Login-Seiten-Erkennung dient
+  // und dessen Fehlen keine Sicherheitsgrenze umgeht, da /portal/... zusätzlich
+  // durch checkPlatformAccess() geschützt ist) trägt dieser Header hier
+  // ALLEIN die gesamte Zugriffsentscheidung — /marketplace/... hat bewusst
+  // keine weitere Auth-Prüfung (vollständig öffentlicher Bereich).
+  //
+  // `requestHeaders` beginnt oben als `new Headers(request.headers)` — eine
+  // reine Kopie der vom KLIENTEN gesendeten Header. Ein `set()` NUR im
+  // True-Fall würde einen vom Client selbst mitgeschickten
+  // `x-marketplace-host: 1` unangetastet durchreichen, sobald die
+  // Bedingung unten `false` ist (z. B. Request an einen echten Mandanten-
+  // Host mit gefälschtem Header) — der Gate in layout.tsx sähe dann
+  // fälschlich "1" und würde rendern. Deshalb IMMER explizit auf das
+  // tatsächliche Ergebnis setzen ("1" oder "0"), nie nur bedingt setzen —
+  // das überschreibt einen eventuell vom Client mitgeschickten Wert in
+  // JEDEM Fall mit der echten, middleware-seitig ermittelten Antwort.
+  // isSameHost() ist dieselbe reine, getestete Vergleichsfunktion wie in
+  // routing.ts::decideRouting() — keine zweite, abweichende Logik.
+  requestHeaders.set("x-marketplace-host", isSameHost(host, publicEnv.NEXT_PUBLIC_MARKETPLACE_HOST) ? "1" : "0");
 
   function buildResponse() {
     if (routing.rewrite) {

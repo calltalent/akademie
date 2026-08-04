@@ -1050,6 +1050,56 @@
       "imageEntityLabel": "Trainerbild",
       "imageEntityFallbackTitle": "Trainer",
       "genericError": "Fehler."
+    },
+    "marketplace": {
+      "eyebrow": "Inhalte · Marketplace",
+      "title": "Marketplace",
+      "listingsHeading": "Listings",
+      "newListing": "Neues Listing",
+      "empty": "Noch keine Marketplace-Listings angelegt.",
+      "noCoursesAvailable": "Kein veröffentlichter Kurs ohne bestehendes Listing verfügbar. Veröffentliche zuerst einen Kurs.",
+      "createCourseFirstLink": "Zu den Kursen",
+      "courseColumn": "Kurs",
+      "priceColumn": "Preis",
+      "statusColumn": "Status",
+      "visibleColumn": "Sichtbar",
+      "totalCountSuffix": "{count} gesamt",
+      "courseNotFound": "Kurs nicht gefunden",
+      "free": "Kostenlos",
+      "status": {
+        "draft": "Nicht gelistet",
+        "submitted": "In Prüfung",
+        "approved": "Freigegeben",
+        "rejected": "Abgelehnt",
+        "suspended": "Vom Betreiber deaktiviert"
+      },
+      "courseLabel": "Kurs",
+      "selectCoursePlaceholder": "Kurs auswählen …",
+      "headlineLabel": "Titel (optional)",
+      "headlinePlaceholder": "Kurzer, werblicher Titel für den Marketplace",
+      "summaryLabel": "Beschreibung (optional)",
+      "summaryPlaceholder": "Kurze Beschreibung für die Detailseite",
+      "coverUrlLabel": "Bild-URL (optional)",
+      "priceLabel": "Preis in Euro (0 = kostenlos)",
+      "pricePlaceholder": "z. B. 9,90 oder 0",
+      "create": "Listing anlegen",
+      "save": "Änderungen speichern",
+      "saved": "Gespeichert.",
+      "editAria": "Listing bearbeiten: {title}",
+      "editButtonTitle": "Bearbeiten",
+      "editLockedHint": "Bearbeiten ist erst wieder möglich, nachdem das Listing zurückgezogen wurde bzw. nicht mehr eingereicht ist.",
+      "reviewNoteLabel": "Begründung des Betreibers",
+      "submitAction": "Zur Prüfung einreichen",
+      "submitPending": "Wird eingereicht …",
+      "withdrawAction": "Zurückziehen",
+      "withdrawPending": "Wird zurückgezogen …",
+      "enabledLabel": "Sichtbar",
+      "disabledLabel": "Verborgen",
+      "visibleOnlyWhenApproved": "Erst änderbar, sobald der Betreiber das Listing freigegeben hat.",
+      "statusCardHeading": "Marketplace",
+      "statusCardNotListed": "Nicht gelistet",
+      "statusCardLinkManage": "Marketplace verwalten",
+      "statusCardLinkCreate": "Im Marketplace listen"
     }
   },
   "portal": {
@@ -1232,7 +1282,102 @@
     "orderPaid": {
       "subject": "Zahlung erhalten",
       "heading": "Zahlung erhalten",
-      "body": "vielen Dank für deinen Kauf von {productName} bei {tenantName}. Die Zahlung ist eingegangen und dein Zugang ist freigeschaltet."
+      "body": "vielen Dank für deinen Kauf von {productName} bei {tenantName}. Die Zahlung ist eingegangen und dein Zugang ist freigeschaltet.",
+      "actionButton": "Zum Kurs"
+    }
+  },
+  "marketplace": {
+    "shell": {
+      "metaTitle": "Calltalent Marketplace",
+      "subLabel": "MARKETPLACE",
+      "footerCopyright": "© {year} Calltalent Ltd.",
+      "footerNavLabel": "Rechtliches",
+      "footerImpressum": "Impressum",
+      "footerDatenschutz": "Datenschutz",
+      "footerAgb": "AGB"
+    },
+    "catalog": {
+      "eyebrow": "Calltalent Marketplace",
+      "title": "Kurse von unabhängigen Anbietern",
+      "subtitle": "Entdecke Kurse, die Mandanten der Calltalent-Akademie für den freien Verkauf freigegeben haben.",
+      "empty": "Noch keine Kurse im Marketplace.",
+      "free": "Kostenlos",
+      "bySeller": "Angeboten von {seller}",
+      "viewCourse": "Kurs ansehen"
+    },
+    "detail": {
+      "offeredBy": "Angeboten von {seller}",
+      "modulesLabel": "Module",
+      "lessonsLabel": "Lektionen",
+      "durationLabel": "Videomaterial",
+      "minutesValue": "{minutes} Min.",
+      "free": "Kostenlos",
+      "buyButton": "Kaufen",
+      "acquireButton": "Kostenlos freischalten",
+      "buyPending": "Wird vorbereitet …",
+      "loginRequired": "Bitte melde dich an, um diesen Kurs zu erwerben.",
+      "loginButton": "Anmelden",
+      "noAccountHint": "Noch kein Konto? Schreib uns an office@calltalent.ai.",
+      "dataTransferNotice": "Bei einem Kauf werden dein Name, deine E-Mail-Adresse und dein Lernfortschritt an {seller} übermittelt, da der Kurs dort stattfindet."
+    },
+    "thankYou": {
+      "heading": "Vielen Dank für deinen Erwerb",
+      "body": "Dein Zugang zu „{course}“ ist freigeschaltet.",
+      "goToCourse": "Zum Kurs",
+      "loginHint": "Falls du auf der Kursseite erneut angemeldet werden musst, funktioniert das mit denselben Zugangsdaten."
+    },
+    "login": {
+      "eyebrow": "Calltalent Marketplace",
+      "heading": "Anmelden",
+      "passwordFormAriaLabel": "Mit Passwort anmelden",
+      "emailLabel": "E-Mail",
+      "passwordLabel": "Passwort",
+      "submitButton": "Anmelden",
+      "orDivider": "oder",
+      "magicLinkFormAriaLabel": "Mit Magic Link anmelden",
+      "magicLinkEmailLabel": "E-Mail für Magic Link",
+      "magicLinkSuccess": "Link gesendet. Bitte E-Mail-Postfach prüfen.",
+      "magicLinkSubmitButton": "Magic Link senden",
+      "noAccountHint": "Noch kein Konto? Schreib uns an office@calltalent.ai."
+    },
+    "legal": {
+      "impressum": {
+        "title": "Impressum",
+        "companyHeading": "Angaben gemäß § 5 DDG",
+        "companyName": "Calltalent Ltd.",
+        "companyForm": "Private Limited Company, eingetragen in England und Wales",
+        "companyNumber": "Company Number: 16591113",
+        "address": "71-75 Shelton Street, Covent Garden, London, WC2H 9JQ, Vereinigtes Königreich",
+        "contactHeading": "Kontakt",
+        "email": "E-Mail: office@calltalent.ai",
+        "representativeHeading": "Vertretungsberechtigt",
+        "representativeText": "Die Geschäftsführung der Calltalent Ltd.",
+        "registerHeading": "Registereintrag",
+        "registerText": "Companies House (England und Wales), Registernummer 16591113"
+      },
+      "datenschutz": {
+        "title": "Datenschutzerklärung",
+        "controllerHeading": "Verantwortliche Stelle",
+        "controllerText": "Calltalent Ltd., 71-75 Shelton Street, Covent Garden, London, WC2H 9JQ, Vereinigtes Königreich, office@calltalent.ai.",
+        "dataHeading": "Welche Daten wir verarbeiten",
+        "dataText": "Beim Aufruf dieser Seite: technische Zugriffsdaten (Server-Logs). Bei einem Kauf zusätzlich: Name, E-Mail-Adresse, Zahlungsdaten (über Stripe) und Lernfortschritt beim jeweiligen Anbieter-Mandanten.",
+        "purposeHeading": "Zweck und Rechtsgrundlage",
+        "purposeText": "Vertragserfüllung und -anbahnung (Art. 6 Abs. 1 lit. b DSGVO) — Bereitstellung des Marketplace-Katalogs und Abwicklung eines Kaufs.",
+        "recipientsHeading": "Empfänger",
+        "recipientsText": "Bei einem Kauf erhält der anbietende Mandant Name, E-Mail-Adresse und Lernfortschritt, da der gekaufte Kurs bei diesem Mandanten stattfindet.",
+        "rightsHeading": "Deine Rechte",
+        "rightsText": "Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch nach Art. 15–21 DSGVO. Wende dich dazu an office@calltalent.ai."
+      },
+      "agb": {
+        "title": "Allgemeine Geschäftsbedingungen",
+        "scopeHeading": "Geltungsbereich",
+        "scopeText": "Diese Bedingungen gelten für den Kauf von Kursen über den Calltalent Marketplace. Vertragspartner für den Kauf ist die Calltalent Ltd.",
+        "contentHeading": "Vertragsgegenstand",
+        "contentText": "Digitale Kursinhalte, angeboten von unabhängigen Mandanten der Calltalent-Akademie und über den Marketplace vermittelt.",
+        "withdrawalHeading": "Widerrufsbelehrung bei digitalen Inhalten",
+        "withdrawalText": "Bei Kursen mit sofortigem Zugriff erlischt das Widerrufsrecht gemäß § 356 Abs. 5 BGB mit ausdrücklicher Zustimmung zum sofortigen Beginn — Details folgen mit der Einführung des Kaufs.",
+        "pendingNotice": "Der Kauf selbst ist auf dieser Seite noch nicht freigeschaltet. Diese Bedingungen werden vor der Freischaltung um den vollständigen Kauf- und Widerrufstext ergänzt."
+      }
     }
   }
 }

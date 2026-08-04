@@ -14,9 +14,11 @@ import { CourseTitleEditor } from "@/components/admin/course-title-editor";
 import { DeleteCourseButton } from "@/components/admin/delete-course-button";
 import { CourseInfoEditor } from "@/components/admin/course-info-editor";
 import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
+import { MarketplaceStatusCard } from "@/components/admin/marketplace-status-card";
 import { updateCourseCoverUrl } from "@/lib/courses/actions";
 import type { CourseCategoryRow } from "@/lib/courses/categories";
 import type { Block } from "@/lib/courses/schema";
+import type { MarketplaceListingStatus } from "@/lib/marketplace/schema";
 
 /**
  * Kurs-Editor als 4-Schritte-Assistent (Josips Auftrag, 25.07.2026: die
@@ -62,6 +64,7 @@ export function CourseEditorSteps({
   lessonCount,
   enrollmentCount,
   certificateCount,
+  marketplaceListing,
   initialStep,
 }: {
   courseId: string;
@@ -83,6 +86,8 @@ export function CourseEditorSteps({
   lessonCount: number;
   enrollmentCount: number;
   certificateCount: number;
+  /** Marketplace M2 (03.08.2026) — Statuskarte im Veröffentlichen-Schritt, siehe MarketplaceStatusCard. */
+  marketplaceListing: { status: MarketplaceListingStatus; reviewNote: string | null } | null;
   initialStep: StepNumber;
 }) {
   const t = useTranslations("admin.courseEditor.steps");
@@ -203,6 +208,8 @@ export function CourseEditorSteps({
             hasCover={!!courseCoverUrl}
             hasCategory={!!courseCategoryId}
           />
+
+          <MarketplaceStatusCard listing={marketplaceListing} />
 
           <div
             className="flex flex-wrap items-center gap-4 rounded-[12px] border p-5"

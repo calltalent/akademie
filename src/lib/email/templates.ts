@@ -438,18 +438,30 @@ export async function confirmSignup({
   return renderLayout({ tenantName, accentColor, heading: t("confirmSignup.heading"), bodyHtml, locale, t });
 }
 
+/**
+ * `actionUrl` (Marketplace M5, Plan Abschnitt 5.5, NEU, optional): ohne
+ * Angabe unverändertes Verhalten (bestehender Aufrufer in
+ * `api/stripe/webhook/route.ts::sendOrderPaidMail()` übergibt weiterhin
+ * keinen Wert). Mit Angabe (Marketplace-Käufer, `marketplace/fulfil.ts::
+ * sendMarketplacePurchaseMail()`) erscheint derselbe "Zum Kurs"-Button wie
+ * auf der Marketplace-Dankeseite (Plan: "sollte denselben ... Link wie die
+ * Dankeseite enthalten") — kein neues Vorlagen-Duplikat für einen einzigen
+ * zusätzlichen Button nötig.
+ */
 export async function orderPaid({
   tenantName,
   recipientName,
   productName,
   accentColor,
   locale,
+  actionUrl,
 }: {
   tenantName: string;
   recipientName?: string;
   productName: string;
   accentColor?: string;
   locale: Locale;
+  actionUrl?: string;
 }): Promise<string> {
   const t = await getTranslations({ locale, namespace: "email" });
   const bodyHtml = `
@@ -458,6 +470,7 @@ export async function orderPaid({
       productName: `<strong>${escapeHtml(productName)}</strong>`,
       tenantName: `<strong>${escapeHtml(tenantName)}</strong>`,
     })}</p>
+    ${actionUrl ? actionButton(actionUrl, t("orderPaid.actionButton"), accentColor) : ""}
   `;
   return renderLayout({ tenantName, accentColor, heading: t("orderPaid.heading"), bodyHtml, locale, t });
 }

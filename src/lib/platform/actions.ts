@@ -11,6 +11,7 @@ import {
   tenantBrandingSchema,
   tenantLogoUrlSchema,
   tenantLoginContentSchema,
+  tenantMarketplaceCommissionSchema,
 } from "@/lib/platform/schema";
 import { getTranslations } from "next-intl/server";
 import { buildSetPasswordLink, findUserByEmail, type ImportTenant } from "@/lib/users/import";
@@ -504,6 +505,20 @@ export async function updateTenantLogoUrl(
  * `defaultChecked` mit derselben Polarität, sonst würde der erste Speichern-
  * Klick auf einer frischen Seite den tatsächlichen Zustand stillschweigend
  * umdrehen.
+ *
+ * ERWEITERT (Marketplace M3, 03.08.2026, Plan Abschnitt 6/7): zwei weitere
+ * Felder — `marketplace_enabled` (gleiche "aus, außer explizit true"-Polarität
+ * wie `tutor_enabled`, siehe tenant/types.ts-Kommentar dort: Opt-in wegen
+ * grenzüberschreitender Datenweitergabe, DSGVO) und
+ * `marketplace_commission_bp` (optional, Prozent-Eingabe im Formular, siehe
+ * `tenantMarketplaceCommissionSchema`). ABWEICHUNG vom ursprünglichen
+ * Plan-Funktionsnamen `updateCommissionRate()` in `platform/marketplace.ts`
+ * (dokumentiert in PHASENSTATUS.md): eine eigene zweite Schreibfunktion für
+ * dasselbe `tenants.settings`-JSONB-Feld hätte zwei unabhängige
+ * Merge-Patch-Pfade auf dieselbe Spalte erzeugt (Race-Potenzial bei
+ * gleichzeitigem Speichern) und wäre inkonsistent mit dem EINEN Formular in
+ * `tenant-features-form.tsx`, das beide Felder in einem Absenden schreibt —
+ * hier direkt mit erweitert statt dupliziert.
  */
 export async function updateTenantFeatures(
   tenantId: string,
@@ -513,6 +528,13 @@ export async function updateTenantFeatures(
   try {
     await requirePlatformAdmin();
 
+    const parsedCommission = tenantMarketplaceCommissionSchema.safeParse(
+      formData.get("marketplaceCommissionPercent"),
+    );
+    if (!parsedCommission.success) {
+      return { error: parsedCommission.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+
     const admin = createAdminClient();
     const { data: current } = await admin.from("tenants").select("settings").eq("id", tenantId).maybeSingle();
 
@@ -521,6 +543,13 @@ export async function updateTenantFeatures(
       payments_enabled: formData.get("paymentsEnabled") === "on",
       tutor_enabled: formData.get("tutorEnabled") === "on",
       course_generator_enabled: formData.get("courseGeneratorEnabled") === "on",
+      marketplace_enabled: formData.get("marketplaceEnabled") === "on",
+      // Leeres Formularfeld -> `parsedCommission.data` ist `undefined` ->
+      // JSON.stringify (Supabase-Client-Serialisierung) lässt den Schlüssel
+      // beim Schreiben weg, ein zuvor gesetzter Wert wird damit entfernt statt
+      // stehen zu bleiben — gewollt, der Mandant fällt dann wieder auf den
+      // globalen Standardsatz zurück (siehe tenant/types.ts-Kommentar).
+      marketplace_commission_bp: parsedCommission.data,
     };
 
     const { error } = await admin.from("tenants").update({ settings: mergedSettings }).eq("id", tenantId);

@@ -121,3 +121,22 @@ export const checkoutMetadataSchema = z.object({
   user_id: z.string().uuid(),
 });
 export type CheckoutMetadata = z.infer<typeof checkoutMetadataSchema>;
+
+/**
+ * Marketplace M5 (Plan Abschnitt 5): ECHTE Obermenge von
+ * `checkoutMetadataSchema` (`.extend()`) — der Webhook (`api/stripe/webhook/
+ * route.ts::handleCheckoutCompleted()`) versucht deshalb IMMER zuerst dieses
+ * strengere Schema, bevor er auf das lockere Basis-Schema zurückfällt (nur
+ * die Reihenfolge stellt sicher, dass eine Marketplace-Zahlung nicht
+ * versehentlich über den normalen, tenant-eigenen Checkout-Pfad verarbeitet
+ * wird — ein normales `checkoutMetadataSchema`-Objekt hätte kein
+ * `listing_id`/`source` und würde hier ohnehin scheitern, die Reihenfolge ist
+ * also nur zur Klarheit explizit dokumentiert, nicht sicherheitskritisch an
+ * sich). `createMarketplaceCheckout()` (`marketplace/checkout.ts`) setzt
+ * genau diese fünf Felder als Session-Metadata.
+ */
+export const marketplaceCheckoutMetadataSchema = checkoutMetadataSchema.extend({
+  listing_id: z.string().uuid(),
+  source: z.literal("marketplace"),
+});
+export type MarketplaceCheckoutMetadata = z.infer<typeof marketplaceCheckoutMetadataSchema>;

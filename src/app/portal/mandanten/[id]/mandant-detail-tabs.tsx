@@ -70,7 +70,14 @@ export function MandantDetailTabs({
   tenantId: string;
   slug: string;
   editable: { id: string; name: string; plan: TenantPlan; status: TenantStatus; customDomain: string | null };
-  features: { paymentsEnabled: boolean; tutorEnabled: boolean; courseGeneratorEnabled: boolean };
+  features: {
+    paymentsEnabled: boolean;
+    tutorEnabled: boolean;
+    courseGeneratorEnabled: boolean;
+    marketplaceEnabled: boolean;
+    marketplaceCommissionPercent: string;
+    defaultCommissionPercent: string;
+  };
   domains: { id: string; domain: string }[];
   brandingInitial: { colorPrimary: string; radius: number; logoUrl: string | null };
   tenantName: string;
@@ -168,6 +175,9 @@ export function MandantDetailTabs({
           paymentsEnabled={features.paymentsEnabled}
           tutorEnabled={features.tutorEnabled}
           courseGeneratorEnabled={features.courseGeneratorEnabled}
+          marketplaceEnabled={features.marketplaceEnabled}
+          marketplaceCommissionPercent={features.marketplaceCommissionPercent}
+          defaultCommissionPercent={features.defaultCommissionPercent}
         />
       )}
 

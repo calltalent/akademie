@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { LayoutDashboard, Building2, ShieldCheck, LogOut } from "lucide-react";
+import { LayoutDashboard, Building2, Store, Wallet, ShieldCheck, LogOut } from "lucide-react";
 import { NavLink } from "@/components/shell/nav-link";
 import { SectionLabel } from "@/components/shell/section-label";
 import { BrandLogo } from "@/components/shell/brand-logo";
@@ -39,17 +39,24 @@ import { PortalMobileNav } from "@/components/portal/portal-mobile-nav";
  * von "Übersicht"/"Mandanten". Jetzt `mt-3 border-t ... pt-3` direkt danach
  * — exakt dasselbe Muster wie in `portal-mobile-nav.tsx`, das diese Trennung
  * schon immer so hatte.
+ *
+ * `pendingMarketplaceCount` NEU (Marketplace M3, 03.08.2026): Badge-Zahl auf
+ * dem "Marketplace"-Menüpunkt (`status='submitted'`-Listings), gleiches
+ * Badge-Muster wie `AdminSidebar.tsx`s `pendingSubmissions` — `NavLink`
+ * unterstützt das bereits über seine `badge`-Prop (components/shell/nav-link.tsx).
  */
 export function PortalShell({
   children,
   ownAdminUrl,
+  pendingMarketplaceCount = 0,
 }: {
   children: ReactNode;
   ownAdminUrl?: string;
+  pendingMarketplaceCount?: number;
 }) {
   return (
     <>
-      <PortalMobileNav ownAdminUrl={ownAdminUrl} />
+      <PortalMobileNav ownAdminUrl={ownAdminUrl} pendingMarketplaceCount={pendingMarketplaceCount} />
       <div className="mx-auto flex min-h-screen max-w-6xl">
         <aside
           className="hidden w-56 flex-shrink-0 flex-col gap-1 border-r border-slate-800 px-3 py-6 lg:flex"
@@ -71,6 +78,32 @@ export function PortalShell({
             variant="dark"
             icon={<Building2 aria-hidden="true" size={18} />}
           />
+          <NavLink
+            href="/portal/marketplace"
+            label="Marketplace"
+            variant="dark"
+            icon={<Store aria-hidden="true" size={18} />}
+            badge={pendingMarketplaceCount > 0 ? String(pendingMarketplaceCount) : undefined}
+          />
+          {/* NEU (Marketplace M6, 04.08.2026, Plan Abschnitt 7): zweiter,
+             gleichrangiger Eintrag statt eines echten Untermenüs — NavLink
+             (components/shell/nav-link.tsx) unterstützt keine verschachtelte
+             Navigation, ein eigenes Untermenü-Bauteil wäre eine deutlich
+             größere UI-Änderung nur für diesen einen Fall gewesen. Leicht
+             eingerückt (`pl-3`), damit die Zugehörigkeit zu "Marketplace"
+             trotzdem optisch erkennbar bleibt. Auf `/portal/marketplace/
+             auszahlungen` zeigen bewusst BEIDE Einträge als aktiv (Marketplace
+             über seinen bestehenden Praefix-Match, siehe NavLink) — das ist
+             inhaltlich korrekt (man befindet sich im Marketplace-Bereich,
+             konkret bei den Auszahlungen), kein Fehler. */}
+          <div className="pl-3">
+            <NavLink
+              href="/portal/marketplace/auszahlungen"
+              label="Auszahlungen"
+              variant="dark"
+              icon={<Wallet aria-hidden="true" size={18} />}
+            />
+          </div>
 
           <div className="mt-3 flex flex-col gap-1 border-t border-slate-800 pt-3">
             {ownAdminUrl && (

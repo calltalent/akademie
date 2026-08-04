@@ -4,12 +4,13 @@ import { getTranslations } from "next-intl/server";
 import { createStripeClient } from "@/lib/stripe/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getServerEnv } from "@/lib/env";
-import { checkoutMetadataSchema } from "@/lib/stripe/schema";
+import { checkoutMetadataSchema, marketplaceCheckoutMetadataSchema } from "@/lib/stripe/schema";
 import { sendEmail } from "@/lib/email/client";
 import { orderPaid } from "@/lib/email/templates";
 import { resolveTenantEmailLocale } from "@/i18n/config";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 import { genericErrorMessage } from "@/lib/errors/generic";
+import { handleMarketplacePurchase } from "@/lib/marketplace/fulfil";
 
 /**
  * Stripe-Webhook (Phase 2, Block 5). REIHENFOLGE STRENG WIE VORGEGEBEN:
@@ -86,10 +87,26 @@ export async function POST(request: Request) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  const rawMetadata = session.metadata ?? {};
+
+  // Marketplace M5 (Plan "ich-möchte-einen-eigenen-groovy-toast.md" Abschnitt
+  // 5): das strengere Schema zuerst versuchen — es ist eine ECHTE Obermenge
+  // von checkoutMetadataSchema (`.extend()`, siehe stripe/schema.ts), daher
+  // ist die Reihenfolge wichtig. Bei Erfolg zweigt die Verarbeitung komplett
+  // in handleMarketplacePurchase() ab, der bestehende Pfad darunter bleibt
+  // dabei UNVERÄNDERT (keine Zeile am bestehenden Code angefasst, nur
+  // danebengestellt).
+  const marketplaceMeta = marketplaceCheckoutMetadataSchema.safeParse(rawMetadata);
+  if (marketplaceMeta.success) {
+    const admin = createAdminClient();
+    await handleMarketplacePurchase(admin, session, marketplaceMeta.data);
+    return;
+  }
+
   // Sicherheitsregel: tenant_id/product_id/user_id kommen AUSSCHLIESSLICH
   // aus der Metadata, die src/lib/stripe/checkout.ts beim Session-Aufbau
   // gesetzt hat - niemals aus einer anderen Quelle.
-  const parsedMeta = checkoutMetadataSchema.safeParse(session.metadata ?? {});
+  const parsedMeta = checkoutMetadataSchema.safeParse(rawMetadata);
   if (!parsedMeta.success) {
     console.error(
       "[stripe/webhook] checkout.session.completed ohne gültige Metadata - ignoriert.",

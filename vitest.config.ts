@@ -6,7 +6,15 @@ import path from "node:path";
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      // "server-only" ist in diesem Projekt keine eigene npm-Abhängigkeit
+      // (nur intern in node_modules/next/dist/compiled/server-only gebündelt
+      // und von Next.js' eigenem Bundler aufgelöst) — Vitest/Vite braucht
+      // einen eigenen Alias auf ein leeres Stub-Modul, siehe
+      // src/test/stubs/server-only.ts.
+      "server-only": path.resolve(__dirname, "./src/test/stubs/server-only.ts"),
+    },
   },
   test: {
     environment: "jsdom",
