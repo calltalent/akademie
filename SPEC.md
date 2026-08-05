@@ -14,6 +14,8 @@ Mandantenfähige Premium-Lernplattform, die ein Betreiber (Calltalent) für sich
 | member (Lernender) | Mandant | zugewiesene Kurse lernen, Quiz, Abgaben, Tutor-Chat |
 | guest (Marketplace-Käufer) | Mandant, eingeschränkt | nur der über den Marketplace gekaufte/erworbene Kurs (Fortschritt, Quiz, Abgaben, Tutor-Chat, Zertifikat); kein Zugriff auf den übrigen Kursbestand, keine Nutzerliste, keine Produkte (siehe Abschnitt 10) |
 
+**Nachtrag 05.08.2026:** Die Kunden Area (Abschnitt 11) führt erstmals eine Sichtbarkeits-Differenzierung *innerhalb* einer Rolle ein — bisher sah jedes Mitglied einer Rolle dieselben mandantenweiten Daten wie jedes andere. Ein `member` sieht dort nur Inhalte, die für alle freigegeben sind, für seine eigene(n) Gruppe(n) oder direkt für ihn — umgesetzt über mandanteneigene, frei definierbare Gruppen (`customer_area_groups`), nicht über zusätzliche Rollen.
+
 ## 3. MoSCoW
 
 **Must (Phase 1–2):** Auth (Magic Link + Passwort), Mandanten-Auflösung (Subdomain + Custom Domain), Branding (Logo, Farben, Schrift, Radius), Kurs → Modul → Lektion mit Block-Editor (Text, Bild, Video, Audio, Datei, Quiz, Abgabe, Hinweisbox, Einbettung), Bunny-Video-Upload + Player (Autoplay, Tempo, Kapitel), Fortschritt + Abschlusslogik, Quiz/Prüfungen mit Versuchen und Bestehensgrenze, Abgaben mit Bewertungs-Inbox, Nutzerverwaltung + CSV-Import + Einladungen, Zertifikate (PDF), Stripe (Einmalkauf + Abo, je Mandant abschaltbar), E-Mail-Benachrichtigungen, Reporting v1 (Fortschritt je Nutzer/Kurs, Abschlussquoten, CSV-Export), DSGVO-Basis (EU-Hosting, Datenexport, Löschkonzept).
@@ -35,6 +37,7 @@ Mandantenfähige Premium-Lernplattform, die ein Betreiber (Calltalent) für sich
 | `/` | Akademie-Start: Kurskacheln „Meine Kurse", Fortschrittsbalken, Weiterlernen-Knopf |
 | `/kurs/[slug]` | Kursübersicht: Module/Lektionen, Fortschritt, Zertifikatsstatus |
 | `/kurs/[slug]/l/[lessonId]` | Lernansicht: Blöcke, Player, „Abschließen", Tutor-Panel (falls aktiv), Vor/Zurück |
+| `/kunden-area` | Kunden Area (05.08.2026, Nachtrag, Abschnitt 11): mandantengepflegte Links, Ansprechpartner, Ankündigungen; Sichtbarkeit je Nutzer oder Gruppe; Menüpunkt nur sichtbar, wenn mindestens ein für den Nutzer sichtbarer Eintrag existiert |
 | `/suche` | semantische Suche über freigeschaltete Inhalte |
 | `/profil` | Name, Passwort, Datenexport, Zertifikate |
 | `/login`, `/registrieren`, `/kaufen/[productSlug]` | Auth + Stripe-Checkout |
@@ -69,7 +72,7 @@ Ruhiges, helles Interface; eine Akzentfarbe je Mandant; Inter als Standardschrif
 
 Vollständig in `supabase/migrations/0001_init.sql`. Kernprinzip: jede Tabelle trägt `tenant_id`, RLS erzwingt Mandantengrenzen; Rollenprüfung über `public.member_role(tenant_id)` (security definer). Personenbezogene Zeilen (progress, attempts, submissions, tutor_messages) zusätzlich auf `user_id = auth.uid()` beschränkt; Staff (owner/admin/trainer) liest mandantenweit.
 
-Tabellenübersicht: tenants, profiles, memberships, courses, modules, lessons, enrollments, progress, quizzes, questions, attempts, submissions, certificates, products, orders, subscriptions, ai_jobs, embeddings, tutor_conversations, tutor_messages, webhooks, webhook_deliveries, api_keys, usage_counters, audit_log. Marketplace (04.08.2026, Abschnitt 10): marketplace_listings, marketplace_ledger, platform_settings (platform_admins existierte bereits seit Phase 4).
+Tabellenübersicht: tenants, profiles, memberships, courses, modules, lessons, enrollments, progress, quizzes, questions, attempts, submissions, certificates, products, orders, subscriptions, ai_jobs, embeddings, tutor_conversations, tutor_messages, webhooks, webhook_deliveries, api_keys, usage_counters, audit_log. Marketplace (04.08.2026, Abschnitt 10): marketplace_listings, marketplace_ledger, platform_settings (platform_admins existierte bereits seit Phase 4). Kunden Area (05.08.2026, Abschnitt 11): customer_area_groups, customer_area_group_members, customer_area_items, customer_area_item_audience; dazu `trainers.phone`/`trainers.email` ergänzt (trainers-Tabelle bestand bereits seit Phase 1 für Kurs-Autoren, siehe Abschnitt 11).
 
 Storage-Buckets (Phase 1 anzulegen): `branding` (öffentlich lesbar), `course-assets` (öffentlich lesbar via signierte URLs optional), `submissions` (privat), `certificates` (privat). Pfadkonvention: `{tenant_id}/...`; Policies analog RLS.
 
@@ -134,3 +137,15 @@ Zentraler, mandantenübergreifender Marktplatz nach App-Store-Prinzip unter eige
 | `/portal/marketplace/auszahlungen` | Provisions-Ledger je Mandant/Zeitraum, CSV-Export, „als ausgezahlt markieren" |
 
 Feature-Flag je Mandant: `tenants.settings.marketplace_enabled` (Default aus, Opt-in durch den Betreiber im Mandanten-Detail des Betreiber-Portals), optionaler mandantenspezifischer Provisionssatz `tenants.settings.marketplace_commission_bp`.
+
+## 11. Kunden Area (nachträglich ergänzt, 05.08.2026)
+
+Neue Unterseite in der Lernansicht (`/kunden-area`, Abschnitt 4.1): Der Mandanten-Admin (owner/admin) stellt seinen Nutzern individuelle Links (z. B. Google-Drive-Ordner, WhatsApp-/Facebook-Gruppen), Ansprechpartner und Ankündigungen/Angebote bereit, um Kommunikation und Informationsaustausch zu erleichtern — Vorbild war ein Kunden-Hub aus einer Wettbewerber-Anwendung, das Design ist eigenständig umgesetzt (keine Übernahme, siehe Abschnitt 4.5).
+
+**Personalisierung:** frei pro Nutzer oder pro mandanteneigener, frei definierbarer Gruppe (`customer_area_groups`/`customer_area_group_members`) statt nur mandantenweit oder rollenbasiert — die erste Stelle im Produkt mit Sichtbarkeits-Differenzierung innerhalb einer Rolle (siehe Nachtrag Abschnitt 2). Ein Eintrag (`customer_area_items`, Diskriminator `kind` in `link`/`contact`/`announcement`) ist entweder für alle Mitglieder sichtbar (`visibility = 'all'`, Standard) oder auf ausgewählte Gruppen/Personen beschränkt (`restricted`, Zuordnung über `customer_area_item_audience`). Der Menüpunkt „Meine Kunden Area" erscheint nur, wenn für den angemeldeten Nutzer mindestens ein sichtbarer Eintrag existiert — kein Pflicht-Setup, kein Feature-Flag nötig.
+
+**Ansprechpartner:** nutzt den bestehenden `trainers`-Datenpool (Kurs-Autoren-Profile seit Phase 1) weiter, erweitert um `phone`/`email`. Ein Trainer kann Kursautor, Kunden-Area-Kontakt, beides oder keines von beiden sein.
+
+**RLS/Sichtbarkeit:** Gruppen und Zuordnungen sind ausschließlich für owner/admin lesbar (ein Mitglied soll nicht auslesen können, dass es z. B. eine Gruppe „Geschäftsführung" gibt); die Filterung für Lernende läuft vollständig serverseitig über eine `security definer`-Hilfsfunktion (`customer_area_can_see()`), analog zum bestehenden `member_role()`/`has_enrollment()`-Muster. **Bewusste Entscheidung (Variante A, siehe Entscheidungs-Log.md, 05.08.2026):** Telefonnummer/E-Mail eines Ansprechpartners bleiben über die bestehende `trainers`-Tabelle für alle Mandanten-Mitglieder lesbar — die Gruppen-Einschränkung der Kunden-Area wirkt hier nur auf Anzeige-Ebene, nicht als zusätzliche Datenbank-Schranke auf `trainers` selbst (Begründung: dienstliche Kontaktdaten, Vermeidung von Regressionsrisiko am Kurs-Editor/Marketplace-Gast-Pfad).
+
+Migrationen: `supabase/migrations/20260805090000_customer_area.sql`, `20260805090100_customer_area_rls_perf_fix.sql` (RLS-Konsolidierung + fehlende FK-Indizes, unmittelbar nach Anwendung der Basis-Migration per Advisor-Befund nachgezogen).

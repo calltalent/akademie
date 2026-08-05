@@ -3399,10 +3399,12 @@ Auf Josips ausdrücklichen Auftrag ("10 offenen Alt-Tests angehen") einzeln diag
 
 Alle zehn Dateien danach einzeln grün. `npm run test`/`npx tsc --noEmit`/`npm run lint` weiterhin grün.
 
+**SPEC.md-Nachträge eingepflegt (05.08.2026, Josips Freigabe "erledige die offenen punkte"):** §2 (Nachtrag: erste rollen-interne Sichtbarkeits-Differenzierung), §4.1 (Route `/kunden-area`), §5 (vier neue Tabellen + `trainers.phone`/`email`), neuer §11 „Kunden Area" analog zur Tiefe von §10 (Marketplace) — Personalisierungsmodell, Ansprechpartner-Wiederverwendung, RLS-Mechanik, Variante-A-Entscheidung mit Verweis auf Entscheidungs-Log.md, Migrationsdateien.
+
 **Offen:**
 
-1. **SPEC.md-Nachträge (Plan Abschnitt 10) noch nicht eingepflegt** — §4.1 (Route `/kunden-area`), §5 (vier neue Tabellen, inkl. Perf-Fix-Migration), §2 (erste rollen-interne Sichtbarkeits-Differenzierung). Analog zum Marketplace-Feature erst nach Josips gesonderter Freigabe.
-2. Kein Bestandsschutz-Insert für `trainers.phone`/`trainers.email` nötig (nullable ohne Default, Risiko 8.2 im Plan) — kein offener Punkt, nur zur Vollständigkeit dokumentiert.
+1. Kein Bestandsschutz-Insert für `trainers.phone`/`trainers.email` nötig (nullable ohne Default, Risiko 8.2 im Plan) — kein offener Punkt, nur zur Vollständigkeit dokumentiert.
+2. **Block „Kunden Area" damit vollständig abgeschlossen.**
 
 **Risiken (aus dem Plan übernommen, weiterhin gültig):**
 
