@@ -1,0 +1,17 @@
+# Einheitliche Zeilenenden im Repository (LF), unabhängig von core.autocrlf
+# auf einzelnen Maschinen. Behebt "LF will be replaced by CRLF"-Warnungen
+# und die bestehende Inkonsistenz (einige Dateien hatten CRLF committet).
+* text=auto eol=lf
+
+# Binärdateien nie als Text behandeln/normalisieren.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
