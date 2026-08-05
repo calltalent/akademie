@@ -4,9 +4,16 @@ import { tenantUrl } from "./helpers/test-data";
 /**
  * Phase 4, Block 6 — csv-import.spec.ts. Staff importiert eine kleine
  * In-Memory-CSV (2 Zeilen, `@example.test`-Adressen, siehe CLAUDE.md §2.6
- * "keine echten E-Mail-Adressen in Tests/Fixtures") über `/admin/nutzer`
+ * "keine echten E-Mail-Adressen in Tests/Fixtures") über `/admin/teilnehmer`
  * (`POST /api/admin/users/import`) — Format `email,full_name,course_slug`
  * (Kopfzeile Pflicht, `course_slug` hier leer/optional).
+ *
+ * FIX (05.08.2026, gefunden beim ersten E2E-Lauf gegen den wiederhergestellten
+ * demo-blau-Mandanten): Der CSV-Import (`CsvImportForm`) sitzt seit
+ * Design-Block 6 (13.07.2026) NICHT mehr offen auf der Seite, sondern in
+ * `InviteUserDialog` (natives `<dialog>`), geöffnet über den "Einladen"-Button
+ * (`admin.invite.openButton`, teilnehmer-liste.tsx) — der Datei-Input existiert
+ * vorher gar nicht im DOM. Ein Klick fehlte im ursprünglichen Test.
  */
 test.use({ storageState: "e2e/.auth/staff.json" });
 
@@ -17,12 +24,15 @@ test("CSV-Import legt neue Nutzer an und zeigt sie in der Mitgliederliste", asyn
   const csv = `email,full_name,course_slug\n${email1},E2E Import Eins,\n${email2},E2E Import Zwei,\n`;
 
   await page.goto(tenantUrl("/admin/teilnehmer"));
-  await page.locator('input[type="file"]').setInputFiles({
+  await page.getByRole("button", { name: "Einladen" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await dialog.locator('input[type="file"]').setInputFiles({
     name: "e2e-import.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(csv, "utf-8"),
   });
-  await page.getByRole("button", { name: "Import starten" }).click();
+  await dialog.getByRole("button", { name: "Import starten" }).click();
 
   await expect(page.getByText(/2 Zeilen verarbeitet/)).toBeVisible({ timeout: 20000 });
   await expect(page.getByText(/2 Konten neu angelegt/)).toBeVisible();

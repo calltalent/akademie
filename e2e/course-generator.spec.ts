@@ -92,23 +92,35 @@ test("Kurs-Generator erzeugt Entwurf aus PDF und übernimmt ihn als Kurs", async
   try {
     const pdfBuffer = await buildTestPdfBuffer();
 
+    // FIX (05.08.2026): "Neuer Entwurf"-Formular wurde am 19.07.2026
+    // umgebaut (ki-upload-form.tsx) — kein "Arbeitstitel"-Feld mehr (Claude
+    // leitet den Titel bewusst aus dem Dokument ab, siehe Kopfkommentar
+    // dort), Button heißt "Entwurf generieren" statt "Kursentwurf
+    // generieren". Der Datei-Input bleibt über denselben Locator erreichbar
+    // (aria-label "PDF-Dokument auswählen" enthält "PDF-Dokument" als
+    // Teilstring, `sr-only`-Sichtbarkeit ist für setInputFiles() unerheblich).
     await page.goto(tenantUrl("/admin/ki"));
     await page.getByLabel("PDF-Dokument").setInputFiles({
       name: "e2e-kursgenerator-test.pdf",
       mimeType: "application/pdf",
       buffer: pdfBuffer,
     });
-    await page.getByLabel("Arbeitstitel (optional)").fill("E2E Kursgenerator Test");
 
     const generateResponsePromise = page.waitForResponse(
       (res) => res.url().includes("/api/admin/ki/generate") && res.request().method() === "POST",
     );
-    await page.getByRole("button", { name: "Kursentwurf generieren" }).click();
+    await page.getByRole("button", { name: "Entwurf generieren" }).click();
     const generateResponse = await generateResponsePromise;
     expect(generateResponse.ok()).toBe(true);
     const generateBody = (await generateResponse.json()) as { jobId: string };
     createdJobId = generateBody.jobId;
     expect(createdJobId).toBeTruthy();
+
+    // FIX (05.08.2026): Erfolgreicher Upload leitet seit dem 19.07.2026-Umbau
+    // client-seitig zur neuen Review-Seite /admin/ki/[jobId] weiter (statt
+    // eines Inline-Panels auf /admin/ki) — explizite Navigation statt auf das
+    // Timing des App-eigenen `router.push()` zu vertrauen.
+    await page.goto(tenantUrl(`/admin/ki/${createdJobId}`));
 
     let finalStatus = "queued";
     for (let attempt = 1; attempt <= 5 && finalStatus !== "done" && finalStatus !== "error"; attempt++) {
@@ -156,9 +168,18 @@ test("Kurs-Generator erzeugt Entwurf aus PDF und übernimmt ihn als Kurs", async
     // Kurs existiert, ist aber NICHT veröffentlicht — applyDraftAsCourse()
     // legt Kurse immer als Entwurf an (Redakteur-Kontrolle vor
     // Live-Schaltung, siehe src/lib/generator/apply.ts).
-    await page.goto(tenantUrl("/admin/kurse"));
-    const courseRow = page.locator("li").filter({ has: page.locator(`a[href="/admin/kurse/${createdCourseId}"]`) });
-    await expect(courseRow.getByRole("button", { name: "Veröffentlichen" })).toBeVisible();
+    // FIX (05.08.2026): Die Kursliste (/admin/kurse) hat seit dem 4-Schritte-
+    // Assistenten-Umbau (25.07.2026) KEINEN "Veröffentlichen"-Button mehr pro
+    // Zeile (nur noch Bearbeiten/Verschieben/Löschen) — der Status wird
+    // ausschließlich im Editor selbst (Schritt 4) über ein <select> gesetzt,
+    // siehe course-completion.spec.ts. Direkte DB-Prüfung ist hier robuster
+    // als ein UI-Text, der an keiner Stelle mehr existiert.
+    const { data: createdCourse } = await admin
+      .from("courses")
+      .select("status")
+      .eq("id", createdCourseId)
+      .single();
+    expect(createdCourse?.status).toBe("draft");
   } finally {
     // Selbst-Aufräumen (dokumentierte Ergänzung zum architect-Plan, siehe
     // PHASENSTATUS.md Block 6): der generierte Kurs-Slug hängt vom

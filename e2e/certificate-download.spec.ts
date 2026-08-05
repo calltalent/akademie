@@ -18,6 +18,13 @@ import {
  * `completeLesson()` (`src/lib/progress/actions.ts` — `await
  * issueCertificateIfEligible(...)` VOR dem Rückgabewert, kein Polling
  * nötig), Download läuft über eine signierte URL (10 Min. gültig).
+ *
+ * FIX (05.08.2026, siehe course-completion.spec.ts-Kopfkommentar): Beim
+ * Abschließen der LETZTEN offenen Lektion eines Kurses leitet die App
+ * automatisch zu `/kurs/[slug]/m/[moduleId]/abgeschlossen` weiter (Kurs-
+ * Abschluss-Seite mit Zertifikat) — kein Inline-"✓ Abgeschlossen" mehr auf
+ * derselben Lektionsseite, kein zweiter Sprung zurück zu `/kurs/[slug]`
+ * nötig, die Zertifikats-Sektion sitzt bereits auf der Abschluss-Seite.
  */
 let admin: SupabaseClient;
 let courseSlug: string;
@@ -40,10 +47,8 @@ test.use({ storageState: "e2e/.auth/student.json" });
 test("Student schließt einlektionigen Kurs ab und lädt das Zertifikat herunter", async ({ page }) => {
   await page.goto(tenantUrl(`/kurs/${courseSlug}/l/${lessonId}`));
   await page.getByRole("button", { name: "Lektion abschließen" }).click();
-  await expect(page.getByText("✓ Abgeschlossen")).toBeVisible({ timeout: 10000 });
-
-  await page.goto(tenantUrl(`/kurs/${courseSlug}`));
-  await expect(page.getByText("Zertifikat ausgestellt 🎓")).toBeVisible({ timeout: 20000 });
+  await expect(page).toHaveURL(/\/kurs\/[^/]+\/m\/[^/]+\/abgeschlossen$/, { timeout: 20000 });
+  await expect(page.getByText("Zertifikat ausgestellt 🎓")).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("link", { name: "Zertifikat herunterladen (PDF)" }).click();

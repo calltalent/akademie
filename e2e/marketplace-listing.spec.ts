@@ -42,17 +42,27 @@ test("Staff legt ein Marketplace-Listing an, sieht es in der Liste und reicht es
   // Neues Listing anlegen (rechte Spalte) — Preis-Feld hat bereits den
   // Standardwert "0" (Gratis-Fall), Headline/Beschreibung bleiben leer
   // (beide optional).
-  await page.getByLabel("Kurs", { exact: true }).selectOption({ label: courseTitle });
+  // FIX (05.08.2026): getByLabel("Kurs") lief trotz sichtbarem, korrekt
+  // beschrifteten <select> (Accessible-Name-Snapshot bestätigte "Kurs") in
+  // ein 180s-Timeout — Ursache ungeklärt (evtl. Label-Assoziation über
+  // umschließendes <label> statt for/id, siehe listing-form.tsx). Rollen-
+  // basierter Locator als robuste Alternative.
+  await page.getByRole("combobox", { name: "Kurs", exact: true }).selectOption({ label: courseTitle });
   await page.getByRole("button", { name: "Listing anlegen" }).click();
 
-  await expect(page.getByText("Gespeichert.")).toBeVisible({ timeout: 10000 });
-
+  // FIX (05.08.2026): kein "Gespeichert."-Toast-Check hier — listing-form.tsx
+  // rendert bei courses.length === 0 (nach Revalidierung: der einzige
+  // Testkurs hat jetzt ein Listing, gilt also nicht mehr als "verfügbar")
+  // unbedingt den "Kein veröffentlichter Kurs..."-Leerzustand, VOR der
+  // state.success-Prüfung — der Erfolgs-Toast ist in diesem
+  // Ein-Kurs-Testszenario nie erreichbar. Die Zeile in der Liste links ist
+  // die eigentlich aussagekräftige Bestätigung.
   // Zeile in der Liste (links) — Bearbeiten-Button trägt den Kurstitel im
   // aria-label (headline ist leer, Anzeige fällt auf courseTitle zurück),
   // eindeutiger als ein Text-Locator (Kurstitel steht sonst doppelt in der
   // Zeile: Titel-Zeile UND Kurs-Unterzeile).
   const editButton = page.getByRole("button", { name: `Listing bearbeiten: ${courseTitle}` });
-  await expect(editButton).toBeVisible();
+  await expect(editButton).toBeVisible({ timeout: 15000 });
 
   // Status vor dem Einreichen: "Nicht gelistet" (draft).
   await expect(page.getByText("Nicht gelistet")).toBeVisible();

@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import Stripe from "stripe";
 import { randomUUID } from "node:crypto";
-import { createE2eAdminClient, getDemoTenantId, tenantUrl, e2eSlug } from "./helpers/test-data";
+import { createE2eAdminClient, getDemoTenantId, createPublishedCourse, tenantUrl, e2eSlug } from "./helpers/test-data";
 import { E2E_STUDENT_EMAIL } from "./global-setup";
 
 /**
@@ -49,19 +49,29 @@ test("Staff legt Testprodukt an, Checkout-Redirect funktioniert, Webhook erzeugt
   const slug = e2eSlug("test-produkt");
   const title = `E2E Testprodukt ${Date.now()}`;
 
+  const admin = createE2eAdminClient();
+  const tenantId = await getDemoTenantId(admin);
+  // FIX (05.08.2026): Produkte sind seit 19.07.2026 zwingend an einen Kurs
+  // gebunden (product-form.tsx: "es darf keine andere Option geben") —
+  // ohne mindestens einen Kurs zeigt die Seite gar kein Formular, nur einen
+  // Hinweis mit Link zu /admin/kurse. Testkurs deshalb vorab anlegen, gleiches
+  // Muster wie submission-review.spec.ts/marketplace-listing.spec.ts.
+  const course = await createPublishedCourse(admin, tenantId, "Stripe Testprodukt");
+
   // --- Staff: 1,00-€-Testprodukt anlegen (echt über die UI) ---
-  // .first() — "Neues Produkt" ist strukturell die erste ProductForm auf der
-  // Seite (die Produktliste darunter kann weitere, gleich beschriftete
-  // Bearbeiten-Formulare enthalten, siehe admin/zahlungen/page.tsx).
-  await page.goto(tenantUrl("/admin/zahlungen"));
+  // FIX (05.08.2026): Produktverwaltung liegt jetzt unter /admin/produkte,
+  // nicht mehr /admin/zahlungen (das ist seither eine reine Umsatz-
+  // Auswertungsseite ohne Formular) — .first() bleibt, "Neues Produkt" ist
+  // strukturell die erste ProductForm auf der Seite (die Produktliste
+  // darunter kann weitere, gleich beschriftete Bearbeiten-Formulare
+  // enthalten, siehe admin/produkte/page.tsx).
+  await page.goto(tenantUrl("/admin/produkte"));
   await page.getByLabel("Titel").first().fill(title);
   await page.getByLabel(/Slug/).first().fill(slug);
   await page.getByLabel("Preis in Euro").first().fill("1,00");
+  await page.getByLabel("Verknüpfter Kurs").first().selectOption({ label: course.title });
   await page.getByRole("button", { name: "Produkt anlegen" }).click();
   await expect(page.getByText("Gespeichert.")).toBeVisible({ timeout: 15000 });
-
-  const admin = createE2eAdminClient();
-  const tenantId = await getDemoTenantId(admin);
 
   const { data: product, error: productError } = await admin
     .from("products")
@@ -88,7 +98,10 @@ test("Staff legt Testprodukt an, Checkout-Redirect funktioniert, Webhook erzeugt
   let sessionId: string;
   try {
     await buyerPage.goto(tenantUrl(`/kaufen/${slug}`));
-    await buyerPage.getByRole("button", { name: "Kaufen" }).click();
+    // FIX (05.08.2026): Button-Text ist "Zahlungspflichtig bestellen" (deutsche
+    // Button-Lösung-Pflicht, §312j Abs. 3 BGB), nicht "Kaufen" — live per
+    // Browser verifiziert, Redirect zu checkout.stripe.com funktioniert damit.
+    await buyerPage.getByRole("button", { name: "Zahlungspflichtig bestellen" }).click();
     await buyerPage.waitForURL(/checkout\.stripe\.com/, { timeout: 20000 });
 
     const match = buyerPage.url().match(/(cs_[a-zA-Z0-9_]+)/);

@@ -46,7 +46,14 @@ test("Student reicht Text ein, Staff bewertet, Status aktualisiert sich beim Stu
     await expect(studentPage.getByRole("group", { name: "Art der Abgabe" })).toBeVisible();
     await studentPage.getByLabel("Dein Text").fill("Meine E2E-Testabgabe.");
     await studentPage.getByRole("button", { name: "Abgabe einreichen" }).click();
-    await expect(studentPage.getByText("Status: Eingereicht")).toBeVisible({ timeout: 10000 });
+    // FIX (05.08.2026): submission-form.tsx rendert den Status als
+    // role="status"-Badge mit dem reinen Label ("Eingereicht"), kein
+    // "Status: "-Präfix mehr als Text. `getByRole("status", {name})` schlug
+    // trotz sichtbarem Badge fehl (role="status" berechnet den Accessible
+    // Name laut ARIA-accname-Spezifikation NICHT aus dem Text-Inhalt) —
+    // reiner Text-Match statt Rollen-Name-Match. `exact: true` grenzt vom
+    // benachbarten "Eingereicht am …"-Textknoten ab.
+    await expect(studentPage.getByText("Eingereicht", { exact: true })).toBeVisible({ timeout: 10000 });
   } finally {
     await studentContext.close();
   }
@@ -127,7 +134,7 @@ test("Student reicht Text ein, Staff bewertet, Status aktualisiert sich beim Stu
   const verifyPage = await verifyContext.newPage();
   try {
     await verifyPage.goto(tenantUrl(`/kurs/${courseSlug}/l/${lessonId}`));
-    await expect(verifyPage.getByText("Status: Angenommen")).toBeVisible({ timeout: 10000 });
+    await expect(verifyPage.getByText("Angenommen", { exact: true })).toBeVisible({ timeout: 10000 });
   } finally {
     await verifyContext.close();
   }

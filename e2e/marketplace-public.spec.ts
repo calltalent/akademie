@@ -34,8 +34,14 @@ test.describe("Marketplace-Host-Gate (M4)", () => {
     const response = await page.goto(`${MARKETPLACE_URL}/impressum`);
     expect(response?.ok()).toBe(true);
     await expect(page.getByRole("heading", { level: 1, name: "Impressum" })).toBeVisible();
-    await expect(page.getByText("Calltalent Ltd.")).toBeVisible();
-    await expect(page.getByText("16591113")).toBeVisible();
+    // FIX (05.08.2026): "Calltalent Ltd." matcht ohne exact drei Absätze
+    // (Firmenname, Geschäftsführung-Satz, Copyright-Zeile) -> Strict-Mode-
+    // Verstoß. exact:true grenzt auf den alleinstehenden Firmennamen-Absatz ein.
+    await expect(page.getByText("Calltalent Ltd.", { exact: true })).toBeVisible();
+    // "16591113" matcht ohne Eingrenzung ebenfalls zwei Absätze (Company
+    // Number-Zeile UND die Registernummer-Detailzeile) — voller Satz statt
+    // reiner Ziffernfolge.
+    await expect(page.getByText("Company Number: 16591113")).toBeVisible();
   });
 
   test("derselbe Pfad liefert 404 unter einem normalen Mandanten-Host (kein Header-Spoofing)", async ({

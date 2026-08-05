@@ -13,7 +13,10 @@ test.use({ storageState: "e2e/.auth/staff.json" });
 test("Admin-Bereich zeigt die neue gruppierte Sidebar-Navigation", async ({ page }) => {
   await page.goto(tenantUrl("/admin"));
 
-  const nav = page.getByRole("navigation", { name: "Verwaltungs-Navigation" });
+  // `<aside aria-label="Verwaltungs-Navigation">` → ARIA-Rolle "complementary",
+  // NICHT "navigation" (AdminSidebar.tsx: Label sitzt auf <aside>, der innere
+  // <nav> ist unbenannt). Vorbestehender Locator-Fehler, gefunden 05.08.2026.
+  const nav = page.getByRole("complementary", { name: "Verwaltungs-Navigation" });
   await expect(nav).toBeVisible();
   await expect(nav.getByRole("link", { name: "Dashboard" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Kurse" })).toBeVisible();
@@ -32,7 +35,7 @@ test("Admin-Bereich zeigt die neue gruppierte Sidebar-Navigation", async ({ page
 
 test("Von der Akademie-Startseite ist der Admin-Bereich für Staff erreichbar", async ({ page }) => {
   await page.goto(tenantUrl("/"));
-  const nav = page.getByRole("navigation", { name: "Hauptnavigation" });
+  const nav = page.getByRole("complementary", { name: "Hauptnavigation" });
   await nav.getByRole("link", { name: "Admin-Bereich" }).click();
   await expect(page).toHaveURL(/\/admin$/);
 });

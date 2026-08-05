@@ -55,7 +55,16 @@ test.use({ storageState: "e2e/.auth/staff.json" });
 
 test("Tutor beantwortet Frage zum Fachbegriff mit Quelle und lehnt Off-Topic-Frage ab", async ({ page }) => {
   // --- Kurs für KI-Suche einbetten (echt über die UI, kein Direktaufruf der Server Action) ---
+  // FIX (05.08.2026): Kurs-Editor ist seit 25.07.2026 ein 4-Schritte-
+  // Assistent (course-editor-steps.tsx) — "Kurs für KI-Suche einbetten"
+  // sitzt auf Schritt 4 (Veröffentlichung), Direktaufruf ohne ?lesson=-Query
+  // landet auf Schritt 1 (Grunddaten). Gleiches Muster wie
+  // course-completion.spec.ts.
   await page.goto(tenantUrl(`/admin/kurse/${courseId}`));
+  await page.waitForTimeout(1000);
+  await page.getByRole("button", { name: /Weiter zu Informationen/ }).click();
+  await page.getByRole("button", { name: /Weiter zu Inhalt & Struktur/ }).click();
+  await page.getByRole("button", { name: /Weiter zu Veröffentlichung/ }).click();
   await page.getByRole("button", { name: "Kurs für KI-Suche einbetten" }).click();
   await expect(page.getByText(/Lektion\(en\) verarbeitet/)).toBeVisible({ timeout: 30000 });
 
