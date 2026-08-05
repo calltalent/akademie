@@ -46,6 +46,16 @@ import { HtmlBackgroundSync } from "@/components/shell/html-background-sync";
  * Abfrage pro Seitenaufruf, analog zur bereits bestehenden `isStaff`-Prüfung
  * auf Aufrufer-Seite. `.ok` ist bei jedem Fehler/fehlender Anmeldung `false`
  * (fail-closed), zeigt den Link also nie fälschlich an.
+ *
+ * `showCustomerArea` NEU (05.08.2026, "Meine Kunden Area", Plan
+ * verwende-den-planungs-agenten-sequential-frost.md Abschnitt 5) — gleicher
+ * Grund wie oben bei `isPlatformAdmin`: hier statt auf jeder Seite einzeln.
+ * `.select("id").limit(1)` statt `count: "exact"` (Postgres bricht nach der
+ * ersten sichtbaren Zeile ab, günstiger als vollständiges Zählen — Risiko
+ * 8.4 im Plan). Läuft unter RLS (`customer_area_items_member_select`),
+ * respektiert also automatisch auch die Gruppenfilterung — kein
+ * Marketplace-Gast sieht hier je eine Zeile (`member_role()` liefert für
+ * 'guest' `null`, Plan Abschnitt 0.4).
  */
 export async function AppShell({
   children,
@@ -92,14 +102,19 @@ export async function AppShell({
   // pro Seitenaufruf.
   const tenant = await getTenant();
   let customLinks: { id: string; label: string; url: string }[] = [];
+  let showCustomerArea = false;
   if (tenant) {
     const supabase = await createClient();
-    const { data } = await supabase
-      .from("sidebar_links")
-      .select("id, label, url")
-      .eq("tenant_id", tenant.id)
-      .order("position", { ascending: true });
-    customLinks = data ?? [];
+    const [{ data: links }, { data: caRows }] = await Promise.all([
+      supabase
+        .from("sidebar_links")
+        .select("id, label, url")
+        .eq("tenant_id", tenant.id)
+        .order("position", { ascending: true }),
+      supabase.from("customer_area_items").select("id").eq("tenant_id", tenant.id).limit(1),
+    ]);
+    customLinks = links ?? [];
+    showCustomerArea = (caRows?.length ?? 0) > 0;
   }
 
   const topBarUser = { name: userName, email: userEmail, role: t("role") };
@@ -112,6 +127,7 @@ export async function AppShell({
         isStaff={isStaff}
         isPlatformAdmin={platformAccess.ok}
         customLinks={customLinks}
+        showCustomerArea={showCustomerArea}
         user={topBarUser}
         notifications={[]}
         tenantName={tenantName}
@@ -123,6 +139,7 @@ export async function AppShell({
           isStaff={isStaff}
           isPlatformAdmin={platformAccess.ok}
           customLinks={customLinks}
+          showCustomerArea={showCustomerArea}
           tenantName={tenantName}
           logoUrl={logoUrl}
         />

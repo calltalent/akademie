@@ -319,6 +319,7 @@
       "navDashboardLabel": "Moji kursevi",
       "navBookmarksLabel": "Zabilješke",
       "navCatalogLabel": "Katalog kurseva",
+      "navCustomerAreaLabel": "Moja korisnička zona",
       "navLinksLabel": "Linkovi",
       "navAccountLabel": "Nalog",
       "navAdminAreaLabel": "Admin panel",
@@ -395,6 +396,20 @@
       "countLabel": "{count} zabilježaka",
       "doneSuffix": "{done} od {count} završeno",
       "goToCourse": "Idi na kurs"
+    },
+    "customerArea": {
+      "breadcrumb": "Učenje · Moja korisnička zona",
+      "title": "Moja korisnička zona",
+      "bannerEyebrow": "MOJA KORISNIČKA ZONA",
+      "bannerGreeting": "Drago nam je što si ovdje, {name}.",
+      "bannerBody": "Ovdje pronalaziš važne linkove, svoje kontakt osobe i aktuelne ponude.",
+      "linksHeading": "Važni linkovi",
+      "contactsHeading": "Kontakt osobe",
+      "announcementsHeading": "Aktuelne ponude",
+      "emptyAll": "Trenutno ti nije dodijeljen nijedan sadržaj.",
+      "contactPhoneAria": "Pozovi {name}: {phone}",
+      "contactEmailAria": "Pošalji e-mail {name}: {email}",
+      "announcementCtaLabel": "Saznaj više"
     },
     "module": {
       "looseLessonsTitle": "Ostale lekcije",
@@ -913,6 +928,7 @@
       "tabs": {
         "general": "Općenito",
         "content": "Sadržaj",
+        "customerArea": "Korisnička zona",
         "integrations": "Integracije"
       },
       "branding": {
@@ -1047,9 +1063,101 @@
       "roleLabel": "Uloga (opcionalno)",
       "rolePlaceholder": "Trener, kontakt osoba …",
       "bioLabel": "Biografija (opcionalno)",
+      "phoneLabel": "Telefon (opcionalno)",
+      "phonePlaceholder": "+49 30 1234567",
+      "emailLabel": "E-mail (opcionalno)",
+      "emailPlaceholder": "kontakt@calltalent.ai",
       "imageEntityLabel": "Slika trenera",
       "imageEntityFallbackTitle": "Trener",
       "genericError": "Greška."
+    },
+    "customerArea": {
+      "groups": {
+        "heading": "Grupe",
+        "description": "Vlastite grupe za kontrolu vidljivosti linkova, kontakt osoba i objava u korisničkoj zoni — npr. „Tim A“ ili „Premium klijenti“.",
+        "nameLabel": "Naziv",
+        "namePlaceholder": "npr. Tim A",
+        "addButton": "Kreiraj grupu",
+        "addingButton": "Kreira se …",
+        "empty": "Još nisu kreirane grupe.",
+        "memberCount": "{count, plural, one {# član} few {# člana} other {# članova}}",
+        "membersToggle": "Članovi",
+        "noMembers": "Nema pronađenih aktivnih članova.",
+        "saveMembersButton": "Sačuvaj članove"
+      },
+      "links": {
+        "heading": "Linkovi",
+        "description": "Individualni linkovi za tvoje klijente — npr. Drive folder, WhatsApp ili Facebook grupa.",
+        "addButton": "Dodaj link",
+        "empty": "Još nisu kreirani linkovi.",
+        "titleLabel": "Naslov",
+        "titlePlaceholder": "Naš Drive folder",
+        "urlLabel": "URL",
+        "urlPlaceholder": "/kontakt ili https://…",
+        "descriptionLabel": "Opis (opcionalno)",
+        "iconLabel": "Ikona",
+        "moveUpAria": "Link prema gore: {title}",
+        "moveDownAria": "Link prema dolje: {title}",
+        "genericError": "Greška."
+      },
+      "contacts": {
+        "heading": "Kontakt osobe",
+        "description": "Poziva se na postojeće profile trenera/kontakt osoba (kartica „Sadržaj“) i određuje ko ih vidi u korisničkoj zoni.",
+        "addButton": "Dodaj kontakt osobu",
+        "empty": "Još nisu dodijeljene kontakt osobe.",
+        "trainerLabel": "Profil trenera/kontakt osobe",
+        "trainerPlaceholder": "Molimo odaberite …",
+        "noTrainers": "Još nisu kreirani profili trenera. Prvo kreiraj trenera na kartici „Sadržaj“.",
+        "unknownTrainer": "Nepoznat profil",
+        "moveUpAria": "Kontakt osoba prema gore: {name}",
+        "moveDownAria": "Kontakt osoba prema dolje: {name}",
+        "genericError": "Greška."
+      },
+      "announcements": {
+        "heading": "Objave",
+        "description": "Aktuelne ponude i objave za tvoje klijente — naslov, opis, opcionalna slika i link.",
+        "addButton": "Dodaj objavu",
+        "empty": "Još nisu kreirane objave.",
+        "titleLabel": "Naslov",
+        "titlePlaceholder": "Nova ponuda za tebe",
+        "descriptionLabel": "Opis (opcionalno)",
+        "dateLabel": "Datum (opcionalno)",
+        "linkLabel": "Link (opcionalno)",
+        "linkPlaceholder": "/kontakt ili https://…",
+        "imageEntityLabel": "Slika objave",
+        "imageEntityFallbackTitle": "Objava",
+        "moveUpAria": "Objava prema gore: {title}",
+        "moveDownAria": "Objava prema dolje: {title}",
+        "genericError": "Greška."
+      },
+      "icons": {
+        "link": "Link",
+        "folder": "Folder",
+        "video": "Video",
+        "messageCircle": "Chat",
+        "users": "Grupa",
+        "calendar": "Kalendar",
+        "fileText": "Dokument",
+        "globe": "Web stranica",
+        "mail": "E-mail",
+        "phone": "Telefon"
+      },
+      "visibility": {
+        "legend": "Vidljivost",
+        "allOption": "Svi članovi",
+        "restrictedOption": "Samo odabrane grupe ili osobe",
+        "groupsLegend": "Grupe",
+        "peopleLegend": "Osobe",
+        "noGroups": "Još nisu kreirane grupe.",
+        "noMembers": "Nema dostupnih dodatnih članova.",
+        "summaryAll": "Vidljivo svim članovima.",
+        "summaryNone": "Trenutno nije vidljivo nikome.",
+        "summaryPrefix": "Vidljivo za ",
+        "groupsCount": "{count, plural, one {# grupu} few {# grupe} other {# grupa}}",
+        "peopleCount": "{count, plural, one {# osobu} few {# osobe} other {# osoba}}",
+        "summaryJoin": " i ",
+        "summarySuffix": "."
+      }
     },
     "marketplace": {
       "eyebrow": "Sadržaj · Marketplace",

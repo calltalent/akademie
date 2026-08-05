@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { EinstellungenTabs } from "@/components/admin/einstellungen-tabs";
 import type { PromoCardRow, TrainerRow } from "@/lib/settings/actions";
 import { DEFAULT_LOCALE, isSupportedLocale, resolveEnabledLocales } from "@/i18n/config";
+import { toCustomerAreaItemRow, type CustomerAreaGroupRow, type CustomerAreaItemRow, type CustomerAreaTenantMember } from "@/lib/customer-area/schema";
 
 /**
  * Design-Block 6 (13.07.2026, Claude-Design-Export Teil 3,
@@ -58,34 +59,67 @@ export default async function AdminEinstellungenPage() {
   // Mandanten-Admins, die diese Seite genauso sehen).
   const isPlatformAdmin = (await checkPlatformAccess()).ok;
   const supabase = await createClient();
-  const [{ data: apiKeys }, { data: webhooks }, { data: sidebarLinks }, { data: promoCardsRaw }, { data: trainersRaw }] =
-    await Promise.all([
-      supabase
-        .from("api_keys")
-        .select("id, name, last_used, active, created_at")
-        .eq("tenant_id", tenant.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("webhooks")
-        .select("id, url, events, active, created_at")
-        .eq("tenant_id", tenant.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("sidebar_links")
-        .select("id, label, url")
-        .eq("tenant_id", tenant.id)
-        .order("position", { ascending: true }),
-      supabase
-        .from("promo_cards")
-        .select("id, title, description, media_kind, image_url, bunny_video_id, link_url")
-        .eq("tenant_id", tenant.id)
-        .order("position", { ascending: true }),
-      supabase
-        .from("trainers")
-        .select("id, name, role, bio, image_url")
-        .eq("tenant_id", tenant.id)
-        .order("position", { ascending: true }),
-    ]);
+  const [
+    { data: apiKeys },
+    { data: webhooks },
+    { data: sidebarLinks },
+    { data: promoCardsRaw },
+    { data: trainersRaw },
+    { data: customerAreaGroupsRaw },
+    { data: customerAreaGroupMembersRaw },
+    { data: customerAreaItemsRaw },
+    { data: customerAreaAudienceRaw },
+    { data: membershipsRaw },
+  ] = await Promise.all([
+    supabase
+      .from("api_keys")
+      .select("id, name, last_used, active, created_at")
+      .eq("tenant_id", tenant.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("webhooks")
+      .select("id, url, events, active, created_at")
+      .eq("tenant_id", tenant.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("sidebar_links")
+      .select("id, label, url")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: true }),
+    supabase
+      .from("promo_cards")
+      .select("id, title, description, media_kind, image_url, bunny_video_id, link_url")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: true }),
+    supabase
+      .from("trainers")
+      .select("id, name, role, bio, image_url, phone, email")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: true }),
+    // "Meine Kunden Area" (05.08.2026, Plan
+    // verwende-den-planungs-agenten-sequential-frost.md, Abschnitt 3) — vier
+    // neue Abfragen + memberships(profiles) für die Personenauswahl im
+    // Sichtbarkeits-Baustein (gleiches Muster wie admin/teilnehmer/page.tsx:
+    // `profiles(email, full_name)` embedded, gefiltert auf `status='active'`).
+    supabase
+      .from("customer_area_groups")
+      .select("id, name")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: true }),
+    supabase.from("customer_area_group_members").select("group_id, user_id").eq("tenant_id", tenant.id),
+    supabase
+      .from("customer_area_items")
+      .select("id, kind, title, description, url, image_url, icon, item_date, trainer_id, visibility, position")
+      .eq("tenant_id", tenant.id)
+      .order("kind", { ascending: true })
+      .order("position", { ascending: true }),
+    supabase.from("customer_area_item_audience").select("item_id, group_id, user_id").eq("tenant_id", tenant.id),
+    supabase
+      .from("memberships")
+      .select("user_id, status, profiles(email, full_name)")
+      .eq("tenant_id", tenant.id)
+      .eq("status", "active"),
+  ]);
 
   const promoCards: PromoCardRow[] = (promoCardsRaw ?? []).map((c) => ({
     id: c.id,
@@ -103,7 +137,37 @@ export default async function AdminEinstellungenPage() {
     role: t.role,
     bio: t.bio,
     imageUrl: t.image_url,
+    phone: t.phone,
+    email: t.email,
   }));
+
+  // "Meine Kunden Area" — Gruppen tragen ihre Mitglieder eingebettet
+  // (`memberUserIds`), Items ihre Sichtbarkeits-Zuordnung (`groupIds`/
+  // `userIds`) — kein separates Prop für die Rohzeilen, siehe Plan
+  // Abschnitt 3 ("vier neue Props").
+  const customerAreaGroups: CustomerAreaGroupRow[] = (customerAreaGroupsRaw ?? []).map((g) => ({
+    id: g.id,
+    name: g.name,
+    memberUserIds: (customerAreaGroupMembersRaw ?? []).filter((m) => m.group_id === g.id).map((m) => m.user_id),
+  }));
+
+  const customerAreaItems: CustomerAreaItemRow[] = (customerAreaItemsRaw ?? []).map((row) =>
+    toCustomerAreaItemRow(
+      row,
+      (customerAreaAudienceRaw ?? []).filter((a) => a.item_id === row.id),
+    ),
+  );
+
+  // `profiles` kommt als eingebettete n:1-Relation zurück — postgrest-js
+  // typisiert das generisch als Array, liefert zur Laufzeit aber ein
+  // Objekt (gleicher Fallstrick wie in admin/teilnehmer/page.tsx).
+  const tenantMembers: CustomerAreaTenantMember[] = (membershipsRaw ?? [])
+    .map((m) => {
+      const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+      if (!profile?.email) return null;
+      return { userId: m.user_id, email: profile.email, fullName: profile.full_name ?? null };
+    })
+    .filter((m): m is CustomerAreaTenantMember => m !== null);
 
   const branding = tenant.branding;
 
@@ -143,6 +207,9 @@ export default async function AdminEinstellungenPage() {
         sidebarLinks={sidebarLinks ?? []}
         promoCards={promoCards}
         trainers={trainers}
+        customerAreaGroups={customerAreaGroups}
+        customerAreaItems={customerAreaItems}
+        tenantMembers={tenantMembers}
         apiKeys={apiKeys ?? []}
         webhooks={(webhooks ?? []) as { id: string; url: string; events: string[]; active: boolean; created_at: string }[]}
         enabledLocales={enabledLocales}

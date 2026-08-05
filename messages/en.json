@@ -319,6 +319,7 @@
       "navDashboardLabel": "My courses",
       "navBookmarksLabel": "Bookmarks",
       "navCatalogLabel": "Course catalog",
+      "navCustomerAreaLabel": "My customer area",
       "navLinksLabel": "Links",
       "navAccountLabel": "Account",
       "navAdminAreaLabel": "Admin area",
@@ -395,6 +396,20 @@
       "countLabel": "{count} bookmarks",
       "doneSuffix": "{done} of {count} done",
       "goToCourse": "Go to course"
+    },
+    "customerArea": {
+      "breadcrumb": "Learn · My customer area",
+      "title": "My customer area",
+      "bannerEyebrow": "MY CUSTOMER AREA",
+      "bannerGreeting": "Great to have you here, {name}.",
+      "bannerBody": "Here you'll find important links, your contacts, and current offers.",
+      "linksHeading": "Important links",
+      "contactsHeading": "Contacts",
+      "announcementsHeading": "Current offers",
+      "emptyAll": "No content has been shared with you yet.",
+      "contactPhoneAria": "Call {name}: {phone}",
+      "contactEmailAria": "Email {name}: {email}",
+      "announcementCtaLabel": "Learn more"
     },
     "module": {
       "looseLessonsTitle": "More lessons",
@@ -913,6 +928,7 @@
       "tabs": {
         "general": "General",
         "content": "Content",
+        "customerArea": "Customer area",
         "integrations": "Integrations"
       },
       "branding": {
@@ -1047,9 +1063,101 @@
       "roleLabel": "Role (optional)",
       "rolePlaceholder": "Trainer, contact person …",
       "bioLabel": "Bio (optional)",
+      "phoneLabel": "Phone (optional)",
+      "phonePlaceholder": "+49 30 1234567",
+      "emailLabel": "Email (optional)",
+      "emailPlaceholder": "contact@calltalent.ai",
       "imageEntityLabel": "Trainer image",
       "imageEntityFallbackTitle": "Trainer",
       "genericError": "Error."
+    },
+    "customerArea": {
+      "groups": {
+        "heading": "Groups",
+        "description": "Your own groups for controlling visibility of links, contacts, and announcements in the customer area — e.g. \"Team A\" or \"Premium customers\".",
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. Team A",
+        "addButton": "Create group",
+        "addingButton": "Creating …",
+        "empty": "No groups created yet.",
+        "memberCount": "{count, plural, one {# member} other {# members}}",
+        "membersToggle": "Members",
+        "noMembers": "No active members found.",
+        "saveMembersButton": "Save members"
+      },
+      "links": {
+        "heading": "Links",
+        "description": "Individual links for your customers — e.g. a Drive folder, a WhatsApp or Facebook group.",
+        "addButton": "Add link",
+        "empty": "No links created yet.",
+        "titleLabel": "Title",
+        "titlePlaceholder": "Our Drive folder",
+        "urlLabel": "URL",
+        "urlPlaceholder": "/contact or https://…",
+        "descriptionLabel": "Description (optional)",
+        "iconLabel": "Icon",
+        "moveUpAria": "Move link up: {title}",
+        "moveDownAria": "Move link down: {title}",
+        "genericError": "Error."
+      },
+      "contacts": {
+        "heading": "Contacts",
+        "description": "References existing trainer/contact profiles (\"Content\" tab) and sets who sees them in the customer area.",
+        "addButton": "Add contact",
+        "empty": "No contacts assigned yet.",
+        "trainerLabel": "Trainer/contact profile",
+        "trainerPlaceholder": "Please select …",
+        "noTrainers": "No trainer profiles created yet. Create one in the \"Content\" tab first.",
+        "unknownTrainer": "Unknown profile",
+        "moveUpAria": "Move contact up: {name}",
+        "moveDownAria": "Move contact down: {name}",
+        "genericError": "Error."
+      },
+      "announcements": {
+        "heading": "Announcements",
+        "description": "Current offers and announcements for your customers — title, description, optional image and link.",
+        "addButton": "Add announcement",
+        "empty": "No announcements created yet.",
+        "titleLabel": "Title",
+        "titlePlaceholder": "New offer for you",
+        "descriptionLabel": "Description (optional)",
+        "dateLabel": "Date (optional)",
+        "linkLabel": "Link (optional)",
+        "linkPlaceholder": "/contact or https://…",
+        "imageEntityLabel": "Announcement image",
+        "imageEntityFallbackTitle": "Announcement",
+        "moveUpAria": "Move announcement up: {title}",
+        "moveDownAria": "Move announcement down: {title}",
+        "genericError": "Error."
+      },
+      "icons": {
+        "link": "Link",
+        "folder": "Folder",
+        "video": "Video",
+        "messageCircle": "Chat",
+        "users": "Group",
+        "calendar": "Calendar",
+        "fileText": "Document",
+        "globe": "Website",
+        "mail": "Email",
+        "phone": "Phone"
+      },
+      "visibility": {
+        "legend": "Visibility",
+        "allOption": "All members",
+        "restrictedOption": "Only selected groups or people",
+        "groupsLegend": "Groups",
+        "peopleLegend": "People",
+        "noGroups": "No groups created yet.",
+        "noMembers": "No further members available.",
+        "summaryAll": "Visible to all members.",
+        "summaryNone": "Currently not visible to anyone.",
+        "summaryPrefix": "Visible to ",
+        "groupsCount": "{count, plural, one {# group} other {# groups}}",
+        "peopleCount": "{count, plural, one {# person} other {# people}}",
+        "summaryJoin": " and ",
+        "summarySuffix": "."
+      }
     },
     "marketplace": {
       "eyebrow": "Content · Marketplace",

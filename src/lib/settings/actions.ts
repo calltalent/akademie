@@ -9,6 +9,12 @@ import { webhookEventSchema } from "@/lib/webhooks/dispatch";
 import { assertSafeWebhookUrl } from "@/lib/webhooks/url-safety";
 import { translateDbError } from "@/lib/errors/db";
 import { genericErrorMessage } from "@/lib/errors/generic";
+import { trainerSchema, type TrainerInput } from "@/lib/settings/schema";
+// KEIN `export type { TrainerInput }` hier: ein Typ-Re-Export in einer
+// "use server"-Datei bricht zur Laufzeit ("ReferenceError: TrainerInput is
+// not defined", Turbopack-Server-Actions-Codegen behandelt re-exportierte
+// Importe anders als lokal deklarierte Typen wie `TrainerRow` unten).
+// Aufrufer importieren `TrainerInput` direkt aus `@/lib/settings/schema`.
 
 /**
  * Phase 3, Block 7 — Server Actions für `/admin/einstellungen`
@@ -461,21 +467,25 @@ export async function movePromoCard(id: string, direction: "up" | "down"): Promi
 // Anlegen, Auf/Ab statt Drag-and-Drop (CLAUDE.md §3.4), kein Rate-Limit
 // (reine Konfigurationsdaten, gleiche Einstufung wie Positionen/Sidebar-
 // Links).
-const trainerSchema = z.object({
-  name: z.string().trim().min(1, "Name erforderlich.").max(150),
-  role: z.string().trim().max(150).optional(),
-  bio: z.string().trim().max(2000).optional(),
-  imageUrl: z.string().trim().url("Ungültige Bild-URL.").optional(),
-});
-
-export type TrainerInput = z.infer<typeof trainerSchema>;
-
+//
+// `trainerSchema`/`TrainerInput` NEU ausgelagert nach `settings/schema.ts`
+// (05.08.2026, "Meine Kunden Area") — eine `"use server"`-Datei darf laut
+// Next.js ausschließlich async Server Actions exportieren, kein zod-Schema
+// als Laufzeitwert; siehe Kopfkommentar dort. `phone`/`email` NEU (gleicher
+// Auftrag, Migration 20260805090000_customer_area.sql): Kunden-Area-
+// Ansprechpartner (customer_area_items, kind='contact') zeigen diese Felder
+// zusätzlich. Der Kurs-Informations-Tab bleibt unverändert — er zeigt
+// weiterhin nur Bild/Name/Rolle/Bio, phone/email werden dort NICHT
+// angezeigt (Variante-A-Entscheidung, siehe PHASENSTATUS.md/
+// Entscheidungs-Log.md).
 export type TrainerRow = {
   id: string;
   name: string;
   role: string | null;
   bio: string | null;
   imageUrl: string | null;
+  phone: string | null;
+  email: string | null;
 };
 
 type TrainerResult = { ok: true; trainer: TrainerRow } | { ok: false; error: string };
@@ -486,6 +496,8 @@ function toTrainerRow(row: {
   role: string | null;
   bio: string | null;
   image_url: string | null;
+  phone: string | null;
+  email: string | null;
 }): TrainerRow {
   return {
     id: row.id,
@@ -493,6 +505,8 @@ function toTrainerRow(row: {
     role: row.role,
     bio: row.bio,
     imageUrl: row.image_url,
+    phone: row.phone,
+    email: row.email,
   };
 }
 
@@ -517,9 +531,11 @@ export async function createTrainer(input: TrainerInput): Promise<TrainerResult>
         role: parsed.data.role ?? null,
         bio: parsed.data.bio ?? null,
         image_url: parsed.data.imageUrl ?? null,
+        phone: parsed.data.phone ?? null,
+        email: parsed.data.email ?? null,
         position: count ?? 0,
       })
-      .select("id, name, role, bio, image_url")
+      .select("id, name, role, bio, image_url, phone, email")
       .single();
     if (error || !data) return { ok: false, error: error ? translateDbError(error) : "Anlegen fehlgeschlagen." };
 
@@ -545,10 +561,12 @@ export async function updateTrainer(id: string, input: TrainerInput): Promise<Tr
         role: parsed.data.role ?? null,
         bio: parsed.data.bio ?? null,
         image_url: parsed.data.imageUrl ?? null,
+        phone: parsed.data.phone ?? null,
+        email: parsed.data.email ?? null,
       })
       .eq("id", id)
       .eq("tenant_id", tenant.id)
-      .select("id, name, role, bio, image_url")
+      .select("id, name, role, bio, image_url, phone, email")
       .single();
     if (error || !data) return { ok: false, error: error ? translateDbError(error) : "Speichern fehlgeschlagen." };
 

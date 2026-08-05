@@ -33,6 +33,7 @@ export function LearnMobileNav({
   isStaff = false,
   isPlatformAdmin = false,
   customLinks = [],
+  showCustomerArea = false,
   user,
   notifications = [],
   tenantName = "Calltalent",
@@ -41,6 +42,8 @@ export function LearnMobileNav({
   isStaff?: boolean;
   isPlatformAdmin?: boolean;
   customLinks?: SidebarLink[];
+  /** Siehe Sidebar.tsx-Kopfkommentar — unverändert an `<Sidebar variant="panel">` durchgereicht, keine zweite Datenquelle. */
+  showCustomerArea?: boolean;
   user: TopBarUser;
   notifications?: NotificationItem[];
   tenantName?: string;
@@ -129,6 +132,7 @@ export function LearnMobileNav({
             isStaff={isStaff}
             isPlatformAdmin={isPlatformAdmin}
             customLinks={customLinks}
+            showCustomerArea={showCustomerArea}
             tenantName={tenantName}
             logoUrl={logoUrl}
           />

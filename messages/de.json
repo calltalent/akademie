@@ -319,6 +319,7 @@
       "navDashboardLabel": "Meine Kurse",
       "navBookmarksLabel": "Lesezeichen",
       "navCatalogLabel": "Kurskatalog",
+      "navCustomerAreaLabel": "Meine Kunden Area",
       "navLinksLabel": "Links",
       "navAccountLabel": "Konto",
       "navAdminAreaLabel": "Admin-Bereich",
@@ -395,6 +396,20 @@
       "countLabel": "{count} Lesezeichen",
       "doneSuffix": "{done} von {count} erledigt",
       "goToCourse": "Zum Kurs"
+    },
+    "customerArea": {
+      "breadcrumb": "Lernen · Meine Kunden Area",
+      "title": "Meine Kunden Area",
+      "bannerEyebrow": "MEINE KUNDEN AREA",
+      "bannerGreeting": "Schön, dass du da bist, {name}.",
+      "bannerBody": "Hier findest du wichtige Links, deine Ansprechpartner und aktuelle Angebote.",
+      "linksHeading": "Wichtige Links",
+      "contactsHeading": "Ansprechpartner",
+      "announcementsHeading": "Aktuelle Angebote",
+      "emptyAll": "Für dich sind aktuell keine Inhalte freigeschaltet.",
+      "contactPhoneAria": "{name} anrufen: {phone}",
+      "contactEmailAria": "E-Mail an {name} schreiben: {email}",
+      "announcementCtaLabel": "Mehr erfahren"
     },
     "module": {
       "looseLessonsTitle": "Weitere Lektionen",
@@ -913,6 +928,7 @@
       "tabs": {
         "general": "Allgemein",
         "content": "Inhalte",
+        "customerArea": "Kunden-Area",
         "integrations": "Integrationen"
       },
       "branding": {
@@ -1047,9 +1063,101 @@
       "roleLabel": "Rolle (optional)",
       "rolePlaceholder": "Trainer, Ansprechpartner …",
       "bioLabel": "Bio (optional)",
+      "phoneLabel": "Telefon (optional)",
+      "phonePlaceholder": "+49 30 1234567",
+      "emailLabel": "E-Mail (optional)",
+      "emailPlaceholder": "kontakt@calltalent.ai",
       "imageEntityLabel": "Trainerbild",
       "imageEntityFallbackTitle": "Trainer",
       "genericError": "Fehler."
+    },
+    "customerArea": {
+      "groups": {
+        "heading": "Gruppen",
+        "description": "Eigene Gruppen für die Sichtbarkeit von Links, Ansprechpartnern und Ankündigungen in der Kunden Area — z. B. „Team A“ oder „Premium-Kunden“.",
+        "nameLabel": "Name",
+        "namePlaceholder": "z. B. Team A",
+        "addButton": "Gruppe anlegen",
+        "addingButton": "Wird angelegt …",
+        "empty": "Noch keine Gruppen angelegt.",
+        "memberCount": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+        "membersToggle": "Mitglieder",
+        "noMembers": "Keine aktiven Mitglieder gefunden.",
+        "saveMembersButton": "Mitglieder speichern"
+      },
+      "links": {
+        "heading": "Links",
+        "description": "Individuelle Links für deine Kunden — z. B. Drive-Ordner, WhatsApp- oder Facebook-Gruppen.",
+        "addButton": "Link hinzufügen",
+        "empty": "Noch keine Links angelegt.",
+        "titleLabel": "Titel",
+        "titlePlaceholder": "Unser Drive-Ordner",
+        "urlLabel": "URL",
+        "urlPlaceholder": "/kontakt oder https://…",
+        "descriptionLabel": "Beschreibung (optional)",
+        "iconLabel": "Icon",
+        "moveUpAria": "Link nach oben: {title}",
+        "moveDownAria": "Link nach unten: {title}",
+        "genericError": "Fehler."
+      },
+      "contacts": {
+        "heading": "Ansprechpartner",
+        "description": "Verweist auf vorhandene Trainer-/Ansprechperson-Profile (Reiter „Inhalte“) und legt fest, wer sie in der Kunden Area sieht.",
+        "addButton": "Ansprechpartner hinzufügen",
+        "empty": "Noch keine Ansprechpartner zugeordnet.",
+        "trainerLabel": "Trainer-/Ansprechperson-Profil",
+        "trainerPlaceholder": "Bitte auswählen …",
+        "noTrainers": "Noch keine Trainer-Profile angelegt. Lege zuerst im Reiter „Inhalte“ einen Trainer an.",
+        "unknownTrainer": "Unbekanntes Profil",
+        "moveUpAria": "Ansprechpartner nach oben: {name}",
+        "moveDownAria": "Ansprechpartner nach unten: {name}",
+        "genericError": "Fehler."
+      },
+      "announcements": {
+        "heading": "Ankündigungen",
+        "description": "Aktuelle Angebote und Ankündigungen für deine Kunden — Titel, Beschreibung, optionales Bild und Link.",
+        "addButton": "Ankündigung hinzufügen",
+        "empty": "Noch keine Ankündigungen angelegt.",
+        "titleLabel": "Titel",
+        "titlePlaceholder": "Neues Angebot für dich",
+        "descriptionLabel": "Beschreibung (optional)",
+        "dateLabel": "Datum (optional)",
+        "linkLabel": "Link (optional)",
+        "linkPlaceholder": "/kontakt oder https://…",
+        "imageEntityLabel": "Ankündigungsbild",
+        "imageEntityFallbackTitle": "Ankündigung",
+        "moveUpAria": "Ankündigung nach oben: {title}",
+        "moveDownAria": "Ankündigung nach unten: {title}",
+        "genericError": "Fehler."
+      },
+      "icons": {
+        "link": "Link",
+        "folder": "Ordner",
+        "video": "Video",
+        "messageCircle": "Chat",
+        "users": "Gruppe",
+        "calendar": "Kalender",
+        "fileText": "Dokument",
+        "globe": "Website",
+        "mail": "E-Mail",
+        "phone": "Telefon"
+      },
+      "visibility": {
+        "legend": "Sichtbarkeit",
+        "allOption": "Alle Mitglieder",
+        "restrictedOption": "Nur ausgewählte Gruppen oder Personen",
+        "groupsLegend": "Gruppen",
+        "peopleLegend": "Personen",
+        "noGroups": "Noch keine Gruppen angelegt.",
+        "noMembers": "Keine weiteren Mitglieder verfügbar.",
+        "summaryAll": "Sichtbar für alle Mitglieder.",
+        "summaryNone": "Aktuell für niemanden sichtbar.",
+        "summaryPrefix": "Sichtbar für ",
+        "groupsCount": "{count, plural, one {# Gruppe} other {# Gruppen}}",
+        "peopleCount": "{count, plural, one {# Person} other {# Personen}}",
+        "summaryJoin": " und ",
+        "summarySuffix": "."
+      }
     },
     "marketplace": {
       "eyebrow": "Inhalte · Marketplace",

@@ -4,51 +4,51 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ChevronUp, ChevronDown, User as UserIcon } from "lucide-react";
-import {
-  createTrainer,
-  updateTrainer,
-  deleteTrainer,
-  moveTrainer,
-  type TrainerRow,
-} from "@/lib/settings/actions";
-import type { TrainerInput } from "@/lib/settings/schema";
-import { ThumbnailUpload } from "@/components/admin/thumbnail-upload";
+import { createCustomerAreaItem, updateCustomerAreaItem, deleteCustomerAreaItem, moveCustomerAreaItem } from "@/lib/customer-area/actions";
+import type { CustomerAreaItemInput, CustomerAreaItemRow } from "@/lib/customer-area/schema";
+import type { CustomerAreaGroupRow, CustomerAreaTenantMember, CustomerAreaVisibility } from "@/lib/customer-area/schema";
+import type { TrainerRow } from "@/lib/settings/actions";
+import { CustomerAreaVisibilityField } from "@/components/admin/customer-area-visibility-field";
 
 type SubmitResult = { ok: boolean; error?: string };
 
 /**
- * Trainer-/Ansprechperson-Profile für den Informations-Tab der Kurse
- * (Josips Auftrag, 24.07.2026 — Informations-Tab nach Baulig-Vorbild,
- * Migration 20260724130000_course_information.sql). Wiederverwendbares
- * Profil (Bild + Name + optional Rolle/Bio), im Kurs-Editor pro Kurs als
- * "Autor" auswählbar (course-info-editor.tsx). Strukturell 1:1 nach Vorbild
- * `promo-cards-panel.tsx`: Karte mit Anlegen-Formular oben, Liste darunter
- * mit Bearbeiten/Löschen/Auf-Ab — bewusst kein Drag-and-Drop (CLAUDE.md
- * §3.4).
- *
- * Bild-Upload nutzt `ThumbnailUpload` unverändert — `onUpload` schreibt nur
- * in lokalen State statt sofort zu persistieren, weil beim Anlegen noch
- * keine `trainers`-Zeile existiert; gespeichert wird erst beim
- * Formular-Submit zusammen mit Name/Rolle/Bio.
- *
- * Optik (25.07.2026, Josips Auftrag "Inhalte ... vom Stil her anpassen"):
- * Inputs/Zeilen/Buttons nutzten generisches Tailwind-Grau statt der
- * Design-Tokens der übrigen Karte. Reine Optik, keine Logikänderung.
+ * Ansprechpartner-Panel für "Meine Kunden Area" (Plan Abschnitt 3,
+ * verwende-den-planungs-agenten-sequential-frost.md) — verweist auf
+ * vorhandene Trainer-/Ansprechperson-Profile (Reiter "Inhalte",
+ * `trainer-profile-panel.tsx`) statt eigene Profile anzulegen (Plan
+ * Abschnitt 0.2: `trainers` bleibt der Datenpool). Eine Zeile hier bindet
+ * ein Trainerprofil per `trainer_id` an die Kunden-Area und legt zusätzlich
+ * die Sichtbarkeit fest — Name/Bild/Rolle/Telefon/E-Mail kommen unverändert
+ * aus `trainers`.
  */
-export function TrainerProfilePanel({ trainers }: { trainers: TrainerRow[] }) {
-  const t = useTranslations("admin.trainers");
+export function CustomerAreaContactsPanel({
+  items,
+  trainers,
+  groups,
+  tenantMembers,
+}: {
+  items: CustomerAreaItemRow[];
+  trainers: TrainerRow[];
+  groups: CustomerAreaGroupRow[];
+  tenantMembers: CustomerAreaTenantMember[];
+}) {
+  const t = useTranslations("admin.customerArea.contacts");
   const router = useRouter();
 
-  async function handleCreate(input: TrainerInput): Promise<SubmitResult> {
-    const result = await createTrainer(input);
+  async function handleCreate(input: CustomerAreaItemInput): Promise<SubmitResult> {
+    const result = await createCustomerAreaItem(input);
     if (!result.ok) return { ok: false, error: result.error };
     router.refresh();
     return { ok: true };
   }
 
   function handleDelete(id: string) {
-    deleteTrainer(id).then(() => router.refresh());
+    deleteCustomerAreaItem(id).then(() => router.refresh());
   }
+
+  const availableTrainerIds = new Set(items.map((i) => i.trainerId).filter(Boolean));
+  const selectableTrainers = trainers.filter((tr) => !availableTrainerIds.has(tr.id));
 
   return (
     <section className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
@@ -57,19 +57,35 @@ export function TrainerProfilePanel({ trainers }: { trainers: TrainerRow[] }) {
         {t("description")}
       </div>
 
-      <TrainerForm onSubmit={handleCreate} submitLabel={t("addButton")} />
+      {trainers.length === 0 ? (
+        <p className="text-sm" style={{ color: "#A9AAC4" }}>
+          {t("noTrainers")}
+        </p>
+      ) : (
+        <CustomerAreaContactForm
+          trainers={selectableTrainers}
+          groups={groups}
+          tenantMembers={tenantMembers}
+          onSubmit={handleCreate}
+          submitLabel={t("addButton")}
+        />
+      )}
 
       <ul className="mt-4 flex flex-col gap-2">
-        {trainers.map((trainer, index) => (
-          <TrainerRowItem
-            key={trainer.id}
-            trainer={trainer}
+        {items.map((item, index) => (
+          <CustomerAreaContactRowItem
+            key={item.id}
+            item={item}
+            trainer={trainers.find((tr) => tr.id === item.trainerId) ?? null}
+            selectableTrainers={selectableTrainers}
+            groups={groups}
+            tenantMembers={tenantMembers}
             onDelete={handleDelete}
             isFirst={index === 0}
-            isLast={index === trainers.length - 1}
+            isLast={index === items.length - 1}
           />
         ))}
-        {trainers.length === 0 && (
+        {items.length === 0 && (
           <p className="text-sm" style={{ color: "#A9AAC4" }}>
             {t("empty")}
           </p>
@@ -79,18 +95,26 @@ export function TrainerProfilePanel({ trainers }: { trainers: TrainerRow[] }) {
   );
 }
 
-function TrainerRowItem({
+function CustomerAreaContactRowItem({
+  item,
   trainer,
+  selectableTrainers,
+  groups,
+  tenantMembers,
   onDelete,
   isFirst,
   isLast,
 }: {
-  trainer: TrainerRow;
+  item: CustomerAreaItemRow;
+  trainer: TrainerRow | null;
+  selectableTrainers: TrainerRow[];
+  groups: CustomerAreaGroupRow[];
+  tenantMembers: CustomerAreaTenantMember[];
   onDelete: (id: string) => void;
   isFirst: boolean;
   isLast: boolean;
 }) {
-  const t = useTranslations("admin.trainers");
+  const t = useTranslations("admin.customerArea.contacts");
   const tSettings = useTranslations("admin.settings");
   const tCommon = useTranslations("common");
   const tPosition = useTranslations("admin.courseEditor.position");
@@ -100,23 +124,31 @@ function TrainerRowItem({
 
   function handleMove(direction: "up" | "down") {
     startMoving(async () => {
-      await moveTrainer(trainer.id, direction);
+      await moveCustomerAreaItem(item.id, direction);
       router.refresh();
     });
   }
 
-  async function handleUpdate(input: TrainerInput): Promise<SubmitResult> {
-    const result = await updateTrainer(trainer.id, input);
+  async function handleUpdate(input: CustomerAreaItemInput): Promise<SubmitResult> {
+    const result = await updateCustomerAreaItem(item.id, input);
     if (!result.ok) return { ok: false, error: result.error };
     router.refresh();
     return { ok: true };
   }
 
+  // Beim Bearbeiten darf das aktuell zugeordnete Trainerprofil weiterhin
+  // ausgewählt sein, auch wenn es sonst schon "vergeben" ist (nur EIN
+  // Kunden-Area-Kontakt je Trainer, siehe `availableTrainerIds` oben).
+  const editableTrainers = trainer ? [trainer, ...selectableTrainers] : selectableTrainers;
+
   if (editing) {
     return (
       <li className="rounded-[10px] border px-4 py-3" style={{ borderColor: "#E7E8F2" }}>
-        <TrainerForm
-          initial={trainer}
+        <CustomerAreaContactForm
+          trainers={editableTrainers}
+          groups={groups}
+          tenantMembers={tenantMembers}
+          initial={item}
           onSubmit={handleUpdate}
           submitLabel={tCommon("save")}
           onCancel={() => setEditing(false)}
@@ -131,7 +163,7 @@ function TrainerRowItem({
       style={{ borderColor: "#E7E8F2" }}
     >
       <div className="flex min-w-0 items-center gap-3">
-        {trainer.imageUrl ? (
+        {trainer?.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- Storage-URL, kein next/image-Loader konfiguriert
           <img src={trainer.imageUrl} alt="" className="h-10 w-10 flex-none rounded-full object-cover" />
         ) : (
@@ -143,8 +175,8 @@ function TrainerRowItem({
           </span>
         )}
         <div className="flex min-w-0 flex-col">
-          <span className="truncate font-semibold">{trainer.name}</span>
-          {trainer.role && (
+          <span className="truncate font-semibold">{trainer?.name ?? t("unknownTrainer")}</span>
+          {trainer?.role && (
             <span className="truncate text-sm" style={{ color: "#66679B" }}>
               {trainer.role}
             </span>
@@ -154,7 +186,7 @@ function TrainerRowItem({
       <div className="flex flex-none gap-2">
         <button
           type="button"
-          aria-label={t("moveUpAria", { name: trainer.name })}
+          aria-label={t("moveUpAria", { name: trainer?.name ?? "" })}
           title={tPosition("moveUpTitle")}
           onClick={() => handleMove("up")}
           disabled={moving || isFirst}
@@ -165,7 +197,7 @@ function TrainerRowItem({
         </button>
         <button
           type="button"
-          aria-label={t("moveDownAria", { name: trainer.name })}
+          aria-label={t("moveDownAria", { name: trainer?.name ?? "" })}
           title={tPosition("moveDownTitle")}
           onClick={() => handleMove("down")}
           disabled={moving || isLast}
@@ -185,7 +217,7 @@ function TrainerRowItem({
         </button>
         <button
           type="button"
-          onClick={() => onDelete(trainer.id)}
+          onClick={() => onDelete(item.id)}
           disabled={moving}
           className="rounded-[9px] border bg-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
           style={{ borderColor: "#E9CFCF", color: "#B14A4A" }}
@@ -197,26 +229,30 @@ function TrainerRowItem({
   );
 }
 
-function TrainerForm({
+function CustomerAreaContactForm({
   initial,
+  trainers,
+  groups,
+  tenantMembers,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
-  initial?: TrainerRow;
+  initial?: CustomerAreaItemRow;
+  trainers: TrainerRow[];
+  groups: CustomerAreaGroupRow[];
+  tenantMembers: CustomerAreaTenantMember[];
   submitLabel: string;
-  onSubmit: (input: TrainerInput) => Promise<SubmitResult>;
+  onSubmit: (input: CustomerAreaItemInput) => Promise<SubmitResult>;
   onCancel?: () => void;
 }) {
-  const t = useTranslations("admin.trainers");
+  const t = useTranslations("admin.customerArea.contacts");
   const tAdminCommon = useTranslations("admin.common");
   const tCommon = useTranslations("common");
-  const [name, setName] = useState(initial?.name ?? "");
-  const [role, setRole] = useState(initial?.role ?? "");
-  const [bio, setBio] = useState(initial?.bio ?? "");
-  const [imageUrl, setImageUrl] = useState<string | null>(initial?.imageUrl ?? null);
-  const [phone, setPhone] = useState(initial?.phone ?? "");
-  const [email, setEmail] = useState(initial?.email ?? "");
+  const [trainerId, setTrainerId] = useState(initial?.trainerId ?? "");
+  const [visibility, setVisibility] = useState<CustomerAreaVisibility>(initial?.visibility ?? "all");
+  const [groupIds, setGroupIds] = useState<string[]>(initial?.groupIds ?? []);
+  const [userIds, setUserIds] = useState<string[]>(initial?.userIds ?? []);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -225,25 +261,21 @@ function TrainerForm({
     setError(null);
     startTransition(async () => {
       const result = await onSubmit({
-        name,
-        role: role.trim() || undefined,
-        bio: bio.trim() || undefined,
-        imageUrl: imageUrl ?? undefined,
-        phone: phone.trim() || undefined,
-        email: email.trim() || undefined,
+        kind: "contact",
+        trainerId: trainerId || undefined,
+        visibility,
+        groupIds,
+        userIds,
       });
       if (!result.ok) {
         setError(result.error ?? t("genericError"));
         return;
       }
       if (!initial) {
-        // Anlegen-Formular: Felder für das nächste Profil zurücksetzen.
-        setName("");
-        setRole("");
-        setBio("");
-        setImageUrl(null);
-        setPhone("");
-        setEmail("");
+        setTrainerId("");
+        setVisibility("all");
+        setGroupIds([]);
+        setUserIds([]);
       } else {
         onCancel?.();
       }
@@ -252,83 +284,36 @@ function TrainerForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <div className="flex items-start gap-3">
-        <ThumbnailUpload
-          initialUrl={imageUrl}
-          entityLabel={t("imageEntityLabel")}
-          entityTitle={name || t("imageEntityFallbackTitle")}
-          onUpload={async (url) => {
-            setImageUrl(url);
-            return { error: null };
-          }}
-        />
-        <div className="flex flex-1 flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-            {t("nameLabel")}
-            <input
-              type="text"
-              required
-              maxLength={150}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("namePlaceholder")}
-              className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
-              style={{ borderColor: "#D8DAEA" }}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-            {t("roleLabel")}
-            <input
-              type="text"
-              maxLength={150}
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              placeholder={t("rolePlaceholder")}
-              className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
-              style={{ borderColor: "#D8DAEA" }}
-            />
-          </label>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-          {t("phoneLabel")}
-          <input
-            type="tel"
-            maxLength={30}
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder={t("phonePlaceholder")}
-            className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
-            style={{ borderColor: "#D8DAEA" }}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-          {t("emailLabel")}
-          <input
-            type="email"
-            maxLength={150}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={t("emailPlaceholder")}
-            className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
-            style={{ borderColor: "#D8DAEA" }}
-          />
-        </label>
-      </div>
-
-      <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }}>
-        {t("bioLabel")}
-        <textarea
-          maxLength={2000}
-          rows={3}
-          value={bio}
-          onChange={(e) => setBio(e.target.value)}
+      <label className="flex flex-col gap-1 text-sm font-semibold" style={{ color: "#3E3F66" }} htmlFor={`customer-area-contact-trainer-${initial?.id ?? "new"}`}>
+        {t("trainerLabel")}
+        <select
+          id={`customer-area-contact-trainer-${initial?.id ?? "new"}`}
+          required
+          value={trainerId}
+          onChange={(e) => setTrainerId(e.target.value)}
           className="rounded-[10px] border px-3.5 py-2.5 text-base font-normal"
           style={{ borderColor: "#D8DAEA" }}
-        />
+        >
+          <option value="">{t("trainerPlaceholder")}</option>
+          {trainers.map((tr) => (
+            <option key={tr.id} value={tr.id}>
+              {tr.role ? `${tr.name} — ${tr.role}` : tr.name}
+            </option>
+          ))}
+        </select>
       </label>
+
+      <CustomerAreaVisibilityField
+        idPrefix={`customer-area-contact-${initial?.id ?? "new"}`}
+        groups={groups}
+        members={tenantMembers}
+        visibility={visibility}
+        onVisibilityChange={setVisibility}
+        groupIds={groupIds}
+        onGroupIdsChange={setGroupIds}
+        userIds={userIds}
+        onUserIdsChange={setUserIds}
+      />
 
       {error && (
         <p role="alert" className="text-sm font-semibold" style={{ color: "#B14A4A" }}>

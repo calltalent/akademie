@@ -9,6 +9,7 @@ import {
   HelpCircle,
   LayoutGrid,
   Bookmark,
+  Headset,
   ShieldCheck,
   Building2,
   ExternalLink,
@@ -89,10 +90,23 @@ import {
  * entfällt (im Panel ergibt "einklappen" keinen Sinn), Labels sind IMMER
  * sichtbar unabhängig vom gespeicherten `expanded`-Zustand der Desktop-
  * Schiene (`showLabels`, ersetzt die bisherigen `expanded &&`-Stellen).
+ *
+ * `showCustomerArea` NEU (05.08.2026, "Meine Kunden Area", Plan
+ * verwende-den-planungs-agenten-sequential-frost.md Abschnitt 5) — der
+ * Menüpunkt erscheint nur, wenn für den angemeldeten Nutzer mindestens ein
+ * sichtbares `customer_area_items`-Item existiert (gleiches Prinzip "keine
+ * toten Links" wie bei `customLinks`). Default `false`: jeder Aufrufer ohne
+ * dieses Prop verhält sich exakt wie zuvor.
  */
-export type SidebarItemId = "dashboard" | "catalog" | "bookmarks";
+export type SidebarItemId = "dashboard" | "catalog" | "bookmarks" | "customerArea";
 
-type NavItem = { id: SidebarItemId; labelKey: "navDashboardLabel" | "navBookmarksLabel" | "navCatalogLabel"; href: string; badge?: string; icon: LucideIcon };
+type NavItem = {
+  id: SidebarItemId;
+  labelKey: "navDashboardLabel" | "navBookmarksLabel" | "navCatalogLabel" | "navCustomerAreaLabel";
+  href: string;
+  badge?: string;
+  icon: LucideIcon;
+};
 
 /** Admin-verwaltbarer "LINKS"-Bereich (Josips Auftrag, 23.07.2026) — siehe app-shell.tsx/sidebar-links-panel.tsx. */
 export type SidebarLink = { id: string; label: string; url: string };
@@ -101,6 +115,7 @@ const LERNEN: NavItem[] = [
   { id: "dashboard", labelKey: "navDashboardLabel", href: "/dashboard", icon: LayoutGrid },
   { id: "bookmarks", labelKey: "navBookmarksLabel", href: "/lesezeichen", icon: Bookmark },
   { id: "catalog", labelKey: "navCatalogLabel", href: "/kurskatalog", icon: Search },
+  { id: "customerArea", labelKey: "navCustomerAreaLabel", href: "/kunden-area", icon: Headset },
 ];
 
 /** Leitet den aktiven Menüpunkt aus der Route ab (Semantik wie shell/nav-link.tsx). */
@@ -108,6 +123,7 @@ function activeFromPath(pathname: string): SidebarItemId | undefined {
   if (pathname === "/dashboard") return "dashboard";
   if (pathname === "/kurskatalog" || pathname.startsWith("/kurskatalog/")) return "catalog";
   if (pathname === "/lesezeichen" || pathname.startsWith("/lesezeichen/")) return "bookmarks";
+  if (pathname === "/kunden-area" || pathname.startsWith("/kunden-area/")) return "customerArea";
   return undefined;
 }
 
@@ -116,6 +132,7 @@ export function Sidebar({
   isStaff = false,
   isPlatformAdmin = false,
   customLinks = [],
+  showCustomerArea = false,
   variant = "rail",
   tenantName = "Calltalent",
   logoUrl = null,
@@ -124,6 +141,8 @@ export function Sidebar({
   isStaff?: boolean;
   isPlatformAdmin?: boolean;
   customLinks?: SidebarLink[];
+  /** Siehe Kopfkommentar oben — Default `false` erhält das bisherige Verhalten. */
+  showCustomerArea?: boolean;
   variant?: "rail" | "panel";
   /** Mandanten-Wortmarke/-Logo (26.07.2026, Josips Fund: "oben links kommt
    * das Logo von Calltalent statt von Projekt X"). Default bewahrt exakt das
@@ -137,6 +156,7 @@ export function Sidebar({
   const pathname = usePathname();
   const activeId = active ?? activeFromPath(pathname);
   const isPanel = variant === "panel";
+  const visibleLernen = LERNEN.filter((item) => item.id !== "customerArea" || showCustomerArea);
   // Im Panel (mobiles Ausklapp-Menü) sind Labels immer sichtbar — der
   // Ein-/Ausklapp-Zustand der Desktop-Schiene ist dort irrelevant.
   const showLabels = isPanel || expanded;
@@ -289,7 +309,7 @@ export function Sidebar({
             {t("navLernenLabel")}
           </p>
         )}
-        {LERNEN.map(renderItem)}
+        {visibleLernen.map(renderItem)}
 
         {customLinks.length > 0 && (
           <>

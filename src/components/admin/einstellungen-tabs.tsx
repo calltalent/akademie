@@ -9,7 +9,12 @@ import { PromoCardsPanel } from "@/components/admin/promo-cards-panel";
 import { TrainerProfilePanel } from "@/components/admin/trainer-profile-panel";
 import { ApiKeysPanel } from "@/components/admin/api-keys-panel";
 import { WebhooksPanel } from "@/components/admin/webhooks-panel";
+import { CustomerAreaGroupsPanel } from "@/components/admin/customer-area-groups-panel";
+import { CustomerAreaLinksPanel } from "@/components/admin/customer-area-links-panel";
+import { CustomerAreaContactsPanel } from "@/components/admin/customer-area-contacts-panel";
+import { CustomerAreaAnnouncementsPanel } from "@/components/admin/customer-area-announcements-panel";
 import type { PromoCardRow, TrainerRow } from "@/lib/settings/actions";
+import type { CustomerAreaGroupRow, CustomerAreaItemRow, CustomerAreaTenantMember } from "@/lib/customer-area/schema";
 import type { Locale } from "@/i18n/config";
 
 /**
@@ -29,8 +34,15 @@ import type { Locale } from "@/i18n/config";
  * einer Akkordeon-Karte zwischen den anderen: beides sicherheitsrelevant,
  * ein eigener Reiter macht den Kontextwechsel klarer als ein Aufklapp-Pfeil
  * mitten in der Seite.
+ *
+ * "kundenarea" NEU (05.08.2026, "Meine Kunden Area", Plan
+ * verwende-den-planungs-agenten-sequential-frost.md Abschnitt 3) — neuer
+ * Reiter nach "inhalte", vier neue Props (`customerAreaGroups`,
+ * `customerAreaItems`, `tenantMembers` — plus das bereits bestehende
+ * `trainers`, wiederverwendet vom Kontakte-Panel statt eines eigenen
+ * Trainer-Datenpools).
  */
-type TabKey = "allgemein" | "inhalte" | "integrationen";
+type TabKey = "allgemein" | "inhalte" | "kundenarea" | "integrationen";
 
 export function EinstellungenTabs({
   tenantName,
@@ -45,6 +57,9 @@ export function EinstellungenTabs({
   sidebarLinks,
   promoCards,
   trainers,
+  customerAreaGroups,
+  customerAreaItems,
+  tenantMembers,
   apiKeys,
   webhooks,
   enabledLocales,
@@ -62,6 +77,9 @@ export function EinstellungenTabs({
   sidebarLinks: { id: string; label: string; url: string }[];
   promoCards: PromoCardRow[];
   trainers: TrainerRow[];
+  customerAreaGroups: CustomerAreaGroupRow[];
+  customerAreaItems: CustomerAreaItemRow[];
+  tenantMembers: CustomerAreaTenantMember[];
   apiKeys: { id: string; name: string; last_used: string | null; active: boolean; created_at: string }[];
   webhooks: { id: string; url: string; events: string[]; active: boolean; created_at: string }[];
   /** i18n Block B5 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 4). */
@@ -73,6 +91,7 @@ export function EinstellungenTabs({
   const TABS: { key: TabKey; label: string }[] = [
     { key: "allgemein", label: t("tabs.general") },
     { key: "inhalte", label: t("tabs.content") },
+    { key: "kundenarea", label: t("tabs.customerArea") },
     { key: "integrationen", label: t("tabs.integrations") },
   ];
 
@@ -146,6 +165,28 @@ export function EinstellungenTabs({
           <SidebarLinksPanel links={sidebarLinks} />
           <PromoCardsPanel cards={promoCards} />
           <TrainerProfilePanel trainers={trainers} />
+        </div>
+      )}
+
+      {tab === "kundenarea" && (
+        <div className="flex max-w-[820px] flex-col gap-[22px]">
+          <CustomerAreaGroupsPanel groups={customerAreaGroups} tenantMembers={tenantMembers} />
+          <CustomerAreaLinksPanel
+            items={customerAreaItems.filter((i) => i.kind === "link")}
+            groups={customerAreaGroups}
+            tenantMembers={tenantMembers}
+          />
+          <CustomerAreaContactsPanel
+            items={customerAreaItems.filter((i) => i.kind === "contact")}
+            trainers={trainers}
+            groups={customerAreaGroups}
+            tenantMembers={tenantMembers}
+          />
+          <CustomerAreaAnnouncementsPanel
+            items={customerAreaItems.filter((i) => i.kind === "announcement")}
+            groups={customerAreaGroups}
+            tenantMembers={tenantMembers}
+          />
         </div>
       )}
 
