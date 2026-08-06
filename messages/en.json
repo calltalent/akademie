@@ -950,7 +950,7 @@
         "certificatesLabel": "Issue certificates",
         "certificatesDesc": "Automatically generate a certificate after course completion.",
         "maintenanceLabel": "Maintenance mode",
-        "maintenanceDesc": "Will be saved, but does not yet lock the portal (coming in a later update).",
+        "maintenanceDesc": "Locks the portal for learners. Team members keep access, including the admin area.",
         "languagesHeading": "Languages",
         "languagesSubtitle": "Which languages learners can choose in this academy.",
         "enabledLocalesLegend": "Enabled languages",
@@ -1393,6 +1393,13 @@
       "body": "thank you for your purchase of {productName} at {tenantName}. The payment has been received and your access is now active.",
       "actionButton": "Go to course"
     }
+  },
+  "maintenance": {
+    "brandHeading": "We'll be right back.",
+    "brandBody": "We're improving your academy right now. This usually takes just a few minutes.",
+    "heading": "Under maintenance",
+    "body": "This academy is currently unavailable. Please try again shortly.",
+    "supportLabel": "Support"
   },
   "marketplace": {
     "shell": {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideRouting, isApiPath, isAuthPath, isSameHost } from "./routing";
+import { decideRouting, isApiPath, isAuthPath, isMaintenanceBypassPath, isSameHost } from "./routing";
 
 const PORTAL_HOST = "portal.calltalent.ai";
 const MARKETPLACE_HOST = "marketplace.calltalent.ai";
@@ -85,6 +85,32 @@ describe("isAuthPath", () => {
     expect(isAuthPath("/authentifizierung")).toBe(false);
     expect(isAuthPath("/")).toBe(false);
   });
+});
+
+describe("isMaintenanceBypassPath", () => {
+  it.each([
+    "/api",
+    "/api/bunny/create-video",
+    "/auth/signout",
+    "/auth/callback",
+    "/wartung",
+    "/admin",
+    "/admin/kurse",
+    "/admin/einstellungen",
+    "/login",
+    "/registrieren",
+    "/passwort-vergessen",
+    "/passwort-setzen",
+  ])("lässt %s auch bei aktivem Wartungsmodus immer durch", (pathname) => {
+    expect(isMaintenanceBypassPath(pathname)).toBe(true);
+  });
+
+  it.each(["/", "/dashboard", "/kurse", "/kurs/beispiel-kurs", "/profil", "/kunden-area"])(
+    "sperrt %s NICHT grundsätzlich aus (Middleware entscheidet zusätzlich per Staff-Prüfung)",
+    (pathname) => {
+      expect(isMaintenanceBypassPath(pathname)).toBe(false);
+    },
+  );
 });
 
 describe("decideRouting — Portal-Host", () => {

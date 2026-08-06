@@ -50,9 +50,10 @@ function ToggleRow({
  * Design-Block 6 (13.07.2026, AdminEinstellungen.dc.html): echte, gespeicherte
  * Version der "Akademie"- und "Plattform-Optionen"-Karten. Alle drei Schalter
  * sind ECHT persistiert (tenants.settings) und wirken sich tatsächlich aus
- * (Selbstregistrierung: auth/actions.ts, Zertifikate: certificates/issue.ts)
- * — bis auf "Wartungsmodus": der wird gespeichert, sperrt das Portal aber
- * noch NICHT (siehe Hinweistext unten + PHASENSTATUS.md, offener Punkt).
+ * (Selbstregistrierung: auth/actions.ts, Zertifikate: certificates/issue.ts,
+ * Wartungsmodus: seit dem Folgeblock vom 06.08.2026 ECHT durchgesetzt über
+ * das Gate in middleware.ts, siehe Kopfkommentar bei `maintenance_enabled`
+ * in lib/tenant/types.ts).
  */
 export function TenantSettingsForm({
   name,

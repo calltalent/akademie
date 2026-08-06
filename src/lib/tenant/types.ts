@@ -63,11 +63,12 @@ export type PublicTenant = {
      * - `self_signup_enabled`: gate in signUpWithPassword() (auth/actions.ts).
      * - `certificates_enabled`: zusätzliches Gate NEBEN dem bestehenden
      *   `courses.settings.certificate_enabled` in certificates/issue.ts.
-     * - `maintenance_enabled`: NUR persistiert, NOCH NICHT durchgesetzt —
-     *   eine echte Portal-Sperre bräuchte eine seitenübergreifende Prüfung
-     *   (z. B. middleware.ts), die aus Zeit-/Risikogründen bewusst nicht Teil
-     *   dieses Design-Blocks ist (siehe PHASENSTATUS.md, offener Punkt für
-     *   Josip). Nicht sicherheitskritisch, hier unbedenklich mit aufzunehmen.
+     * - `maintenance_enabled`: seit dem Folgeblock vom 06.08.2026 ECHT
+     *   durchgesetzt — Gate in middleware.ts (`isMaintenanceBypassPath()` in
+     *   tenant/routing.ts + `is_staff`-RPC-Ausnahme), rewritet auf
+     *   src/app/wartung/page.tsx mit Status 503. Team-Mitglieder (Trainer,
+     *   Admins/Owner) sowie /admin/..., /login und /api/... bleiben immer
+     *   erreichbar, damit sich niemand selbst aussperrt.
      */
     self_signup_enabled?: boolean;
     certificates_enabled?: boolean;

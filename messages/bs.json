@@ -950,7 +950,7 @@
         "certificatesLabel": "Izdavanje certifikata",
         "certificatesDesc": "Automatski kreiraj certifikat nakon završetka kursa.",
         "maintenanceLabel": "Način rada za održavanje",
-        "maintenanceDesc": "Sprema se, ali trenutno još ne zaključava portal (slijedi u narednom bloku).",
+        "maintenanceDesc": "Zaključava portal za polaznike. Članovi tima zadržavaju pristup, i u admin dijelu.",
         "languagesHeading": "Jezici",
         "languagesSubtitle": "Koje jezike polaznici mogu birati u ovoj akademiji.",
         "enabledLocalesLegend": "Aktivirani jezici",
@@ -1393,6 +1393,13 @@
       "body": "hvala na kupovini {productName} kod {tenantName}. Uplata je primljena i tvoj pristup je otključan.",
       "actionButton": "Idi na kurs"
     }
+  },
+  "maintenance": {
+    "brandHeading": "Vraćamo se uskoro.",
+    "brandBody": "Trenutno unapređujemo tvoju akademiju. To obično traje samo nekoliko minuta.",
+    "heading": "Radovi na održavanju",
+    "body": "Ova akademija trenutno nije dostupna. Pokušaj ponovo za kratko vrijeme.",
+    "supportLabel": "Podrška"
   },
   "marketplace": {
     "shell": {

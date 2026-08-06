@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env";
 import { resolveTenantByHost } from "@/lib/tenant/resolve";
-import { decideRouting, isSameHost } from "@/lib/tenant/routing";
+import { decideRouting, isMaintenanceBypassPath, isSameHost } from "@/lib/tenant/routing";
 import type { PublicTenant } from "@/lib/tenant/types";
 import { resolveEnabledLocales } from "@/i18n/config";
 import { resolveLocale } from "@/i18n/resolve";
@@ -140,14 +140,41 @@ export async function middleware(request: NextRequest) {
   // routing.ts::decideRouting() — keine zweite, abweichende Logik.
   requestHeaders.set("x-marketplace-host", isSameHost(host, publicEnv.NEXT_PUBLIC_MARKETPLACE_HOST) ? "1" : "0");
 
+  // Wartungsmodus-Durchsetzung (Folgeblock zu `tenants.settings.
+  // maintenance_enabled`, vorher nur persistiert — siehe Kopfkommentar bei
+  // diesem Feld in lib/tenant/types.ts): `blocked` entscheidet, ob
+  // buildResponse() statt der normalen Antwort auf /wartung umschreibt.
+  // Bleibt bis zum Ende der Funktion `false`, solange kein Mandant aufgelöst
+  // wurde, der Pfad ausgenommen ist (isMaintenanceBypassPath) oder die
+  // anfragende Person Team-Mitglied ist — im Regelfall (Schalter aus)
+  // bleibt der Wert immer `false`, ohne dass unten überhaupt der
+  // zusätzliche is_staff-RPC-Aufruf stattfindet.
+  let blocked = false;
+  // Von setAll() gesetzte Cookies (Session-Refresh) müssen jeden erneuten
+  // buildResponse()-Aufruf überleben — buildResponse() erzeugt jedes Mal ein
+  // frisches NextResponse-Objekt, ein zweiter Aufruf NACH der
+  // Wartungsmodus-Entscheidung (unten) würde sie sonst verwerfen.
+  let pendingCookies: { name: string; value: string; options: CookieOptions }[] = [];
+
   function buildResponse() {
-    if (routing.rewrite) {
-      const rewriteUrl = new URL(servedPath + request.nextUrl.search, request.url);
-      return NextResponse.rewrite(rewriteUrl, {
+    let res: NextResponse;
+    if (blocked) {
+      res = NextResponse.rewrite(new URL("/wartung", request.url), {
+        status: 503,
         request: { headers: requestHeaders },
       });
+    } else if (routing.rewrite) {
+      const rewriteUrl = new URL(servedPath + request.nextUrl.search, request.url);
+      res = NextResponse.rewrite(rewriteUrl, {
+        request: { headers: requestHeaders },
+      });
+    } else {
+      res = NextResponse.next({ request: { headers: requestHeaders } });
     }
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    for (const { name, value, options } of pendingCookies) {
+      res.cookies.set(name, value, options);
+    }
+    return res;
   }
 
   let response = buildResponse();
@@ -164,10 +191,8 @@ export async function middleware(request: NextRequest) {
           for (const { name, value } of cookiesToSet) {
             request.cookies.set(name, value);
           }
+          pendingCookies = cookiesToSet;
           response = buildResponse();
-          for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(name, value, options);
-          }
         },
       },
     },
@@ -176,8 +201,28 @@ export async function middleware(request: NextRequest) {
   // Erzwingt Token-Refresh, falls nötig — Pflicht laut @supabase/ssr-Doku,
   // sonst laufen Sessions in Server Components unbemerkt ab. Gilt auch für
   // Portal-Nutzer (Calltalent-Team), die genauso eine gültige Session
-  // brauchen wie Mandanten-Nutzer.
-  await supabase.auth.getUser();
+  // brauchen wie Mandanten-Nutzer. Der zurückgegebene `user` wird jetzt
+  // zusätzlich für die Wartungsmodus-Staff-Ausnahme unten gebraucht.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (tenant?.settings.maintenance_enabled && !isMaintenanceBypassPath(servedPath)) {
+    // Neues Terrain (06.08.2026): is_staff() lief bisher nur in Server
+    // Components/Actions, nie in middleware.ts (Edge-Runtime). Deshalb der
+    // zusätzliche RPC-Rundlauf NUR hier, streng an die Bedingung oben
+    // gekoppelt — im Normalbetrieb (Schalter aus) entsteht dadurch keine
+    // zusätzliche Latenz für irgendeine Anfrage.
+    let isStaff = false;
+    if (user) {
+      const { data } = await supabase.rpc("is_staff", { t: tenant.id });
+      isStaff = Boolean(data);
+    }
+    if (!isStaff) {
+      blocked = true;
+      response = buildResponse();
+    }
+  }
 
   return response;
 }

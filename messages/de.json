@@ -950,7 +950,7 @@
         "certificatesLabel": "Zertifikate ausstellen",
         "certificatesDesc": "Nach Kursabschluss automatisch ein Zertifikat erzeugen.",
         "maintenanceLabel": "Wartungsmodus",
-        "maintenanceDesc": "Wird gespeichert, sperrt das Portal aktuell noch nicht (folgt in einem späteren Block).",
+        "maintenanceDesc": "Sperrt das Portal für Lernende. Team-Mitglieder behalten Zugriff, auch im Admin-Bereich.",
         "languagesHeading": "Sprachen",
         "languagesSubtitle": "Welche Sprachen Lernende in dieser Akademie wählen können.",
         "enabledLocalesLegend": "Freigeschaltete Sprachen",
@@ -1393,6 +1393,13 @@
       "body": "vielen Dank für deinen Kauf von {productName} bei {tenantName}. Die Zahlung ist eingegangen und dein Zugang ist freigeschaltet.",
       "actionButton": "Zum Kurs"
     }
+  },
+  "maintenance": {
+    "brandHeading": "Wir sind gleich zurück.",
+    "brandBody": "Wir verbessern gerade deine Akademie. Das ist normalerweise in wenigen Minuten erledigt.",
+    "heading": "Wartungsarbeiten",
+    "body": "Diese Akademie ist aktuell nicht erreichbar. Bitte versuche es in Kürze erneut.",
+    "supportLabel": "Support"
   },
   "marketplace": {
     "shell": {

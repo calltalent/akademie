@@ -90,6 +90,35 @@ export function isAuthPath(pathname: string): boolean {
 }
 
 /**
+ * Wartungsmodus-Durchsetzung (Folgeblock zu `tenants.settings.
+ * maintenance_enabled`, vorher nur persistiert, siehe Kopfkommentar in
+ * `lib/tenant/types.ts`): welche Pfade auch bei aktivem Wartungsmodus IMMER
+ * erreichbar bleiben, unabhängig davon, ob die anfragende Person Team-
+ * Mitglied ist. `/api/...` und `/auth/...` aus demselben Grund wie
+ * `isApiPath()`/`isAuthPath()` oben (Webhooks bzw. Signout/Callback dürfen
+ * nie blockiert werden). `/admin/...` bleibt immer erreichbar, da dort
+ * ohnehin `checkStaffAccess()`/`checkAdminAccess()` (lib/auth/staff.ts)
+ * greift — sonst könnte sich ein Owner nach dem Aktivieren des Schalters
+ * nicht mehr anmelden, um ihn wieder auszuschalten. Die Login-/
+ * Registrierungs-/Passwort-Seiten bleiben aus demselben Grund erreichbar.
+ * `/wartung` selbst muss ausgenommen sein, sonst rewritet middleware.ts in
+ * eine Endlosschleife.
+ */
+export function isMaintenanceBypassPath(pathname: string): boolean {
+  return (
+    isApiPath(pathname) ||
+    isAuthPath(pathname) ||
+    pathname === "/wartung" ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/login" ||
+    pathname === "/registrieren" ||
+    pathname === "/passwort-vergessen" ||
+    pathname === "/passwort-setzen"
+  );
+}
+
+/**
  * Gemeinsame Rewrite-Regel für BEIDE mandantenlosen Sonder-Hosts (Portal,
  * Marketplace): `/api/...` und `/auth/...` bleiben unangetastet (Regel 1,
  * siehe Kopfkommentar), jeder andere Pfad bekommt `prefix` vorangestellt,
