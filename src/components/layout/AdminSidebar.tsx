@@ -17,6 +17,7 @@ import {
   Settings,
   GraduationCap,
   LogOut,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -75,6 +76,7 @@ export type AdminSidebarItemId =
   | "payments"
   | "members"
   | "import"
+  | "schichtplanung"
   | "tenants"
   | "settings";
 
@@ -92,6 +94,12 @@ type AdminNavItem = {
    * `payments_enabled` & Co., Begründung dort).
    */
   marketplaceOnly?: boolean;
+  /**
+   * NEU (Schichtplan S1, 07.08.2026): nur sichtbar, wenn der Mandant den
+   * Schichtplan freigeschaltet hat (`tenant.settings.shift_calendar_enabled
+   * === true`) — gleiches Opt-in-Prinzip wie `marketplaceOnly`.
+   */
+  shiftCalendarOnly?: boolean;
 };
 
 const GROUPS: { title: string; items: AdminNavItem[] }[] = [
@@ -118,6 +126,13 @@ const GROUPS: { title: string; items: AdminNavItem[] }[] = [
     items: [
       { id: "members", label: "Teilnehmer", href: "/admin/teilnehmer", icon: Users },
       { id: "import", label: "Import", href: "/admin/import", icon: Upload },
+      {
+        id: "schichtplanung",
+        label: "Schichtplanung",
+        href: "/admin/schichtplanung",
+        icon: CalendarClock,
+        shiftCalendarOnly: true,
+      },
     ],
   },
   {
@@ -141,6 +156,7 @@ function activeFromPath(pathname: string): AdminSidebarItemId | undefined {
   if (pathname.startsWith("/admin/zahlungen")) return "payments";
   if (pathname.startsWith("/admin/teilnehmer")) return "members";
   if (pathname.startsWith("/admin/import")) return "import";
+  if (pathname.startsWith("/admin/schichtplanung")) return "schichtplanung";
   if (pathname.startsWith("/portal/mandanten")) return "tenants";
   if (pathname.startsWith("/admin/einstellungen")) return "settings";
   return undefined;
@@ -154,6 +170,7 @@ export function AdminSidebar({
   tenantName = "Calltalent",
   logoUrl = null,
   marketplaceEnabled = false,
+  shiftCalendarEnabled = false,
 }: {
   active?: AdminSidebarItemId;
   isPlatformAdmin?: boolean;
@@ -170,6 +187,10 @@ export function AdminSidebar({
    * `false` (Opt-in), anders als `isPlatformAdmin`s eigentliche Bedeutung
    * (Rollen-Gate) bewusst analog zu dessen technischem Muster genutzt. */
   marketplaceEnabled?: boolean;
+  /** Schichtplan S1 (07.08.2026) — steuert Sichtbarkeit des
+   * "Schichtplanung"-Menüpunkts, siehe `shiftCalendarOnly` oben. Default
+   * `false` (Opt-in), gleiches Prinzip wie `marketplaceEnabled`. */
+  shiftCalendarEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const activeId = active ?? activeFromPath(pathname);
@@ -274,7 +295,10 @@ export function AdminSidebar({
       <nav className="min-h-0 flex-1 overflow-y-auto px-4">
         {GROUPS.map((group) => {
           const items = group.items.filter(
-            (i) => (!i.platformOnly || isPlatformAdmin) && (!i.marketplaceOnly || marketplaceEnabled),
+            (i) =>
+              (!i.platformOnly || isPlatformAdmin) &&
+              (!i.marketplaceOnly || marketplaceEnabled) &&
+              (!i.shiftCalendarOnly || shiftCalendarEnabled),
           );
           if (items.length === 0) return null;
           return (

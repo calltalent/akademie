@@ -53,6 +53,7 @@ export default async function AdminLayout({
       isPlatformAdmin={platformAccess.ok}
       pendingSubmissions={pendingSubmissions ?? 0}
       marketplaceEnabled={access.tenant.settings.marketplace_enabled === true}
+      shiftCalendarEnabled={access.tenant.settings.shift_calendar_enabled === true}
     >
       {children}
     </AdminShell>

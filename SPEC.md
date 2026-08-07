@@ -16,6 +16,8 @@ Mandantenfähige Premium-Lernplattform, die ein Betreiber (Calltalent) für sich
 
 **Nachtrag 05.08.2026:** Die Kunden Area (Abschnitt 11) führt erstmals eine Sichtbarkeits-Differenzierung *innerhalb* einer Rolle ein — bisher sah jedes Mitglied einer Rolle dieselben mandantenweiten Daten wie jedes andere. Ein `member` sieht dort nur Inhalte, die für alle freigegeben sind, für seine eigene(n) Gruppe(n) oder direkt für ihn — umgesetzt über mandanteneigene, frei definierbare Gruppen (`customer_area_groups`), nicht über zusätzliche Rollen.
 
+**Nachtrag 07.08.2026:** Der Schichtplan (Abschnitt 12) führt eine zweite, von der Kursrolle unabhängige Personendimension ein. Ein Nutzer bleibt für den Kurszugriff `member`/`trainer`/etc. und bekommt zusätzlich optional eine Arbeiterzeile (`calendar_workers`, `worker_type` `employee`/`freelancer`) — bewusst kein neuer `memberships.role`-Wert, um die Kurszugriffssemantik nicht mit der Personalsemantik zu vermischen (Begründung siehe Abschnitt 12).
+
 ## 3. MoSCoW
 
 **Must (Phase 1–2):** Auth (Magic Link + Passwort), Mandanten-Auflösung (Subdomain + Custom Domain), Branding (Logo, Farben, Schrift, Radius), Kurs → Modul → Lektion mit Block-Editor (Text, Bild, Video, Audio, Datei, Quiz, Abgabe, Hinweisbox, Einbettung), Bunny-Video-Upload + Player (Autoplay, Tempo, Kapitel), Fortschritt + Abschlusslogik, Quiz/Prüfungen mit Versuchen und Bestehensgrenze, Abgaben mit Bewertungs-Inbox, Nutzerverwaltung + CSV-Import + Einladungen, Zertifikate (PDF), Stripe (Einmalkauf + Abo, je Mandant abschaltbar), E-Mail-Benachrichtigungen, Reporting v1 (Fortschritt je Nutzer/Kurs, Abschlussquoten, CSV-Export), DSGVO-Basis (EU-Hosting, Datenexport, Löschkonzept).
@@ -38,6 +40,7 @@ Mandantenfähige Premium-Lernplattform, die ein Betreiber (Calltalent) für sich
 | `/kurs/[slug]` | Kursübersicht: Module/Lektionen, Fortschritt, Zertifikatsstatus |
 | `/kurs/[slug]/l/[lessonId]` | Lernansicht: Blöcke, Player, „Abschließen", Tutor-Panel (falls aktiv), Vor/Zurück |
 | `/kunden-area` | Kunden Area (05.08.2026, Nachtrag, Abschnitt 11): mandantengepflegte Links, Ansprechpartner, Ankündigungen; Sichtbarkeit je Nutzer oder Gruppe; Menüpunkt nur sichtbar, wenn mindestens ein für den Nutzer sichtbarer Eintrag existiert |
+| `/schichtplan` | Schichtplan (07.08.2026, Nachtrag, Abschnitt 12): „Mein Schichtplan" — eigene Wochenansicht (Schichten, Projektzugehörigkeit), Ein-/Ausstempeln. Nur sichtbar, wenn der Mandant das Add-on gebucht hat UND der Nutzer eine eigene Arbeiterzeile hat |
 | `/suche` | semantische Suche über freigeschaltete Inhalte |
 | `/profil` | Name, Passwort, Datenexport, Zertifikate |
 | `/login`, `/registrieren`, `/kaufen/[productSlug]` | Auth + Stripe-Checkout |
@@ -55,6 +58,7 @@ Mandantenfähige Premium-Lernplattform, die ein Betreiber (Calltalent) für sich
 | `/admin/zahlungen` | Stripe-Anbindung, Produkte/Preise, Bestellungen |
 | `/admin/design` | Branding: Logo, Farben, Schrift, Radius, Impressum/Datenschutz-Links |
 | `/admin/einstellungen` | Domain, Sprachen, Tutor an/aus, Webhooks, API-Keys |
+| `/admin/schichtplanung` | Schichtplan (07.08.2026, Nachtrag, Abschnitt 12): Arbeiter (Mitarbeiter/Freelancer) zuweisen und Parameter setzen, Projekte anlegen und Arbeiter zuweisen. Nur sichtbar, wenn der Betreiber das Add-on für diesen Mandanten freigeschaltet hat |
 
 ### 4.3 Betreiber-Portal (portal.calltalent.ai)
 
@@ -72,7 +76,7 @@ Ruhiges, helles Interface; eine Akzentfarbe je Mandant; Inter als Standardschrif
 
 Vollständig in `supabase/migrations/0001_init.sql`. Kernprinzip: jede Tabelle trägt `tenant_id`, RLS erzwingt Mandantengrenzen; Rollenprüfung über `public.member_role(tenant_id)` (security definer). Personenbezogene Zeilen (progress, attempts, submissions, tutor_messages) zusätzlich auf `user_id = auth.uid()` beschränkt; Staff (owner/admin/trainer) liest mandantenweit.
 
-Tabellenübersicht: tenants, profiles, memberships, courses, modules, lessons, enrollments, progress, quizzes, questions, attempts, submissions, certificates, products, orders, subscriptions, ai_jobs, embeddings, tutor_conversations, tutor_messages, webhooks, webhook_deliveries, api_keys, usage_counters, audit_log. Marketplace (04.08.2026, Abschnitt 10): marketplace_listings, marketplace_ledger, platform_settings (platform_admins existierte bereits seit Phase 4). Kunden Area (05.08.2026, Abschnitt 11): customer_area_groups, customer_area_group_members, customer_area_items, customer_area_item_audience; dazu `trainers.phone`/`trainers.email` ergänzt (trainers-Tabelle bestand bereits seit Phase 1 für Kurs-Autoren, siehe Abschnitt 11).
+Tabellenübersicht: tenants, profiles, memberships, courses, modules, lessons, enrollments, progress, quizzes, questions, attempts, submissions, certificates, products, orders, subscriptions, ai_jobs, embeddings, tutor_conversations, tutor_messages, webhooks, webhook_deliveries, api_keys, usage_counters, audit_log. Marketplace (04.08.2026, Abschnitt 10): marketplace_listings, marketplace_ledger, platform_settings (platform_admins existierte bereits seit Phase 4). Kunden Area (05.08.2026, Abschnitt 11): customer_area_groups, customer_area_group_members, customer_area_items, customer_area_item_audience; dazu `trainers.phone`/`trainers.email` ergänzt (trainers-Tabelle bestand bereits seit Phase 1 für Kurs-Autoren, siehe Abschnitt 11). Schichtplan (07.08.2026, Abschnitt 12): calendar_workers, calendar_projects, calendar_project_members, calendar_slots, calendar_shifts, calendar_absences, calendar_shift_change_requests, calendar_time_entries; dazu `btree_gist` als dritte Postgres-Extension neben `pgcrypto`/`vector` und die erste zusammengesetzte Eindeutigkeit `memberships(id, tenant_id)`.
 
 Storage-Buckets (Phase 1 anzulegen): `branding` (öffentlich lesbar), `course-assets` (öffentlich lesbar via signierte URLs optional), `submissions` (privat), `certificates` (privat). Pfadkonvention: `{tenant_id}/...`; Policies analog RLS.
 
@@ -149,3 +153,23 @@ Neue Unterseite in der Lernansicht (`/kunden-area`, Abschnitt 4.1): Der Mandante
 **RLS/Sichtbarkeit:** Gruppen und Zuordnungen sind ausschließlich für owner/admin lesbar (ein Mitglied soll nicht auslesen können, dass es z. B. eine Gruppe „Geschäftsführung" gibt); die Filterung für Lernende läuft vollständig serverseitig über eine `security definer`-Hilfsfunktion (`customer_area_can_see()`), analog zum bestehenden `member_role()`/`has_enrollment()`-Muster. **Bewusste Entscheidung (Variante A, siehe Entscheidungs-Log.md, 05.08.2026):** Telefonnummer/E-Mail eines Ansprechpartners bleiben über die bestehende `trainers`-Tabelle für alle Mandanten-Mitglieder lesbar — die Gruppen-Einschränkung der Kunden-Area wirkt hier nur auf Anzeige-Ebene, nicht als zusätzliche Datenbank-Schranke auf `trainers` selbst (Begründung: dienstliche Kontaktdaten, Vermeidung von Regressionsrisiko am Kurs-Editor/Marketplace-Gast-Pfad).
 
 Migrationen: `supabase/migrations/20260805090000_customer_area.sql`, `20260805090100_customer_area_rls_perf_fix.sql` (RLS-Konsolidierung + fehlende FK-Indizes, unmittelbar nach Anwendung der Basis-Migration per Advisor-Befund nachgezogen).
+
+## 12. Schichtplan (nachträglich ergänzt, 07.08.2026)
+
+Kalender für Schichtplanung und Zeiterfassung für festangestellte Mitarbeiter und externe Freelancer, nutzbar auf `academy.calltalent.ai` und pro Mandant zubuchbar. Festangestellte werden von einem Admin/Projektleiter geplant; Freelancer buchen sich perspektivisch selbst in freigegebene Zeitfenster mit begrenzter Kapazität ein. Beide Arbeiter-Typen werden über den bestehenden Einladungsmechanismus zur Academy eingeladen und bekommen zusätzlich zu ihrer Kursrolle eine Arbeiterzeile.
+
+**Rollenmodell:** bewusst kein neuer `memberships.role`-Wert (siehe Nachtrag Abschnitt 2) — `20260803100000_marketplace_guest_role.sql` hat `member_role()` bereits verengt, ein weiterer Rollenwert würde Kurszugriffsrechte aller bestehenden Policies mitverändern. Stattdessen eine eigenständige Tabelle `calendar_workers` (`worker_type` `employee`/`freelancer`, Planungsparameter: Sollstunden, Periode, bevorzugte Schicht, Wochentage). Verwaltungsrechte laufen über `member_role(tenant_id) in ('owner','admin')`, nicht über `is_staff()` (das würde `trainer` einschließen — Schicht-/Zeiterfassungsdaten sind Beschäftigtendaten, DSGVO Art. 5 Abs. 1 lit. c). Ein Projektleiter (`calendar_projects.lead_user_id`) sieht und plant ausschließlich Arbeiter seiner eigenen Projekte, projektbezogen statt mandantenweit.
+
+**Projekte:** Admin/Projektleiter legt Projekte an und weist Arbeiter zu (`calendar_project_members`). Ein Arbeiter kann mehreren Projekten angehören, pro Stunde aber nur in einem gebucht sein — technisch erzwungen über einen Postgres-`EXCLUDE USING GIST`-Constraint auf `calendar_shifts` (kein Anwendungs-Check).
+
+**Kapazitätssteuerung (Grundlage gelegt, UI folgt in Block S2):** `calendar_slots` definiert freigegebene Zeitfenster mit einer festen Platzzahl; ein `AFTER`-Trigger sperrt die Zeitfenster-Zeile (`FOR UPDATE`) und zählt aktive Buchungen unter dieser Sperre, um Überbuchung bei gleichzeitiger Selbstbuchung race-condition-sicher auszuschließen — kein denormalisierter Buchungszähler.
+
+**Änderungsanfragen (Grundlage gelegt, UI folgt in Block S3):** Ein Arbeiter kann eine bereits gebuchte Zeit nicht direkt ändern — Arbeiter haben kein UPDATE/DELETE auf `calendar_shifts`. Der einzige Änderungsweg ist `calendar_shift_change_requests` (Anfrage mit vorgeschlagener neuer Zeit oder Storno), die Genehmigung durch Admin/Projektleiter erfordert. Die Regel liegt in der Datenbank, nicht in einer Server Action.
+
+**Zeiterfassung:** echtes Stempeln über `calendar_time_entries` (mehrere Ein-/Ausstempel-Vorgänge je Tag möglich, nicht nur ein Ist-Beginn/-Ende je Schicht). Nur ein offener Stempel je Arbeiter gleichzeitig; ein `BEFORE UPDATE`-Spaltenschutz-Trigger verhindert, dass ein Arbeiter beim Ausstempeln rückwirkend andere Felder als `ended_at` verändert. Aufbewahrungspflicht zu beachten: Ist-Zeiten sind in Deutschland nach § 16 Abs. 2 ArbZG zwei Jahre aufzubewahren — der Löschpfad in `src/lib/gdpr/` muss `calendar_time_entries` beim Mandantenexport/Löschantrag berücksichtigen.
+
+**KI-gestützte Schichtplanung (Block S4, noch nicht gebaut):** perspektivisch schlägt ein Claude-Sonnet-Aufruf (`ai_jobs.kind = 'shift_plan'`) aus den Arbeiter-Parametern, Abwesenheiten/Feiertagen und bestehenden Schichten einen Wochenplan vor (Entwurf → Review → Übernahme, gleicher Ablauf wie der Kurs-Generator, Abschnitt 6). `enforceQuota()` läuft davor wie bei jedem KI-Aufruf.
+
+**Mandantenfähigkeit:** `tenants.settings.shift_calendar_enabled`, ausschließlich vom Betreiber im Betreiber-Portal (`/portal/mandanten/[id]`) setzbar — gleiches Muster wie `marketplace_enabled` (Opt-in-Polarität, fehlender Wert bedeutet aus). Der Menüpunkt „Mein Schichtplan" erscheint für einen Nutzer nur, wenn zusätzlich zum gesetzten Mandanten-Flag eine eigene Arbeiterzeile existiert.
+
+**Umsetzung in Blöcken:** S1 (07.08.2026, Datenmodell vollständig für S1–S4, Feature-Flag, Arbeiter-/Projektverwaltung, lesende Wochenansicht, Ein-/Ausstempeln) umgesetzt. S2 (Schicht-CRUD, Freelancer-Selbstbuchung, Abwesenheiten/Feiertage, Admin-Korrektur von Zeitstempeln), S3 (Änderungsanfragen-UI) und S4 (KI-Schichtplanung) sind Roadmap, jeweils mit eigenem `architect`-Durchlauf vor der Umsetzung — Schema und RLS für alle vier Blöcke liegen bereits vollständig in `supabase/migrations/20260807090000_shift_calendar.sql`.

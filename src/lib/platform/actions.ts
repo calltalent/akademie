@@ -519,6 +519,12 @@ export async function updateTenantLogoUrl(
  * gleichzeitigem Speichern) und wäre inkonsistent mit dem EINEN Formular in
  * `tenant-features-form.tsx`, das beide Felder in einem Absenden schreibt —
  * hier direkt mit erweitert statt dupliziert.
+ *
+ * ERWEITERT (Schichtplan S1, 07.08.2026): sechster Schalter
+ * `shift_calendar_enabled` — 1:1 dasselbe Muster wie `marketplace_enabled`
+ * (Opt-in, fehlend/undefined = AUS), einziger Freischalt-Weg für das Feature
+ * (Mandant selbst hat keinen eigenen Schalter dafür, siehe
+ * tenant/types.ts-Kommentar).
  */
 export async function updateTenantFeatures(
   tenantId: string,
@@ -544,6 +550,7 @@ export async function updateTenantFeatures(
       tutor_enabled: formData.get("tutorEnabled") === "on",
       course_generator_enabled: formData.get("courseGeneratorEnabled") === "on",
       marketplace_enabled: formData.get("marketplaceEnabled") === "on",
+      shift_calendar_enabled: formData.get("shiftCalendarEnabled") === "on",
       // Leeres Formularfeld -> `parsedCommission.data` ist `undefined` ->
       // JSON.stringify (Supabase-Client-Serialisierung) lässt den Schlüssel
       // beim Schreiben weg, ein zuvor gesetzter Wert wird damit entfernt statt

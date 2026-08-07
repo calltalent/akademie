@@ -114,6 +114,19 @@ export type PublicTenant = {
      * `marketplace_enabled` selbst.
      */
     marketplace_commission_bp?: number;
+    /**
+     * NEU (Schichtplan S1, 07.08.2026): steuert, ob "Schichtplanung"
+     * (Admin) bzw. "Mein Schichtplan" (Lernbereich) sichtbar sind. Gleiche
+     * Opt-in-Polarität wie `marketplace_enabled` (fehlend/undefined = AUS,
+     * NICHT wie `payments_enabled` & Co.) — der Schalter kommt ausschließlich
+     * aus dem Betreiber-Portal (`updateTenantFeatures()`,
+     * `platform/actions.ts`), niemals vom Mandanten selbst (siehe
+     * CLAUDE.md-Feature-Beschreibung: "pro Mandant über das Betreiber-Portal
+     * freischaltbar, nicht vom Mandanten selbst"). Der Lernbereich-Menüpunkt
+     * braucht zusätzlich eine eigene `calendar_workers`-Zeile des Nutzers
+     * (app-shell.tsx) — dieses Flag allein reicht dafür nicht aus.
+     */
+    shift_calendar_enabled?: boolean;
   };
 };
 

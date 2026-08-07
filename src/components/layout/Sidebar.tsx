@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Building2,
   ExternalLink,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -97,12 +98,17 @@ import {
  * sichtbares `customer_area_items`-Item existiert (gleiches Prinzip "keine
  * toten Links" wie bei `customLinks`). Default `false`: jeder Aufrufer ohne
  * dieses Prop verhält sich exakt wie zuvor.
+ *
+ * `showShiftCalendar` NEU (Schichtplan S1, 07.08.2026) — gleiches Prinzip
+ * wie `showCustomerArea`: nur sichtbar, wenn der Mandant das Feature über
+ * das Betreiber-Portal freigeschaltet hat UND der Nutzer eine eigene
+ * `calendar_workers`-Zeile hat (Berechnung in app-shell.tsx). Default `false`.
  */
-export type SidebarItemId = "dashboard" | "catalog" | "bookmarks" | "customerArea";
+export type SidebarItemId = "dashboard" | "catalog" | "bookmarks" | "customerArea" | "shiftCalendar";
 
 type NavItem = {
   id: SidebarItemId;
-  labelKey: "navDashboardLabel" | "navBookmarksLabel" | "navCatalogLabel" | "navCustomerAreaLabel";
+  labelKey: "navDashboardLabel" | "navBookmarksLabel" | "navCatalogLabel" | "navCustomerAreaLabel" | "navShiftCalendarLabel";
   href: string;
   badge?: string;
   icon: LucideIcon;
@@ -116,6 +122,7 @@ const LERNEN: NavItem[] = [
   { id: "bookmarks", labelKey: "navBookmarksLabel", href: "/lesezeichen", icon: Bookmark },
   { id: "catalog", labelKey: "navCatalogLabel", href: "/kurskatalog", icon: Search },
   { id: "customerArea", labelKey: "navCustomerAreaLabel", href: "/kunden-area", icon: Headset },
+  { id: "shiftCalendar", labelKey: "navShiftCalendarLabel", href: "/schichtplan", icon: CalendarClock },
 ];
 
 /** Leitet den aktiven Menüpunkt aus der Route ab (Semantik wie shell/nav-link.tsx). */
@@ -124,6 +131,7 @@ function activeFromPath(pathname: string): SidebarItemId | undefined {
   if (pathname === "/kurskatalog" || pathname.startsWith("/kurskatalog/")) return "catalog";
   if (pathname === "/lesezeichen" || pathname.startsWith("/lesezeichen/")) return "bookmarks";
   if (pathname === "/kunden-area" || pathname.startsWith("/kunden-area/")) return "customerArea";
+  if (pathname === "/schichtplan" || pathname.startsWith("/schichtplan/")) return "shiftCalendar";
   return undefined;
 }
 
@@ -133,6 +141,7 @@ export function Sidebar({
   isPlatformAdmin = false,
   customLinks = [],
   showCustomerArea = false,
+  showShiftCalendar = false,
   variant = "rail",
   tenantName = "Calltalent",
   logoUrl = null,
@@ -143,6 +152,8 @@ export function Sidebar({
   customLinks?: SidebarLink[];
   /** Siehe Kopfkommentar oben — Default `false` erhält das bisherige Verhalten. */
   showCustomerArea?: boolean;
+  /** Siehe Kopfkommentar oben — Default `false` erhält das bisherige Verhalten. */
+  showShiftCalendar?: boolean;
   variant?: "rail" | "panel";
   /** Mandanten-Wortmarke/-Logo (26.07.2026, Josips Fund: "oben links kommt
    * das Logo von Calltalent statt von Projekt X"). Default bewahrt exakt das
@@ -156,7 +167,10 @@ export function Sidebar({
   const pathname = usePathname();
   const activeId = active ?? activeFromPath(pathname);
   const isPanel = variant === "panel";
-  const visibleLernen = LERNEN.filter((item) => item.id !== "customerArea" || showCustomerArea);
+  const visibleLernen = LERNEN.filter(
+    (item) =>
+      (item.id !== "customerArea" || showCustomerArea) && (item.id !== "shiftCalendar" || showShiftCalendar),
+  );
   // Im Panel (mobiles Ausklapp-Menü) sind Labels immer sichtbar — der
   // Ein-/Ausklapp-Zustand der Desktop-Schiene ist dort irrelevant.
   const showLabels = isPanel || expanded;

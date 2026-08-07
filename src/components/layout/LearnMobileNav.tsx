@@ -34,6 +34,7 @@ export function LearnMobileNav({
   isPlatformAdmin = false,
   customLinks = [],
   showCustomerArea = false,
+  showShiftCalendar = false,
   user,
   notifications = [],
   tenantName = "Calltalent",
@@ -44,6 +45,8 @@ export function LearnMobileNav({
   customLinks?: SidebarLink[];
   /** Siehe Sidebar.tsx-Kopfkommentar — unverändert an `<Sidebar variant="panel">` durchgereicht, keine zweite Datenquelle. */
   showCustomerArea?: boolean;
+  /** Siehe Sidebar.tsx-Kopfkommentar — unverändert an `<Sidebar variant="panel">` durchgereicht, keine zweite Datenquelle. */
+  showShiftCalendar?: boolean;
   user: TopBarUser;
   notifications?: NotificationItem[];
   tenantName?: string;
@@ -133,6 +136,7 @@ export function LearnMobileNav({
             isPlatformAdmin={isPlatformAdmin}
             customLinks={customLinks}
             showCustomerArea={showCustomerArea}
+            showShiftCalendar={showShiftCalendar}
             tenantName={tenantName}
             logoUrl={logoUrl}
           />

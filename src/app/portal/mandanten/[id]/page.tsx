@@ -107,11 +107,13 @@ export default async function MandantDetailPage({
     course_generator_enabled?: boolean;
     marketplace_enabled?: boolean;
     marketplace_commission_bp?: number;
+    shift_calendar_enabled?: boolean;
   };
   const paymentsEnabled = tenantSettings.payments_enabled !== false;
   const tutorEnabled = tenantSettings.tutor_enabled === true;
   const courseGeneratorEnabled = tenantSettings.course_generator_enabled === true;
   const marketplaceEnabled = tenantSettings.marketplace_enabled === true;
+  const shiftCalendarEnabled = tenantSettings.shift_calendar_enabled === true;
   // Bp -> Prozent-String fürs Formularfeld (z. B. 1750 -> "17,5"), leer wenn
   // kein mandantenspezifischer Satz gesetzt ist (Formular zeigt dann den
   // globalen Standardsatz nur als Platzhalter-Hinweistext, siehe unten).
@@ -277,6 +279,7 @@ export default async function MandantDetailPage({
           marketplaceEnabled,
           marketplaceCommissionPercent,
           defaultCommissionPercent,
+          shiftCalendarEnabled,
         }}
         domains={tenantDomains ?? []}
         brandingInitial={brandingInitial}

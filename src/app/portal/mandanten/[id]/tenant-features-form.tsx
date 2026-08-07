@@ -29,6 +29,11 @@ const initialState: PlatformActionState = { error: null };
  * zeigt den aktuellen globalen Wert an, keine Vorbelegung — ein Platzhalter
  * würde beim Absenden sonst fälschlich als "explizit gewählter Wert"
  * missverstanden werden können).
+ *
+ * ERWEITERT (Schichtplan S1, 07.08.2026): fünfter Schalter "Schichtplan
+ * freischalten" (`shift_calendar_enabled`), gleiche "aus, außer explizit
+ * true"-Polarität, einziger Freischalt-Weg für das Feature (der Mandant hat
+ * dafür keinen eigenen Schalter, siehe CLAUDE.md-Feature-Beschreibung).
  */
 export function TenantFeaturesForm({
   tenantId,
@@ -38,6 +43,7 @@ export function TenantFeaturesForm({
   marketplaceEnabled,
   marketplaceCommissionPercent,
   defaultCommissionPercent,
+  shiftCalendarEnabled,
 }: {
   tenantId: string;
   paymentsEnabled: boolean;
@@ -46,6 +52,7 @@ export function TenantFeaturesForm({
   marketplaceEnabled: boolean;
   marketplaceCommissionPercent: string;
   defaultCommissionPercent: string;
+  shiftCalendarEnabled: boolean;
 }) {
   const boundUpdate = updateTenantFeatures.bind(null, tenantId);
   const [state, formAction, pending] = useActionState(boundUpdate, initialState);
@@ -111,6 +118,12 @@ export function TenantFeaturesForm({
             </p>
           </div>
         )}
+        <FeatureCheckbox
+          name="shiftCalendarEnabled"
+          label="Schichtplan freischalten"
+          desc="Kalender für Schichtplanung und Zeiterfassung — Arbeiterverwaltung im Admin-Bereich, Wochenansicht + Ein-/Ausstempeln im Lernbereich."
+          defaultChecked={shiftCalendarEnabled}
+        />
       </div>
 
       {state.error && (

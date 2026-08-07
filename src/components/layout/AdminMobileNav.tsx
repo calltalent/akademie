@@ -26,6 +26,7 @@ export function AdminMobileNav({
   tenantName = "Calltalent",
   logoUrl = null,
   marketplaceEnabled = false,
+  shiftCalendarEnabled = false,
 }: {
   isPlatformAdmin?: boolean;
   pendingSubmissions?: number;
@@ -35,6 +36,8 @@ export function AdminMobileNav({
   logoUrl?: string | null;
   /** Marketplace M2 (03.08.2026) — siehe AdminSidebar.tsx. */
   marketplaceEnabled?: boolean;
+  /** Schichtplan S1 (07.08.2026) — siehe AdminSidebar.tsx. */
+  shiftCalendarEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -93,6 +96,7 @@ export function AdminMobileNav({
             isPlatformAdmin={isPlatformAdmin}
             pendingSubmissions={pendingSubmissions}
             marketplaceEnabled={marketplaceEnabled}
+            shiftCalendarEnabled={shiftCalendarEnabled}
           />
         </div>
       )}

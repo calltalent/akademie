@@ -56,6 +56,14 @@ import { HtmlBackgroundSync } from "@/components/shell/html-background-sync";
  * respektiert also automatisch auch die Gruppenfilterung — kein
  * Marketplace-Gast sieht hier je eine Zeile (`member_role()` liefert für
  * 'guest' `null`, Plan Abschnitt 0.4).
+ *
+ * `showShiftCalendar` NEU (Schichtplan S1, 07.08.2026) — gleicher Grund wie
+ * `showCustomerArea` oben. Zeigt den Menüpunkt "Mein Schichtplan" nur, wenn
+ * BEIDES zutrifft: das Betreiber-Portal-Flag ist gesetzt UND der Nutzer hat
+ * eine eigene `calendar_workers`-Zeile in diesem Mandanten — die
+ * `calendar_workers`-Abfrage läuft deshalb nur, wenn das Flag überhaupt
+ * gesetzt ist (kein unnötiger Rundlauf für die meisten Mandanten, die das
+ * Feature gar nicht gebucht haben).
  */
 export async function AppShell({
   children,
@@ -103,6 +111,7 @@ export async function AppShell({
   const tenant = await getTenant();
   let customLinks: { id: string; label: string; url: string }[] = [];
   let showCustomerArea = false;
+  let showShiftCalendar = false;
   if (tenant) {
     const supabase = await createClient();
     const [{ data: links }, { data: caRows }] = await Promise.all([
@@ -115,6 +124,26 @@ export async function AppShell({
     ]);
     customLinks = links ?? [];
     showCustomerArea = (caRows?.length ?? 0) > 0;
+
+    // Schichtplan (Block S1, 07.08.2026): Abfrage nur, wenn das Betreiber-
+    // Portal-Flag überhaupt gesetzt ist (kein unnötiger Rundlauf für die
+    // meisten Mandanten, die das Feature gar nicht gebucht haben) — exakt
+    // `.eq("tenant_id", …).eq("user_id", …).limit(1)`, gleiches
+    // "erste sichtbare Zeile reicht"-Prinzip wie bei `showCustomerArea` oben.
+    if (tenant.settings.shift_calendar_enabled === true) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: workerRows } = await supabase
+          .from("calendar_workers")
+          .select("id")
+          .eq("tenant_id", tenant.id)
+          .eq("user_id", user.id)
+          .limit(1);
+        showShiftCalendar = (workerRows?.length ?? 0) > 0;
+      }
+    }
   }
 
   const topBarUser = { name: userName, email: userEmail, role: t("role") };
@@ -128,6 +157,7 @@ export async function AppShell({
         isPlatformAdmin={platformAccess.ok}
         customLinks={customLinks}
         showCustomerArea={showCustomerArea}
+        showShiftCalendar={showShiftCalendar}
         user={topBarUser}
         notifications={[]}
         tenantName={tenantName}
@@ -140,6 +170,7 @@ export async function AppShell({
           isPlatformAdmin={platformAccess.ok}
           customLinks={customLinks}
           showCustomerArea={showCustomerArea}
+          showShiftCalendar={showShiftCalendar}
           tenantName={tenantName}
           logoUrl={logoUrl}
         />

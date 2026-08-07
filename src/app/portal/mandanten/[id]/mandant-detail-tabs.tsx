@@ -77,6 +77,7 @@ export function MandantDetailTabs({
     marketplaceEnabled: boolean;
     marketplaceCommissionPercent: string;
     defaultCommissionPercent: string;
+    shiftCalendarEnabled: boolean;
   };
   domains: { id: string; domain: string }[];
   brandingInitial: { colorPrimary: string; radius: number; logoUrl: string | null };
@@ -178,6 +179,7 @@ export function MandantDetailTabs({
           marketplaceEnabled={features.marketplaceEnabled}
           marketplaceCommissionPercent={features.marketplaceCommissionPercent}
           defaultCommissionPercent={features.defaultCommissionPercent}
+          shiftCalendarEnabled={features.shiftCalendarEnabled}
         />
       )}
 
