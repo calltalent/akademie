@@ -12,7 +12,7 @@ import { E2E_STAFF_EMAIL, E2E_STUDENT_EMAIL, E2E_TEST_PASSWORD } from "./global-
  * (`test.describe.configure({ mode: "serial" })`, gleiches Prinzip wie S1:
  * die sieben Fälle bauen bewusst aufeinander auf).
  *
- * Migration `20260808100000_shift_calendar_s2.sql` ist zum Zeitpunkt des
+ * Migration `20260807171725_shift_calendar_s2.sql` ist zum Zeitpunkt des
  * Schreibens dieser Datei NOCH NICHT auf der verlinkten Supabase-Instanz
  * angewendet — dieser Spec läuft deshalb noch nicht gegen echte Daten, wird
  * aber nach der Migration verifiziert (gleiches Vorgehen wie S1).

@@ -212,7 +212,16 @@ export function ShiftChangeRequestPanel({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const requestByShiftId = new Map(requests.map((r) => [r.shiftId, r]));
+  // `requests` kommt sortiert nach created_at DESC (neueste zuerst,
+  // getWorkerChangeRequests()) — bei mehreren Anfragen für dieselbe Schicht
+  // (z. B. eine bereits entschiedene plus eine neue offene) muss die
+  // NEUESTE gewinnen. `new Map(requests.map(...))` würde stattdessen die
+  // ÄLTESTE gewinnen lassen (spätere .set()-Aufrufe überschreiben frühere),
+  // deshalb hier explizit nur den ersten Treffer je shiftId übernehmen.
+  const requestByShiftId = new Map<string, CalendarChangeRequestRow>();
+  for (const r of requests) {
+    if (!requestByShiftId.has(r.shiftId)) requestByShiftId.set(r.shiftId, r);
+  }
   const visibleShifts = shifts.filter((s) => s.status === "planned" || s.status === "confirmed");
 
   function submit(shiftId: string, kind: "update" | "cancel", extra: { date?: string; startTime?: string; endTime?: string; breakMinutes?: number; reason: string }) {
@@ -278,27 +287,27 @@ export function ShiftChangeRequestPanel({
                         {statusLabel}
                       </span>
                     )}
-                    {!request || isPendingRequest ? (
-                      <>
-                        <button
-                          type="button"
-                          disabled={isPendingRequest}
-                          onClick={() => setFormState({ mode: "change", shiftId: shift.id })}
-                          className="rounded-sm border border-border-300 bg-white px-3 py-2 text-sm font-semibold text-navy disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        >
-                          {t("changeButton")}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isPendingRequest}
-                          onClick={() => setFormState({ mode: "cancel", shiftId: shift.id })}
-                          className="rounded-sm border px-3 py-2 text-sm font-semibold disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/40"
-                          style={{ borderColor: "#E3C0C0", color: "#B24343" }}
-                        >
-                          {t("cancelButton")}
-                        </button>
-                      </>
-                    ) : null}
+                    {/* Knöpfe erscheinen immer, nur bei einer OFFENEN Anfrage
+                        deaktiviert — eine bereits entschiedene (approved/
+                        rejected) Anfrage darf eine neue Anfrage für dieselbe
+                        Schicht nicht dauerhaft blockieren. */}
+                    <button
+                      type="button"
+                      disabled={isPendingRequest}
+                      onClick={() => setFormState({ mode: "change", shiftId: shift.id })}
+                      className="rounded-sm border border-border-300 bg-white px-3 py-2 text-sm font-semibold text-navy disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    >
+                      {t("changeButton")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPendingRequest}
+                      onClick={() => setFormState({ mode: "cancel", shiftId: shift.id })}
+                      className="rounded-sm border px-3 py-2 text-sm font-semibold disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      style={{ borderColor: "#E3C0C0", color: "#B24343" }}
+                    >
+                      {t("cancelButton")}
+                    </button>
                   </div>
                 </div>
 

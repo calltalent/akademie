@@ -424,7 +424,7 @@ export async function getOpenSlotsForWorker(
   // nicht auf der DB angewendet) — die generierten Supabase-Typen kennen sie
   // deshalb noch nicht, `.rpc()` liefert hier `unknown`. Manuelles Casting
   // auf die per Migration definierte `returns table(...)`-Form (Abschnitt 6
-  // von 20260808100000_shift_calendar_s2.sql). Nach `npx supabase gen types`
+  // von 20260807171725_shift_calendar_s2.sql). Nach `npx supabase gen types`
   // (nach Anwendung der Migration) kann dieser Cast entfallen.
   const { data } = await supabase.rpc("calendar_open_slots", { t: tenantId, from_ts: fromIso, to_ts: toIso });
   const rows = (data ?? []) as unknown as CalendarOpenSlotDbRow[];

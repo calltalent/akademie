@@ -1,6 +1,6 @@
 -- Sicherheits-Fix (security-reviewer, S2-Durchlauf, 08.08.2026, MITTEL):
 --
--- calendar_workers_guard() (20260808100000_shift_calendar_s2.sql) und
+-- calendar_workers_guard() (20260807171725_shift_calendar_s2.sql) und
 -- calendar_time_entries_guard() (20260807142619_shift_calendar.sql, S1)
 -- prüften beide `calendar_is_admin(new.tenant_id)` statt `old.tenant_id`,
 -- BEVOR sie new.tenant_id auf old.tenant_id zurücksetzen.

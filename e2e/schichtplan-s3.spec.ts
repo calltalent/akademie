@@ -10,7 +10,7 @@ import { E2E_STAFF_EMAIL, E2E_STUDENT_EMAIL, E2E_TEST_PASSWORD } from "./global-
  * (S1) und `schichtplan-s2.spec.ts` (S2) bleiben UNVERÄNDERT, eigene
  * serielle Kette (`mode: "serial"`, die acht Fälle bauen aufeinander auf).
  *
- * Migration `20260809100000_shift_calendar_s3.sql` ist zum Zeitpunkt des
+ * Migration `20260807215142_shift_calendar_s3.sql` ist zum Zeitpunkt des
  * Schreibens dieser Datei NOCH NICHT auf der verlinkten Supabase-Instanz
  * angewendet — dieser Spec läuft deshalb noch nicht gegen echte Daten, wird
  * aber nach der Migration verifiziert (gleiches Vorgehen wie S1/S2).
@@ -289,7 +289,10 @@ test("Fall 5 — Admin öffnet 'Änderungsanfragen', sieht Arbeitername/Zeiten/B
   const startHour = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", hourCycle: "h23" }).format(
     new Date(shiftRow.starts_at as string),
   );
-  expect(startHour).toBe("09");
+  // Node/ICU hängt an ein reines "hour: 2-digit"-Format in de-DE zusätzlich
+  // " Uhr" an (versionsabhängig) — nur die Ziffern vergleichen, nicht den
+  // exakten String.
+  expect(startHour.replace(/\D/g, "")).toBe("09");
   expect(shiftRow.status).toBe("planned");
 
   const { data: requestRow } = await admin
@@ -346,7 +349,7 @@ test("Fall 6 — Konfliktfall: Genehmigung schlägt bei Zeitüberschneidung sich
   const hourAfterFail = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", hourCycle: "h23" }).format(
     new Date(shiftAfterFail!.starts_at as string),
   );
-  expect(hourAfterFail).toBe("09");
+  expect(hourAfterFail.replace(/\D/g, "")).toBe("09");
 
   const { data: stillPending } = await admin
     .from("calendar_shift_change_requests")
@@ -356,7 +359,10 @@ test("Fall 6 — Konfliktfall: Genehmigung schlägt bei Zeitüberschneidung sich
     .maybeSingle();
   expect(stillPending).not.toBeNull();
 
-  // Blockierende Schicht stornieren, dann erneut genehmigen.
+  // Blockierende Schicht stornieren, dann erneut genehmigen. Zurück zum
+  // Reiter "Schichten" — der Button existiert nur dort, nicht im gerade
+  // aktiven Reiter "Änderungsanfragen".
+  await page.goto(tenantUrl("/admin/schichtplanung?tab=shifts"));
   await blockingShiftButton.click();
   await expect(page.getByRole("heading", { name: "Schicht bearbeiten" })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
@@ -373,7 +379,7 @@ test("Fall 6 — Konfliktfall: Genehmigung schlägt bei Zeitüberschneidung sich
   const hourAfterSuccess = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", hourCycle: "h23" }).format(
     new Date(shiftAfterSuccess!.starts_at as string),
   );
-  expect(hourAfterSuccess).toBe("18");
+  expect(hourAfterSuccess.replace(/\D/g, "")).toBe("18");
   expect(shiftAfterSuccess?.status).toBe("planned");
 });
 
@@ -396,6 +402,12 @@ test("Fall 7 — Stornierungs-Anfrage: Genehmigung setzt Schicht auf 'cancelled'
   await expect(page.getByRole("heading", { name: "Schicht anlegen" })).toBeVisible();
   await page.getByLabel("Projekt (optional)").selectOption({ label: projectName });
   await page.getByRole("button", { name: "Schicht anlegen" }).click();
+  // Ohne diese Wartebestätigung läuft die folgende DB-Abfrage gegen
+  // Supabase, bevor der zweite Server-Action-Aufruf tatsächlich committed
+  // ist (Race Condition) — die erste Anlage wurde bereits so abgesichert.
+  await expect(
+    page.getByRole("button", { name: new RegExp(`E2E Student, .*08:00 bis 16:00 Uhr, Projekt ${projectName}`) }),
+  ).toHaveCount(2, { timeout: 15000 });
 
   const { data: newShifts, error } = await admin
     .from("calendar_shifts")
@@ -482,7 +494,11 @@ test("Fall 8 — Projektleiter-Zugang: sieht in /admin/schichtplanung NUR 'Schic
     await expect(page.getByRole("button", { name: "Arbeiter", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Projekte", exact: true })).toHaveCount(0);
 
-    const nav = page.getByRole("navigation", { name: "Verwaltungs-Navigation" });
+    // role="complementary", nicht "navigation" — aria-label sitzt auf dem
+    // <aside>, der innere <nav> trägt kein eigenes Label (bekanntes Muster,
+    // siehe PHASENSTATUS.md "Kunden Area", Abschnitt zum Locator-Bug in
+    // dashboard-shell.spec.ts/admin-shell.spec.ts).
+    const nav = page.getByRole("complementary", { name: "Verwaltungs-Navigation" });
     await expect(nav.getByText("Schichtplanung")).toBeVisible();
     await expect(nav.getByText("Teilnehmer")).toHaveCount(0);
     await expect(nav.getByText("Kurse")).toHaveCount(0);

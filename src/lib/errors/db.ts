@@ -24,7 +24,7 @@ const DB_ERROR_MESSAGES_DE: Record<string, string> = {
   "23P01": "Diese Zeit überschneidet sich mit einer bestehenden Schicht.", // exclusion_violation (Postgres-Standard, EXCLUDE-Constraint)
   "CT001": "Dieses Zeitfenster ist bereits voll belegt.", // calendar_slot_capacity_guard()
   "CT002": "Die gewählte Zeit liegt außerhalb des freigegebenen Zeitfensters.", // calendar_slot_capacity_guard()
-  // Schichtplan Block S2 (08.08.2026, supabase/migrations/20260808100000_shift_calendar_s2.sql):
+  // Schichtplan Block S2 (08.08.2026, supabase/migrations/20260807171725_shift_calendar_s2.sql):
   "CT003": "Die Schicht gehört nicht zum Projekt des gewählten Zeitfensters.", // calendar_slot_capacity_guard()
 };
 
