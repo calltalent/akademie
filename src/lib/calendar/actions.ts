@@ -420,7 +420,7 @@ export async function clockIn(input: CalendarClockInInput = {}): Promise<TimeEnt
     // shiftId (falls angegeben) muss zu DIESEM Mandanten UND diesem
     // Arbeiter gehören — calendar_time_entries.shift_id ist bewusst ein
     // einfacher, nicht zusammengesetzter Fremdschlüssel (siehe
-    // Migrationskopf 20260807090000_shift_calendar.sql, Abschnitt 8), diese
+    // Migrationskopf 20260807142619_shift_calendar.sql, Abschnitt 8), diese
     // Prüfung ist die dafür vorgesehene Anwendungs-Verteidigungslinie.
     let shiftId: string | null = null;
     if (data.shiftId) {

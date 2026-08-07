@@ -20,7 +20,7 @@ const DB_ERROR_MESSAGES_DE: Record<string, string> = {
   "42501": "Du hast keine Berechtigung für diese Aktion.", // insufficient_privilege (RLS)
   "PGRST301": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.", // JWT expired
   "PGRST116": "Der angeforderte Datensatz wurde nicht gefunden.", // no rows / not a single row
-  // Schichtplan (Block S1, 07.08.2026, supabase/migrations/20260807090000_shift_calendar.sql):
+  // Schichtplan (Block S1, 07.08.2026, supabase/migrations/20260807142619_shift_calendar.sql):
   "23P01": "Diese Zeit überschneidet sich mit einer bestehenden Schicht.", // exclusion_violation (Postgres-Standard, EXCLUDE-Constraint)
   "CT001": "Dieses Zeitfenster ist bereits voll belegt.", // calendar_slot_capacity_guard()
   "CT002": "Die gewählte Zeit liegt außerhalb des freigegebenen Zeitfensters.", // calendar_slot_capacity_guard()

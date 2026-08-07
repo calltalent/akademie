@@ -5,7 +5,7 @@ import { E2E_STUDENT_EMAIL, E2E_TEST_PASSWORD } from "./global-setup";
 
 /**
  * "Schichtplan" Block S1 (Josips Auftrag, 07.08.2026). Migration
- * 20260807090000_shift_calendar.sql ist zum Zeitpunkt des Schreibens dieser
+ * 20260807142619_shift_calendar.sql ist zum Zeitpunkt des Schreibens dieser
  * Datei NOCH NICHT auf der verlinkten Supabase-Instanz angewendet (siehe
  * PHASENSTATUS.md) — dieser Spec läuft deshalb noch nicht gegen echte Daten,
  * wird aber nach der Migration verifiziert.
