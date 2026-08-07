@@ -3487,3 +3487,13 @@ Josips lokaler `npx supabase db push` scheiterte zweimal an CLI-Umgebungsproblem
 4. **Dateinamen korrigiert:** Die Supabase-MCP-`apply_migration`-Funktion vergibt die Migrations-Version nach dem tatsächlichen Ausführungszeitpunkt, nicht nach dem lokalen Dateinamen-Zeitstempel — remote wurden die beiden Migrationen als `20260807142619`/`20260807142948` registriert, lokal hießen die Dateien noch `20260807090000`/`20260807090100`. Beide Dateien umbenannt, damit ein künftiger `supabase db push` sie nicht als "neu, noch nicht angewendet" erkennt und erneut auszuführen versucht. Alle Verweise in `PHASENSTATUS.md`, `SPEC.md`, `e2e/schichtplan.spec.ts`, `src/lib/calendar/actions.ts`, `src/lib/errors/db.ts` und `Entscheidungs-Log.md` (vaultweit) auf den neuen Dateinamen nachgezogen.
 
 **Offen:** `e2e/schichtplan.spec.ts` gegen die jetzt echten Tabellen laufen lassen (bisher nur `--list` bestätigt) — noch nicht ausgeführt, da kein `npm run e2e`-Lauf in diesem Schritt beauftragt war.
+
+## Schichtplan — Block S1: e2e-Lauf gegen echte Daten, ein Testbug gefunden und behoben (07.08.2026)
+
+`npx playwright test e2e/schichtplan.spec.ts` erstmals gegen die jetzt live angewendeten Tabellen ausgeführt. Erster Lauf: 4/5 grün, Test 5 ("Ein-/Ausstempeln funktioniert; zweites Einstempeln ohne vorheriges Ausstempeln wird abgelehnt") lief zweimal reproduzierbar (kein Flackern) in ein 180s-Timeout.
+
+**Ursache gefunden:** `studentClient.auth.signOut()` (zwei Stellen: Zeile 194 im RLS-Sichtbarkeitscheck von Test 4, Zeile 228 im Doppel-Einstempel-Check von Test 5) rief Supabase Auth ohne `scope`-Angabe auf — Standardwert ist `"global"`, das widerruft **alle** Sitzungen des Kontos serverseitig, nicht nur die des Ad-hoc-Clients. Das hat die im Playwright-Browser über `storageState: "e2e/.auth/student.json"` gespeicherte Session mit-invalidiert — ein `page.goto("/schichtplan")` danach landete deshalb sofort auf `/login` und das anschließende `expect(...).toBeVisible()` lief ins Timeout. Reiner Testcode-Fehler, keine Produktschwachstelle (die eigentlich geprüfte Datenbank-Sperre — `calendar_time_entries_one_open`/`calendar_time_entries_no_overlap` — war laut security-reviewer-Durchlauf bereits als korrekt bestätigt und blieb von diesem Bug unberührt).
+
+**Fix:** beide Aufrufe auf `studentClient.auth.signOut({ scope: "local" })` umgestellt, mit erklärendem Kommentar an beiden Stellen. Danach zweimal komplett neu gelaufen: **5/5 grün** (25,8s). `npm run test` (523 Tests) und die übrige Suite weiterhin unberührt/grün.
+
+**Block „Schichtplan S1" damit vollständig abgeschlossen und live verifiziert:** Migration angewendet, Advisor-Funde behoben, Security-Review bestanden, volle e2e-Abdeckung grün.

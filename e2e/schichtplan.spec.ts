@@ -191,7 +191,12 @@ test("Owner legt Projekt an und weist den Arbeiter zu — Zuweisung admin-seitig
     expect(visibleError).toBeNull();
     expect(visibleProject?.name).toBe(projectName);
   } finally {
-    await studentClient.auth.signOut();
+    // scope "local" ist hier Pflicht: der Standard-Scope "global" widerruft
+    // ALLE Sitzungen dieses Nutzers serverseitig — inklusive der im
+    // Playwright-Browser über storageState ("e2e/.auth/student.json")
+    // gespeicherten Session, die der nächste Test in dieser Datei noch
+    // braucht. Ohne "local" landet der nächste Test sofort auf /login.
+    await studentClient.auth.signOut({ scope: "local" });
   }
 });
 
@@ -225,7 +230,11 @@ test("Ein-/Ausstempeln funktioniert; zweites Einstempeln ohne vorheriges Ausstem
       });
       expect(duplicateError).not.toBeNull();
     } finally {
-      await studentClient.auth.signOut();
+      // scope "local" — siehe Kommentar bei der ersten Verwendung oben.
+      // Ohne "local" würde dieser Aufruf sogar die eigene Browser-Session
+      // DIESES Tests widerrufen, noch bevor der "Ausstempeln"-Klick unten
+      // ausgeführt wird.
+      await studentClient.auth.signOut({ scope: "local" });
     }
 
     await page.getByRole("button", { name: "Ausstempeln" }).click();
