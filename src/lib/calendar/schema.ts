@@ -160,3 +160,159 @@ export function toCalendarProjectRow(
     memberWorkerIds,
   };
 }
+
+// =====================================================================
+// Block S2 (08.08.2026) — Admin-Schicht-CRUD, Zeitfenster-Verwaltung,
+// Freelancer-Selbstbuchung, Feiertagsimport, Sollstunden-Selbstverwaltung.
+// Bestehende Schemas/Typen oben UNVERÄNDERT.
+// =====================================================================
+
+/** Deckt sich mit den zod-Regex-Anforderungen unten UND dem HTML-Standardformat von `<input type="date">`/`<input type="time">`. */
+export const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ungültiges Datum.");
+export const calendarTimeSchema = z.string().regex(/^\d{2}:\d{2}$/, "Ungültige Uhrzeit.");
+
+export const CALENDAR_SHIFT_STATUSES = ["planned", "confirmed", "cancelled"] as const;
+export type CalendarShiftStatus = (typeof CALENDAR_SHIFT_STATUSES)[number];
+
+export const CALENDAR_SLOT_STATUSES = ["open", "closed"] as const;
+export type CalendarSlotStatus = (typeof CALENDAR_SLOT_STATUSES)[number];
+
+export const CALENDAR_ABSENCE_KINDS = ["vacation", "holiday", "sick", "other"] as const;
+export type CalendarAbsenceKind = (typeof CALENDAR_ABSENCE_KINDS)[number];
+
+export const CALENDAR_HOLIDAY_COUNTRIES = ["DE", "AT", "CH"] as const;
+export type CalendarHolidayCountryCode = (typeof CALENDAR_HOLIDAY_COUNTRIES)[number];
+
+/** Admin-Schicht-CRUD (`createCalendarShift`/`updateCalendarShift`) — Datum+Uhrzeit getrennt (Formular-Felder), die Server Action baut daraus über `berlinDateTimeToUtc()` die `starts_at`/`ends_at`-Zeitstempel. */
+export const calendarShiftSchema = z
+  .object({
+    workerId: z.string().uuid("Ungültiger Arbeiter."),
+    projectId: z.string().uuid("Ungültiges Projekt.").optional(),
+    slotId: z.string().uuid("Ungültiges Zeitfenster.").optional(),
+    date: calendarDateSchema,
+    startTime: calendarTimeSchema,
+    endTime: calendarTimeSchema,
+    breakMinutes: z.coerce.number().int().min(0).max(480).default(0),
+    note: z.string().trim().max(500, "Höchstens 500 Zeichen.").optional(),
+  })
+  .refine((d) => d.startTime !== d.endTime, {
+    message: "Start- und Endzeit dürfen nicht gleich sein.",
+    path: ["endTime"],
+  });
+export type CalendarShiftInput = z.infer<typeof calendarShiftSchema>;
+
+export const calendarShiftStatusSchema = z.enum(CALENDAR_SHIFT_STATUSES);
+
+/** Zeitfenster-Serienanlage (`createCalendarSlots`) — `repeatWeeks` steuert `buildWeeklySeries()`. */
+export const calendarSlotSchema = z.object({
+  projectId: z.string().uuid("Ungültiges Projekt."),
+  date: calendarDateSchema,
+  startTime: calendarTimeSchema,
+  endTime: calendarTimeSchema,
+  capacity: z.coerce.number().int().min(1).max(500),
+  repeatWeeks: z.coerce.number().int().min(1).max(26).default(1),
+});
+export type CalendarSlotInput = z.infer<typeof calendarSlotSchema>;
+
+export const calendarSlotStatusSchema = z.enum(CALENDAR_SLOT_STATUSES);
+
+/**
+ * Abwesenheit/Feiertag (`createCalendarAbsence`). Der zweite `refine`
+ * spiegelt den DB-CHECK `calendar_absences` `(kind = 'holiday') = (worker_id
+ * is null)` (20260807142619_shift_calendar.sql, Abschnitt 6) — beide
+ * Stellen bei einer künftigen Änderung synchron halten, gleiches Prinzip
+ * wie `calendarWeekdaySchema` oben (Kommentar dort).
+ */
+export const calendarAbsenceSchema = z
+  .object({
+    workerId: z.string().uuid("Ungültiger Arbeiter.").optional(),
+    kind: z.enum(CALENDAR_ABSENCE_KINDS),
+    startsOn: calendarDateSchema,
+    endsOn: calendarDateSchema,
+    note: z.string().trim().max(500, "Höchstens 500 Zeichen.").optional(),
+  })
+  .refine((d) => d.endsOn >= d.startsOn, {
+    message: "Das Enddatum darf nicht vor dem Startdatum liegen.",
+    path: ["endsOn"],
+  })
+  .refine((d) => (d.kind === "holiday") === (d.workerId === undefined), {
+    message: "Ein Feiertag hat keinen Arbeiter, jede andere Abwesenheit braucht einen.",
+    path: ["workerId"],
+  });
+export type CalendarAbsenceInput = z.infer<typeof calendarAbsenceSchema>;
+
+export const calendarHolidayImportSchema = z.object({
+  country: z.enum(CALENDAR_HOLIDAY_COUNTRIES),
+  year: z.coerce.number().int().min(2020).max(2100),
+});
+export type CalendarHolidayImportInput = z.infer<typeof calendarHolidayImportSchema>;
+
+export const calendarSelfBookingSchema = z.object({
+  slotId: z.string().uuid("Ungültiges Zeitfenster."),
+});
+export type CalendarSelfBookingInput = z.infer<typeof calendarSelfBookingSchema>;
+
+/** Freelancer-Selbstverwaltung (`updateOwnTargetHours`) — nur die zwei Felder, die der Trigger `calendar_workers_guard()` (S2-Migration) Nicht-Admins erlaubt. */
+export const calendarWorkerTargetSchema = z.object({
+  targetHours: z
+    .number()
+    .positive("Sollstunden müssen größer als 0 sein.")
+    .max(400, "Sollstunden dürfen höchstens 400 betragen.")
+    .optional(),
+  targetPeriod: z.enum(CALENDAR_TARGET_PERIODS),
+});
+export type CalendarWorkerTargetInput = z.infer<typeof calendarWorkerTargetSchema>;
+
+// --- Zeilentypen (App-Form, snake_case-DB-Zeilen -> camelCase) ---------
+
+export type CalendarSlotRow = {
+  id: string;
+  projectId: string | null;
+  projectName: string | null;
+  projectColor: string | null;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  status: CalendarSlotStatus;
+  bookedCount: number;
+};
+
+export type CalendarAbsenceRow = {
+  id: string;
+  workerId: string | null;
+  workerName: string | null;
+  kind: CalendarAbsenceKind;
+  startsOn: string;
+  endsOn: string;
+  note: string | null;
+  status: "requested" | "approved" | "rejected";
+};
+
+/** Admin-Wochenraster-Zeile — anders als `CalendarShiftRow` (Lernbereich, nur eigene Schichten) trägt diese zusätzlich Arbeitername/-id UND alle Status (Admin soll auch Stornos sehen). */
+export type CalendarAdminShiftRow = {
+  id: string;
+  workerId: string;
+  workerName: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  projectColor: string | null;
+  slotId: string | null;
+  startsAt: string;
+  endsAt: string;
+  breakMinutes: number;
+  status: CalendarShiftStatus;
+  source: "admin" | "self" | "ai";
+  note: string | null;
+};
+
+/** Ergebniszeile von `calendar_open_slots()` (RPC, S2-Migration) — Selbstbuchungs-Ansicht des Freelancers. */
+export type CalendarOpenSlotRow = {
+  id: string;
+  projectId: string;
+  projectName: string;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  freeSeats: number;
+  alreadyBooked: boolean;
+};

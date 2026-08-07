@@ -37,6 +37,20 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * dann alle Nachrichten (Rolle "user" UND "assistant") dieser
  * Konversationen — das bildet den vollständigen eigenen Tutor-Chatverlauf
  * ab, exakt das, was der Nutzer nach Art. 15/20 DSGVO erwarten würde.
+ *
+ * Schichtplan-Nachzug (Block S2, 08.08.2026, SPEC.md §12): `calendar_workers`
+ * hat KEINE direkte `user_id`-Filterung auf `calendar_shifts`/
+ * `calendar_time_entries`/`calendar_absences` (die hängen an `worker_id`,
+ * nicht an `user_id`) — gleiches Zwei-Schritt-Prinzip wie bei
+ * `tutor_messages` oben: zuerst die eigenen Arbeiterzeilen (ein Nutzer kann
+ * in mehreren Mandanten je eine Arbeiterzeile haben) laden, dann alle drei
+ * Tabellen über `worker_id in (...)`. `calendar_absences` mit
+ * `worker_id is null` (mandantenweite Feiertage) wird bewusst NICHT
+ * aufgenommen — das sind keine personenbezogenen Daten dieses Nutzers.
+ * `kind = 'sick'` ist ein Gesundheitsdatum (Art. 9 DSGVO), muss deshalb Teil
+ * der Selbstauskunft sein, seit S2 real vorhanden — S1 hatte nur
+ * `calendar_time_entries` (Ist-Zeiten, keine Gesundheitsdaten) hier bereits
+ * angemahnt, aber noch nicht nachgezogen.
  */
 export async function exportUserData(supabase: SupabaseClient, userId: string) {
   const [
@@ -49,6 +63,7 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
     certificatesRes,
     ordersRes,
     tutorConversationsRes,
+    calendarWorkersRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
     supabase.from("memberships").select("*").eq("user_id", userId),
@@ -59,6 +74,7 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
     supabase.from("certificates").select("*").eq("user_id", userId),
     supabase.from("orders").select("*").eq("user_id", userId),
     supabase.from("tutor_conversations").select("*").eq("user_id", userId),
+    supabase.from("calendar_workers").select("*").eq("user_id", userId),
   ]);
 
   const conversations = tutorConversationsRes.data ?? [];
@@ -73,6 +89,23 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
     tutorMessages = data ?? [];
   }
 
+  const calendarWorkers = calendarWorkersRes.data ?? [];
+  const calendarWorkerIds = calendarWorkers.map((w) => w.id as string);
+
+  let calendarShifts: unknown[] = [];
+  let calendarTimeEntries: unknown[] = [];
+  let calendarAbsences: unknown[] = [];
+  if (calendarWorkerIds.length > 0) {
+    const [shiftsRes, timeEntriesRes, absencesRes] = await Promise.all([
+      supabase.from("calendar_shifts").select("*").in("worker_id", calendarWorkerIds),
+      supabase.from("calendar_time_entries").select("*").in("worker_id", calendarWorkerIds),
+      supabase.from("calendar_absences").select("*").in("worker_id", calendarWorkerIds),
+    ]);
+    calendarShifts = shiftsRes.data ?? [];
+    calendarTimeEntries = timeEntriesRes.data ?? [];
+    calendarAbsences = absencesRes.data ?? [];
+  }
+
   return {
     exported_at: new Date().toISOString(),
     profile: profileRes.data ?? null,
@@ -85,5 +118,9 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
     orders: ordersRes.data ?? [],
     tutor_conversations: conversations,
     tutor_messages: tutorMessages,
+    calendar_workers: calendarWorkers,
+    calendar_shifts: calendarShifts,
+    calendar_time_entries: calendarTimeEntries,
+    calendar_absences: calendarAbsences,
   };
 }

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
+  berlinDateTimeToUtc,
   buildWeekGrid,
+  buildWeeklySeries,
   formatDayLabel,
   formatTime,
   formatTimeRange,
@@ -9,6 +11,7 @@ import {
   isoWeekNumber,
   minutesBetween,
   startOfIsoWeek,
+  toTimeInputValue,
 } from "./date";
 
 /**
@@ -125,5 +128,59 @@ describe("formatTimeRange/formatDayLabel", () => {
   it("formatiert den Tag als 'Wochentag, Tag. Monat' (Deutsch)", () => {
     const monday = new Date("2026-08-10T06:00:00Z");
     expect(formatDayLabel(monday)).toBe("Montag, 10. August");
+  });
+});
+
+/**
+ * Block S2 (08.08.2026) — berlinDateTimeToUtc/toTimeInputValue/buildWeeklySeries.
+ * Pflicht-Testfälle laut Bauauftrag.
+ */
+describe("berlinDateTimeToUtc", () => {
+  it("wandelt Datum+Uhrzeit in Berliner Sommerzeit korrekt nach UTC (08:00 CEST = 06:00 UTC)", () => {
+    expect(berlinDateTimeToUtc("2026-08-10", "08:00").toISOString()).toBe("2026-08-10T06:00:00.000Z");
+  });
+
+  it("wandelt Datum+Uhrzeit in Berliner Winterzeit korrekt nach UTC (08:00 CET = 07:00 UTC)", () => {
+    expect(berlinDateTimeToUtc("2026-01-15", "08:00").toISOString()).toBe("2026-01-15T07:00:00.000Z");
+  });
+});
+
+describe("toTimeInputValue", () => {
+  it("liefert immer ein zweistelliges HH:MM, auch bei einstelliger Stunde/Minute", () => {
+    // 2026-08-10T05:05:00Z = 07:05 Berlin (CEST)
+    expect(toTimeInputValue(new Date("2026-08-10T05:05:00Z"))).toBe("07:05");
+  });
+
+  it("ist konsistent mit berlinDateTimeToUtc (Hin- und Rückweg)", () => {
+    const utc = berlinDateTimeToUtc("2026-08-10", "08:00");
+    expect(toTimeInputValue(utc)).toBe("08:00");
+  });
+});
+
+describe("buildWeeklySeries", () => {
+  it("liefert 4 Termine mit Berliner Wanduhrzeit 08:00–16:00, DST-Sprung am 25.10.2026 erzeugt eine UTC-Verschiebung zwischen den Terminen davor/danach", () => {
+    const series = buildWeeklySeries("2026-10-12", "08:00", "16:00", 4);
+    expect(series).toHaveLength(4);
+    // Vor dem Umstellungstag (25.10.2026): CEST, UTC+2.
+    expect(series[0].startsAt.toISOString()).toBe("2026-10-12T06:00:00.000Z");
+    expect(series[0].endsAt.toISOString()).toBe("2026-10-12T14:00:00.000Z");
+    expect(series[1].startsAt.toISOString()).toBe("2026-10-19T06:00:00.000Z");
+    // Nach dem Umstellungstag: CET, UTC+1 — dieselbe Berliner Wanduhrzeit 08:00,
+    // aber ein anderer UTC-Versatz als die Termine davor.
+    expect(series[2].startsAt.toISOString()).toBe("2026-10-26T07:00:00.000Z");
+    expect(series[2].endsAt.toISOString()).toBe("2026-10-26T15:00:00.000Z");
+    expect(series[3].startsAt.toISOString()).toBe("2026-11-02T07:00:00.000Z");
+  });
+
+  it("Nachtschicht (endTime <= startTime) endet am Folgetag", () => {
+    const series = buildWeeklySeries("2026-08-10", "22:00", "06:00", 1);
+    expect(series).toHaveLength(1);
+    // 2026-08-10 22:00 CEST = 2026-08-10T20:00Z; 2026-08-11 06:00 CEST = 2026-08-11T04:00Z
+    expect(series[0].startsAt.toISOString()).toBe("2026-08-10T20:00:00.000Z");
+    expect(series[0].endsAt.toISOString()).toBe("2026-08-11T04:00:00.000Z");
+  });
+
+  it("weeks=1 liefert genau 1 Termin", () => {
+    expect(buildWeeklySeries("2026-08-10", "08:00", "16:00", 1)).toHaveLength(1);
   });
 });

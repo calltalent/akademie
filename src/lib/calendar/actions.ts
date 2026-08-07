@@ -7,24 +7,42 @@ import { getTenant } from "@/lib/tenant/context";
 import { translateDbError } from "@/lib/errors/db";
 import { genericErrorMessage } from "@/lib/errors/generic";
 import {
+  calendarAbsenceSchema,
   calendarClockInSchema,
+  calendarHolidayImportSchema,
   calendarProjectMemberIdsSchema,
   calendarProjectSchema,
   calendarProjectStatusSchema,
+  calendarSelfBookingSchema,
+  calendarShiftSchema,
+  calendarShiftStatusSchema,
+  calendarSlotSchema,
+  calendarSlotStatusSchema,
   calendarWorkerCreateSchema,
   calendarWorkerEditableSchema,
   calendarWorkerStatusSchema,
+  calendarWorkerTargetSchema,
   toCalendarProjectRow,
+  type CalendarAbsenceInput,
+  type CalendarAdminShiftRow,
   type CalendarClockInInput,
+  type CalendarHolidayImportInput,
   type CalendarProjectInput,
   type CalendarProjectRow,
   type CalendarProjectStatus,
+  type CalendarShiftInput,
+  type CalendarShiftStatus,
+  type CalendarSlotInput,
+  type CalendarSlotStatus,
   type CalendarTimeEntryRow,
   type CalendarWorkerCreateInput,
   type CalendarWorkerEditableInput,
   type CalendarWorkerRow,
   type CalendarWorkerStatus,
+  type CalendarWorkerTargetInput,
 } from "@/lib/calendar/schema";
+import { buildWeeklySeries } from "@/lib/calendar/date";
+import { buildHolidays } from "@/lib/calendar/holidays";
 
 /**
  * Server Actions für "Schichtplan" (Block S1, 07.08.2026). Stilvorbild
@@ -48,6 +66,10 @@ type ActionResult = { ok: true } | { ok: false; error: string };
 type WorkerResult = { ok: true; worker: CalendarWorkerRow } | { ok: false; error: string };
 type ProjectResult = { ok: true; project: CalendarProjectRow } | { ok: false; error: string };
 type TimeEntryResult = { ok: true; entry: CalendarTimeEntryRow } | { ok: false; error: string };
+type ShiftResult = { ok: true; shift: CalendarAdminShiftRow } | { ok: false; error: string };
+type SlotsCreateResult = { ok: true; created: number } | { ok: false; error: string };
+type HolidayImportResult = { ok: true; inserted: number; skipped: number } | { ok: false; error: string };
+type SelfBookingResult = { ok: true; shiftId: string } | { ok: false; error: string };
 
 const ADMIN_PATH = "/admin/schichtplanung";
 const LEARN_PATH = "/schichtplan";
@@ -517,6 +539,437 @@ export async function clockOut(): Promise<TimeEntryResult> {
         note: entry.note,
       },
     };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+// =====================================================================
+// Block S2 (08.08.2026) — Admin-Schicht-CRUD, Zeitfenster-Verwaltung,
+// Freelancer-Selbstbuchung, Feiertagsimport, Sollstunden-Selbstverwaltung.
+// =====================================================================
+
+async function loadAdminShiftRow(supabase: Supa, tenantId: string, shiftId: string): Promise<CalendarAdminShiftRow | null> {
+  const { data } = await supabase
+    .from("calendar_shifts")
+    .select(
+      "id, worker_id, project_id, slot_id, starts_at, ends_at, break_minutes, status, source, note, calendar_projects(name, color), calendar_workers(profiles(full_name, email))",
+    )
+    .eq("id", shiftId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (!data) return null;
+
+  const project = embeddedOne(data.calendar_projects as { name: string; color: string | null } | { name: string; color: string | null }[] | null);
+  const worker = embeddedOne(data.calendar_workers as { profiles: unknown } | { profiles: unknown }[] | null);
+  const profile = worker
+    ? embeddedOne(worker.profiles as { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null)
+    : null;
+
+  return {
+    id: data.id,
+    workerId: data.worker_id,
+    workerName: profile ? profile.full_name || profile.email : null,
+    projectId: data.project_id,
+    projectName: project?.name ?? null,
+    projectColor: project?.color ?? null,
+    slotId: data.slot_id,
+    startsAt: data.starts_at,
+    endsAt: data.ends_at,
+    breakMinutes: data.break_minutes,
+    status: data.status,
+    source: data.source,
+    note: data.note,
+  };
+}
+
+/** projectId/workerId/slotId serverseitig gegen den eigenen Mandanten validieren — nicht blind aus dem Formular übernehmen (RLS fängt eine fremde ID zwar auch ab, aber mit einer stillen "0 Zeilen" statt einer sprechenden Fehlermeldung). */
+async function assertOwnTenantRow(supabase: Supa, tenantId: string, table: "calendar_projects" | "calendar_slots" | "calendar_workers", id: string): Promise<boolean> {
+  const { data } = await supabase.from(table).select("id").eq("id", id).eq("tenant_id", tenantId).maybeSingle();
+  return Boolean(data);
+}
+
+export async function createCalendarShift(input: CalendarShiftInput): Promise<ShiftResult> {
+  try {
+    const { tenant, supabase, user } = await requireAdminTenant();
+    const parsed = calendarShiftSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+    const data = parsed.data;
+
+    if (!(await assertOwnTenantRow(supabase, tenant.id, "calendar_workers", data.workerId))) {
+      return { ok: false, error: "Arbeiter nicht gefunden." };
+    }
+    if (data.projectId && !(await assertOwnTenantRow(supabase, tenant.id, "calendar_projects", data.projectId))) {
+      return { ok: false, error: "Projekt nicht gefunden." };
+    }
+    if (data.slotId && !(await assertOwnTenantRow(supabase, tenant.id, "calendar_slots", data.slotId))) {
+      return { ok: false, error: "Zeitfenster nicht gefunden." };
+    }
+
+    // buildWeeklySeries(..., 1) liefert genau EINEN Termin — wiederverwendet
+    // statt einer eigenen Berlin->UTC-Umrechnung hier, gleiche
+    // Nachtschicht-Logik (endTime <= startTime -> Ende am Folgetag) wie bei
+    // der Zeitfenster-Serienanlage unten.
+    const [{ startsAt, endsAt }] = buildWeeklySeries(data.date, data.startTime, data.endTime, 1);
+
+    const { data: shift, error } = await supabase
+      .from("calendar_shifts")
+      .insert({
+        tenant_id: tenant.id,
+        worker_id: data.workerId,
+        project_id: data.projectId ?? null,
+        slot_id: data.slotId ?? null,
+        starts_at: startsAt.toISOString(),
+        ends_at: endsAt.toISOString(),
+        break_minutes: data.breakMinutes,
+        status: "planned",
+        source: "admin",
+        note: data.note ?? null,
+        created_by: user.id,
+      })
+      .select("id")
+      .single();
+    if (error || !shift) return { ok: false, error: error ? translateDbError(error) : "Anlegen fehlgeschlagen." };
+
+    const row = await loadAdminShiftRow(supabase, tenant.id, shift.id);
+    if (!row) return { ok: false, error: "Anlegen fehlgeschlagen." };
+
+    revalidatePath(ADMIN_PATH);
+    revalidatePath(LEARN_PATH);
+    return { ok: true, shift: row };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+export async function updateCalendarShift(shiftId: string, input: CalendarShiftInput): Promise<ShiftResult> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const parsed = calendarShiftSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+    const data = parsed.data;
+
+    if (!(await assertOwnTenantRow(supabase, tenant.id, "calendar_workers", data.workerId))) {
+      return { ok: false, error: "Arbeiter nicht gefunden." };
+    }
+    if (data.projectId && !(await assertOwnTenantRow(supabase, tenant.id, "calendar_projects", data.projectId))) {
+      return { ok: false, error: "Projekt nicht gefunden." };
+    }
+    if (data.slotId && !(await assertOwnTenantRow(supabase, tenant.id, "calendar_slots", data.slotId))) {
+      return { ok: false, error: "Zeitfenster nicht gefunden." };
+    }
+
+    const [{ startsAt, endsAt }] = buildWeeklySeries(data.date, data.startTime, data.endTime, 1);
+
+    const { error } = await supabase
+      .from("calendar_shifts")
+      .update({
+        worker_id: data.workerId,
+        project_id: data.projectId ?? null,
+        slot_id: data.slotId ?? null,
+        starts_at: startsAt.toISOString(),
+        ends_at: endsAt.toISOString(),
+        break_minutes: data.breakMinutes,
+        note: data.note ?? null,
+      })
+      .eq("id", shiftId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { ok: false, error: translateDbError(error) };
+
+    const row = await loadAdminShiftRow(supabase, tenant.id, shiftId);
+    if (!row) return { ok: false, error: "Schicht nicht gefunden." };
+
+    revalidatePath(ADMIN_PATH);
+    revalidatePath(LEARN_PATH);
+    return { ok: true, shift: row };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+export async function setCalendarShiftStatus(shiftId: string, status: CalendarShiftStatus): Promise<ActionResult> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const parsed = calendarShiftStatusSchema.safeParse(status);
+    if (!parsed.success) return { ok: false, error: "Ungültiger Status." };
+
+    const { error } = await supabase
+      .from("calendar_shifts")
+      .update({ status: parsed.data })
+      .eq("id", shiftId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { ok: false, error: translateDbError(error) };
+
+    revalidatePath(ADMIN_PATH);
+    revalidatePath(LEARN_PATH);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+// --- Zeitfenster ------------------------------------------------------
+
+/** Erzeugt die komplette Serie über buildWeeklySeries() und fügt ALLE Zeilen in EINEM .insert([...]) ein — schlägt eine Zeile fehl, scheitert die ganze Serie bewusst (kein Teilerfolg, der Admin müsste sonst manuell nachprüfen, welche Wochen schon angelegt wurden). */
+export async function createCalendarSlots(input: CalendarSlotInput): Promise<SlotsCreateResult> {
+  try {
+    const { tenant, supabase, user } = await requireAdminTenant();
+    const parsed = calendarSlotSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+    const data = parsed.data;
+
+    if (!(await assertOwnTenantRow(supabase, tenant.id, "calendar_projects", data.projectId))) {
+      return { ok: false, error: "Projekt nicht gefunden." };
+    }
+
+    const series = buildWeeklySeries(data.date, data.startTime, data.endTime, data.repeatWeeks);
+    const rows = series.map(({ startsAt, endsAt }) => ({
+      tenant_id: tenant.id,
+      project_id: data.projectId,
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
+      capacity: data.capacity,
+      status: "open" as const,
+      created_by: user.id,
+    }));
+
+    const { data: inserted, error } = await supabase.from("calendar_slots").insert(rows).select("id");
+    if (error) return { ok: false, error: translateDbError(error) };
+
+    revalidatePath(ADMIN_PATH);
+    return { ok: true, created: inserted?.length ?? 0 };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+export async function setCalendarSlotStatus(slotId: string, status: CalendarSlotStatus): Promise<ActionResult> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const parsed = calendarSlotStatusSchema.safeParse(status);
+    if (!parsed.success) return { ok: false, error: "Ungültiger Status." };
+
+    const { error } = await supabase
+      .from("calendar_slots")
+      .update({ status: parsed.data })
+      .eq("id", slotId)
+      .eq("tenant_id", tenant.id);
+    if (error) return { ok: false, error: translateDbError(error) };
+
+    revalidatePath(ADMIN_PATH);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+/** Kann mit 23503 (FK RESTRICT, siehe Migrationskopf 20260807142619) scheitern, wenn noch Schichten an diesem Zeitfenster hängen — translateDbError deckt das ab, das UI warnt zusätzlich vorher, wenn bookedCount > 0. */
+export async function deleteCalendarSlot(slotId: string): Promise<ActionResult> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const { error } = await supabase.from("calendar_slots").delete().eq("id", slotId).eq("tenant_id", tenant.id);
+    if (error) return { ok: false, error: translateDbError(error) };
+
+    revalidatePath(ADMIN_PATH);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+// --- Abwesenheiten/Feiertage -------------------------------------------
+
+export async function createCalendarAbsence(input: CalendarAbsenceInput): Promise<ActionResult> {
+  try {
+    const { tenant, supabase, user } = await requireAdminTenant();
+    const parsed = calendarAbsenceSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+    const data = parsed.data;
+
+    if (data.workerId && !(await assertOwnTenantRow(supabase, tenant.id, "calendar_workers", data.workerId))) {
+      return { ok: false, error: "Arbeiter nicht gefunden." };
+    }
+
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase.from("calendar_absences").insert({
+      tenant_id: tenant.id,
+      worker_id: data.workerId ?? null,
+      kind: data.kind,
+      starts_on: data.startsOn,
+      ends_on: data.endsOn,
+      note: data.note ?? null,
+      status: "approved",
+      created_by: user.id,
+      decided_by: user.id,
+      decided_at: nowIso,
+    });
+    if (error) return { ok: false, error: translateDbError(error) };
+
+    revalidatePath(ADMIN_PATH);
+    revalidatePath(LEARN_PATH);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+export async function deleteCalendarAbsence(absenceId: string): Promise<ActionResult> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+    const { error } = await supabase.from("calendar_absences").delete().eq("id", absenceId).eq("tenant_id", tenant.id);
+    if (error) return { ok: false, error: translateDbError(error) };
+
+    revalidatePath(ADMIN_PATH);
+    revalidatePath(LEARN_PATH);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+/** Lädt vorher bestehende kind='holiday'-Zeilen des Jahres und filtert die neue Liste dagegen (kein Unique-Index auf calendar_absences für diesen Fall, App-seitige Entdopplung, siehe Migrationskopf S1). */
+export async function importCalendarHolidays(input: CalendarHolidayImportInput): Promise<HolidayImportResult> {
+  try {
+    const { tenant, supabase, user } = await requireAdminTenant();
+    const parsed = calendarHolidayImportSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+    const data = parsed.data;
+
+    const holidays = buildHolidays(data.country, data.year);
+
+    const { data: existingRaw } = await supabase
+      .from("calendar_absences")
+      .select("starts_on")
+      .eq("tenant_id", tenant.id)
+      .eq("kind", "holiday")
+      .gte("starts_on", `${data.year}-01-01`)
+      .lte("starts_on", `${data.year}-12-31`);
+    const existingDates = new Set((existingRaw ?? []).map((r) => r.starts_on as string));
+
+    const toInsert = holidays.filter((h) => !existingDates.has(h.date));
+
+    if (toInsert.length > 0) {
+      const nowIso = new Date().toISOString();
+      const { error } = await supabase.from("calendar_absences").insert(
+        toInsert.map((h) => ({
+          tenant_id: tenant.id,
+          worker_id: null,
+          kind: "holiday" as const,
+          starts_on: h.date,
+          ends_on: h.date,
+          note: h.name,
+          status: "approved" as const,
+          created_by: user.id,
+          decided_by: user.id,
+          decided_at: nowIso,
+        })),
+      );
+      if (error) return { ok: false, error: translateDbError(error) };
+    }
+
+    revalidatePath(ADMIN_PATH);
+    revalidatePath(LEARN_PATH);
+    return { ok: true, inserted: toInsert.length, skipped: holidays.length - toInsert.length };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+// --- Freelancer-Selbstbuchung/-Selbstverwaltung (kein requireAdminTenant) -
+
+/** Kein requireAdminTenant() — jeder Freelancer bucht sich selbst in ein offenes Zeitfenster ein. Muster exakt wie clockIn() oben: normaler RLS-Client, auth.getUser(), getTenant(), eigene Arbeiterzeile laden. Die eigentliche Absicherung (Freelancer/aktiv/Projektmitgliedschaft/Kapazität/Projekt-Konsistenz) liegt in der RLS-Policy calendar_shifts_insert + den Triggern (S2-Migration), nicht in dieser Funktion. */
+export async function bookOwnShift(input: { slotId: string }): Promise<SelfBookingResult> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht angemeldet." };
+    const tenant = await getTenant();
+    if (!tenant) return { ok: false, error: "Kein Mandant zu diesem Host gefunden." };
+
+    const parsed = calendarSelfBookingSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+    const data = parsed.data;
+
+    const { data: worker } = await supabase
+      .from("calendar_workers")
+      .select("id")
+      .eq("tenant_id", tenant.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!worker) return { ok: false, error: "Kein Arbeiterprofil in diesem Mandanten." };
+
+    const { data: slot } = await supabase
+      .from("calendar_slots")
+      .select("id, project_id, starts_at, ends_at")
+      .eq("id", data.slotId)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+    if (!slot) return { ok: false, error: "Zeitfenster nicht gefunden." };
+
+    const { data: shift, error } = await supabase
+      .from("calendar_shifts")
+      .insert({
+        tenant_id: tenant.id,
+        worker_id: worker.id,
+        project_id: slot.project_id,
+        slot_id: slot.id,
+        starts_at: slot.starts_at,
+        ends_at: slot.ends_at,
+        break_minutes: 0,
+        status: "planned",
+        source: "self",
+      })
+      .select("id")
+      .single();
+    if (error || !shift) return { ok: false, error: error ? translateDbError(error) : "Buchung fehlgeschlagen." };
+
+    revalidatePath(LEARN_PATH);
+    return { ok: true, shiftId: shift.id };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+/** Kein requireAdminTenant() — schreibt NUR target_hours/target_period der eigenen Zeile. Die eigentliche Absicherung liegt im Trigger calendar_workers_guard() + der Policy calendar_workers_update (S2-Migration), nicht in dieser Funktion — ein Nicht-Freelancer/inaktiver Freelancer bekommt hier kein UI, könnte die Action aber theoretisch trotzdem aufrufen; die DB verwirft dann still (0 betroffene Zeilen laut RLS) oder der Guard-Trigger setzt die Spalten zurück (falls die Policy WIDER Erwarten durchließe). */
+export async function updateOwnTargetHours(input: CalendarWorkerTargetInput): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht angemeldet." };
+    const tenant = await getTenant();
+    if (!tenant) return { ok: false, error: "Kein Mandant zu diesem Host gefunden." };
+
+    const parsed = calendarWorkerTargetSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+    const data = parsed.data;
+
+    const { error } = await supabase
+      .from("calendar_workers")
+      .update({ target_hours: data.targetHours ?? null, target_period: data.targetPeriod })
+      .eq("tenant_id", tenant.id)
+      .eq("user_id", user.id);
+    if (error) return { ok: false, error: translateDbError(error) };
+
+    revalidatePath(LEARN_PATH);
+    return { ok: true };
   } catch (e) {
     return { ok: false, error: genericErrorMessage(e) };
   }

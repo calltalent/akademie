@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { CalendarWorkersPanel, type CalendarMembershipOption } from "@/components/admin/calendar-workers-panel";
 import {
@@ -8,42 +8,117 @@ import {
   type CalendarLeadOption,
   type CalendarWorkerOption,
 } from "@/components/admin/calendar-projects-panel";
-import type { CalendarProjectRow, CalendarWorkerRow } from "@/lib/calendar/schema";
+import { CalendarShiftsPanel } from "@/components/admin/calendar-shifts-panel";
+import { CalendarSlotsPanel } from "@/components/admin/calendar-slots-panel";
+import { CalendarAbsencesPanel } from "@/components/admin/calendar-absences-panel";
+import type {
+  CalendarAbsenceRow,
+  CalendarAdminShiftRow,
+  CalendarProjectRow,
+  CalendarSlotRow,
+  CalendarWorkerRow,
+} from "@/lib/calendar/schema";
 
 /**
- * Zwei Reiter (Arbeiter/Projekte) für `/admin/schichtplanung` (Block S1,
- * 07.08.2026) — optische Vorlage `einstellungen-tabs.tsx` (aktiv #5663AE).
+ * Fünf Reiter (Arbeiter/Projekte/Schichten/Zeitfenster/Abwesenheiten) für
+ * `/admin/schichtplanung` — Block S1 (Arbeiter/Projekte) + Block S2
+ * (08.08.2026, Schichten/Zeitfenster/Abwesenheiten). Alle Daten kommen
+ * fertig vom Server geladen (`admin/schichtplanung/page.tsx` lädt NUR die
+ * Daten des aktiven Reiters), diese Komponente entscheidet nur noch, welcher
+ * Panel gerendert wird, und steuert die URL (`?tab=…&week=…&year=…`).
+ *
+ * DOKUMENTIERTE ABWEICHUNG vom Bau-Auftrag-Wortlaut ("`<Link href="?tab=...">`
+ * statt `onClick`/`useState`"): ein echtes `<Link>` hätte einen
+ * Accessibility-Tree-Knoten mit Rolle `"link"` (bzw. explizit `"tab"`) —
+ * `e2e/schichtplan.spec.ts` (S1, UNVERÄNDERT, Regressionsnetz) klickt aber
+ * `page.getByRole("button", { name: "Projekte" })`. Ein `<a>`/`role="tab"`
+ * matcht diese Rollen-Abfrage NICHT (bei Code-Review in Abschnitt 14 des
+ * S2-Bauauftrags entdeckt) — S1 darf laut Auftrag NICHT geändert werden.
+ * Deshalb: echte `<button>`-Elemente (native Rolle `"button"`, S1-Selektor
+ * bleibt gültig) mit `onClick={() => router.push(href)}` — `router.push()`
+ * navigiert trotzdem zu einer neuen URL mit neuen `searchParams`, der
+ * Server-Component-Baum der Route wird dabei neu ausgeführt (exakt dieselbe
+ * "URL-gesteuert, Wochen-/Jahresnavigation bleibt serverseitig konsistent"-
+ * Eigenschaft wie ein `<Link>`, nur ohne dessen Fallback ohne JavaScript).
+ * Macht diese Komponente zwangsläufig `"use client"` (ein Server Component
+ * kann keinen Router-Hook verwenden) — die fünf Panels waren ohnehin bereits
+ * `"use client"`.
  */
-type Tab = "workers" | "projects";
+export type SchichtplanungTab = "workers" | "projects" | "shifts" | "slots" | "absences";
+
+type ShiftsData = { shifts: CalendarAdminShiftRow[]; slots: CalendarSlotRow[]; absences: CalendarAbsenceRow[] } | null;
+type SlotsData = { slots: CalendarSlotRow[] } | null;
+type AbsencesData = { absences: CalendarAbsenceRow[] } | null;
+
+const TAB_IDS: SchichtplanungTab[] = ["workers", "projects", "shifts", "slots", "absences"];
+
+function buildTabHref(tab: SchichtplanungTab, weekIso: string, year: number): string {
+  const params = new URLSearchParams();
+  params.set("tab", tab);
+  if (weekIso) params.set("week", weekIso);
+  if (year) params.set("year", String(year));
+  return `?${params.toString()}`;
+}
 
 export function SchichtplanungTabs({
+  activeTab,
+  weekIso,
+  prevWeekIso,
+  nextWeekIso,
+  year,
+  weekLabel,
+  isCurrentWeek,
+  days,
   workers,
   memberships,
   projects,
   leadOptions,
   workerOptions,
+  shiftsData,
+  slotsData,
+  absencesData,
 }: {
+  activeTab: SchichtplanungTab;
+  weekIso: string;
+  prevWeekIso: string;
+  nextWeekIso: string;
+  year: number;
+  weekLabel: string;
+  isCurrentWeek: boolean;
+  days: { isoDate: string; dayLabel: string; shortLabel: string; isToday: boolean }[];
   workers: CalendarWorkerRow[];
   memberships: CalendarMembershipOption[];
   projects: CalendarProjectRow[];
   leadOptions: CalendarLeadOption[];
   workerOptions: CalendarWorkerOption[];
+  shiftsData: ShiftsData;
+  slotsData: SlotsData;
+  absencesData: AbsencesData;
 }) {
   const t = useTranslations("admin.shiftCalendar.tabs");
-  const [tab, setTab] = useState<Tab>("workers");
-  const TAB_LABELS: Record<Tab, string> = { workers: t("workers"), projects: t("projects") };
+  const router = useRouter();
+
+  const TAB_LABELS: Record<SchichtplanungTab, string> = {
+    workers: t("workers"),
+    projects: t("projects"),
+    shifts: t("shifts"),
+    slots: t("slots"),
+    absences: t("absences"),
+  };
+
+  const activeProjects = projects.filter((p) => p.status === "active");
 
   return (
     <div>
-      <div className="mb-[22px] flex gap-1.5 border-b border-border-200">
-        {(Object.keys(TAB_LABELS) as Tab[]).map((tabId) => {
-          const active = tabId === tab;
+      <div className="mb-[22px] flex flex-wrap gap-1.5 border-b border-border-200">
+        {TAB_IDS.map((tabId) => {
+          const active = tabId === activeTab;
           return (
             <button
               key={tabId}
               type="button"
-              onClick={() => setTab(tabId)}
               aria-current={active ? "page" : undefined}
+              onClick={() => router.push(buildTabHref(tabId, weekIso, year))}
               className="-mb-px px-[18px] py-3 text-[15px] focus:outline-none focus:ring-2 focus:ring-primary/40"
               style={{
                 fontWeight: active ? 700 : 500,
@@ -57,9 +132,38 @@ export function SchichtplanungTabs({
         })}
       </div>
 
-      {tab === "workers" && <CalendarWorkersPanel workers={workers} memberships={memberships} />}
-      {tab === "projects" && (
+      {activeTab === "workers" && <CalendarWorkersPanel workers={workers} memberships={memberships} />}
+      {activeTab === "projects" && (
         <CalendarProjectsPanel projects={projects} leadOptions={leadOptions} workerOptions={workerOptions} />
+      )}
+      {activeTab === "shifts" && shiftsData && (
+        <CalendarShiftsPanel
+          workers={workers.filter((w) => w.status === "active")}
+          projects={activeProjects}
+          days={days}
+          shifts={shiftsData.shifts}
+          slots={shiftsData.slots}
+          absences={shiftsData.absences}
+          weekLabel={weekLabel}
+          isCurrentWeek={isCurrentWeek}
+          prevWeekHref={buildTabHref("shifts", prevWeekIso, year)}
+          nextWeekHref={buildTabHref("shifts", nextWeekIso, year)}
+          todayHref="?tab=shifts"
+        />
+      )}
+      {activeTab === "slots" && slotsData && (
+        <CalendarSlotsPanel
+          projects={activeProjects}
+          slots={slotsData.slots}
+          weekLabel={weekLabel}
+          isCurrentWeek={isCurrentWeek}
+          prevWeekHref={buildTabHref("slots", prevWeekIso, year)}
+          nextWeekHref={buildTabHref("slots", nextWeekIso, year)}
+          todayHref="?tab=slots"
+        />
+      )}
+      {activeTab === "absences" && absencesData && (
+        <CalendarAbsencesPanel workers={workers.filter((w) => w.status === "active")} absences={absencesData.absences} year={year} />
       )}
     </div>
   );

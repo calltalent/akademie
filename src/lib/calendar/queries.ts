@@ -1,6 +1,16 @@
 import "server-only";
 import type { createClient } from "@/lib/supabase/server";
-import { toCalendarProjectRow, type CalendarProjectRow, type CalendarShiftRow, type CalendarTimeEntryRow, type CalendarWorkerRow } from "@/lib/calendar/schema";
+import {
+  toCalendarProjectRow,
+  type CalendarAbsenceRow,
+  type CalendarAdminShiftRow,
+  type CalendarOpenSlotRow,
+  type CalendarProjectRow,
+  type CalendarShiftRow,
+  type CalendarSlotRow,
+  type CalendarTimeEntryRow,
+  type CalendarWorkerRow,
+} from "@/lib/calendar/schema";
 
 /**
  * Leseabfragen für Server Components (Block S1, 07.08.2026) — eigene Woche,
@@ -243,4 +253,218 @@ export async function getActiveCalendarWorkersForSelection(
     const profile = embeddedOne(row.profiles as { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null);
     return { id: row.id, fullName: profile?.full_name ?? null, email: profile?.email ?? "" };
   });
+}
+
+// =====================================================================
+// Block S2 (08.08.2026) — Admin-Schicht-CRUD, Zeitfenster-Verwaltung,
+// Freelancer-Selbstbuchung, Abwesenheiten/Feiertage.
+// =====================================================================
+
+/**
+ * ALLE Schichten des Mandanten in einem Zeitraum [from, to) für das
+ * Admin-Wochenraster — ANDERS als `getWorkerShifts` oben bewusst OHNE
+ * `.neq("status", "cancelled")`: Admin soll auch Stornos sehen (UI blendet
+ * sie visuell aus, siehe `calendar-shifts-panel.tsx`).
+ */
+export async function getAdminCalendarShifts(
+  supabase: SupabaseServerClient,
+  tenantId: string,
+  fromIso: string,
+  toIso: string,
+): Promise<CalendarAdminShiftRow[]> {
+  const { data } = await supabase
+    .from("calendar_shifts")
+    .select(
+      "id, worker_id, project_id, slot_id, starts_at, ends_at, break_minutes, status, source, note, calendar_projects(name, color), calendar_workers(profiles(full_name, email))",
+    )
+    .eq("tenant_id", tenantId)
+    .gte("starts_at", fromIso)
+    .lt("starts_at", toIso)
+    .order("starts_at", { ascending: true });
+
+  return (data ?? []).map((row) => {
+    const project = embeddedOne(row.calendar_projects as { name: string; color: string | null } | { name: string; color: string | null }[] | null);
+    const worker = embeddedOne(
+      row.calendar_workers as { profiles: unknown } | { profiles: unknown }[] | null,
+    );
+    const profile = worker
+      ? embeddedOne(worker.profiles as { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null)
+      : null;
+    return {
+      id: row.id,
+      workerId: row.worker_id,
+      workerName: profile ? profile.full_name || profile.email : null,
+      projectId: row.project_id,
+      projectName: project?.name ?? null,
+      projectColor: project?.color ?? null,
+      slotId: row.slot_id,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      breakMinutes: row.break_minutes,
+      status: row.status,
+      source: row.source,
+      note: row.note,
+    };
+  });
+}
+
+/**
+ * Zeitfenster des Mandanten in einem Zeitraum [from, to), mit gebuchter
+ * Anzahl je Zeitfenster (zweite Abfrage auf calendar_shifts mit
+ * `in("slot_id", ids)`, in JS gruppiert — kein PostgREST-Aggregat über die
+ * Relation nötig für eine Handvoll Zeitfenster pro Woche).
+ */
+export async function getAdminCalendarSlots(
+  supabase: SupabaseServerClient,
+  tenantId: string,
+  fromIso: string,
+  toIso: string,
+): Promise<CalendarSlotRow[]> {
+  const { data: slotsRaw } = await supabase
+    .from("calendar_slots")
+    .select("id, project_id, starts_at, ends_at, capacity, status, calendar_projects(name, color)")
+    .eq("tenant_id", tenantId)
+    .gte("starts_at", fromIso)
+    .lt("starts_at", toIso)
+    .order("starts_at", { ascending: true });
+
+  const slots = slotsRaw ?? [];
+  const slotIds = slots.map((s) => s.id as string);
+
+  let bookedBySlot = new Map<string, number>();
+  if (slotIds.length > 0) {
+    const { data: bookings } = await supabase
+      .from("calendar_shifts")
+      .select("slot_id")
+      .eq("tenant_id", tenantId)
+      .in("slot_id", slotIds)
+      .neq("status", "cancelled");
+    bookedBySlot = new Map();
+    for (const row of bookings ?? []) {
+      const key = row.slot_id as string;
+      bookedBySlot.set(key, (bookedBySlot.get(key) ?? 0) + 1);
+    }
+  }
+
+  return slots.map((row) => {
+    const project = embeddedOne(row.calendar_projects as { name: string; color: string | null } | { name: string; color: string | null }[] | null);
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      projectName: project?.name ?? null,
+      projectColor: project?.color ?? null,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      capacity: row.capacity,
+      status: row.status,
+      bookedCount: bookedBySlot.get(row.id as string) ?? 0,
+    };
+  });
+}
+
+/** Feiertage/Abwesenheiten des Mandanten, die das Jahr `year` berühren (Overlap, nicht nur "beginnt in diesem Jahr" — eine Abwesenheit über den Jahreswechsel soll in beiden Jahren erscheinen). */
+export async function getAdminCalendarAbsences(
+  supabase: SupabaseServerClient,
+  tenantId: string,
+  year: number,
+): Promise<CalendarAbsenceRow[]> {
+  const { data } = await supabase
+    .from("calendar_absences")
+    .select("id, worker_id, kind, starts_on, ends_on, note, status, calendar_workers(profiles(full_name, email))")
+    .eq("tenant_id", tenantId)
+    .lte("starts_on", `${year}-12-31`)
+    .gte("ends_on", `${year}-01-01`)
+    .order("starts_on", { ascending: true });
+
+  return (data ?? []).map((row) => {
+    const worker = embeddedOne(
+      row.calendar_workers as { profiles: unknown } | { profiles: unknown }[] | null,
+    );
+    const profile = worker
+      ? embeddedOne(worker.profiles as { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null)
+      : null;
+    return {
+      id: row.id,
+      workerId: row.worker_id,
+      workerName: profile ? profile.full_name || profile.email : null,
+      kind: row.kind,
+      startsOn: row.starts_on,
+      endsOn: row.ends_on,
+      note: row.note,
+      status: row.status,
+    };
+  });
+}
+
+/**
+ * Offene Zeitfenster der eigenen Projekte für die Selbstbuchungs-Ansicht
+ * (Freelancer) — EIN Aufruf der `security definer`-Funktion
+ * `calendar_open_slots()` (S2-Migration), liefert Kapazität/freie
+ * Plätze/"bereits gebucht" bereits fertig berechnet.
+ */
+type CalendarOpenSlotDbRow = {
+  id: string;
+  project_id: string;
+  project_name: string;
+  starts_at: string;
+  ends_at: string;
+  capacity: number;
+  free_seats: number;
+  already_booked: boolean;
+};
+
+export async function getOpenSlotsForWorker(
+  supabase: SupabaseServerClient,
+  tenantId: string,
+  fromIso: string,
+  toIso: string,
+): Promise<CalendarOpenSlotRow[]> {
+  // `calendar_open_slots` ist eine neue RPC-Funktion (S2-Migration, noch
+  // nicht auf der DB angewendet) — die generierten Supabase-Typen kennen sie
+  // deshalb noch nicht, `.rpc()` liefert hier `unknown`. Manuelles Casting
+  // auf die per Migration definierte `returns table(...)`-Form (Abschnitt 6
+  // von 20260808100000_shift_calendar_s2.sql). Nach `npx supabase gen types`
+  // (nach Anwendung der Migration) kann dieser Cast entfallen.
+  const { data } = await supabase.rpc("calendar_open_slots", { t: tenantId, from_ts: fromIso, to_ts: toIso });
+  const rows = (data ?? []) as unknown as CalendarOpenSlotDbRow[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    projectId: row.project_id,
+    projectName: row.project_name,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    capacity: row.capacity,
+    freeSeats: row.free_seats,
+    alreadyBooked: row.already_booked,
+  }));
+}
+
+/** Abwesenheiten eines Arbeiters (inkl. mandantenweiter Feiertage, worker_id null) in einem Zeitraum — für die Markierung im eigenen Wochenraster. */
+export async function getWorkerAbsences(
+  supabase: SupabaseServerClient,
+  tenantId: string,
+  workerId: string,
+  fromIso: string,
+  toIso: string,
+): Promise<CalendarAbsenceRow[]> {
+  const { data } = await supabase
+    .from("calendar_absences")
+    .select("id, worker_id, kind, starts_on, ends_on, note, status")
+    .eq("tenant_id", tenantId)
+    .or(`worker_id.eq.${workerId},worker_id.is.null`)
+    .lte("starts_on", toIso)
+    .gte("ends_on", fromIso)
+    .order("starts_on", { ascending: true });
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    workerId: row.worker_id,
+    workerName: null,
+    kind: row.kind,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
+    note: row.note,
+    status: row.status,
+  }));
 }

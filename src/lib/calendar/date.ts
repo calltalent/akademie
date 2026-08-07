@@ -203,3 +203,87 @@ export function minutesBetween(a: Date, b: Date): number {
 export function isSameBerlinDay(a: Date, b: Date): boolean {
   return isoDateString(a) === isoDateString(b);
 }
+
+// =====================================================================
+// Block S2 (08.08.2026) — Ergänzungen für Admin-Schicht-CRUD und
+// Zeitfenster-Serienanlage. Bestehende Funktionen oben UNVERÄNDERT.
+// =====================================================================
+
+/** "yyyy-mm-dd" -> [Jahr, Monat, Tag] als Zahlen, ungeprüft (Aufrufer validiert per zod-Schema vor dem Aufruf). */
+function parseIsoDate(isoDate: string): [number, number, number] {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return [y, m, d];
+}
+
+/** "hh:mm" -> [Stunde, Minute] als Zahlen, ungeprüft (Aufrufer validiert per zod-Schema vor dem Aufruf). */
+function parseHhMm(time: string): [number, number] {
+  const [h, min] = time.split(":").map(Number);
+  return [h, min];
+}
+
+/**
+ * Wandelt ein Berlin-lokales Datum+Uhrzeit ("yyyy-mm-dd", "hh:mm") in den
+ * entsprechenden UTC-Zeitpunkt um — Kernbaustein für `createCalendarShift`/
+ * `createCalendarSlots` (Formular liefert Datum+Uhrzeit getrennt als
+ * `<input type="date">`/`<input type="time">`-Werte, die DB will einen
+ * einzigen `timestamptz`). Nutzt dieselbe zonenbewusste Korrektur wie
+ * `startOfIsoWeek()`/`addDays()` oben (`zonedTimeToUtc()`).
+ */
+export function berlinDateTimeToUtc(isoDate: string, timeHhMm: string): Date {
+  const [year, month, day] = parseIsoDate(isoDate);
+  const [hour, minute] = parseHhMm(timeHhMm);
+  return zonedTimeToUtc(year, month, day, hour, minute, 0, CALENDAR_TIME_ZONE);
+}
+
+/**
+ * `Date` -> immer zweistelliges "HH:MM" in Berlin-Ortszeit, unabhängig vom
+ * Locale (für den `value` eines `<input type="time">` — der HTML-Standard
+ * verlangt exakt dieses Format, ein Locale-abhängiges `formatTime()` wäre
+ * hier riskant, siehe MDN `<input type="time">`).
+ */
+export function toTimeInputValue(date: Date): string {
+  const p = getZonedParts(date, CALENDAR_TIME_ZONE);
+  return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
+}
+
+/** `isoDate` um `days` Berlin-Kalendertage verschoben, als "yyyy-mm-dd" (Mitternacht-Anker — an beiden deutschen Umstellungstagen unproblematisch, die Umstellung selbst liegt nachts um 02:00/03:00, nie um 00:00). */
+function shiftIsoDate(isoDate: string, days: number): string {
+  const [year, month, day] = parseIsoDate(isoDate);
+  const anchor = zonedTimeToUtc(year, month, day, 0, 0, 0, CALENDAR_TIME_ZONE);
+  return isoDateString(addDays(anchor, days));
+}
+
+/**
+ * Erzeugt eine wöchentliche Terminserie für die Zeitfenster-Serienanlage
+ * (`createCalendarSlots`): `weeks` Termine, jeweils 7 Berlin-Kalendertage
+ * auseinander, bei GLEICHER Berlin-Wanduhrzeit (`addDays()`-Prinzip, siehe
+ * oben — bleibt auch über eine Zeitumstellung hinweg wanduhrzeittreu, auch
+ * wenn sich dadurch der UTC-Versatz zwischen zwei Terminen ändert).
+ *
+ * `endTime <= startTime` heißt Nachtschicht: das Ende liegt einen
+ * Kalendertag nach dem Beginn (z. B. 22:00 -> 06:00 am Folgetag). Ein
+ * Gleichstand (`endTime === startTime`) wird von den zod-Schemas bereits
+ * VOR dem Aufruf abgelehnt (`calendarSlotSchema`/`calendarShiftSchema`
+ * verlangen `startTime !== endTime`) — hier trotzdem als Nachtschicht
+ * behandelt, falls die Funktion direkt (z. B. in einem Test) ohne
+ * vorgeschaltete Validierung aufgerufen wird.
+ */
+export function buildWeeklySeries(
+  firstDateIso: string,
+  startTime: string,
+  endTime: string,
+  weeks: number,
+): { startsAt: Date; endsAt: Date }[] {
+  const isNightShift = endTime <= startTime;
+  const series: { startsAt: Date; endsAt: Date }[] = [];
+
+  for (let i = 0; i < weeks; i++) {
+    const dateIso = i === 0 ? firstDateIso : shiftIsoDate(firstDateIso, i * 7);
+    const startsAt = berlinDateTimeToUtc(dateIso, startTime);
+    const endDateIso = isNightShift ? shiftIsoDate(dateIso, 1) : dateIso;
+    const endsAt = berlinDateTimeToUtc(endDateIso, endTime);
+    series.push({ startsAt, endsAt });
+  }
+
+  return series;
+}

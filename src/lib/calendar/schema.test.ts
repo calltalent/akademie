@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  calendarAbsenceSchema,
   calendarClockInSchema,
+  calendarDateSchema,
+  calendarHolidayImportSchema,
   calendarProjectMemberIdsSchema,
   calendarProjectSchema,
+  calendarSelfBookingSchema,
+  calendarShiftSchema,
+  calendarSlotSchema,
+  calendarTimeSchema,
   calendarWorkerCreateSchema,
   calendarWorkerEditableSchema,
   calendarWorkerStatusSchema,
+  calendarWorkerTargetSchema,
 } from "./schema";
 
 describe("calendarWorkerEditableSchema", () => {
@@ -127,5 +135,155 @@ describe("calendarClockInSchema", () => {
 
   it("lehnt eine ungültige shiftId ab", () => {
     expect(calendarClockInSchema.safeParse({ shiftId: "nicht-uuid" }).success).toBe(false);
+  });
+});
+
+// =====================================================================
+// Block S2 (08.08.2026)
+// =====================================================================
+
+describe("calendarDateSchema/calendarTimeSchema", () => {
+  it("lehnt eine einstellige Uhrzeit ohne führende Null ab", () => {
+    expect(calendarTimeSchema.safeParse("8:00").success).toBe(false);
+  });
+
+  it("akzeptiert eine zweistellige Uhrzeit", () => {
+    expect(calendarTimeSchema.safeParse("08:00").success).toBe(true);
+  });
+
+  it("lehnt ein Datum mit einstelligem Monat ab", () => {
+    expect(calendarDateSchema.safeParse("2026-8-10").success).toBe(false);
+  });
+
+  it("akzeptiert ein vollständiges yyyy-mm-dd-Datum", () => {
+    expect(calendarDateSchema.safeParse("2026-08-10").success).toBe(true);
+  });
+});
+
+const VALID_UUID = "00000000-0000-0000-0000-000000000001";
+
+describe("calendarShiftSchema", () => {
+  const base = { workerId: VALID_UUID, date: "2026-08-10", startTime: "08:00", endTime: "16:00" };
+
+  it("akzeptiert eine gültige Minimaleingabe", () => {
+    expect(calendarShiftSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("lehnt gleiche Start- und Endzeit ab", () => {
+    expect(calendarShiftSchema.safeParse({ ...base, endTime: "08:00" }).success).toBe(false);
+  });
+
+  it("lehnt breakMinutes über 480 ab", () => {
+    expect(calendarShiftSchema.safeParse({ ...base, breakMinutes: 481 }).success).toBe(false);
+  });
+
+  it("akzeptiert breakMinutes am oberen Rand (480)", () => {
+    expect(calendarShiftSchema.safeParse({ ...base, breakMinutes: 480 }).success).toBe(true);
+  });
+});
+
+describe("calendarSlotSchema", () => {
+  const base = { projectId: VALID_UUID, date: "2026-08-10", startTime: "08:00", endTime: "16:00", capacity: 5 };
+
+  it("akzeptiert eine gültige Minimaleingabe mit Standard-repeatWeeks=1", () => {
+    const parsed = calendarSlotSchema.safeParse(base);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.repeatWeeks).toBe(1);
+  });
+
+  it("lehnt capacity=0 ab", () => {
+    expect(calendarSlotSchema.safeParse({ ...base, capacity: 0 }).success).toBe(false);
+  });
+
+  it("lehnt capacity=501 ab", () => {
+    expect(calendarSlotSchema.safeParse({ ...base, capacity: 501 }).success).toBe(false);
+  });
+
+  it("akzeptiert capacity=500 (oberer Rand)", () => {
+    expect(calendarSlotSchema.safeParse({ ...base, capacity: 500 }).success).toBe(true);
+  });
+
+  it("lehnt repeatWeeks=0 ab", () => {
+    expect(calendarSlotSchema.safeParse({ ...base, repeatWeeks: 0 }).success).toBe(false);
+  });
+
+  it("lehnt repeatWeeks=27 ab", () => {
+    expect(calendarSlotSchema.safeParse({ ...base, repeatWeeks: 27 }).success).toBe(false);
+  });
+
+  it("akzeptiert repeatWeeks=26 (oberer Rand)", () => {
+    expect(calendarSlotSchema.safeParse({ ...base, repeatWeeks: 26 }).success).toBe(true);
+  });
+});
+
+describe("calendarAbsenceSchema", () => {
+  const base = { kind: "vacation" as const, startsOn: "2026-08-10", endsOn: "2026-08-14", workerId: VALID_UUID };
+
+  it("akzeptiert eine gültige personenbezogene Abwesenheit", () => {
+    expect(calendarAbsenceSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("akzeptiert einen gültigen Feiertag ohne workerId", () => {
+    expect(
+      calendarAbsenceSchema.safeParse({ kind: "holiday", startsOn: "2026-10-03", endsOn: "2026-10-03" }).success,
+    ).toBe(true);
+  });
+
+  it("lehnt kind='holiday' MIT workerId ab", () => {
+    expect(calendarAbsenceSchema.safeParse({ ...base, kind: "holiday" }).success).toBe(false);
+  });
+
+  it("lehnt kind='sick' OHNE workerId ab", () => {
+    expect(
+      calendarAbsenceSchema.safeParse({ kind: "sick", startsOn: base.startsOn, endsOn: base.endsOn }).success,
+    ).toBe(false);
+  });
+
+  it("lehnt ein Enddatum vor dem Startdatum ab", () => {
+    expect(calendarAbsenceSchema.safeParse({ ...base, startsOn: "2026-08-14", endsOn: "2026-08-10" }).success).toBe(
+      false,
+    );
+  });
+
+  it("akzeptiert gleiches Start- und Enddatum (ein Tag Abwesenheit)", () => {
+    expect(calendarAbsenceSchema.safeParse({ ...base, startsOn: "2026-08-10", endsOn: "2026-08-10" }).success).toBe(
+      true,
+    );
+  });
+});
+
+describe("calendarHolidayImportSchema", () => {
+  it("akzeptiert ein gültiges Land+Jahr", () => {
+    expect(calendarHolidayImportSchema.safeParse({ country: "DE", year: 2026 }).success).toBe(true);
+  });
+
+  it("lehnt ein unbekanntes Land ab", () => {
+    expect(calendarHolidayImportSchema.safeParse({ country: "FR", year: 2026 }).success).toBe(false);
+  });
+
+  it("lehnt ein Jahr außerhalb 2020-2100 ab", () => {
+    expect(calendarHolidayImportSchema.safeParse({ country: "DE", year: 2019 }).success).toBe(false);
+    expect(calendarHolidayImportSchema.safeParse({ country: "DE", year: 2101 }).success).toBe(false);
+  });
+});
+
+describe("calendarSelfBookingSchema", () => {
+  it("verlangt eine gültige slotId", () => {
+    expect(calendarSelfBookingSchema.safeParse({ slotId: "nicht-uuid" }).success).toBe(false);
+    expect(calendarSelfBookingSchema.safeParse({ slotId: VALID_UUID }).success).toBe(true);
+  });
+});
+
+describe("calendarWorkerTargetSchema", () => {
+  it("verlangt targetPeriod (kein Default anders als calendarWorkerEditableSchema)", () => {
+    expect(calendarWorkerTargetSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("akzeptiert gültige Sollstunden mit Zeitraum", () => {
+    expect(calendarWorkerTargetSchema.safeParse({ targetHours: 20, targetPeriod: "month" }).success).toBe(true);
+  });
+
+  it("lehnt Sollstunden über 400 ab", () => {
+    expect(calendarWorkerTargetSchema.safeParse({ targetHours: 401, targetPeriod: "week" }).success).toBe(false);
   });
 });

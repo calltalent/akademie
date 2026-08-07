@@ -7,7 +7,9 @@ import { AppShell } from "@/components/learn/app-shell";
 import { ShiftCalendarWeekNav } from "@/components/learn/shift-calendar-week-nav";
 import { ShiftCalendarView, type ShiftCalendarDay } from "@/components/learn/shift-calendar-view";
 import { TimeClockWidget } from "@/components/learn/time-clock-widget";
-import { getOpenTimeEntry, getOwnCalendarWorker, getWorkerShifts } from "@/lib/calendar/queries";
+import { OpenSlotsPanel } from "@/components/learn/open-slots-panel";
+import { TargetHoursForm } from "@/components/learn/target-hours-form";
+import { getOpenSlotsForWorker, getOpenTimeEntry, getOwnCalendarWorker, getWorkerShifts } from "@/lib/calendar/queries";
 import { addDays, formatDayLabel, formatShortDayLabel, formatTimeRange, isoDateString, startOfIsoWeek } from "@/lib/calendar/date";
 
 /**
@@ -52,11 +54,19 @@ export default async function SchichtplanPage({
   const currentWeekStart = startOfIsoWeek(new Date());
   const isCurrentWeek = isoDateString(weekStart) === isoDateString(currentWeekStart);
 
-  const [shifts, openEntry, { data: profile }, { data: isStaff }] = await Promise.all([
+  const isFreelancer = worker.workerType === "freelancer";
+
+  const [shifts, openEntry, { data: profile }, { data: isStaff }, openSlots] = await Promise.all([
     getWorkerShifts(supabase, tenant.id, worker.id, weekStart.toISOString(), weekEnd.toISOString()),
     getOpenTimeEntry(supabase, tenant.id, worker.id),
     supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
     supabase.rpc("is_staff", { t: tenant.id }),
+    // Offene Zeitfenster nur für Freelancer laden — Festangestellte
+    // bekommen den Selbstbuchungs-Block ohnehin nicht gerendert (Josips
+    // ausdrückliche Vorgabe, siehe target-hours-form.tsx-Kopfkommentar).
+    isFreelancer
+      ? getOpenSlotsForWorker(supabase, tenant.id, weekStart.toISOString(), weekEnd.toISOString())
+      : Promise.resolve([]),
   ]);
 
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
@@ -141,6 +151,13 @@ export default async function SchichtplanPage({
           emptyWeekText={t("emptyWeek")}
           noProjectText={t("noProject")}
         />
+
+        {isFreelancer && (
+          <>
+            <OpenSlotsPanel slots={openSlots} />
+            <TargetHoursForm initialTargetHours={worker.targetHours} initialTargetPeriod={worker.targetPeriod} />
+          </>
+        )}
       </div>
     </AppShell>
   );
