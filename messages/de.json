@@ -457,6 +457,29 @@
         "saveButton": "Speichern",
         "savingButton": "Speichert …",
         "saved": "Sollstunden gespeichert."
+      },
+      "changeRequests": {
+        "heading": "Änderung beantragen",
+        "description": "Für deine Schichten dieser Woche kannst du eine Zeitänderung oder Stornierung beantragen — dein Team entscheidet.",
+        "empty": "Keine Schichten in dieser Woche.",
+        "changeButton": "Zeit ändern",
+        "cancelButton": "Stornieren",
+        "formChangeHeading": "Zeitänderung beantragen",
+        "formCancelHeading": "Stornierung beantragen",
+        "newDateLabel": "Datum",
+        "newStartLabel": "Neue Startzeit",
+        "newEndLabel": "Neue Endzeit",
+        "newBreakLabel": "Pause (Minuten)",
+        "reasonLabel": "Begründung (optional)",
+        "submitButton": "Anfrage senden",
+        "submittingButton": "Wird gesendet …",
+        "closeButton": "Abbrechen",
+        "alreadyPending": "Für diese Schicht liegt bereits eine offene Anfrage vor.",
+        "statusPending": "Anfrage offen",
+        "statusApproved": "Genehmigt",
+        "statusRejected": "Abgelehnt",
+        "decisionNoteLabel": "Notiz vom Team",
+        "cancelConfirm": "Stornierung dieser Schicht wirklich beantragen?"
       }
     },
     "module": {
@@ -587,6 +610,8 @@
       "reasonNoTenant": "Kein Mandant zu diesem Host gefunden.",
       "reasonNotAuthenticated": "Bitte zuerst anmelden.",
       "reasonNotStaff": "Kein Zugriff — dieser Bereich ist nur für Team-Mitglieder (owner/admin/trainer).",
+      "reasonNotShiftPlanner": "Kein Zugriff — dieser Bereich ist nur für Inhaber, Administratoren oder Projektleiter.",
+      "reasonShiftCalendarDisabled": "Der Schichtplan ist für diese Akademie nicht aktiviert.",
       "goToLoginButton": "Zur Anmeldung"
     },
     "common": {
@@ -1265,7 +1290,8 @@
         "projects": "Projekte",
         "shifts": "Schichten",
         "slots": "Zeitfenster",
-        "absences": "Abwesenheiten"
+        "absences": "Abwesenheiten",
+        "requests": "Änderungsanfragen"
       },
       "workers": {
         "heading": "Arbeiter",
@@ -1425,6 +1451,32 @@
           "result": "{inserted} eingefügt, {skipped} übersprungen."
         },
         "country": { "DE": "Deutschland", "AT": "Österreich", "CH": "Schweiz" }
+      },
+      "requests": {
+        "heading": "Änderungsanfragen",
+        "description": "Anfragen von Arbeitern auf Zeitänderung oder Stornierung einer Schicht — hier entscheiden.",
+        "filterAriaLabel": "Anfragen filtern",
+        "filterPending": "Offen",
+        "filterDecided": "Entschieden",
+        "filterAll": "Alle",
+        "empty": "Keine Anfragen in dieser Ansicht.",
+        "currentLabel": "Aktuell",
+        "proposedLabel": "Vorgeschlagen",
+        "kindUpdate": "Zeitänderung",
+        "kindCancel": "Stornierung beantragt",
+        "reasonLabel": "Begründung",
+        "noReason": "Keine Begründung angegeben.",
+        "decisionNoteLabel": "Entscheidungsnotiz (optional)",
+        "approveButton": "Genehmigen",
+        "rejectButton": "Ablehnen",
+        "decidingButton": "Wird gespeichert …",
+        "openButton": "Details anzeigen",
+        "closeButton": "Schließen",
+        "statusPending": "Offen",
+        "statusApproved": "Genehmigt",
+        "statusRejected": "Abgelehnt",
+        "decidedAtLabel": "Entschieden am {date}",
+        "conflictHint": "Genehmigung nicht möglich: Die vorgeschlagene Zeit überschneidet sich mit einer anderen Schicht dieses Arbeiters. Die Anfrage bleibt offen — stornieren Sie zuerst die überlappende Schicht und versuchen Sie es dann erneut."
       }
     }
   },
@@ -1610,6 +1662,23 @@
       "heading": "Zahlung erhalten",
       "body": "vielen Dank für deinen Kauf von {productName} bei {tenantName}. Die Zahlung ist eingegangen und dein Zugang ist freigeschaltet.",
       "actionButton": "Zum Kurs"
+    },
+    "shiftChangeRequestDecided": {
+      "subject": "Deine Änderungsanfrage wurde entschieden",
+      "heading": "Änderungsanfrage entschieden",
+      "bodyApproved": "deine Änderungsanfrage für eine Schicht wurde genehmigt.",
+      "bodyRejected": "deine Änderungsanfrage für eine Schicht wurde abgelehnt.",
+      "shiftLabel": "Schicht",
+      "proposedLabel": "Neue Zeit",
+      "decisionNoteLabel": "Notiz"
+    },
+    "shiftChangeRequestSubmitted": {
+      "subject": "Neue Änderungsanfrage im Schichtplan",
+      "heading": "Neue Änderungsanfrage",
+      "body": "{workerName} hat eine Änderungsanfrage für eine Schicht gestellt.",
+      "shiftLabel": "Schicht",
+      "proposedLabel": "Neue Zeit",
+      "reasonLabel": "Begründung"
     }
   },
   "maintenance": {

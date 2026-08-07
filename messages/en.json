@@ -457,6 +457,29 @@
         "saveButton": "Save",
         "savingButton": "Saving …",
         "saved": "Target hours saved."
+      },
+      "changeRequests": {
+        "heading": "Request a change",
+        "description": "For your shifts this week you can request a time change or cancellation — your team decides.",
+        "empty": "No shifts this week.",
+        "changeButton": "Change time",
+        "cancelButton": "Cancel",
+        "formChangeHeading": "Request a time change",
+        "formCancelHeading": "Request a cancellation",
+        "newDateLabel": "Date",
+        "newStartLabel": "New start time",
+        "newEndLabel": "New end time",
+        "newBreakLabel": "Break (minutes)",
+        "reasonLabel": "Reason (optional)",
+        "submitButton": "Send request",
+        "submittingButton": "Sending …",
+        "closeButton": "Cancel",
+        "alreadyPending": "There is already an open request for this shift.",
+        "statusPending": "Request pending",
+        "statusApproved": "Approved",
+        "statusRejected": "Rejected",
+        "decisionNoteLabel": "Note from your team",
+        "cancelConfirm": "Really request cancellation of this shift?"
       }
     },
     "module": {
@@ -587,6 +610,8 @@
       "reasonNoTenant": "No tenant found for this host.",
       "reasonNotAuthenticated": "Please log in first.",
       "reasonNotStaff": "No access — this area is for team members only (owner/admin/trainer).",
+      "reasonNotShiftPlanner": "No access — this area is for owners, administrators, or project leads only.",
+      "reasonShiftCalendarDisabled": "The shift schedule is not enabled for this academy.",
       "goToLoginButton": "Go to login"
     },
     "common": {
@@ -1265,7 +1290,8 @@
         "projects": "Projects",
         "shifts": "Shifts",
         "slots": "Time slots",
-        "absences": "Absences"
+        "absences": "Absences",
+        "requests": "Change requests"
       },
       "workers": {
         "heading": "Workers",
@@ -1425,6 +1451,32 @@
           "result": "{inserted} inserted, {skipped} skipped."
         },
         "country": { "DE": "Germany", "AT": "Austria", "CH": "Switzerland" }
+      },
+      "requests": {
+        "heading": "Change requests",
+        "description": "Requests from workers to change or cancel a shift's time — decide here.",
+        "filterAriaLabel": "Filter requests",
+        "filterPending": "Pending",
+        "filterDecided": "Decided",
+        "filterAll": "All",
+        "empty": "No requests in this view.",
+        "currentLabel": "Current",
+        "proposedLabel": "Proposed",
+        "kindUpdate": "Time change",
+        "kindCancel": "Cancellation requested",
+        "reasonLabel": "Reason",
+        "noReason": "No reason given.",
+        "decisionNoteLabel": "Decision note (optional)",
+        "approveButton": "Approve",
+        "rejectButton": "Reject",
+        "decidingButton": "Saving …",
+        "openButton": "Show details",
+        "closeButton": "Close",
+        "statusPending": "Pending",
+        "statusApproved": "Approved",
+        "statusRejected": "Rejected",
+        "decidedAtLabel": "Decided on {date}",
+        "conflictHint": "Approval not possible: the proposed time overlaps with another shift of this worker. The request stays open — cancel the overlapping shift first, then try again."
       }
     }
   },
@@ -1610,6 +1662,23 @@
       "heading": "Payment received",
       "body": "thank you for your purchase of {productName} at {tenantName}. The payment has been received and your access is now active.",
       "actionButton": "Go to course"
+    },
+    "shiftChangeRequestDecided": {
+      "subject": "Your change request has been decided",
+      "heading": "Change request decided",
+      "bodyApproved": "your change request for a shift has been approved.",
+      "bodyRejected": "your change request for a shift has been rejected.",
+      "shiftLabel": "Shift",
+      "proposedLabel": "New time",
+      "decisionNoteLabel": "Note"
+    },
+    "shiftChangeRequestSubmitted": {
+      "subject": "New change request in the shift schedule",
+      "heading": "New change request",
+      "body": "{workerName} submitted a change request for a shift.",
+      "shiftLabel": "Shift",
+      "proposedLabel": "New time",
+      "reasonLabel": "Reason"
     }
   },
   "maintenance": {

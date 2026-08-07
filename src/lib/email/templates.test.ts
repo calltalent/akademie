@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import de from "../../../messages/de.json";
 import bs from "../../../messages/bs.json";
+import en from "../../../messages/en.json";
 import {
   certificateIssued,
   confirmSignup,
@@ -9,6 +10,8 @@ import {
   magicLinkEmail,
   orderPaid,
   passwordReset,
+  shiftChangeRequestDecided,
+  shiftChangeRequestSubmitted,
   submissionGraded,
   welcomeInvite,
 } from "./templates";
@@ -53,7 +56,8 @@ function interpolate(message: string, values?: Record<string, unknown>): string 
 
 vi.mock("next-intl/server", () => ({
   getTranslations: async ({ locale, namespace }: { locale: string; namespace: string }) => {
-    const tree = getNamespace((locale === "bs" ? bs : de) as MessageTree, namespace);
+    const messages = locale === "bs" ? bs : locale === "en" ? en : de;
+    const tree = getNamespace(messages as MessageTree, namespace);
     return (key: string, values?: Record<string, unknown>) => interpolate(lookupMessage(tree, key), values);
   },
 }));
@@ -314,5 +318,111 @@ describe("orderPaid", () => {
       locale: "de",
     });
     expect(html).not.toContain("<img src=x onerror=alert(1)>");
+  });
+});
+
+describe("shiftChangeRequestDecided", () => {
+  it("enthält Schicht-/Vorschlag-/Notiz-Details bei Genehmigung (de)", async () => {
+    const html = await shiftChangeRequestDecided({
+      tenantName: "Demo Akademie",
+      recipientName: "Max Mustermann",
+      decision: "approved",
+      kind: "update",
+      shiftLabel: "Montag, 10. August, 08:00–16:00 Uhr",
+      proposedLabel: "Montag, 10. August, 09:00–17:00 Uhr",
+      decisionNote: "Passt so.",
+      locale: "de",
+    });
+    expect(html).toContain("Demo Akademie");
+    expect(html).toContain("genehmigt");
+    expect(html).toContain("Montag, 10. August, 08:00–16:00 Uhr");
+    expect(html).toContain("Montag, 10. August, 09:00–17:00 Uhr");
+    expect(html).toContain("Passt so.");
+  });
+
+  it("rendert englische Texte bei Ablehnung (en), ohne proposedLabel bei kind=cancel", async () => {
+    const html = await shiftChangeRequestDecided({
+      tenantName: "Demo Academy",
+      decision: "rejected",
+      kind: "cancel",
+      shiftLabel: "Monday, August 10, 08:00–16:00",
+      locale: "en",
+    });
+    expect(html).toContain('<html lang="en">');
+    expect(html).toContain("rejected");
+    expect(html).toContain("Monday, August 10, 08:00–16:00");
+  });
+
+  it("escaped einen bösartigen Entscheidungsnotiz-Text statt ihn auszuführen", async () => {
+    const html = await shiftChangeRequestDecided({
+      tenantName: "Demo Akademie",
+      decision: "approved",
+      kind: "update",
+      shiftLabel: "Montag, 10. August, 08:00–16:00 Uhr",
+      proposedLabel: "Montag, 10. August, 09:00–17:00 Uhr",
+      decisionNote: "<script>alert(1)</script>",
+      locale: "de",
+    });
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+});
+
+describe("shiftChangeRequestSubmitted", () => {
+  it("enthält Arbeitername, Schicht-/Vorschlag-/Begründungsdetails (de)", async () => {
+    const html = await shiftChangeRequestSubmitted({
+      tenantName: "Demo Akademie",
+      recipientName: "Max Mustermann",
+      workerName: "Erika Musterfrau",
+      shiftLabel: "Montag, 10. August, 08:00–16:00 Uhr",
+      proposedLabel: "Montag, 10. August, 09:00–17:00 Uhr",
+      kind: "update",
+      reason: "Arzttermin.",
+      locale: "de",
+    });
+    expect(html).toContain("Demo Akademie");
+    expect(html).toContain("Erika Musterfrau");
+    expect(html).toContain("Montag, 10. August, 08:00–16:00 Uhr");
+    expect(html).toContain("Montag, 10. August, 09:00–17:00 Uhr");
+    expect(html).toContain("Arzttermin.");
+  });
+
+  it("rendert englische Texte (en), ohne reason-Block wenn keine Begründung angegeben ist", async () => {
+    const html = await shiftChangeRequestSubmitted({
+      tenantName: "Demo Academy",
+      workerName: "Jane Doe",
+      shiftLabel: "Monday, August 10, 08:00–16:00",
+      kind: "cancel",
+      locale: "en",
+    });
+    expect(html).toContain('<html lang="en">');
+    expect(html).toContain("Jane Doe");
+    expect(html).toContain("Monday, August 10, 08:00–16:00");
+  });
+
+  it("escaped einen bösartigen Arbeitername statt ihn auszuführen", async () => {
+    const html = await shiftChangeRequestSubmitted({
+      tenantName: "Demo Akademie",
+      workerName: "<script>alert(1)</script>",
+      shiftLabel: "Montag, 10. August, 08:00–16:00 Uhr",
+      kind: "cancel",
+      locale: "de",
+    });
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+
+  it("escaped eine bösartige Begründung statt sie auszuführen", async () => {
+    const html = await shiftChangeRequestSubmitted({
+      tenantName: "Demo Akademie",
+      workerName: "Erika Musterfrau",
+      shiftLabel: "Montag, 10. August, 08:00–16:00 Uhr",
+      kind: "update",
+      proposedLabel: "Montag, 10. August, 09:00–17:00 Uhr",
+      reason: "<img src=x onerror=alert(1)>",
+      locale: "de",
+    });
+    expect(html).not.toContain("<img src=x onerror=alert(1)>");
+    expect(html).toContain("&lt;img");
   });
 });

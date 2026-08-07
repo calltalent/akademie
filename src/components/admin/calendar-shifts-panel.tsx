@@ -34,6 +34,7 @@ export function CalendarShiftsPanel({
   prevWeekHref,
   nextWeekHref,
   todayHref,
+  readOnly = false,
 }: {
   workers: { id: string; fullName: string | null; email: string }[];
   projects: { id: string; name: string }[];
@@ -46,6 +47,8 @@ export function CalendarShiftsPanel({
   prevWeekHref: string;
   nextWeekHref: string;
   todayHref: string;
+  /** NEU (Block S3, 09.08.2026): Projektleiter sehen das Wochenraster NUR lesend — kein Anlegen/Bearbeiten/Stornieren. Default `false` (Admin-Verhalten unverändert). */
+  readOnly?: boolean;
 }) {
   const t = useTranslations("admin.shiftCalendar.shifts");
   const [formState, setFormState] = useState<FormState>(null);
@@ -160,34 +163,51 @@ export function CalendarShiftsPanel({
                                 start: formatTimeRange(starts, ends).split("–")[0],
                                 end: formatTimeRange(starts, ends).split("–")[1],
                               });
-                          return (
+                          const cellContent = (
+                            <>
+                              <span className="block font-semibold text-ink">{formatTimeRange(starts, ends)}</span>
+                              {shift.status === "cancelled" && (
+                                <span className="block font-bold text-[#B24343]">{t("cancelledBadge")}</span>
+                              )}
+                            </>
+                          );
+                          const cellStyle = {
+                            borderLeftColor: shift.projectColor ?? "#5663AE",
+                            background: shift.status === "cancelled" ? "#F4F4F8" : "#F7F8FC",
+                            opacity: shift.status === "cancelled" ? 0.6 : 1,
+                          };
+                          return readOnly ? (
+                            <div
+                              key={shift.id}
+                              aria-label={ariaLabel}
+                              className="w-full rounded-sm border-l-4 px-2 py-1.5 text-left text-xs"
+                              style={cellStyle}
+                            >
+                              {cellContent}
+                            </div>
+                          ) : (
                             <button
                               key={shift.id}
                               type="button"
                               aria-label={ariaLabel}
                               onClick={() => setFormState({ mode: "edit", shift })}
                               className="w-full rounded-sm border-l-4 px-2 py-1.5 text-left text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
-                              style={{
-                                borderLeftColor: shift.projectColor ?? "#5663AE",
-                                background: shift.status === "cancelled" ? "#F4F4F8" : "#F7F8FC",
-                                opacity: shift.status === "cancelled" ? 0.6 : 1,
-                              }}
+                              style={cellStyle}
                             >
-                              <span className="block font-semibold text-ink">{formatTimeRange(starts, ends)}</span>
-                              {shift.status === "cancelled" && (
-                                <span className="block font-bold text-[#B24343]">{t("cancelledBadge")}</span>
-                              )}
+                              {cellContent}
                             </button>
                           );
                         })}
-                        <button
-                          type="button"
-                          aria-label={t("addShiftAriaLabel", { name: workerName(worker.id), day: day.dayLabel })}
-                          onClick={() => setFormState({ mode: "create", workerId: worker.id, isoDate: day.isoDate })}
-                          className="w-full rounded-sm border border-dashed border-border-300 py-1 text-xs font-semibold text-muted-500 focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        >
-                          +
-                        </button>
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            aria-label={t("addShiftAriaLabel", { name: workerName(worker.id), day: day.dayLabel })}
+                            onClick={() => setFormState({ mode: "create", workerId: worker.id, isoDate: day.isoDate })}
+                            className="w-full rounded-sm border border-dashed border-border-300 py-1 text-xs font-semibold text-muted-500 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                          >
+                            +
+                          </button>
+                        )}
                       </div>
                     );
                   })}

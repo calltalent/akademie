@@ -171,6 +171,7 @@ export function AdminSidebar({
   logoUrl = null,
   marketplaceEnabled = false,
   shiftCalendarEnabled = false,
+  restrictedToShiftCalendar = false,
 }: {
   active?: AdminSidebarItemId;
   isPlatformAdmin?: boolean;
@@ -191,6 +192,15 @@ export function AdminSidebar({
    * "Schichtplanung"-Menüpunkts, siehe `shiftCalendarOnly` oben. Default
    * `false` (Opt-in), gleiches Prinzip wie `marketplaceEnabled`. */
   shiftCalendarEnabled?: boolean;
+  /**
+   * NEU (Schichtplan S3, 09.08.2026): Projektleiter-Zugang zu `/admin/*`
+   * ist auf `/admin/schichtplanung` beschränkt (kein Schicht-/Zeitfenster-
+   * CRUD, kein Zugriff auf Teilnehmer/Kurse/Abgaben/…). Bei `true` blendet
+   * die Navigation ALLE Menüpunkte außer "Schichtplanung" aus — "Abmelden"
+   * (Footer) bleibt unverändert bestehen. Default `false` (Admin-Verhalten
+   * unverändert).
+   */
+  restrictedToShiftCalendar?: boolean;
 }) {
   const pathname = usePathname();
   const activeId = active ?? activeFromPath(pathname);
@@ -298,7 +308,8 @@ export function AdminSidebar({
             (i) =>
               (!i.platformOnly || isPlatformAdmin) &&
               (!i.marketplaceOnly || marketplaceEnabled) &&
-              (!i.shiftCalendarOnly || shiftCalendarEnabled),
+              (!i.shiftCalendarOnly || shiftCalendarEnabled) &&
+              (!restrictedToShiftCalendar || i.id === "schichtplanung"),
           );
           if (items.length === 0) return null;
           return (

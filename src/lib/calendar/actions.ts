@@ -1,13 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { requireAdminTenant } from "@/lib/auth/staff";
+import { requireShiftPlannerTenant } from "@/lib/calendar/access";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getTenant } from "@/lib/tenant/context";
 import { translateDbError } from "@/lib/errors/db";
 import { genericErrorMessage } from "@/lib/errors/generic";
+import { sendEmail } from "@/lib/email/client";
+import { shiftChangeRequestDecided, shiftChangeRequestSubmitted } from "@/lib/email/templates";
+import { resolveTenantEmailLocale } from "@/i18n/config";
+import type { PublicTenant } from "@/lib/tenant/types";
 import {
   calendarAbsenceSchema,
+  calendarChangeDecisionSchema,
+  calendarChangeRequestSchema,
   calendarClockInSchema,
   calendarHolidayImportSchema,
   calendarProjectMemberIdsSchema,
@@ -25,6 +34,8 @@ import {
   toCalendarProjectRow,
   type CalendarAbsenceInput,
   type CalendarAdminShiftRow,
+  type CalendarChangeDecisionInput,
+  type CalendarChangeRequestInput,
   type CalendarClockInInput,
   type CalendarHolidayImportInput,
   type CalendarProjectInput,
@@ -41,7 +52,7 @@ import {
   type CalendarWorkerStatus,
   type CalendarWorkerTargetInput,
 } from "@/lib/calendar/schema";
-import { buildWeeklySeries } from "@/lib/calendar/date";
+import { buildWeeklySeries, formatDayLabel, formatTimeRange } from "@/lib/calendar/date";
 import { buildHolidays } from "@/lib/calendar/holidays";
 
 /**
@@ -969,6 +980,379 @@ export async function updateOwnTargetHours(input: CalendarWorkerTargetInput): Pr
     if (error) return { ok: false, error: translateDbError(error) };
 
     revalidatePath(LEARN_PATH);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+// =====================================================================
+// Block S3 (09.08.2026) — Änderungsanfragen (Arbeiter-Selbstanfrage +
+// Admin-/Projektleiter-Entscheidung).
+// =====================================================================
+
+type ChangeRequestCreateResult = { ok: true; requestId: string } | { ok: false; error: string };
+
+/** "Montag, 10. August, 08:00–16:00 Uhr" — reine Anzeige-Kürzel für E-Mails, bewusst fest in de-DE-Format (gleiches Prinzip wie die hartcodierten deutschen Fehlermeldungen in diesem Modul — die umgebenden Textbausteine der Mail sind über i18n lokalisiert, dieser Zeitstempel-Wert nicht). */
+function buildShiftLabel(startsAt: Date, endsAt: Date): string {
+  return `${formatDayLabel(startsAt)}, ${formatTimeRange(startsAt, endsAt)} Uhr`;
+}
+
+/**
+ * Empfängerkreis + Mailversand für eine NEUE Änderungsanfrage — alle
+ * `owner`/`admin` des Mandanten PLUS der Projektleiter des betroffenen
+ * Projekts (falls gesetzt). Fail-soft (CLAUDE.md/tutor-actions.ts-Muster):
+ * wird IMMER per `.catch()` am Aufrufort abgefangen, wirft hier absichtlich
+ * nicht nach außen durch.
+ */
+async function notifyChangeRequestSubmitted(params: {
+  tenant: PublicTenant;
+  workerUserId: string;
+  kind: "update" | "cancel";
+  reason: string | null;
+  shiftStartsAt: string;
+  shiftEndsAt: string;
+  proposedStartsAt: string | null;
+  proposedEndsAt: string | null;
+  projectId: string | null;
+}): Promise<void> {
+  const admin = createAdminClient();
+  const { tenant } = params;
+
+  const { data: workerProfile } = await admin
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", params.workerUserId)
+    .maybeSingle();
+  const workerName = workerProfile?.full_name?.trim() || workerProfile?.email || "Ein Arbeiter";
+
+  const recipientIds = new Set<string>();
+  const { data: staffMemberships } = await admin
+    .from("memberships")
+    .select("user_id")
+    .eq("tenant_id", tenant.id)
+    .eq("status", "active")
+    .in("role", ["owner", "admin"]);
+  for (const m of staffMemberships ?? []) {
+    if (m.user_id) recipientIds.add(m.user_id as string);
+  }
+
+  if (params.projectId) {
+    const { data: project } = await admin
+      .from("calendar_projects")
+      .select("lead_user_id")
+      .eq("id", params.projectId)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+    if (project?.lead_user_id) recipientIds.add(project.lead_user_id as string);
+  }
+  if (recipientIds.size === 0) return;
+
+  const { data: recipientProfiles } = await admin
+    .from("profiles")
+    .select("id, email, full_name")
+    .in("id", Array.from(recipientIds));
+
+  const shiftLabel = buildShiftLabel(new Date(params.shiftStartsAt), new Date(params.shiftEndsAt));
+  const proposedLabel =
+    params.kind === "update" && params.proposedStartsAt && params.proposedEndsAt
+      ? buildShiftLabel(new Date(params.proposedStartsAt), new Date(params.proposedEndsAt))
+      : undefined;
+
+  const locale = resolveTenantEmailLocale(tenant.settings.default_locale);
+  const tSubject = await getTranslations({ locale, namespace: "email" });
+
+  for (const profile of recipientProfiles ?? []) {
+    if (!profile.email) continue;
+    const html = await shiftChangeRequestSubmitted({
+      tenantName: tenant.name,
+      recipientName: profile.full_name ?? undefined,
+      workerName,
+      shiftLabel,
+      proposedLabel,
+      kind: params.kind,
+      reason: params.reason ?? undefined,
+      accentColor: tenant.branding.color_primary,
+      locale,
+    });
+    const result = await sendEmail({
+      to: profile.email,
+      subject: tSubject("shiftChangeRequestSubmitted.subject"),
+      html,
+      tenant: { name: tenant.name },
+    });
+    if (!result.success) {
+      console.error("[calendar/actions] Anfragemail fehlgeschlagen (fail-soft):", result.error);
+    }
+  }
+}
+
+/** Kein `requireAdminTenant()`/`requireShiftPlannerTenant()` — jeder Arbeiter stellt eine Anfrage NUR für die eigene Schicht (Muster wie `bookOwnShift()`), RLS (`calendar_may_request_change()`) ist die eigentliche Sperre gegen fremde Schichten. */
+export async function createShiftChangeRequest(input: CalendarChangeRequestInput): Promise<ChangeRequestCreateResult> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht angemeldet." };
+    const tenant = await getTenant();
+    if (!tenant) return { ok: false, error: "Kein Mandant zu diesem Host gefunden." };
+
+    const parsed = calendarChangeRequestSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+    const data = parsed.data;
+
+    const { data: worker } = await supabase
+      .from("calendar_workers")
+      .select("id")
+      .eq("tenant_id", tenant.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!worker) return { ok: false, error: "Kein Arbeiterprofil in diesem Mandanten." };
+
+    const { data: shift } = await supabase
+      .from("calendar_shifts")
+      .select("id, status, starts_at, ends_at, project_id")
+      .eq("id", data.shiftId)
+      .eq("tenant_id", tenant.id)
+      .eq("worker_id", worker.id)
+      .maybeSingle();
+    if (!shift) return { ok: false, error: "Schicht nicht gefunden." };
+    if (shift.status === "cancelled") return { ok: false, error: "Diese Schicht ist bereits storniert." };
+
+    const { data: existingPending } = await supabase
+      .from("calendar_shift_change_requests")
+      .select("id")
+      .eq("tenant_id", tenant.id)
+      .eq("shift_id", data.shiftId)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (existingPending) return { ok: false, error: "Für diese Schicht liegt bereits eine offene Anfrage vor." };
+
+    let proposedStartsAt: string | null = null;
+    let proposedEndsAt: string | null = null;
+    let proposedBreakMinutes: number | null = null;
+    if (data.kind === "update") {
+      const [{ startsAt, endsAt }] = buildWeeklySeries(data.date, data.startTime, data.endTime, 1);
+      proposedStartsAt = startsAt.toISOString();
+      proposedEndsAt = endsAt.toISOString();
+      proposedBreakMinutes = data.breakMinutes;
+    }
+
+    const { data: inserted, error } = await supabase
+      .from("calendar_shift_change_requests")
+      .insert({
+        tenant_id: tenant.id,
+        shift_id: data.shiftId,
+        worker_id: worker.id,
+        kind: data.kind,
+        proposed_starts_at: proposedStartsAt,
+        proposed_ends_at: proposedEndsAt,
+        proposed_break_minutes: proposedBreakMinutes,
+        proposed_project_id: null,
+        reason: data.reason ?? null,
+        status: "pending",
+      })
+      .select("id")
+      .single();
+    if (error || !inserted) {
+      if (error?.code === "23505") {
+        return { ok: false, error: "Für diese Schicht liegt bereits eine offene Anfrage vor." };
+      }
+      return { ok: false, error: error ? translateDbError(error) : "Anfrage konnte nicht gespeichert werden." };
+    }
+
+    revalidatePath(ADMIN_PATH);
+    revalidatePath(LEARN_PATH);
+
+    void notifyChangeRequestSubmitted({
+      tenant,
+      workerUserId: user.id,
+      kind: data.kind,
+      reason: data.reason ?? null,
+      shiftStartsAt: shift.starts_at,
+      shiftEndsAt: shift.ends_at,
+      proposedStartsAt,
+      proposedEndsAt,
+      projectId: shift.project_id,
+    }).catch((e) => {
+      console.error("[calendar/actions] notifyChangeRequestSubmitted fehlgeschlagen (fail-soft):", e);
+    });
+
+    return { ok: true, requestId: inserted.id };
+  } catch (e) {
+    return { ok: false, error: genericErrorMessage(e) };
+  }
+}
+
+/** Mailversand an den Arbeiter nach einer Entscheidung — fail-soft, siehe notifyChangeRequestSubmitted() oben. */
+async function notifyChangeRequestDecided(params: {
+  tenant: PublicTenant;
+  workerId: string;
+  shiftId: string;
+  kind: "update" | "cancel";
+  decision: "approved" | "rejected";
+  decisionNote: string | null;
+  proposedStartsAt: string | null;
+  proposedEndsAt: string | null;
+}): Promise<void> {
+  const admin = createAdminClient();
+  const { tenant } = params;
+
+  const { data: workerRow } = await admin
+    .from("calendar_workers")
+    .select("user_id")
+    .eq("id", params.workerId)
+    .eq("tenant_id", tenant.id)
+    .maybeSingle();
+  if (!workerRow) return;
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", workerRow.user_id)
+    .maybeSingle();
+  if (!profile?.email) return;
+
+  const { data: shiftRow } = await admin
+    .from("calendar_shifts")
+    .select("starts_at, ends_at")
+    .eq("id", params.shiftId)
+    .eq("tenant_id", tenant.id)
+    .maybeSingle();
+  if (!shiftRow) return;
+  const shiftLabel = buildShiftLabel(new Date(shiftRow.starts_at), new Date(shiftRow.ends_at));
+  const proposedLabel =
+    params.kind === "update" && params.proposedStartsAt && params.proposedEndsAt
+      ? buildShiftLabel(new Date(params.proposedStartsAt), new Date(params.proposedEndsAt))
+      : undefined;
+
+  const locale = resolveTenantEmailLocale(tenant.settings.default_locale);
+  const tSubject = await getTranslations({ locale, namespace: "email" });
+
+  const html = await shiftChangeRequestDecided({
+    tenantName: tenant.name,
+    recipientName: profile.full_name ?? undefined,
+    decision: params.decision,
+    kind: params.kind,
+    shiftLabel,
+    proposedLabel,
+    decisionNote: params.decisionNote ?? undefined,
+    accentColor: tenant.branding.color_primary,
+    locale,
+  });
+  const result = await sendEmail({
+    to: profile.email,
+    subject: tSubject("shiftChangeRequestDecided.subject"),
+    html,
+    tenant: { name: tenant.name },
+  });
+  if (!result.success) {
+    console.error("[calendar/actions] Entscheidungsmail fehlgeschlagen (fail-soft):", result.error);
+  }
+}
+
+/**
+ * Entscheidung über eine Änderungsanfrage — Admin ODER Projektleiter
+ * (`requireShiftPlannerTenant()`, NICHT `requireAdminTenant()`). Reihenfolge
+ * ist die Lösung für die Nebenläufigkeits-Anforderung: erst die Schicht
+ * schreiben (Ablehnung überspringt das), dann die Anfrage abschließen — drei
+ * Fehlerfälle beim Schicht-Schreiben lassen die Anfrage bewusst `pending`
+ * (sofortiges Return, kein Schreibversuch auf die Anfrage).
+ */
+export async function decideShiftChangeRequest(requestId: string, input: CalendarChangeDecisionInput): Promise<ActionResult> {
+  try {
+    const { tenant, supabase, user } = await requireShiftPlannerTenant();
+    const parsed = calendarChangeDecisionSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+    const data = parsed.data;
+
+    const { data: request } = await supabase
+      .from("calendar_shift_change_requests")
+      .select(
+        "id, shift_id, worker_id, kind, proposed_starts_at, proposed_ends_at, proposed_break_minutes, proposed_project_id",
+      )
+      .eq("id", requestId)
+      .eq("tenant_id", tenant.id)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (!request) return { ok: false, error: "Diese Anfrage wurde bereits entschieden." };
+
+    const CONFLICT_MESSAGE =
+      "Genehmigung nicht möglich: Die vorgeschlagene Zeit überschneidet sich mit einer anderen Schicht dieses Arbeiters. Die Anfrage bleibt offen — stornieren Sie zuerst die überlappende Schicht und versuchen Sie es dann erneut.";
+
+    if (data.decision === "approved") {
+      if (request.kind === "cancel") {
+        const { data: updated, error } = await supabase
+          .from("calendar_shifts")
+          .update({ status: "cancelled" })
+          .eq("id", request.shift_id)
+          .eq("tenant_id", tenant.id)
+          .select("id");
+        if (error) return { ok: false, error: error.code === "23P01" ? CONFLICT_MESSAGE : translateDbError(error) };
+        if (!updated || updated.length === 0) {
+          return { ok: false, error: "Kein Zugriff auf diese Schicht — bitte an einen Administrator übergeben." };
+        }
+      } else {
+        if (request.proposed_project_id) {
+          const validProject = await assertOwnTenantRow(supabase, tenant.id, "calendar_projects", request.proposed_project_id);
+          if (!validProject) return { ok: false, error: "Projekt nicht gefunden." };
+        }
+        const updatePayload: Record<string, unknown> = {
+          starts_at: request.proposed_starts_at,
+          ends_at: request.proposed_ends_at,
+          break_minutes: request.proposed_break_minutes,
+        };
+        if (request.proposed_project_id) updatePayload.project_id = request.proposed_project_id;
+
+        const { data: updated, error } = await supabase
+          .from("calendar_shifts")
+          .update(updatePayload)
+          .eq("id", request.shift_id)
+          .eq("tenant_id", tenant.id)
+          .select("id");
+        if (error) return { ok: false, error: error.code === "23P01" ? CONFLICT_MESSAGE : translateDbError(error) };
+        if (!updated || updated.length === 0) {
+          return { ok: false, error: "Kein Zugriff auf diese Schicht — bitte an einen Administrator übergeben." };
+        }
+      }
+    }
+
+    const { data: decided, error: decideError } = await supabase
+      .from("calendar_shift_change_requests")
+      .update({
+        status: data.decision,
+        decided_by: user.id,
+        decided_at: new Date().toISOString(),
+        decision_note: data.decisionNote ?? null,
+      })
+      .eq("id", requestId)
+      .eq("tenant_id", tenant.id)
+      .eq("status", "pending")
+      .select("id");
+    if (decideError) return { ok: false, error: translateDbError(decideError) };
+    if (!decided || decided.length === 0) return { ok: false, error: "Diese Anfrage wurde bereits entschieden." };
+
+    revalidatePath(ADMIN_PATH);
+    revalidatePath(LEARN_PATH);
+
+    void notifyChangeRequestDecided({
+      tenant,
+      workerId: request.worker_id,
+      shiftId: request.shift_id,
+      kind: request.kind,
+      decision: data.decision,
+      decisionNote: data.decisionNote ?? null,
+      proposedStartsAt: request.proposed_starts_at,
+      proposedEndsAt: request.proposed_ends_at,
+    }).catch((e) => {
+      console.error("[calendar/actions] notifyChangeRequestDecided fehlgeschlagen (fail-soft):", e);
+    });
+
     return { ok: true };
   } catch (e) {
     return { ok: false, error: genericErrorMessage(e) };

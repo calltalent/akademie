@@ -457,6 +457,29 @@
         "saveButton": "Sačuvaj",
         "savingButton": "Čuvanje …",
         "saved": "Ciljni sati sačuvani."
+      },
+      "changeRequests": {
+        "heading": "Zatraži izmjenu",
+        "description": "Za svoje smjene ove sedmice možeš zatražiti izmjenu vremena ili otkazivanje — tvoj tim odlučuje.",
+        "empty": "Nema smjena ove sedmice.",
+        "changeButton": "Izmijeni vrijeme",
+        "cancelButton": "Otkaži",
+        "formChangeHeading": "Zatraži izmjenu vremena",
+        "formCancelHeading": "Zatraži otkazivanje",
+        "newDateLabel": "Datum",
+        "newStartLabel": "Novo vrijeme početka",
+        "newEndLabel": "Novo vrijeme završetka",
+        "newBreakLabel": "Pauza (minuta)",
+        "reasonLabel": "Obrazloženje (opciono)",
+        "submitButton": "Pošalji zahtjev",
+        "submittingButton": "Slanje …",
+        "closeButton": "Otkaži",
+        "alreadyPending": "Za ovu smjenu već postoji zahtjev na čekanju.",
+        "statusPending": "Zahtjev na čekanju",
+        "statusApproved": "Odobreno",
+        "statusRejected": "Odbijeno",
+        "decisionNoteLabel": "Napomena tima",
+        "cancelConfirm": "Zaista zatražiti otkazivanje ove smjene?"
       }
     },
     "module": {
@@ -587,6 +610,8 @@
       "reasonNoTenant": "Nije pronađen klijent za ovaj host.",
       "reasonNotAuthenticated": "Prvo se prijavi.",
       "reasonNotStaff": "Nema pristupa — ovaj odjeljak je samo za članove tima (owner/admin/trainer).",
+      "reasonNotShiftPlanner": "Nema pristupa — ovaj odjeljak je samo za vlasnike, administratore ili voditelje projekata.",
+      "reasonShiftCalendarDisabled": "Raspored smjena nije aktiviran za ovu akademiju.",
       "goToLoginButton": "Na prijavu"
     },
     "common": {
@@ -1265,7 +1290,8 @@
         "projects": "Projekti",
         "shifts": "Smjene",
         "slots": "Termini",
-        "absences": "Odsustva"
+        "absences": "Odsustva",
+        "requests": "Zahtjevi za izmjenu"
       },
       "workers": {
         "heading": "Radnici",
@@ -1425,6 +1451,32 @@
           "result": "{inserted} uneseno, {skipped} preskočeno."
         },
         "country": { "DE": "Njemačka", "AT": "Austrija", "CH": "Švicarska" }
+      },
+      "requests": {
+        "heading": "Zahtjevi za izmjenu",
+        "description": "Zahtjevi radnika za izmjenu vremena ili otkazivanje smjene — odlučite ovdje.",
+        "filterAriaLabel": "Filtriraj zahtjeve",
+        "filterPending": "Na čekanju",
+        "filterDecided": "Odlučeno",
+        "filterAll": "Sve",
+        "empty": "Nema zahtjeva u ovom pregledu.",
+        "currentLabel": "Trenutno",
+        "proposedLabel": "Predloženo",
+        "kindUpdate": "Izmjena vremena",
+        "kindCancel": "Zatraženo otkazivanje",
+        "reasonLabel": "Obrazloženje",
+        "noReason": "Obrazloženje nije navedeno.",
+        "decisionNoteLabel": "Napomena uz odluku (opciono)",
+        "approveButton": "Odobri",
+        "rejectButton": "Odbij",
+        "decidingButton": "Čuvanje …",
+        "openButton": "Prikaži detalje",
+        "closeButton": "Zatvori",
+        "statusPending": "Na čekanju",
+        "statusApproved": "Odobreno",
+        "statusRejected": "Odbijeno",
+        "decidedAtLabel": "Odlučeno {date}",
+        "conflictHint": "Odobravanje nije moguće: predloženo vrijeme se preklapa s drugom smjenom ovog radnika. Zahtjev ostaje na čekanju — prvo otkaži smjenu koja se preklapa, pa pokušaj ponovo."
       }
     }
   },
@@ -1610,6 +1662,23 @@
       "heading": "Uplata primljena",
       "body": "hvala na kupovini {productName} kod {tenantName}. Uplata je primljena i tvoj pristup je otključan.",
       "actionButton": "Idi na kurs"
+    },
+    "shiftChangeRequestDecided": {
+      "subject": "Tvoj zahtjev za izmjenu je odlučen",
+      "heading": "Zahtjev za izmjenu odlučen",
+      "bodyApproved": "tvoj zahtjev za izmjenu smjene je odobren.",
+      "bodyRejected": "tvoj zahtjev za izmjenu smjene je odbijen.",
+      "shiftLabel": "Smjena",
+      "proposedLabel": "Novo vrijeme",
+      "decisionNoteLabel": "Napomena"
+    },
+    "shiftChangeRequestSubmitted": {
+      "subject": "Novi zahtjev za izmjenu u rasporedu smjena",
+      "heading": "Novi zahtjev za izmjenu",
+      "body": "{workerName} je poslao/la zahtjev za izmjenu smjene.",
+      "shiftLabel": "Smjena",
+      "proposedLabel": "Novo vrijeme",
+      "reasonLabel": "Obrazloženje"
     }
   },
   "maintenance": {

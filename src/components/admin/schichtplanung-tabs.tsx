@@ -11,9 +11,11 @@ import {
 import { CalendarShiftsPanel } from "@/components/admin/calendar-shifts-panel";
 import { CalendarSlotsPanel } from "@/components/admin/calendar-slots-panel";
 import { CalendarAbsencesPanel } from "@/components/admin/calendar-absences-panel";
+import { CalendarChangeRequestsPanel } from "@/components/admin/calendar-change-requests-panel";
 import type {
   CalendarAbsenceRow,
   CalendarAdminShiftRow,
+  CalendarChangeRequestRow,
   CalendarProjectRow,
   CalendarSlotRow,
   CalendarWorkerRow,
@@ -44,24 +46,26 @@ import type {
  * kann keinen Router-Hook verwenden) — die fünf Panels waren ohnehin bereits
  * `"use client"`.
  */
-export type SchichtplanungTab = "workers" | "projects" | "shifts" | "slots" | "absences";
+export type SchichtplanungTab = "workers" | "projects" | "shifts" | "slots" | "absences" | "requests";
 
 type ShiftsData = { shifts: CalendarAdminShiftRow[]; slots: CalendarSlotRow[]; absences: CalendarAbsenceRow[] } | null;
 type SlotsData = { slots: CalendarSlotRow[] } | null;
 type AbsencesData = { absences: CalendarAbsenceRow[] } | null;
-
-const TAB_IDS: SchichtplanungTab[] = ["workers", "projects", "shifts", "slots", "absences"];
+type RequestsData = { requests: CalendarChangeRequestRow[]; status: "pending" | "decided" | "all" } | null;
 
 function buildTabHref(tab: SchichtplanungTab, weekIso: string, year: number): string {
   const params = new URLSearchParams();
   params.set("tab", tab);
   if (weekIso) params.set("week", weekIso);
   if (year) params.set("year", String(year));
+  if (tab === "requests") params.set("requestStatus", "pending");
   return `?${params.toString()}`;
 }
 
 export function SchichtplanungTabs({
   activeTab,
+  allowedTabs,
+  isAdmin,
   weekIso,
   prevWeekIso,
   nextWeekIso,
@@ -77,8 +81,13 @@ export function SchichtplanungTabs({
   shiftsData,
   slotsData,
   absencesData,
+  requestsData,
 }: {
   activeTab: SchichtplanungTab;
+  /** Rollenfilterung (Block S3) — Admin: alle sechs Reiter, Projektleiter: nur `["shifts", "requests"]`. */
+  allowedTabs: SchichtplanungTab[];
+  /** Steuert `readOnly` auf dem Schichten-Panel — Projektleiter dürfen NUR lesen (kein Schicht-CRUD). */
+  isAdmin: boolean;
   weekIso: string;
   prevWeekIso: string;
   nextWeekIso: string;
@@ -94,6 +103,7 @@ export function SchichtplanungTabs({
   shiftsData: ShiftsData;
   slotsData: SlotsData;
   absencesData: AbsencesData;
+  requestsData: RequestsData;
 }) {
   const t = useTranslations("admin.shiftCalendar.tabs");
   const router = useRouter();
@@ -104,6 +114,7 @@ export function SchichtplanungTabs({
     shifts: t("shifts"),
     slots: t("slots"),
     absences: t("absences"),
+    requests: t("requests"),
   };
 
   const activeProjects = projects.filter((p) => p.status === "active");
@@ -111,7 +122,7 @@ export function SchichtplanungTabs({
   return (
     <div>
       <div className="mb-[22px] flex flex-wrap gap-1.5 border-b border-border-200">
-        {TAB_IDS.map((tabId) => {
+        {allowedTabs.map((tabId) => {
           const active = tabId === activeTab;
           return (
             <button
@@ -149,6 +160,7 @@ export function SchichtplanungTabs({
           prevWeekHref={buildTabHref("shifts", prevWeekIso, year)}
           nextWeekHref={buildTabHref("shifts", nextWeekIso, year)}
           todayHref="?tab=shifts"
+          readOnly={!isAdmin}
         />
       )}
       {activeTab === "slots" && slotsData && (
@@ -164,6 +176,14 @@ export function SchichtplanungTabs({
       )}
       {activeTab === "absences" && absencesData && (
         <CalendarAbsencesPanel workers={workers.filter((w) => w.status === "active")} absences={absencesData.absences} year={year} />
+      )}
+      {activeTab === "requests" && requestsData && (
+        <CalendarChangeRequestsPanel
+          requests={requestsData.requests}
+          status={requestsData.status}
+          weekIso={weekIso}
+          year={year}
+        />
       )}
     </div>
   );

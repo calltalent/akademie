@@ -316,3 +316,82 @@ export type CalendarOpenSlotRow = {
   freeSeats: number;
   alreadyBooked: boolean;
 };
+
+// =====================================================================
+// Block S3 (09.08.2026) — Änderungsanfragen-UI, Projektleiter-Zugang zum
+// Admin-Bereich. Bestehende Schemas/Typen oben UNVERÄNDERT.
+// =====================================================================
+
+export const CALENDAR_CHANGE_REQUEST_KINDS = ["update", "cancel"] as const;
+export type CalendarChangeRequestKind = (typeof CALENDAR_CHANGE_REQUEST_KINDS)[number];
+
+export const CALENDAR_CHANGE_REQUEST_STATUSES = ["pending", "approved", "rejected"] as const;
+export type CalendarChangeRequestStatus = (typeof CALENDAR_CHANGE_REQUEST_STATUSES)[number];
+
+/**
+ * Änderungsanfrage eines Arbeiters (`createShiftChangeRequest`) — entweder
+ * "Zeit ändern" (`update`, mit vollständigem neuen Datum/Uhrzeit/Pause) oder
+ * "Stornieren" (`cancel`, ohne Zeitfelder). WICHTIG: `.refine()` steht
+ * AUSSERHALB der `discriminatedUnion` — ein `ZodEffects` als Union-Mitglied
+ * würde `discriminatedUnion` brechen (`kind`-Diskriminator müsste dann durch
+ * den Effect-Wrapper hindurchschauen).
+ */
+export const calendarChangeRequestSchema = z
+  .discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("cancel"),
+      shiftId: z.string().uuid("Ungültige Schicht."),
+      reason: z.string().trim().max(500, "Höchstens 500 Zeichen.").optional(),
+    }),
+    z.object({
+      kind: z.literal("update"),
+      shiftId: z.string().uuid("Ungültige Schicht."),
+      date: calendarDateSchema,
+      startTime: calendarTimeSchema,
+      endTime: calendarTimeSchema,
+      breakMinutes: z.coerce.number().int().min(0).max(480).default(0),
+      reason: z.string().trim().max(500, "Höchstens 500 Zeichen.").optional(),
+    }),
+  ])
+  .refine((d) => d.kind !== "update" || d.startTime !== d.endTime, {
+    message: "Start- und Endzeit dürfen nicht gleich sein.",
+    path: ["endTime"],
+  });
+export type CalendarChangeRequestInput = z.infer<typeof calendarChangeRequestSchema>;
+
+/** Entscheidung über eine Änderungsanfrage (`decideShiftChangeRequest`) — Admin/Projektleiter. */
+export const calendarChangeDecisionSchema = z.object({
+  decision: z.enum(["approved", "rejected"]),
+  decisionNote: z.string().trim().max(500, "Höchstens 500 Zeichen.").optional(),
+});
+export type CalendarChangeDecisionInput = z.infer<typeof calendarChangeDecisionSchema>;
+
+/**
+ * Änderungsanfrage-Zeile für die Admin-Inbox UND die Arbeiter-eigene Ansicht
+ * — trägt zusätzlich zum Anfrage-Datensatz selbst den Kontext der
+ * Ursprungsschicht (`shiftStartsAt`/…/`projectName`/`projectColor`), damit
+ * "Aktuell" vs. "Vorgeschlagen" ohne einen zweiten Round-Trip dargestellt
+ * werden kann.
+ */
+export type CalendarChangeRequestRow = {
+  id: string;
+  shiftId: string;
+  workerId: string;
+  workerName: string | null;
+  kind: CalendarChangeRequestKind;
+  proposedStartsAt: string | null;
+  proposedEndsAt: string | null;
+  proposedBreakMinutes: number | null;
+  proposedProjectId: string | null;
+  reason: string | null;
+  status: CalendarChangeRequestStatus;
+  decisionNote: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+  shiftStartsAt: string;
+  shiftEndsAt: string;
+  shiftBreakMinutes: number;
+  shiftStatus: CalendarShiftStatus;
+  projectName: string | null;
+  projectColor: string | null;
+};

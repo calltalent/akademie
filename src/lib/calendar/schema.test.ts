@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   calendarAbsenceSchema,
+  calendarChangeDecisionSchema,
+  calendarChangeRequestSchema,
   calendarClockInSchema,
   calendarDateSchema,
   calendarHolidayImportSchema,
@@ -285,5 +287,87 @@ describe("calendarWorkerTargetSchema", () => {
 
   it("lehnt Sollstunden über 400 ab", () => {
     expect(calendarWorkerTargetSchema.safeParse({ targetHours: 401, targetPeriod: "week" }).success).toBe(false);
+  });
+});
+
+// =====================================================================
+// Block S3 (09.08.2026) — Änderungsanfragen
+// =====================================================================
+
+describe("calendarChangeRequestSchema", () => {
+  it("akzeptiert kind='cancel' ohne Zeitfelder", () => {
+    expect(calendarChangeRequestSchema.safeParse({ kind: "cancel", shiftId: VALID_UUID }).success).toBe(true);
+  });
+
+  it("akzeptiert kind='cancel' mit Begründung", () => {
+    expect(
+      calendarChangeRequestSchema.safeParse({ kind: "cancel", shiftId: VALID_UUID, reason: "Krank." }).success,
+    ).toBe(true);
+  });
+
+  it("lehnt kind='update' OHNE date/startTime/endTime ab", () => {
+    expect(calendarChangeRequestSchema.safeParse({ kind: "update", shiftId: VALID_UUID }).success).toBe(false);
+  });
+
+  it("akzeptiert kind='update' mit vollständigen Zeitfeldern", () => {
+    expect(
+      calendarChangeRequestSchema.safeParse({
+        kind: "update",
+        shiftId: VALID_UUID,
+        date: "2026-08-10",
+        startTime: "08:00",
+        endTime: "16:00",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("lehnt startTime === endTime bei kind='update' ab", () => {
+    expect(
+      calendarChangeRequestSchema.safeParse({
+        kind: "update",
+        shiftId: VALID_UUID,
+        date: "2026-08-10",
+        startTime: "08:00",
+        endTime: "08:00",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("akzeptiert breakMinutes 0 und 480 bei kind='update'", () => {
+    const base = { kind: "update" as const, shiftId: VALID_UUID, date: "2026-08-10", startTime: "08:00", endTime: "16:00" };
+    expect(calendarChangeRequestSchema.safeParse({ ...base, breakMinutes: 0 }).success).toBe(true);
+    expect(calendarChangeRequestSchema.safeParse({ ...base, breakMinutes: 480 }).success).toBe(true);
+  });
+
+  it("lehnt breakMinutes -1 und 481 bei kind='update' ab", () => {
+    const base = { kind: "update" as const, shiftId: VALID_UUID, date: "2026-08-10", startTime: "08:00", endTime: "16:00" };
+    expect(calendarChangeRequestSchema.safeParse({ ...base, breakMinutes: -1 }).success).toBe(false);
+    expect(calendarChangeRequestSchema.safeParse({ ...base, breakMinutes: 481 }).success).toBe(false);
+  });
+
+  it("akzeptiert eine Begründung mit 500 Zeichen, lehnt 501 Zeichen ab", () => {
+    expect(
+      calendarChangeRequestSchema.safeParse({ kind: "cancel", shiftId: VALID_UUID, reason: "a".repeat(500) })
+        .success,
+    ).toBe(true);
+    expect(
+      calendarChangeRequestSchema.safeParse({ kind: "cancel", shiftId: VALID_UUID, reason: "a".repeat(501) })
+        .success,
+    ).toBe(false);
+  });
+
+  it("lehnt ein unbekanntes kind ab", () => {
+    expect(calendarChangeRequestSchema.safeParse({ kind: "delete", shiftId: VALID_UUID }).success).toBe(false);
+  });
+});
+
+describe("calendarChangeDecisionSchema", () => {
+  it("akzeptiert 'approved' und 'rejected'", () => {
+    expect(calendarChangeDecisionSchema.safeParse({ decision: "approved" }).success).toBe(true);
+    expect(calendarChangeDecisionSchema.safeParse({ decision: "rejected" }).success).toBe(true);
+  });
+
+  it("lehnt decision='pending' ab", () => {
+    expect(calendarChangeDecisionSchema.safeParse({ decision: "pending" }).success).toBe(false);
   });
 });

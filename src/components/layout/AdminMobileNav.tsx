@@ -27,6 +27,7 @@ export function AdminMobileNav({
   logoUrl = null,
   marketplaceEnabled = false,
   shiftCalendarEnabled = false,
+  restrictedToShiftCalendar = false,
 }: {
   isPlatformAdmin?: boolean;
   pendingSubmissions?: number;
@@ -38,6 +39,8 @@ export function AdminMobileNav({
   marketplaceEnabled?: boolean;
   /** Schichtplan S1 (07.08.2026) — siehe AdminSidebar.tsx. */
   shiftCalendarEnabled?: boolean;
+  /** Schichtplan S3 (09.08.2026) — siehe AdminSidebar.tsx. */
+  restrictedToShiftCalendar?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -97,6 +100,7 @@ export function AdminMobileNav({
             pendingSubmissions={pendingSubmissions}
             marketplaceEnabled={marketplaceEnabled}
             shiftCalendarEnabled={shiftCalendarEnabled}
+            restrictedToShiftCalendar={restrictedToShiftCalendar}
           />
         </div>
       )}

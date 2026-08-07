@@ -30,6 +30,7 @@ export async function AdminShell({
   pendingSubmissions = 0,
   marketplaceEnabled = false,
   shiftCalendarEnabled = false,
+  restrictedToShiftCalendar = false,
 }: {
   children: ReactNode;
   tenantName: string;
@@ -42,6 +43,8 @@ export async function AdminShell({
   marketplaceEnabled?: boolean;
   /** Schichtplan S1 (07.08.2026) — siehe AdminSidebar.tsx. */
   shiftCalendarEnabled?: boolean;
+  /** Schichtplan S3 (09.08.2026), Projektleiter-Zugang — siehe AdminSidebar.tsx. */
+  restrictedToShiftCalendar?: boolean;
 }) {
   const t = await getTranslations("admin.shell");
 
@@ -54,6 +57,7 @@ export async function AdminShell({
         pendingSubmissions={pendingSubmissions}
         marketplaceEnabled={marketplaceEnabled}
         shiftCalendarEnabled={shiftCalendarEnabled}
+        restrictedToShiftCalendar={restrictedToShiftCalendar}
       />
       <div className="flex min-h-screen" style={{ background: "#F4F5FA" }}>
         <HtmlBackgroundSync color="#F4F5FA" />
@@ -64,6 +68,7 @@ export async function AdminShell({
           pendingSubmissions={pendingSubmissions}
           marketplaceEnabled={marketplaceEnabled}
           shiftCalendarEnabled={shiftCalendarEnabled}
+          restrictedToShiftCalendar={restrictedToShiftCalendar}
         />
 
         <div className="min-w-0 flex-1 px-4 py-6 lg:px-10 lg:py-8">

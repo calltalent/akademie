@@ -51,6 +51,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * der Selbstauskunft sein, seit S2 real vorhanden — S1 hatte nur
  * `calendar_time_entries` (Ist-Zeiten, keine Gesundheitsdaten) hier bereits
  * angemahnt, aber noch nicht nachgezogen.
+ *
+ * Schichtplan-Nachzug (Block S3, 09.08.2026): `calendar_shift_change_requests`
+ * hängt ebenfalls an `worker_id`, nicht an `user_id` — gleiches Zwei-
+ * Schritt-Prinzip wie `calendar_shifts`/`calendar_time_entries`/
+ * `calendar_absences` oben, über dieselben bereits geladenen
+ * `calendarWorkerIds`.
  */
 export async function exportUserData(supabase: SupabaseClient, userId: string) {
   const [
@@ -95,15 +101,18 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
   let calendarShifts: unknown[] = [];
   let calendarTimeEntries: unknown[] = [];
   let calendarAbsences: unknown[] = [];
+  let calendarChangeRequests: unknown[] = [];
   if (calendarWorkerIds.length > 0) {
-    const [shiftsRes, timeEntriesRes, absencesRes] = await Promise.all([
+    const [shiftsRes, timeEntriesRes, absencesRes, changeRequestsRes] = await Promise.all([
       supabase.from("calendar_shifts").select("*").in("worker_id", calendarWorkerIds),
       supabase.from("calendar_time_entries").select("*").in("worker_id", calendarWorkerIds),
       supabase.from("calendar_absences").select("*").in("worker_id", calendarWorkerIds),
+      supabase.from("calendar_shift_change_requests").select("*").in("worker_id", calendarWorkerIds),
     ]);
     calendarShifts = shiftsRes.data ?? [];
     calendarTimeEntries = timeEntriesRes.data ?? [];
     calendarAbsences = absencesRes.data ?? [];
+    calendarChangeRequests = changeRequestsRes.data ?? [];
   }
 
   return {
@@ -122,5 +131,6 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
     calendar_shifts: calendarShifts,
     calendar_time_entries: calendarTimeEntries,
     calendar_absences: calendarAbsences,
+    calendar_shift_change_requests: calendarChangeRequests,
   };
 }

@@ -9,7 +9,14 @@ import { ShiftCalendarView, type ShiftCalendarDay } from "@/components/learn/shi
 import { TimeClockWidget } from "@/components/learn/time-clock-widget";
 import { OpenSlotsPanel } from "@/components/learn/open-slots-panel";
 import { TargetHoursForm } from "@/components/learn/target-hours-form";
-import { getOpenSlotsForWorker, getOpenTimeEntry, getOwnCalendarWorker, getWorkerShifts } from "@/lib/calendar/queries";
+import { ShiftChangeRequestPanel } from "@/components/learn/shift-change-request-panel";
+import {
+  getOpenSlotsForWorker,
+  getOpenTimeEntry,
+  getOwnCalendarWorker,
+  getWorkerChangeRequests,
+  getWorkerShifts,
+} from "@/lib/calendar/queries";
 import { addDays, formatDayLabel, formatShortDayLabel, formatTimeRange, isoDateString, startOfIsoWeek } from "@/lib/calendar/date";
 
 /**
@@ -56,7 +63,7 @@ export default async function SchichtplanPage({
 
   const isFreelancer = worker.workerType === "freelancer";
 
-  const [shifts, openEntry, { data: profile }, { data: isStaff }, openSlots] = await Promise.all([
+  const [shifts, openEntry, { data: profile }, { data: isStaff }, openSlots, changeRequests] = await Promise.all([
     getWorkerShifts(supabase, tenant.id, worker.id, weekStart.toISOString(), weekEnd.toISOString()),
     getOpenTimeEntry(supabase, tenant.id, worker.id),
     supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
@@ -67,6 +74,10 @@ export default async function SchichtplanPage({
     isFreelancer
       ? getOpenSlotsForWorker(supabase, tenant.id, weekStart.toISOString(), weekEnd.toISOString())
       : Promise.resolve([]),
+    // Änderungsanfragen (Block S3) — für ALLE Arbeitertypen, nicht nur
+    // Freelancer (anders als der Selbstbuchungs-Block oben): jeder Arbeiter
+    // mit einer geplanten Schicht darf eine Änderung/Stornierung beantragen.
+    getWorkerChangeRequests(supabase, tenant.id, worker.id),
   ]);
 
   const emailLocalPart = (user.email ?? "").split("@")[0] ?? "";
@@ -151,6 +162,8 @@ export default async function SchichtplanPage({
           emptyWeekText={t("emptyWeek")}
           noProjectText={t("noProject")}
         />
+
+        <ShiftChangeRequestPanel shifts={shifts} requests={changeRequests} />
 
         {isFreelancer && (
           <>

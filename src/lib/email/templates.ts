@@ -474,3 +474,84 @@ export async function orderPaid({
   `;
   return renderLayout({ tenantName, accentColor, heading: t("orderPaid.heading"), bodyHtml, locale, t });
 }
+
+// =====================================================================
+// Schichtplan Block S3 (09.08.2026) — Änderungsanfragen. Bestehende
+// Vorlagen oben UNVERÄNDERT.
+// =====================================================================
+
+function detailBlock(label: string, value: string): string {
+  return `<p style="margin:0 0 8px 0;font-size:14px;"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>`;
+}
+
+/**
+ * Entscheidung über eine Änderungsanfrage — an den Arbeiter. `shiftLabel`
+ * ist die (weiterhin gültige oder, bei Genehmigung, bereits überschriebene)
+ * Ursprungsschicht als sprechender Text ("Montag, 10. August, 08:00–16:00
+ * Uhr"), `proposedLabel` nur bei `kind==="update"` gesetzt.
+ */
+export async function shiftChangeRequestDecided({
+  tenantName,
+  recipientName,
+  decision,
+  kind,
+  shiftLabel,
+  proposedLabel,
+  decisionNote,
+  accentColor,
+  locale,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  decision: "approved" | "rejected";
+  kind: "update" | "cancel";
+  shiftLabel: string;
+  proposedLabel?: string;
+  decisionNote?: string;
+  accentColor?: string;
+  locale: Locale;
+}): Promise<string> {
+  const t = await getTranslations({ locale, namespace: "email" });
+  const bodyText = decision === "approved" ? t("shiftChangeRequestDecided.bodyApproved") : t("shiftChangeRequestDecided.bodyRejected");
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName, t)}</p>
+    <p style="margin:0 0 16px 0;">${bodyText}</p>
+    ${detailBlock(t("shiftChangeRequestDecided.shiftLabel"), shiftLabel)}
+    ${kind === "update" && proposedLabel ? detailBlock(t("shiftChangeRequestDecided.proposedLabel"), proposedLabel) : ""}
+    ${decisionNote ? detailBlock(t("shiftChangeRequestDecided.decisionNoteLabel"), decisionNote) : ""}
+  `;
+  return renderLayout({ tenantName, accentColor, heading: t("shiftChangeRequestDecided.heading"), bodyHtml, locale, t });
+}
+
+/** Neue Änderungsanfrage — an Admins/Projektleiter des Mandanten. */
+export async function shiftChangeRequestSubmitted({
+  tenantName,
+  recipientName,
+  workerName,
+  shiftLabel,
+  proposedLabel,
+  kind,
+  reason,
+  accentColor,
+  locale,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  workerName: string;
+  shiftLabel: string;
+  proposedLabel?: string;
+  kind: "update" | "cancel";
+  reason?: string;
+  accentColor?: string;
+  locale: Locale;
+}): Promise<string> {
+  const t = await getTranslations({ locale, namespace: "email" });
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName, t)}</p>
+    <p style="margin:0 0 16px 0;">${t("shiftChangeRequestSubmitted.body", { workerName: `<strong>${escapeHtml(workerName)}</strong>` })}</p>
+    ${detailBlock(t("shiftChangeRequestSubmitted.shiftLabel"), shiftLabel)}
+    ${kind === "update" && proposedLabel ? detailBlock(t("shiftChangeRequestSubmitted.proposedLabel"), proposedLabel) : ""}
+    ${reason ? detailBlock(t("shiftChangeRequestSubmitted.reasonLabel"), reason) : ""}
+  `;
+  return renderLayout({ tenantName, accentColor, heading: t("shiftChangeRequestSubmitted.heading"), bodyHtml, locale, t });
+}

@@ -4,6 +4,7 @@ import {
   toCalendarProjectRow,
   type CalendarAbsenceRow,
   type CalendarAdminShiftRow,
+  type CalendarChangeRequestRow,
   type CalendarOpenSlotRow,
   type CalendarProjectRow,
   type CalendarShiftRow,
@@ -438,6 +439,143 @@ export async function getOpenSlotsForWorker(
     freeSeats: row.free_seats,
     alreadyBooked: row.already_booked,
   }));
+}
+
+// =====================================================================
+// Block S3 (09.08.2026) — Änderungsanfragen-UI, Projektleiter-Zugang.
+// =====================================================================
+
+type CalendarChangeRequestDbRow = {
+  id: string;
+  shift_id: string;
+  worker_id: string;
+  kind: "update" | "cancel";
+  proposed_starts_at: string | null;
+  proposed_ends_at: string | null;
+  proposed_break_minutes: number | null;
+  proposed_project_id: string | null;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected";
+  decision_note: string | null;
+  decided_at: string | null;
+  created_at: string;
+  calendar_shifts:
+    | {
+        starts_at: string;
+        ends_at: string;
+        break_minutes: number;
+        status: CalendarAdminShiftRow["status"];
+        calendar_projects: { name: string; color: string | null } | { name: string; color: string | null }[] | null;
+      }
+    | {
+        starts_at: string;
+        ends_at: string;
+        break_minutes: number;
+        status: CalendarAdminShiftRow["status"];
+        calendar_projects: { name: string; color: string | null } | { name: string; color: string | null }[] | null;
+      }[]
+    | null;
+};
+
+function toChangeRequestRow(row: CalendarChangeRequestDbRow, workerName: string | null): CalendarChangeRequestRow {
+  const shift = embeddedOne(row.calendar_shifts);
+  const project = shift ? embeddedOne(shift.calendar_projects) : null;
+  return {
+    id: row.id,
+    shiftId: row.shift_id,
+    workerId: row.worker_id,
+    workerName,
+    kind: row.kind,
+    proposedStartsAt: row.proposed_starts_at,
+    proposedEndsAt: row.proposed_ends_at,
+    proposedBreakMinutes: row.proposed_break_minutes,
+    proposedProjectId: row.proposed_project_id,
+    reason: row.reason,
+    status: row.status,
+    decisionNote: row.decision_note,
+    decidedAt: row.decided_at,
+    createdAt: row.created_at,
+    shiftStartsAt: shift?.starts_at ?? row.created_at,
+    shiftEndsAt: shift?.ends_at ?? row.created_at,
+    shiftBreakMinutes: shift?.break_minutes ?? 0,
+    shiftStatus: shift?.status ?? "planned",
+    projectName: project?.name ?? null,
+    projectColor: project?.color ?? null,
+  };
+}
+
+const CHANGE_REQUEST_SELECT =
+  "id, shift_id, worker_id, kind, proposed_starts_at, proposed_ends_at, proposed_break_minutes, proposed_project_id, reason, status, decision_note, decided_at, created_at, calendar_shifts(starts_at, ends_at, break_minutes, status, calendar_projects(name, color))";
+
+/**
+ * Änderungsanfragen des Mandanten (Admin-/Projektleiter-Inbox) — EINE
+ * Abfrage mit eingebetteter Relation auf `calendar_shifts` (Kontext der
+ * Ursprungsschicht), sortiert `created_at desc`. Bewusst KEIN
+ * `calendar_workers(profiles(...))`-Embed hier — `profiles_select` verlangt
+ * `is_staff()`, ein Projektleiter mit reiner `member`-Kursrolle bekäme sonst
+ * still eine leere Relation zurück (RLS-Lücke 4 des S3-Bauauftrags). Der
+ * Arbeitername kommt stattdessen separat aus `getPlannerWorkerNames()`
+ * (`calendar_planner_worker_names()`-RPC), das die Sichtbarkeit korrekt nach
+ * Admin/Projektleiter filtert.
+ */
+export async function getCalendarChangeRequests(
+  supabase: SupabaseServerClient,
+  tenantId: string,
+  filter: "pending" | "decided" | "all",
+): Promise<CalendarChangeRequestRow[]> {
+  let query = supabase
+    .from("calendar_shift_change_requests")
+    .select(CHANGE_REQUEST_SELECT)
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false });
+
+  if (filter === "pending") query = query.eq("status", "pending");
+  else if (filter === "decided") query = query.neq("status", "pending");
+
+  const { data } = await query;
+  return ((data ?? []) as unknown as CalendarChangeRequestDbRow[]).map((row) => toChangeRequestRow(row, null));
+}
+
+/** Alle eigenen Änderungsanfragen eines Arbeiters (Lernbereich-Ansicht). */
+export async function getWorkerChangeRequests(
+  supabase: SupabaseServerClient,
+  tenantId: string,
+  workerId: string,
+): Promise<CalendarChangeRequestRow[]> {
+  const { data } = await supabase
+    .from("calendar_shift_change_requests")
+    .select(CHANGE_REQUEST_SELECT)
+    .eq("tenant_id", tenantId)
+    .eq("worker_id", workerId)
+    .order("created_at", { ascending: false });
+
+  return ((data ?? []) as unknown as CalendarChangeRequestDbRow[]).map((row) => toChangeRequestRow(row, null));
+}
+
+/** Arbeitername/E-Mail für die Änderungsanfragen-Inbox — `calendar_planner_worker_names()`-RPC (S3-Migration), liefert für Admin alle Arbeiter des Mandanten, für Projektleiter nur die seiner eigenen Projekte. */
+export async function getPlannerWorkerNames(
+  supabase: SupabaseServerClient,
+  tenantId: string,
+): Promise<Map<string, { fullName: string | null; email: string }>> {
+  // Gleicher Grund wie bei calendar_open_slots() (S2, siehe dortiger
+  // Kommentar): neue RPC-Funktion, noch nicht auf der DB angewendet, die
+  // generierten Supabase-Typen kennen sie deshalb noch nicht.
+  const { data } = await supabase.rpc("calendar_planner_worker_names", { t: tenantId });
+  const rows = (data ?? []) as unknown as { id: string; full_name: string | null; email: string }[];
+  return new Map(rows.map((r) => [r.id, { fullName: r.full_name, email: r.email }]));
+}
+
+/** Anzahl offener (pending) Änderungsanfragen des Mandanten — für das Sidebar-Badge. */
+export async function getPendingChangeRequestCount(
+  supabase: SupabaseServerClient,
+  tenantId: string,
+): Promise<number> {
+  const { count } = await supabase
+    .from("calendar_shift_change_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("status", "pending");
+  return count ?? 0;
 }
 
 /** Abwesenheiten eines Arbeiters (inkl. mandantenweiter Feiertage, worker_id null) in einem Zeitraum — für die Markierung im eigenen Wochenraster. */
