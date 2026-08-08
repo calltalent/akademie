@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { getAuthUser } from "@/lib/auth/context";
 import { AppShell } from "@/components/learn/app-shell";
-import { ShiftCalendarWeekNav } from "@/components/learn/shift-calendar-week-nav";
 import { ShiftCalendarView, type ShiftCalendarDay } from "@/components/learn/shift-calendar-view";
 import { TimeClockWidget } from "@/components/learn/time-clock-widget";
 import { OpenSlotsPanel } from "@/components/learn/open-slots-panel";
@@ -164,17 +163,6 @@ export default async function SchichtplanPage({
       <div className="flex flex-col gap-6">
         <TimeClockWidget initialOpenEntryStartedAt={openEntry?.startedAt ?? null} />
 
-        <ShiftCalendarWeekNav
-          weekLabel={weekLabel}
-          isCurrentWeek={isCurrentWeek}
-          prevHref={`/schichtplan?week=${isoDateString(addDays(weekStart, -7))}`}
-          nextHref={`/schichtplan?week=${isoDateString(addDays(weekStart, 7))}`}
-          todayHref="/schichtplan"
-          prevLabel={t("prevWeekButton")}
-          nextLabel={t("nextWeekButton")}
-          todayLabel={t("todayButton")}
-        />
-
         <ShiftCalendarView
           days={days}
           gridAriaLabel={t("gridAriaLabel")}
@@ -183,6 +171,16 @@ export default async function SchichtplanPage({
           listDescription={t("listDescription")}
           emptyWeekText={t("emptyWeek")}
           noProjectText={t("noProject")}
+          weekNav={{
+            weekLabel,
+            isCurrentWeek,
+            prevHref: `/schichtplan?week=${isoDateString(addDays(weekStart, -7))}`,
+            nextHref: `/schichtplan?week=${isoDateString(addDays(weekStart, 7))}`,
+            todayHref: "/schichtplan",
+            prevLabel: t("prevWeekButton"),
+            nextLabel: t("nextWeekButton"),
+            todayLabel: t("todayButton"),
+          }}
           unavailableLegendText={t("unavailableLegend")}
         />
 

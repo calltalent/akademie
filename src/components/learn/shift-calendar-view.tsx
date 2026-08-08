@@ -1,12 +1,18 @@
+import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 /**
  * Wochenansicht "Mein Schichtplan" (Block S1, 07.08.2026 — Stunden-Raster
  * am 08.08.2026 auf Josips ausdrücklichen Wunsch nachgezogen: "eine
  * Wochenansicht mit Tagen und Stunden, ähnlich wie ein Kalender, belegte
  * Zeiten in der Projektfarbe hervorgehoben, Zeiten zu denen nicht
- * gearbeitet werden kann hellgrau"). Reine Darstellungskomponente, keine
- * eigene Datenabfrage/Datumsrechnung (übernimmt `(portal)/schichtplan/
- * page.tsx`). Server Component (kein `"use client"` nötig — Schicht-Details/
- * -CRUD kommt erst mit S2/S3, hier nur native `<button>`-Fokussierbarkeit).
+ * gearbeitet werden kann hellgrau"; Wochen-Navigation am 09.08.2026 auf
+ * Josips Wunsch aus einer eigenen Box darüber IN diese Karte verschoben,
+ * rechtsbündig über der letzten Tagesspalte — siehe `weekNav`-Prop unten).
+ * Reine Darstellungskomponente, keine eigene Datenabfrage/Datumsrechnung
+ * (übernimmt `(portal)/schichtplan/page.tsx`). Server Component (kein
+ * `"use client"` nötig — Schicht-Details/-CRUD kommt erst mit S2/S3, hier
+ * nur native `<button>`-/`<Link>`-Fokussierbarkeit).
  *
  * DESIGN (per Vorschau im Chat mit Josip abgestimmt, im Calltalent-Branding
  * — `#5663AE` Primärfarbe, `#F5F6FA` Flächen, `#1A1A2E`/`#66679B` Text):
@@ -63,6 +69,18 @@ export type ShiftCalendarDay = {
   shifts: ShiftCalendarShift[];
 };
 
+/** Wochen-Navigation, rechtsbündig im Kopf dieser Karte gerendert (siehe `ShiftCalendarView`). Gleiche Werte wie zuvor an die eigenständige `ShiftCalendarWeekNav`-Box übergeben — diese Komponente bleibt für die Admin-Ansichten (`calendar-shifts-panel.tsx`/`calendar-slots-panel.tsx`) unverändert bestehen. */
+export type ShiftCalendarWeekNavProps = {
+  prevHref: string;
+  nextHref: string;
+  todayHref: string;
+  isCurrentWeek: boolean;
+  weekLabel: string;
+  prevLabel: string;
+  nextLabel: string;
+  todayLabel: string;
+};
+
 const FALLBACK_COLOR = "#5663AE";
 const DEFAULT_RANGE_START_HOUR = 6;
 const DEFAULT_RANGE_END_HOUR = 22;
@@ -94,6 +112,7 @@ export function ShiftCalendarView({
   emptyWeekText,
   noProjectText,
   unavailableLegendText,
+  weekNav,
 }: {
   days: ShiftCalendarDay[];
   gridAriaLabel: string;
@@ -103,6 +122,7 @@ export function ShiftCalendarView({
   emptyWeekText: string;
   noProjectText: string;
   unavailableLegendText: string;
+  weekNav: ShiftCalendarWeekNavProps;
 }) {
   const hasAnyShift = days.some((d) => d.shifts.length > 0);
   const { start: rangeStart, end: rangeEnd } = computeHourRange(days);
@@ -120,24 +140,54 @@ export function ShiftCalendarView({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-6 rounded-[14px] border border-border-100 bg-white p-5">
-        {legendProjects.length > 0 && (
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] text-muted-500">
-            {legendProjects.map(([name, color]) => (
-              <span key={name} className="inline-flex items-center gap-1.5">
-                <span aria-hidden="true" className="h-2.5 w-2.5 flex-none rounded-sm" style={{ background: color }} />
-                {name}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {legendProjects.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] text-muted-500">
+              {legendProjects.map(([name, color]) => (
+                <span key={name} className="inline-flex items-center gap-1.5">
+                  <span aria-hidden="true" className="h-2.5 w-2.5 flex-none rounded-sm" style={{ background: color }} />
+                  {name}
+                </span>
+              ))}
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className="h-2.5 w-2.5 flex-none rounded-sm border"
+                  style={{ background: "#F5F6FA", borderColor: "#E7E8F2" }}
+                />
+                {unavailableLegendText}
               </span>
-            ))}
-            <span className="inline-flex items-center gap-1.5">
-              <span
-                aria-hidden="true"
-                className="h-2.5 w-2.5 flex-none rounded-sm border"
-                style={{ background: "#F5F6FA", borderColor: "#E7E8F2" }}
-              />
-              {unavailableLegendText}
-            </span>
-          </div>
-        )}
+            </div>
+          ) : (
+            <span />
+          )}
+
+          <nav aria-label={weekNav.weekLabel} className="flex items-center gap-1">
+            <p className="mr-2 text-[15px] font-bold text-ink">{weekNav.weekLabel}</p>
+            <Link
+              href={weekNav.prevHref}
+              aria-label={weekNav.prevLabel}
+              className="flex h-9 w-9 items-center justify-center rounded-sm text-navy no-underline hover:bg-[rgba(62,63,102,0.06)] focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              <ChevronLeft size={20} aria-hidden="true" />
+            </Link>
+            <Link
+              href={weekNav.nextHref}
+              aria-label={weekNav.nextLabel}
+              className="flex h-9 w-9 items-center justify-center rounded-sm text-navy no-underline hover:bg-[rgba(62,63,102,0.06)] focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              <ChevronRight size={20} aria-hidden="true" />
+            </Link>
+            {!weekNav.isCurrentWeek && (
+              <Link
+                href={weekNav.todayHref}
+                className="ml-1 rounded-sm border border-border-300 bg-white px-3 py-1.5 text-sm font-semibold text-navy no-underline focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                {weekNav.todayLabel}
+              </Link>
+            )}
+          </nav>
+        </div>
 
         <div role="grid" aria-label={gridAriaLabel} className="overflow-x-auto">
           <div className="grid min-w-[720px]" style={{ gridTemplateColumns: `52px repeat(7, minmax(0, 1fr))` }}>
