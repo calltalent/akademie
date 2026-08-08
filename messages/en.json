@@ -1032,6 +1032,15 @@
         "defaultLocaleHint": "Language for automated emails and certificates for this tenant.",
         "savedNotice": "Saved."
       },
+      "holidayRegions": {
+        "heading": "Holiday regions",
+        "subtitle": "Which countries and entities should holidays be researched for? This selection applies to this academy's shift calendar.",
+        "legend": "Regions",
+        "emptyHint": "Without a selection, holiday research is unavailable in the shift calendar.",
+        "savedNotice": "Saved.",
+        "errorUnknownRegion": "Unknown region.",
+        "errorFeatureDisabled": "The shift calendar is not enabled for this academy."
+      },
       "sidebarLinks": {
         "heading": "Sidebar links",
         "description": "Additional links in the \"LINKS\" section of the learning area sidebar, e.g. your YouTube channel or a booking link for feedback sessions.",
@@ -1468,6 +1477,16 @@
           "DE": "Germany",
           "AT": "Austria",
           "CH": "Switzerland"
+        },
+        "region": {
+          "DE": "Germany",
+          "AT": "Austria",
+          "CH": "Switzerland",
+          "HR": "Croatia",
+          "RS": "Serbia",
+          "BA_FBIH": "Bosnia and Herzegovina — Federation of BiH",
+          "BA_RS": "Bosnia and Herzegovina — Republika Srpska",
+          "BA_BRCKO": "Bosnia and Herzegovina — Brčko District"
         }
       },
       "requests": {

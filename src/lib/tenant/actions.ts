@@ -6,6 +6,7 @@ import { translateDbError } from "@/lib/errors/db";
 import { genericErrorMessage } from "@/lib/errors/generic";
 import type { CourseActionState } from "@/lib/courses/state";
 import { parseTenantLocaleSettings } from "@/lib/tenant/locale-settings";
+import { parseTenantHolidayRegions } from "@/lib/calendar/schema";
 
 /**
  * Design-Block 6 (13.07.2026, AdminEinstellungen.dc.html): neue, ECHTE
@@ -67,6 +68,59 @@ export async function updateTenantSettings(
     }
 
     revalidatePath("/admin/einstellungen");
+    return { error: null, success: true };
+  } catch (e) {
+    return { error: genericErrorMessage(e) };
+  }
+}
+
+/**
+ * Block S5a (08.08.2026, KI-Feiertagsrecherche, architect-Plan
+ * "plane-und-erstelle-mit-floofy-curry-agent-a2931f285e454e395.md"
+ * Abschnitt 11.5): eigene, kleine Server Action statt einer Erweiterung von
+ * `updateTenantSettings()` oben — Begründung siehe Kopfkommentar von
+ * `TenantHolidayRegionsForm` (Datenverlust-Risiko: `formData.getAll()`
+ * liefert `[]`, sobald die Karte ausgeblendet ist, weil
+ * `shift_calendar_enabled` false ist; eine gemeinsame Action würde die
+ * gespeicherte Regionsauswahl dann bei jedem Speichern der allgemeinen
+ * Einstellungen stillschweigend löschen). MERGE-Schreibweise wie oben —
+ * niemals `settings` komplett überschreiben.
+ *
+ * Gate auf `shift_calendar_enabled === true`: die Regionsauswahl ist ohne
+ * aktiven Schichtplan bedeutungslos (es gibt dann keine Abwesenheiten-Seite,
+ * die sie anzeigen könnte) — serverseitig geprüft, nicht nur durch das
+ * Ausblenden der Karte in einstellungen-tabs.tsx.
+ */
+export async function updateTenantHolidayRegions(
+  _prevState: CourseActionState,
+  formData: FormData,
+): Promise<CourseActionState> {
+  try {
+    const { tenant, supabase } = await requireAdminTenant();
+
+    if (tenant.settings.shift_calendar_enabled !== true) {
+      return { error: "Der Schichtplan ist für diese Akademie nicht aktiviert." };
+    }
+
+    let regions;
+    try {
+      regions = parseTenantHolidayRegions(formData.getAll("holidayRegions"));
+    } catch {
+      return { error: "Unbekannte Region." };
+    }
+
+    const mergedSettings = {
+      ...tenant.settings,
+      shift_calendar_holiday_regions: regions,
+    };
+
+    const { error } = await supabase.from("tenants").update({ settings: mergedSettings }).eq("id", tenant.id);
+    if (error) {
+      return { error: "Speichern fehlgeschlagen: " + translateDbError(error) };
+    }
+
+    revalidatePath("/admin/einstellungen");
+    revalidatePath("/admin/schichtplanung");
     return { error: null, success: true };
   } catch (e) {
     return { error: genericErrorMessage(e) };

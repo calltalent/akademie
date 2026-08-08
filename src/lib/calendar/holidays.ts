@@ -5,6 +5,22 @@
  * KEINE Bundesland-/Kantonslogik (Plan-Vorgabe) — nur Feiertage, die im
  * GESAMTEN Land gelten.
  *
+ * ROLLENWECHSEL ab Block S5a/S5b (08.08.2026, KI-Feiertagsrecherche): diese
+ * Datei bleibt unverändert bestehen, wechselt aber die Aufgabe. Bis Block S2
+ * war sie die einzige Datenquelle für `importCalendarHolidays()`
+ * (calendar/actions.ts). Ab Block S5b liefert stattdessen ein Claude-Aufruf
+ * die Feiertage — für alle acht Regionen aus `CALENDAR_HOLIDAY_REGIONS`
+ * (calendar/schema.ts), nicht nur DE/AT/CH. `buildHolidays()` wird dann zum
+ * NACHGELAGERTEN Abgleich der KI-Antwort (`crossCheckHolidays()`, Block
+ * S5b) — bewusst NICHT als Prompt-Zutat, sonst schreibt das Modell nur ab,
+ * statt eine unabhängige zweite Meinung zu liefern. Für HR/RS/BA_* gibt es
+ * keine entsprechende deterministische Referenzliste — dort bleibt der
+ * Admin die einzige Kontrolle (Review-Hinweistext in Block S5c). Der
+ * schmalere Typ `CalendarHolidayCountry` ("DE"|"AT"|"CH") bleibt deshalb
+ * bewusst enger als das neue `CalendarHolidayRegionCode` (acht Werte,
+ * schema.ts) — nicht synchron halten, beide Typen haben ab jetzt
+ * unterschiedliche Reichweiten mit Absicht.
+ *
  * Osterberechnung nach dem Meeus/Jones/Butcher-Algorithmus (auch
  * "Meeus/Gauß-Verfahren" genannt) — Standardverfahren für den
  * gregorianischen Kalender, exakt für jedes Jahr ab 1583.

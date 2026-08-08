@@ -9,7 +9,7 @@ import {
   importCalendarHolidays,
 } from "@/lib/calendar/actions";
 import type { CalendarAbsenceKind, CalendarAbsenceRow } from "@/lib/calendar/schema";
-import { CALENDAR_HOLIDAY_COUNTRIES, type CalendarHolidayCountryCode } from "@/lib/calendar/schema";
+import type { CalendarHolidayCountry } from "@/lib/calendar/holidays";
 
 /**
  * Abwesenheiten & Feiertage (Block S2, 08.08.2026) — Jahresauswahl, getrennte
@@ -25,6 +25,17 @@ import { CALENDAR_HOLIDAY_COUNTRIES, type CalendarHolidayCountryCode } from "@/l
  * würde legitime Nutzung wie "halber Tag" verhindern).
  */
 const KIND_OPTIONS: CalendarAbsenceKind[] = ["vacation", "holiday", "sick", "other"];
+
+/**
+ * S5a (08.08.2026): `CALENDAR_HOLIDAY_COUNTRIES` (schema.ts) wurde zu
+ * `CALENDAR_HOLIDAY_REGIONS` (acht Werte) umbenannt — der deterministische
+ * Import hier bleibt aber bewusst auf DE/AT/CH beschränkt, weil
+ * `buildHolidays()` (holidays.ts) nur diese drei kennt. Eine lokale,
+ * unveränderte Dreier-Liste statt der erweiterten Konstante, damit das
+ * Dropdown weiterhin exakt die drei bisherigen Länder zeigt. Wird in Block
+ * S5c durch die KI-Karte abgelöst.
+ */
+const IMPORT_COUNTRIES: readonly CalendarHolidayCountry[] = ["DE", "AT", "CH"];
 
 export function CalendarAbsencesPanel({
   workers,
@@ -95,7 +106,7 @@ export function CalendarAbsencesPanel({
   }
 
   // --- Feiertagsimport ---------------------------------------------------
-  const [importCountry, setImportCountry] = useState<CalendarHolidayCountryCode>("DE");
+  const [importCountry, setImportCountry] = useState<CalendarHolidayCountry>("DE");
   const [importYear, setImportYear] = useState(String(year));
   const [importResult, setImportResult] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -342,10 +353,10 @@ export function CalendarAbsencesPanel({
             <select
               id={`${uid}-import-country`}
               value={importCountry}
-              onChange={(e) => setImportCountry(e.target.value as CalendarHolidayCountryCode)}
+              onChange={(e) => setImportCountry(e.target.value as CalendarHolidayCountry)}
               className="rounded-sm border border-border-300 bg-white px-3 py-2.5 text-sm text-ink"
             >
-              {CALENDAR_HOLIDAY_COUNTRIES.map((c) => (
+              {IMPORT_COUNTRIES.map((c) => (
                 <option key={c} value={c}>
                   {t(`country.${c}`)}
                 </option>

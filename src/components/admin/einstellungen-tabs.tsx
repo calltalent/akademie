@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { TenantSettingsForm } from "@/components/admin/tenant-settings-form";
+import { TenantHolidayRegionsForm } from "@/components/admin/tenant-holiday-regions-form";
 import { SidebarLinksPanel } from "@/components/admin/sidebar-links-panel";
 import { PromoCardsPanel } from "@/components/admin/promo-cards-panel";
 import { TrainerProfilePanel } from "@/components/admin/trainer-profile-panel";
@@ -16,6 +17,7 @@ import { CustomerAreaAnnouncementsPanel } from "@/components/admin/customer-area
 import type { PromoCardRow, TrainerRow } from "@/lib/settings/actions";
 import type { CustomerAreaGroupRow, CustomerAreaItemRow, CustomerAreaTenantMember } from "@/lib/customer-area/schema";
 import type { Locale } from "@/i18n/config";
+import type { CalendarHolidayRegionCode } from "@/lib/calendar/schema";
 
 /**
  * Einstellungen als horizontale Reiter (Josips Auftrag, 25.07.2026: "als
@@ -41,6 +43,13 @@ import type { Locale } from "@/i18n/config";
  * `customerAreaItems`, `tenantMembers` — plus das bereits bestehende
  * `trainers`, wiederverwendet vom Kontakte-Panel statt eines eigenen
  * Trainer-Datenpools).
+ *
+ * "Feiertagsregionen" NEU (Block S5a, 08.08.2026, KI-Feiertagsrecherche) —
+ * zwei neue Props (`shiftCalendarEnabled`, `holidayRegions`). Die neue Karte
+ * `TenantHolidayRegionsForm` steht im Reiter "allgemein" NACH
+ * `TenantSettingsForm` und wird NUR gerendert, wenn der Schichtplan für
+ * diesen Mandanten aktiv ist — ohne aktiven Schichtplan gibt es keine
+ * Abwesenheiten-Seite, auf der eine Regionsauswahl wirken könnte.
  */
 type TabKey = "allgemein" | "inhalte" | "kundenarea" | "integrationen";
 
@@ -64,6 +73,8 @@ export function EinstellungenTabs({
   webhooks,
   enabledLocales,
   defaultLocale,
+  shiftCalendarEnabled,
+  holidayRegions,
 }: {
   tenantName: string;
   supportEmail: string;
@@ -85,6 +96,9 @@ export function EinstellungenTabs({
   /** i18n Block B5 (PLAN_Mehrsprachigkeit-i18n.md Abschnitt 4). */
   enabledLocales: Locale[];
   defaultLocale: Locale;
+  /** Block S5a (08.08.2026): steuert, ob `TenantHolidayRegionsForm` überhaupt gerendert wird. */
+  shiftCalendarEnabled: boolean;
+  holidayRegions: CalendarHolidayRegionCode[];
 }) {
   const t = useTranslations("admin.settings");
   const [tab, setTab] = useState<TabKey>("allgemein");
@@ -127,6 +141,8 @@ export function EinstellungenTabs({
             enabledLocales={enabledLocales}
             defaultLocale={defaultLocale}
           />
+
+          {shiftCalendarEnabled && <TenantHolidayRegionsForm holidayRegions={holidayRegions} />}
 
           <div className="rounded-[14px] border bg-white px-7 py-6" style={{ borderColor: "#E7E8F2" }}>
             <div className="mb-1.5 text-[17px] font-bold">{t("branding.heading")}</div>

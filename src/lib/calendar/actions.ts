@@ -856,6 +856,18 @@ export async function importCalendarHolidays(input: CalendarHolidayImportInput):
     }
     const data = parsed.data;
 
+    // S5a (08.08.2026): `calendarHolidayImportSchema` akzeptiert seit der
+    // Umbenennung von CALENDAR_HOLIDAY_COUNTRIES auf CALENDAR_HOLIDAY_REGIONS
+    // (schema.ts) alle acht Regionscodes — `buildHolidays()` (holidays.ts)
+    // kennt aber weiterhin nur DE/AT/CH. Der deterministische Import bleibt
+    // bis Block S5c (Ablösung durch die KI-Feiertagsrecherche) auf diese drei
+    // beschränkt; die übrigen fünf Codes bekommen hier eine eigene, klare
+    // Fehlermeldung statt eines TypeScript-Fehlers, der die eigentliche
+    // Ursache verschleiern würde.
+    if (data.country !== "DE" && data.country !== "AT" && data.country !== "CH") {
+      return { ok: false, error: "Für diese Region gibt es noch keinen Feiertagsimport." };
+    }
+
     const holidays = buildHolidays(data.country, data.year);
 
     const { data: existingRaw } = await supabase

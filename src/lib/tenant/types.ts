@@ -1,4 +1,5 @@
 import type { Locale } from "@/i18n/config";
+import type { CalendarHolidayRegionCode } from "@/lib/calendar/schema";
 
 /**
  * Öffentliche, sichere Teilmenge von `public.tenants` — das ist alles, was
@@ -127,6 +128,26 @@ export type PublicTenant = {
      * (app-shell.tsx) — dieses Flag allein reicht dafür nicht aus.
      */
     shift_calendar_enabled?: boolean;
+    /**
+     * NEU (Schichtplan Block S5, 08.08.2026, KI-Feiertagsrecherche): welche
+     * Regionen (`CalendarHolidayRegionCode`, calendar/schema.ts) dieser
+     * Mandant für die kommende KI-Feiertagsrecherche gewählt hat. Polarität
+     * fehlend/leeres Array = KEINE Region gewählt (nicht "alle" — anders als
+     * `payments_enabled` & Co., aber gleiche Richtung wie
+     * `marketplace_enabled`/`shift_calendar_enabled` oben: ein neues Feature
+     * ist erst nach einer aktiven Entscheidung des Mandanten an). Ohne
+     * Auswahl bleibt die Feiertagsrecherche im Schichtplan ausgeblendet
+     * (Abwesenheiten-Reiter zeigt stattdessen einen Hinweis mit Link zu den
+     * Einstellungen, Block S5c).
+     *
+     * Schreibzugriff AUSSCHLIESSLICH über die eigene Server Action
+     * `updateTenantHolidayRegions()` (tenant/actions.ts) — bewusst NICHT
+     * über `updateTenantSettings()` (Datenverlust-Risiko bei ausgeblendeter
+     * Karte, siehe Kopfkommentar dort). Gate: nur wirksam, solange
+     * `shift_calendar_enabled === true` — die Server Action weist eine
+     * Änderung sonst zurück.
+     */
+    shift_calendar_holiday_regions?: CalendarHolidayRegionCode[];
   };
 };
 

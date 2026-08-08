@@ -1032,6 +1032,15 @@
         "defaultLocaleHint": "Sprache für automatische E-Mails und Zertifikate dieses Mandanten.",
         "savedNotice": "Gespeichert."
       },
+      "holidayRegions": {
+        "heading": "Feiertagsregionen",
+        "subtitle": "Für welche Länder und Entitäten sollen Feiertage recherchiert werden? Die Auswahl gilt für den Schichtplan dieser Akademie.",
+        "legend": "Regionen",
+        "emptyHint": "Ohne Auswahl steht die Feiertagsrecherche im Schichtplan nicht zur Verfügung.",
+        "savedNotice": "Gespeichert.",
+        "errorUnknownRegion": "Unbekannte Region.",
+        "errorFeatureDisabled": "Der Schichtplan ist für diese Akademie nicht aktiviert."
+      },
       "sidebarLinks": {
         "heading": "Sidebar-Links",
         "description": "Zusätzliche Links im Bereich \"LINKS\" der Lernbereich-Sidebar, z. B. euer YouTube-Kanal oder ein Terminbuchungslink für Feedback-Gespräche.",
@@ -1468,6 +1477,16 @@
           "DE": "Deutschland",
           "AT": "Österreich",
           "CH": "Schweiz"
+        },
+        "region": {
+          "DE": "Deutschland",
+          "AT": "Österreich",
+          "CH": "Schweiz",
+          "HR": "Kroatien",
+          "RS": "Serbien",
+          "BA_FBIH": "Bosnien und Herzegowina — Föderation BiH",
+          "BA_RS": "Bosnien und Herzegowina — Republika Srpska",
+          "BA_BRCKO": "Bosnien und Herzegowina — Brčko-Distrikt"
         }
       },
       "requests": {

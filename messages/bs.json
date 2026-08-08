@@ -1032,6 +1032,15 @@
         "defaultLocaleHint": "Jezik za automatske e-mailove i certifikate ovog klijenta.",
         "savedNotice": "Sačuvano."
       },
+      "holidayRegions": {
+        "heading": "Regije za praznike",
+        "subtitle": "Za koje zemlje i entitete treba istražiti praznike? Izbor vrijedi za raspored smjena ove akademije.",
+        "legend": "Regije",
+        "emptyHint": "Bez izbora, istraživanje praznika nije dostupno u rasporedu smjena.",
+        "savedNotice": "Sačuvano.",
+        "errorUnknownRegion": "Nepoznata regija.",
+        "errorFeatureDisabled": "Raspored smjena nije aktiviran za ovu akademiju."
+      },
       "sidebarLinks": {
         "heading": "Bočni linkovi",
         "description": "Dodatni linkovi u sekciji \"LINKOVI\" bočne trake u dijelu za učenje, npr. vaš YouTube kanal ili link za zakazivanje razgovora za povratne informacije.",
@@ -1468,6 +1477,16 @@
           "DE": "Njemačka",
           "AT": "Austrija",
           "CH": "Švicarska"
+        },
+        "region": {
+          "DE": "Njemačka",
+          "AT": "Austrija",
+          "CH": "Švicarska",
+          "HR": "Hrvatska",
+          "RS": "Srbija",
+          "BA_FBIH": "Bosna i Hercegovina — Federacija BiH",
+          "BA_RS": "Bosna i Hercegovina — Republika Srpska",
+          "BA_BRCKO": "Bosna i Hercegovina — Brčko distrikt"
         }
       },
       "requests": {

@@ -142,7 +142,22 @@ export async function recordAiJob(params: {
   // `api/admin/ki/generate/route.ts` beim Kurs-Generator) — die Erweiterung
   // hier hält den Typ trotzdem vollständig, falls ein künftiger Aufrufer
   // `recordAiJob()` direkt nutzt.
-  kind: "course_gen" | "quiz_gen" | "transcript" | "summary" | "embed" | "translation" | "shift_plan";
+  // "holiday_research" (Block S5b, 08.08.2026, KI-Feiertagsrecherche):
+  // erlaubt seit Migration `20260808120000_calendar_holiday_research.sql`
+  // (`ai_jobs_kind_check` erweitert, `ai_jobs_staff_select`/`_insert`
+  // zusätzlich auf `calendar_is_admin(tenant_id)` verengt). Gleiche Lage wie
+  // "shift_plan": `startHolidayResearchJob()` (src/lib/calendar/ai/
+  // holidays/actions.ts) legt den Job direkt per Insert an, nicht über
+  // `recordAiJob()` — Erweiterung hier hält den Typ vollständig.
+  kind:
+    | "course_gen"
+    | "quiz_gen"
+    | "transcript"
+    | "summary"
+    | "embed"
+    | "translation"
+    | "shift_plan"
+    | "holiday_research";
   model: string;
   tokensIn: number;
   tokensOut: number;

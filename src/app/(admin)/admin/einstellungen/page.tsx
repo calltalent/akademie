@@ -214,6 +214,8 @@ export default async function AdminEinstellungenPage() {
         webhooks={(webhooks ?? []) as { id: string; url: string; events: string[]; active: boolean; created_at: string }[]}
         enabledLocales={enabledLocales}
         defaultLocale={defaultLocale}
+        shiftCalendarEnabled={tenant.settings.shift_calendar_enabled === true}
+        holidayRegions={tenant.settings.shift_calendar_holiday_regions ?? []}
       />
     </div>
   );

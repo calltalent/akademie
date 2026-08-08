@@ -180,8 +180,37 @@ export type CalendarSlotStatus = (typeof CALENDAR_SLOT_STATUSES)[number];
 export const CALENDAR_ABSENCE_KINDS = ["vacation", "holiday", "sick", "other"] as const;
 export type CalendarAbsenceKind = (typeof CALENDAR_ABSENCE_KINDS)[number];
 
-export const CALENDAR_HOLIDAY_COUNTRIES = ["DE", "AT", "CH"] as const;
-export type CalendarHolidayCountryCode = (typeof CALENDAR_HOLIDAY_COUNTRIES)[number];
+/**
+ * Block S5a (08.08.2026, KI-Feiertagsrecherche, architect-Plan
+ * "plane-und-erstelle-mit-floofy-curry-agent-a2931f285e454e395.md"
+ * Abschnitt 1): ersetzt die bisherige `CALENDAR_HOLIDAY_COUNTRIES` (nur
+ * DE/AT/CH) — acht Regionscodes statt drei, weil Josip die Feiertagsrecherche
+ * auf Kroatien, Serbien und die drei Entitäten Bosnien und Herzegowinas
+ * (Föderation BiH/Republika Srpska/Brčko-Distrikt) ausweitet. `RS` bleibt der
+ * ISO-3166-1-alpha-2-Code Serbiens; die Republika Srpska (BiH-Entität)
+ * bekommt bewusst den Präfix-Code `BA_RS`, damit beide Codes nie kollidieren
+ * und ein Leser am Präfix sofort erkennt, dass es eine subnationale Einheit
+ * ist. Die drei alten Werte DE/AT/CH sind zeichengleich erhalten geblieben —
+ * keine Datenmigration bestehender Zeilen nötig.
+ *
+ * `src/lib/calendar/holidays.ts`/`buildHolidays()` bekommt in diesem Block
+ * KEINE entsprechende Erweiterung — der dortige, engere Typ
+ * `CalendarHolidayCountry` ("DE"|"AT"|"CH") bleibt bewusst bestehen (wird ab
+ * Block S5b zum nachgelagerten Abgleich der KI-Antwort, nicht mehr zur
+ * alleinigen Datenquelle). Beide Typen sind ab jetzt bewusst verschieden
+ * weit — nicht synchron halten.
+ */
+export const CALENDAR_HOLIDAY_REGIONS = [
+  "DE",
+  "AT",
+  "CH",
+  "HR",
+  "RS",
+  "BA_FBIH",
+  "BA_RS",
+  "BA_BRCKO",
+] as const;
+export type CalendarHolidayRegionCode = (typeof CALENDAR_HOLIDAY_REGIONS)[number];
 
 /** Admin-Schicht-CRUD (`createCalendarShift`/`updateCalendarShift`) — Datum+Uhrzeit getrennt (Formular-Felder), die Server Action baut daraus über `berlinDateTimeToUtc()` die `starts_at`/`ends_at`-Zeitstempel. */
 export const calendarShiftSchema = z
@@ -241,8 +270,19 @@ export const calendarAbsenceSchema = z
   });
 export type CalendarAbsenceInput = z.infer<typeof calendarAbsenceSchema>;
 
+/**
+ * Deterministischer Feiertagsimport (`importCalendarHolidays()`,
+ * calendar/actions.ts, Block S2) — bleibt bis Block S5c bestehen (dann durch
+ * die KI-Feiertagsrecherche mit Pflicht-Review ersetzt). Referenziert seit
+ * Block S5a `CALENDAR_HOLIDAY_REGIONS` statt der entfallenen
+ * `CALENDAR_HOLIDAY_COUNTRIES` — `buildHolidays()` (holidays.ts) kennt aber
+ * WEITERHIN nur DE/AT/CH (siehe Kommentar dort). `importCalendarHolidays()`
+ * weist die fünf neuen Regionscodes deshalb zur Laufzeit mit einer eigenen
+ * Fehlermeldung ab, statt dass die Typdifferenz still am Compiler
+ * vorbeirutscht.
+ */
 export const calendarHolidayImportSchema = z.object({
-  country: z.enum(CALENDAR_HOLIDAY_COUNTRIES),
+  country: z.enum(CALENDAR_HOLIDAY_REGIONS),
   year: z.coerce.number().int().min(2020).max(2100),
 });
 export type CalendarHolidayImportInput = z.infer<typeof calendarHolidayImportSchema>;
@@ -395,3 +435,42 @@ export type CalendarChangeRequestRow = {
   projectName: string | null;
   projectColor: string | null;
 };
+
+// =====================================================================
+// Block S5a (08.08.2026) — Mandanten-Einstellung "Feiertagsregionen" für
+// die kommende KI-Feiertagsrecherche (S5b/S5c, siehe CALENDAR_HOLIDAY_REGIONS
+// oben). Bestehende Schemas/Typen oben UNVERÄNDERT (bis auf die Umbenennung
+// CALENDAR_HOLIDAY_COUNTRIES -> CALENDAR_HOLIDAY_REGIONS direkt dort).
+// =====================================================================
+
+/**
+ * Zod-Schema hinter `parseTenantHolidayRegions()` unten — eigenständig
+ * exportiert, damit ein Vitest-Fall auch das Schema direkt gegen einzelne
+ * Werte prüfen kann, ohne die Parse-Funktion aufzurufen. `.max()` verhindert
+ * ein beliebig langes Array (mehr als acht verschiedene gültige Codes gibt
+ * es nicht).
+ */
+export const tenantHolidayRegionsSchema = z.array(z.enum(CALENDAR_HOLIDAY_REGIONS)).max(CALENDAR_HOLIDAY_REGIONS.length);
+
+/**
+ * Reine Validierung für `updateTenantHolidayRegions()` (tenant/actions.ts).
+ * Nimmt `unknown` entgegen, weil `formData.getAll("holidayRegions")`
+ * `FormDataEntryValue[]` liefert (theoretisch auch `File`-Einträge, falls
+ * ein manipuliertes Formular so ein Feld schickt) — kein Array wird als
+ * leere Auswahl behandelt, NICHT als Fehler: ein Mandant, der keine Region
+ * wählt, ist ein gültiger, sogar der ursprüngliche Zustand (siehe JSDoc bei
+ * `shift_calendar_holiday_regions` in lib/tenant/types.ts).
+ *
+ * Wirft (über `tenantHolidayRegionsSchema.parse()`) bei einem einzigen
+ * unbekannten Code die GANZE Übermittlung zurück — kein stilles
+ * Feld-für-Feld-Verwerfen, damit eine manipulierte Anfrage nicht einen Teil
+ * der gültigen Auswahl unbemerkt verliert. Die aufrufende Server Action
+ * fängt das ab und meldet `errorUnknownRegion`. Duplikate werden NACH der
+ * Prüfung entfernt (ein Mandant, der dieselbe Region zweimal schickt, soll
+ * keinen Fehler bekommen).
+ */
+export function parseTenantHolidayRegions(raw: unknown): CalendarHolidayRegionCode[] {
+  const arr = Array.isArray(raw) ? raw.map(String) : [];
+  const parsed = tenantHolidayRegionsSchema.parse(arr);
+  return Array.from(new Set(parsed));
+}

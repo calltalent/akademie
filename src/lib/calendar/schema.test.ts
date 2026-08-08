@@ -16,6 +16,8 @@ import {
   calendarWorkerEditableSchema,
   calendarWorkerStatusSchema,
   calendarWorkerTargetSchema,
+  parseTenantHolidayRegions,
+  tenantHolidayRegionsSchema,
 } from "./schema";
 
 describe("calendarWorkerEditableSchema", () => {
@@ -266,6 +268,40 @@ describe("calendarHolidayImportSchema", () => {
   it("lehnt ein Jahr außerhalb 2020-2100 ab", () => {
     expect(calendarHolidayImportSchema.safeParse({ country: "DE", year: 2019 }).success).toBe(false);
     expect(calendarHolidayImportSchema.safeParse({ country: "DE", year: 2101 }).success).toBe(false);
+  });
+
+  it("akzeptiert seit Block S5a auch die fünf neuen Regionscodes (Schema-Ebene — buildHolidays() bleibt trotzdem auf DE/AT/CH beschränkt)", () => {
+    expect(calendarHolidayImportSchema.safeParse({ country: "HR", year: 2026 }).success).toBe(true);
+    expect(calendarHolidayImportSchema.safeParse({ country: "BA_RS", year: 2026 }).success).toBe(true);
+  });
+});
+
+describe("tenantHolidayRegionsSchema / parseTenantHolidayRegions (Block S5a)", () => {
+  it("akzeptiert alle acht gültigen Regionscodes", () => {
+    const all = ["DE", "AT", "CH", "HR", "RS", "BA_FBIH", "BA_RS", "BA_BRCKO"];
+    expect(tenantHolidayRegionsSchema.safeParse(all).success).toBe(true);
+    expect(parseTenantHolidayRegions(all)).toEqual(all);
+  });
+
+  it("entfernt Duplikate", () => {
+    expect(parseTenantHolidayRegions(["DE", "DE", "AT"])).toEqual(["DE", "AT"]);
+  });
+
+  it("erlaubt ein leeres Array (keine Region gewählt)", () => {
+    expect(parseTenantHolidayRegions([]).length).toBe(0);
+    expect(tenantHolidayRegionsSchema.safeParse([]).success).toBe(true);
+  });
+
+  it("behandelt Eingaben, die kein Array sind, wie eine leere Auswahl", () => {
+    expect(parseTenantHolidayRegions(undefined)).toEqual([]);
+    expect(parseTenantHolidayRegions(null)).toEqual([]);
+  });
+
+  it("lehnt einen unbekannten Code ab (RS bleibt Serbien, kollidiert nicht mit BA_RS)", () => {
+    expect(tenantHolidayRegionsSchema.safeParse(["FR"]).success).toBe(false);
+    expect(tenantHolidayRegionsSchema.safeParse(["BRCKO"]).success).toBe(false);
+    expect(tenantHolidayRegionsSchema.safeParse(["FBIH"]).success).toBe(false);
+    expect(() => parseTenantHolidayRegions(["DE", "FR"])).toThrow();
   });
 });
 

@@ -3,6 +3,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { getServerEnv } from "@/lib/env";
 import { processNextCourseGenJob } from "@/lib/generator/process";
 import { processNextShiftPlanJob } from "@/lib/calendar/ai/process";
+import { processNextHolidayResearchJob } from "@/lib/calendar/ai/holidays/process";
 
 /**
  * Kurs-Generator — Cron-Prozess-Endpunkt (Phase 3, Block 5). Wird vom
@@ -39,15 +40,21 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Zwei unabhängige Warteschlangen (kind='course_gen'/'shift_plan'), EIN
-    // Schritt/Lauf je Aufruf UND je Warteschlange — beide teilen sich den
-    // Cron-Tick (alle 2 Min., wrangler.jsonc), aber niemals eine Job-Zeile
-    // (Filter über `kind`), daher unabhängig voneinander sicher.
-    const [courseGenResult, shiftPlanResult] = await Promise.all([
+    // Drei unabhängige Warteschlangen (kind='course_gen'/'shift_plan'/
+    // 'holiday_research'), EIN Schritt/Lauf je Aufruf UND je Warteschlange —
+    // alle drei teilen sich den Cron-Tick (alle 2 Min., wrangler.jsonc),
+    // aber niemals eine Job-Zeile (Filter über `kind`), daher unabhängig
+    // voneinander sicher.
+    const [courseGenResult, shiftPlanResult, holidayResearchResult] = await Promise.all([
       processNextCourseGenJob(),
       processNextShiftPlanJob(),
+      processNextHolidayResearchJob(),
     ]);
-    return NextResponse.json({ courseGen: courseGenResult, shiftPlan: shiftPlanResult });
+    return NextResponse.json({
+      courseGen: courseGenResult,
+      shiftPlan: shiftPlanResult,
+      holidayResearch: holidayResearchResult,
+    });
   } catch (e) {
     console.error("[ki/process] Unerwarteter Fehler:", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "Verarbeitung fehlgeschlagen." }, { status: 500 });
