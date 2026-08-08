@@ -3672,3 +3672,22 @@ Josip hat fünf zusätzliche Prüfpunkte für JEDES Sicherheits-Audit vorgegeben
 **Nicht behoben (Punkt 2, bewusst):** Session-Ablauf-Konfiguration bleibt auf Supabase-Dashboard-Standard — kein akuter Fund, als Beobachtung notiert für einen künftigen dedizierten Auth-Härtungsdurchgang.
 
 `npx tsc --noEmit`/`npm run lint`: sauber. `npx vitest run`: 631 Tests grün (unverändert). **Status: Freigegeben.**
+
+## Sicherheitscheckliste erweitert um sechs weitere Punkte (Josips Auftrag, 08.08.2026) — ein Fund MITTEL behoben
+
+Josip hat sechs weitere Prüfpunkte vorgegeben: Datei-Upload-Validierung, parametrisierte DB-Abfragen, sichere Session-Cookies (nicht `localStorage`), Stripe-Webhook-Signaturprüfung, Basis-Security-Headers, keine fremden Personendaten über APIs. Wie beim vorherigen Durchgang an allen drei Stellen dauerhaft verankert: `.claude/agents/security-reviewer.md` (Punkte 15-20), `CLAUDE.md` §2 (Punkte 12-15, zwei der sechs — Upload-Whitelist und Webhook-Signatur — deckten sich mit den bereits bestehenden Punkten 4/5), `~/.claude/CLAUDE.md` (global, Punkte 9-14).
+
+**Prüfergebnis Calltalent-Akademie (direkte Prüfung, kein Agent-Durchlauf — sechs gezielte, schnell verifizierbare Punkte):**
+
+| Punkt | Befund | Status |
+|---|---|---|
+| Datei-Upload Typ/Größe | Bereits durchgängig als zod-Whitelist umgesetzt (`asset-upload-schema.ts`: Bild/Audio/Dokument je eigene MIME-Whitelist + Größenlimit, serverseitig in jeder Upload-Route geprüft) | OK, kein Fund |
+| Parametrisierte Abfragen | Keine rohe SQL-String-Konkatenation im Projekt gefunden — durchgängig Supabase-Query-Builder/RPC mit Objekt-Argumenten | OK, kein Fund |
+| Sichere Session-Cookies | `src/lib/supabase/{client,server}.ts` nutzen `@supabase/ssr`s `createBrowserClient`/`createServerClient` (Cookie-Session) — kein `localStorage`-Pfad. Der separate `browser.ts`-Client (nur für signierte Upload-URLs) trägt bewusst gar keine Session. | OK, kein Fund |
+| Stripe-Webhook-Signatur | Bereits im vorherigen Audit bestätigt (`api/stripe/webhook/route.ts`, `stripe-signature`-Header-Prüfung vor jeder Verarbeitung) | OK, kein Fund |
+| Basis-Security-Headers | **Kein `headers()` in `next.config.ts`, keine Security-Header gesetzt** — nur die Cloudflare-Plattform-Defaults. | **MITTEL** |
+| APIs ohne fremde Personendaten | Stichprobe `src/app/api/v1/**` (externe REST-API): jeder Endpunkt referenziert `tenant_id`/`resolveApiKeyTenant()` mehrfach, konsistent mit dem durchgängigen RLS-Muster aus den S1-S4-Audits. Kein vertiefter Einzel-Routen-Audit in dieser Runde (Zeitrahmen), keine Auffälligkeit bei der Stichprobe. | OK (Stichprobe), keine vertiefte Prüfung |
+
+**Fix MITTEL (Basis-Security-Headers):** `next.config.ts` bekam eine `headers()`-Konfiguration mit `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, `Strict-Transport-Security` (2 Jahre, inkl. Subdomains) und einer restriktiven `Permissions-Policy` (Kamera/Mikrofon/Standort aus). Verifiziert per `curl`-Header-Check gegen den laufenden Dev-Server — alle fünf Header korrekt in der Antwort. **Bewusst KEINE Content-Security-Policy** in diesem Fix: das Projekt bindet Stripe.js, Bunny (Video-Player) und Supabase-Realtime ein — eine CSP ohne Testlauf gegen eine echte Deployment-Umgebung riskiert, Zahlungen oder Video-Wiedergabe stillschweigend zu brechen. Als eigene, separat zu verifizierende Folgeaufgabe vorgemerkt.
+
+`npx tsc --noEmit`/`npm run lint`: sauber. `npx vitest run`: 631 Tests grün (unverändert). **Status: Freigegeben.**

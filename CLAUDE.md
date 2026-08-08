@@ -29,6 +29,10 @@ Sprache: Deutsch (Antworten, Commits, UI-Texte). Code, Bezeichner und Kommentare
 9. Server Actions/API-Routen sind gegen CSRF geschützt (Next.js' eingebauter Origin-Check bei Server Actions genügt für diese; state-ändernde `route.ts`-Handler ohne diesen Schutz brauchen eine eigene Prüfung).
 10. Im Client-Bundle/Browser ausschließlich der eingeschränkte `anon`/publishable Supabase-Key — niemals `service_role`. Jede `createAdminClient()`-Verwendung nur serverseitig und mit vorheriger Autorisierungsprüfung.
 11. Keine Passwörter, Tokens, API-Keys oder Kartennummern im Klartext in Logs (`console.log`/`console.error`/Server-Logs) — auch nicht indirekt über `error.message` von Auth-/Zahlungs-SDKs.
+12. Keine String-Konkatenation von Nutzereingaben in SQL/Query-Bausteinen — ausschließlich Supabase-Query-Builder/RPC mit parametrisierten Argumenten, auch bei dynamisch gebauten Filtern/Sortierungen.
+13. Login-/Session-Tokens ausschließlich in `httpOnly`/`Secure`/`SameSite`-Cookies (Supabase-SSR-Standardverhalten über `@supabase/ssr`) — niemals in `localStorage`/`sessionStorage`.
+14. Basis-Security-Headers gesetzt: `X-Content-Type-Options: nosniff`, `X-Frame-Options`/`frame-ancestors`, `Referrer-Policy`, `Strict-Transport-Security` — nicht nur auf Cloudflare-Plattform-Defaults verlassen, explizit im Code prüfen/setzen.
+15. Jeder API-Endpunkt/jede Server Action liefert ausschließlich Daten, auf die der anfragende Nutzer laut Rolle/Mandant/Eigentümerschaft Zugriff hat — insbesondere bei client-gelieferten IDs (nie ungeprüft `WHERE id = :clientId` ohne Mandanten-/Besitz-Check) und bei Fehlermeldungen (kein Enumeration-Leck über unterschiedliche Fehlertexte).
 
 ## 3. Produktregeln
 
