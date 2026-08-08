@@ -143,7 +143,7 @@ export async function recordAiJob(params: {
   // hier hält den Typ trotzdem vollständig, falls ein künftiger Aufrufer
   // `recordAiJob()` direkt nutzt.
   // "holiday_research" (Block S5b, 08.08.2026, KI-Feiertagsrecherche):
-  // erlaubt seit Migration `20260808120000_calendar_holiday_research.sql`
+  // erlaubt seit Migration `20260808145112_calendar_holiday_research.sql`
   // (`ai_jobs_kind_check` erweitert, `ai_jobs_staff_select`/`_insert`
   // zusätzlich auf `calendar_is_admin(tenant_id)` verengt). Gleiche Lage wie
   // "shift_plan": `startHolidayResearchJob()` (src/lib/calendar/ai/

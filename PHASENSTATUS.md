@@ -3715,7 +3715,7 @@ Umsetzung nach dem freigegebenen architect-Plan (`plane-und-erstelle-mit-floofy-
 5. `src/components/admin/tenant-holiday-regions-form.tsx` (NEU): Checkbox-Gruppe der acht Regionen, `fieldset`/`legend`/`useId()` im Stil der `enabledLocales`-Gruppe aus `tenant-settings-form.tsx`, `useActionState` mit `updateTenantHolidayRegions`.
 6. Einbindung: `admin/einstellungen/page.tsx` lädt `shift_calendar_enabled`/`shift_calendar_holiday_regions` und reicht sie durch; `einstellungen-tabs.tsx` rendert `TenantHolidayRegionsForm` im Reiter „allgemein" nach `TenantSettingsForm`, nur wenn `shiftCalendarEnabled === true` (zwei neue Props).
 7. i18n: `messages/{de,en,bs}.json` — neuer Namensraum `admin.settings.holidayRegions.*` (7 Schlüssel) und `admin.shiftCalendar.absences.region.*` (8 Schlüssel, alle drei Sprachen parallel gepflegt, BiH-Entitäten sinngemäß übersetzt: en „Federation of BiH"/„Republika Srpska"/„Brčko District", bs „Federacija BiH"/„Republika Srpska"/„Brčko distrikt"). Der alte `country.*`-Block (3 Schlüssel) bleibt bestehen — entfällt erst in Block S5c mit dem alten Import.
-8. Migration `supabase/migrations/20260808120000_calendar_holiday_research.sql` geschrieben — **NICHT angewendet** (Platzhalter-Zeitstempel, wird beim tatsächlichen Anwenden in Block S5b umbenannt). Erweitert `ai_jobs_kind_check` um `'holiday_research'`, verengt `ai_jobs_staff_select`/`ai_jobs_staff_insert` von `kind <> 'shift_plan'` auf `kind not in ('shift_plan','holiday_research')` — Begründung im Migrationskopf ausdrücklich als Kostenkontrolle (Rate-Limit-/Kontingent-Missbrauch durch `trainer`), NICHT Geheimhaltung, gekennzeichnet.
+8. Migration `supabase/migrations/20260808145112_calendar_holiday_research.sql` geschrieben — **NICHT angewendet** (Platzhalter-Zeitstempel, wird beim tatsächlichen Anwenden in Block S5b umbenannt). Erweitert `ai_jobs_kind_check` um `'holiday_research'`, verengt `ai_jobs_staff_select`/`ai_jobs_staff_insert` von `kind <> 'shift_plan'` auf `kind not in ('shift_plan','holiday_research')` — Begründung im Migrationskopf ausdrücklich als Kostenkontrolle (Rate-Limit-/Kontingent-Missbrauch durch `trainer`), NICHT Geheimhaltung, gekennzeichnet.
 9. `src/lib/calendar/schema.test.ts`: `calendarHolidayImportSchema`-Block bleibt grün, ein Fall ergänzt (Region-Codes jetzt auf Schema-Ebene akzeptiert). Neuer Testblock `tenantHolidayRegionsSchema`/`parseTenantHolidayRegions` (6 Fälle: alle acht Codes, Duplikate entfernt, leeres Array erlaubt, Nicht-Array-Eingabe wie leer behandelt, unbekannter Code abgelehnt).
 10. Verifikation: `npx tsc --noEmit` → 0 Fehler. `npm run lint` → 0 Fehler/Warnungen. `npx vitest run` → **39 Dateien, 640 Tests, alle grün** (634 vorher + 6 neue). `npx vitest run src/i18n/messages.test.ts` → 4/4 grün (Schlüssel-/Platzhalter-Parität de/en/bs bestätigt).
 
@@ -3727,7 +3727,7 @@ Umsetzung nach dem freigegebenen architect-Plan (`plane-und-erstelle-mit-floofy-
 
 **Offen:**
 
-1. **Block S5b (KI-Weg ohne Oberfläche)** — `src/lib/calendar/ai/holidays/{schema,prompt,pipeline,process,actions,queries}.ts`, `usage.ts`-Erweiterung, `process/route.ts`-Einbindung, zwei neue Vitest-Dateien, danach Migration `20260808120000_calendar_holiday_research.sql` anwenden (Josips Freigabe) + `get_advisors(security)`, plus der einmalige echte Claude-Testlauf vor dem UI-Aufwand.
+1. **Block S5b (KI-Weg ohne Oberfläche)** — `src/lib/calendar/ai/holidays/{schema,prompt,pipeline,process,actions,queries}.ts`, `usage.ts`-Erweiterung, `process/route.ts`-Einbindung, zwei neue Vitest-Dateien, danach Migration `20260808145112_calendar_holiday_research.sql` anwenden (Josips Freigabe) + `get_advisors(security)`, plus der einmalige echte Claude-Testlauf vor dem UI-Aufwand.
 2. **Block S5c (Oberfläche, Ablösung des alten Imports)** — KI-Panel/Review-Komponenten, Umbau `calendar-absences-panel.tsx`, i18n `holidayKi.*`, Entfernen von `importCalendarHolidays()`/`calendarHolidayImportSchema`/`country.*`, neue e2e-Spec, danach `tester` → `security-reviewer` → SPEC.md-Nachtrag.
 3. **Migration noch nicht angewendet** (planmäßig, siehe Bau-Reihenfolge im architect-Plan — Anwendung gehört zu Block S5b).
 4. **`TenantHolidayRegionsForm` noch nicht gegen echte Mandantendaten im Browser geprüft** — die Karte ist per `tsc`/Lint/Unit-Test abgesichert, aber ein manueller Klicktest (Checkbox speichern, Seite neu laden, Haken bleiben gesetzt) steht aus, weil dafür ein angemeldeter Admin-Testnutzer nötig ist (folgt sinnvollerweise zusammen mit dem e2e-Fall 2 aus dem architect-Plan in Block S5c, gleiche Prüftiefe wie bei den anderen Schichtplan-Blöcken).
@@ -3751,12 +3751,32 @@ Umsetzung nach dem freigegebenen architect-Plan (`plane-und-erstelle-mit-floofy-
 9. `src/lib/calendar/ai/holidays/schema.test.ts` (NEU, 21 Fälle) und `src/lib/calendar/ai/holidays/prompt.test.ts` (NEU, 15 Fälle) — decken alle 14 im architect-Plan (Abschnitt 9.1/9.2) geforderten Fälle ab, mit einigen zusätzlichen Rand- und Regressionsfällen (z. B. Grenzwerte exakt 120/8/2020/2100, `.strip()`-Nachweis bei `holidayApplySchema`, "keine Lücke wenn Region gar nicht vertreten" bei `crossCheckHolidays()`).
 10. Verifikation: `npx tsc --noEmit` → 0 Fehler. `npm run lint` → 0 Fehler/Warnungen. `npx vitest run` → **41 Dateien, 676 Tests, alle grün** (640 vorher + 36 neue).
 
-**Keine Abweichungen vom architect-Plan** in diesem Block — die Migration `20260808120000_calendar_holiday_research.sql` existierte bereits vollständig aus Block S5a (CHECK-Constraint-Erweiterung und RLS-Verengung für `'holiday_research'` waren dort schon geschrieben) und musste in S5b nicht mehr angefasst werden.
+**Keine Abweichungen vom architect-Plan** in diesem Block — die Migration `20260808145112_calendar_holiday_research.sql` existierte bereits vollständig aus Block S5a (CHECK-Constraint-Erweiterung und RLS-Verengung für `'holiday_research'` waren dort schon geschrieben) und musste in S5b nicht mehr angefasst werden.
 
 **Offen:**
 
-1. **Migration `20260808120000_calendar_holiday_research.sql` anwenden** (Josips Freigabe, Orchestrator-Aufgabe) + `get_advisors(security)` direkt danach.
+1. **Migration `20260808145112_calendar_holiday_research.sql` anwenden** (Josips Freigabe, Orchestrator-Aufgabe) + `get_advisors(security)` direkt danach.
 2. **Einmaliger echter Claude-Testlauf** über `/api/admin/ki/process` (Orchestrator-Aufgabe, NACH der Migrationsanwendung) — Tokens/Kosten/Trefferquote gegen `buildHolidays()` für DE/AT/CH sowie eine Stichprobe von fünf Daten je BiH-Entität gegen amtliche Quellen protokollieren, gleiches Vorgehen wie beim S4-Testlauf.
 3. **Block S5c (Oberfläche, Ablösung des alten Imports)** — `CalendarHolidaysKiPanel`/`CalendarHolidaysKiReview`, Umbau `calendar-absences-panel.tsx`, i18n `holidayKi.*`, Entfernen von `importCalendarHolidays()`/`calendarHolidayImportSchema`/`country.*`, neue e2e-Spec (`schichtplan-s5-feiertage.spec.ts`, 9 Fälle inkl. RLS-Gegenprobe Fall 9), danach `tester` → `security-reviewer` → SPEC.md-Nachtrag.
 
 **Übergabe an `tester`**: `npx vitest run` als Regressionsnachweis für diesen Block ist bereits grün (siehe Verifikation oben). Eine RLS-Gegenprobe für `kind='holiday_research'` (e2e-Fall 9 aus dem architect-Plan) ist erst NACH der Migrationsanwendung durch den Orchestrator sinnvoll möglich — bis dahin ist S5b aus Vitest-/Typ-/Lint-Sicht vollständig grün und abgeschlossen.
+
+## Schichtplan — Block S5b: Migration live angewendet (08.08.2026, Orchestrator)
+
+Migration `20260808145112_calendar_holiday_research.sql` per Supabase-MCP angewendet (Projekt `vklqksdiyiijzoirntyt`). `get_advisors(security)` direkt danach: keine neuen Risiken über das bereits akzeptierte Projektmuster hinaus (alle `security definer`-RPC-Warnungen und die `rls_enabled_no_policy`-Hinweise betreffen durchgängig auch längst bestehende, bereits geprüfte Funktionen/Tabellen). `ai_jobs_kind_check` erlaubt jetzt `'holiday_research'`, `ai_jobs_staff_select`/`ai_jobs_staff_insert` sind für diesen `kind` zusätzlich auf `calendar_is_admin(tenant_id)` verengt.
+
+## Schichtplan — Block S5b: realer KI-Testlauf (08.08.2026, Orchestrator)
+
+Ein Testauftrag (Jahr 2026, Regionen `DE`+`HR`+`BA_RS` — bewusst eine per Formel geprüfte, eine ungeprüfte und eine BiH-Entität gemischt) wurde über den echten `/api/admin/ki/process`-Endpunkt (mit gültigem `x-cron-secret`) gegen die tatsächliche Claude API verarbeitet.
+
+**Ergebnis:** Status `done`, Modell `claude-sonnet-4-5-20250929`, 671 Input-/1083 Output-Tokens, Kosten **0,0122 USD** für drei Regionen (hochgerechnet auf alle acht Regionen ≈ 0,03 USD — deckt sich mit der Schätzung im architect-Plan).
+
+**Trefferquote gegen `buildHolidays()`:** Alle 9 von 9 DE-Zeilen (Neujahr, Karfreitag, Ostermontag, Tag der Arbeit, Christi Himmelfahrt, Pfingstmontag, Tag der Deutschen Einheit, 1./2. Weihnachtsfeiertag) wurden korrekt mit `check:"confirmed"` markiert — 100 % Deckung mit der deterministischen Referenzliste, kein falsches Datum, keine fehlende Zeile.
+
+**Konflikterkennung:** 7 von 32 Zeilen korrekt als `duplicate` markiert (Datumsüberschneidungen zwischen DE/HR/BA_RS bei Neujahr, Ostermontag, Tag der Arbeit, Weihnachten) — die Priorisierung `outside-year` > `existing` > `duplicate` griff wie vorgesehen.
+
+**BA_RS-vs-RS-Unterscheidung:** Das Modell lieferte ausschließlich Republika-Srpska-spezifische Feiertage (u. a. „Dan Dejtonskog sporazuma" / Tag des Dayton-Abkommens, 21.11. — ein Feiertag, den nur diese Entität kennt) und wandte korrekt den orthodoxen/julianischen Kalender an (zweitägiges Neujahr 01./02.01., orthodoxes Weihnachten 07.01., bewegliche Ostertermine abweichend von den westlichen HR-Terminen) — keine Verwechslung mit dem Staat Serbien, der explizite Prompt-Hinweis griff sichtbar.
+
+**Stichprobenprüfung (5 Daten je Region, gegen allgemein bekannte Fakten, keine tiefgehende Rechtsprüfung):** HR-Zeilen (Dan državnosti 30.05., Dan pobjede i domovinske zahvalnosti 05.08., Tijelovo als bewegliches Datum) stimmen mit bekannten kroatischen Feiertagen überein. BA_RS-Ostertermine (Vaskrs 13.04., Veliki petak 10.04.) sind intern konsistent (Karfreitag exakt 2 Tage vor Ostersonntag), aber NICHT gegen eine amtliche Quelle verifiziert — genau das vom architect-Plan (Risiko 9, Abschnitt 10) benannte Restrisiko für Regionen ohne deterministischen Abgleich. Bestätigt die Notwendigkeit des Pflicht-Reviews vor der Übernahme.
+
+Testdaten (Auftrag, Mandanten-Flag, Regionsauswahl) danach vollständig zurückgesetzt.

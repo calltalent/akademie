@@ -12,7 +12,7 @@ import {
  * Leseabfragen für die KI-Feiertagsrecherche (Block S5b, 08.08.2026) —
  * laufen über den regulären RLS-Client (`ai_jobs_staff_select` deckt
  * owner/admin über `calendar_is_admin()` ab, siehe Migration
- * `20260808120000_calendar_holiday_research.sql`). Kein separater
+ * `20260808145112_calendar_holiday_research.sql`). Kein separater
  * Admin-Client nötig, da hier nur gelesen wird. Gleiches Muster wie
  * `src/lib/calendar/ai/queries.ts` (S4-Vorbild).
  */
