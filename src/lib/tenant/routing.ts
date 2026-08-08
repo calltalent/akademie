@@ -103,6 +103,21 @@ export function isAuthPath(pathname: string): boolean {
  * Registrierungs-/Passwort-Seiten bleiben aus demselben Grund erreichbar.
  * `/wartung` selbst muss ausgenommen sein, sonst rewritet middleware.ts in
  * eine Endlosschleife.
+ *
+ * BUGFIX (08.08.2026, Josips Fund: Betreiber-Portal per Wartungsmodus eines
+ * einzelnen Mandanten ausgesperrt): `/portal/...` (Betreiber-Portal,
+ * `checkPlatformAccess()`/`requirePlatformAdmin()` in `lib/platform/auth.ts`
+ * gated dort bereits eigenständig) fehlte in dieser Liste. Next.js löst
+ * `src/app/portal/...` nach reinem PFAD auf, unabhängig vom Host — trifft
+ * eine Anfrage `<beliebiger-mandanten-host>/portal/...` (z. B. weil ein
+ * Mandant zufällig denselben Host wie NEXT_PUBLIC_PORTAL_HOST verwendet,
+ * oder weil jemand die URL direkt eintippt), wird trotzdem ein Mandant
+ * aufgelöst und dessen `maintenance_enabled` griff bisher AUCH auf
+ * `/portal/...` — der Betreiber selbst wurde durch den Wartungsmodus EINES
+ * Mandanten aus der eigenen Mandantenverwaltung ausgesperrt. Exakt dieselbe
+ * Fehlerklasse und derselbe Grund wie beim `/admin/...`-Ausnahme oben, nur
+ * eine Ebene höher (Plattform- statt Mandanten-Admin) — hier ebenso
+ * nachgezogen.
  */
 export function isMaintenanceBypassPath(pathname: string): boolean {
   return (
@@ -111,6 +126,8 @@ export function isMaintenanceBypassPath(pathname: string): boolean {
     pathname === "/wartung" ||
     pathname === "/admin" ||
     pathname.startsWith("/admin/") ||
+    pathname === "/portal" ||
+    pathname.startsWith("/portal/") ||
     pathname === "/login" ||
     pathname === "/registrieren" ||
     pathname === "/passwort-vergessen" ||
