@@ -1760,7 +1760,8 @@
     "brandBody": "We're improving your academy right now. This usually takes just a few minutes.",
     "heading": "Under maintenance",
     "body": "This academy is currently unavailable. Please try again shortly.",
-    "supportLabel": "Support"
+    "supportLabel": "Support",
+    "teamLogin": "Team member? Log in here"
   },
   "marketplace": {
     "shell": {

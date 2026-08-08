@@ -1760,7 +1760,8 @@
     "brandBody": "Trenutno unapređujemo tvoju akademiju. To obično traje samo nekoliko minuta.",
     "heading": "Radovi na održavanju",
     "body": "Ova akademija trenutno nije dostupna. Pokušaj ponovo za kratko vrijeme.",
-    "supportLabel": "Podrška"
+    "supportLabel": "Podrška",
+    "teamLogin": "Član tima? Prijavi se ovdje"
   },
   "marketplace": {
     "shell": {

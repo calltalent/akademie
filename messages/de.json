@@ -1760,7 +1760,8 @@
     "brandBody": "Wir verbessern gerade deine Akademie. Das ist normalerweise in wenigen Minuten erledigt.",
     "heading": "Wartungsarbeiten",
     "body": "Diese Akademie ist aktuell nicht erreichbar. Bitte versuche es in Kürze erneut.",
-    "supportLabel": "Support"
+    "supportLabel": "Support",
+    "teamLogin": "Team-Mitglied? Hier anmelden"
   },
   "marketplace": {
     "shell": {

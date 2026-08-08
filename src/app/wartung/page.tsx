@@ -130,6 +130,20 @@ export default async function WartungPage() {
               </a>
             </div>
           </div>
+
+          {/* Team-Login-Link (08.08.2026, Josips Auftrag): middleware.ts
+              nimmt /login bereits von der Wartungssperre aus
+              (isMaintenanceBypassPath in lib/tenant/routing.ts) — Team-
+              Mitglieder mit is_staff()-Rolle kommen dort durch und werden ab
+              dem nächsten Request auf jedem Pfad nicht mehr geblockt. Bisher
+              fehlte nur ein sichtbarer Weg dorthin von dieser Seite aus. */}
+          <a
+            href="/login"
+            className="mt-5 text-sm font-semibold no-underline"
+            style={{ color: "#5663AE" }}
+          >
+            {t("teamLogin")}
+          </a>
         </div>
       </div>
     </div>
