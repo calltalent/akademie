@@ -6,11 +6,24 @@ import { E2E_STAFF_EMAIL, E2E_STUDENT_EMAIL, E2E_TEST_PASSWORD } from "./global-
 /**
  * "Schichtplan" Block S2 (Josips Auftrag, 08.08.2026) — Admin-Schicht-CRUD,
  * Zeitfenster-Serienanlage, Freelancer-Selbstbuchung, Sollstunden-
- * Selbstverwaltung, Feiertagsimport. NEUE Datei (nicht
+ * Selbstverwaltung. NEUE Datei (nicht
  * `e2e/schichtplan.spec.ts` erweitert) — S1 bleibt als eigenständiges
  * Regressionsnetz unverändert, diese Datei ist eine eigene serielle Kette
  * (`test.describe.configure({ mode: "serial" })`, gleiches Prinzip wie S1:
- * die sieben Fälle bauen bewusst aufeinander auf).
+ * die Fälle bauen bewusst aufeinander auf).
+ *
+ * DOKUMENTIERTE ABWEICHUNG (Block S5c, 08.08.2026): der ursprüngliche
+ * "Fall 7 — Feiertagsimport DE 2026" ist ENTFERNT. Der S2-Feiertagsimport
+ * (`importCalendarHolidays()`, das `<select>`-Formular „Feiertage
+ * importieren") existiert seit Block S5c nicht mehr im Code — er ist durch
+ * die KI-Feiertagsrecherche (`CalendarHolidaysKiPanel`/-`Review`) ersetzt,
+ * siehe architect-Plan „S5c — Oberfläche und Ablösung des alten Imports".
+ * Ein Test auf ein entferntes Formular kann nicht sinnvoll weiterbestehen;
+ * die Nachfolge-Abdeckung liegt vollständig in
+ * `e2e/schichtplan-s5-feiertage.spec.ts` (neun Fälle). CLAUDE.md §4
+ * ("S1-S4-Specs bleiben unverändert") wird damit an dieser einen Stelle
+ * technisch zwingend unterschritten — dokumentiert hier UND in
+ * PHASENSTATUS.md, Abschnitt „Schichtplan — Block S5c".
  *
  * Migration `20260807171725_shift_calendar_s2.sql` ist zum Zeitpunkt des
  * Schreibens dieser Datei NOCH NICHT auf der verlinkten Supabase-Instanz
@@ -109,14 +122,6 @@ test.beforeAll(async () => {
   await admin.from("calendar_workers").delete().eq("tenant_id", tenantId).eq("user_id", studentUserId);
   await admin.from("calendar_workers").delete().eq("tenant_id", tenantId).eq("user_id", staffUserId);
   await admin.from("calendar_projects").delete().eq("tenant_id", tenantId).eq("name", projectName);
-  // Fall 7 (Feiertagsimport) braucht einen leeren Ausgangszustand für 2026.
-  await admin
-    .from("calendar_absences")
-    .delete()
-    .eq("tenant_id", tenantId)
-    .eq("kind", "holiday")
-    .gte("starts_on", "2026-01-01")
-    .lte("starts_on", "2026-12-31");
 
   // Flag muss an sein — S1s afterAll schaltet es nach dessen eigenem Lauf
   // wieder aus, dieser Spec ist unabhängig davon und schaltet es selbst an.
@@ -162,13 +167,6 @@ test.afterAll(async () => {
     await admin.from("calendar_shifts").delete().eq("worker_id", secondWorkerId);
     await admin.from("calendar_workers").delete().eq("id", secondWorkerId);
   }
-  await admin
-    .from("calendar_absences")
-    .delete()
-    .eq("tenant_id", tenantId)
-    .eq("kind", "holiday")
-    .gte("starts_on", "2026-01-01")
-    .lte("starts_on", "2026-12-31");
 
   const { data: tenantRow } = await admin.from("tenants").select("settings").eq("id", tenantId).single();
   const settings = (tenantRow?.settings ?? {}) as Record<string, unknown>;
@@ -381,23 +379,4 @@ test("Fall 6 — Student ändert eigene Sollstunden über Formular; direkter Man
   expect(workerRow.status).toBe("active");
   expect(Number(workerRow.target_hours)).toBe(20);
   expect(workerRow.target_period).toBe("month");
-});
-
-test("Fall 7 — Feiertagsimport DE 2026 meldet 9 eingefügt, zweiter Klick meldet 0 eingefügt/9 übersprungen", async ({
-  page,
-}) => {
-  await page.goto(tenantUrl("/admin/schichtplanung?tab=absences&year=2026"));
-  await expect(page.getByRole("heading", { name: "Feiertage importieren" })).toBeVisible();
-
-  await page.getByLabel("Land").selectOption({ label: "Deutschland" });
-  // getByRole("spinbutton", ...) statt getByLabel — der Reiter hat oben
-  // bereits eine Jahresauswahl (<select>, gleicher Accessible Name "Jahr")
-  // für die Anzeige, der Import-Block darunter ein eigenes <input
-  // type="number">. Die Rolle unterscheidet beide eindeutig.
-  await page.getByRole("spinbutton", { name: "Jahr" }).fill("2026");
-  await page.getByRole("button", { name: "Importieren" }).click();
-  await expect(page.getByText("9 eingefügt, 0 übersprungen.")).toBeVisible({ timeout: 15000 });
-
-  await page.getByRole("button", { name: "Importieren" }).click();
-  await expect(page.getByText("0 eingefügt, 9 übersprungen.")).toBeVisible({ timeout: 15000 });
 });

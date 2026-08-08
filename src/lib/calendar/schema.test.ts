@@ -5,7 +5,6 @@ import {
   calendarChangeRequestSchema,
   calendarClockInSchema,
   calendarDateSchema,
-  calendarHolidayImportSchema,
   calendarProjectMemberIdsSchema,
   calendarProjectSchema,
   calendarSelfBookingSchema,
@@ -253,26 +252,6 @@ describe("calendarAbsenceSchema", () => {
     expect(calendarAbsenceSchema.safeParse({ ...base, startsOn: "2026-08-10", endsOn: "2026-08-10" }).success).toBe(
       true,
     );
-  });
-});
-
-describe("calendarHolidayImportSchema", () => {
-  it("akzeptiert ein gültiges Land+Jahr", () => {
-    expect(calendarHolidayImportSchema.safeParse({ country: "DE", year: 2026 }).success).toBe(true);
-  });
-
-  it("lehnt ein unbekanntes Land ab", () => {
-    expect(calendarHolidayImportSchema.safeParse({ country: "FR", year: 2026 }).success).toBe(false);
-  });
-
-  it("lehnt ein Jahr außerhalb 2020-2100 ab", () => {
-    expect(calendarHolidayImportSchema.safeParse({ country: "DE", year: 2019 }).success).toBe(false);
-    expect(calendarHolidayImportSchema.safeParse({ country: "DE", year: 2101 }).success).toBe(false);
-  });
-
-  it("akzeptiert seit Block S5a auch die fünf neuen Regionscodes (Schema-Ebene — buildHolidays() bleibt trotzdem auf DE/AT/CH beschränkt)", () => {
-    expect(calendarHolidayImportSchema.safeParse({ country: "HR", year: 2026 }).success).toBe(true);
-    expect(calendarHolidayImportSchema.safeParse({ country: "BA_RS", year: 2026 }).success).toBe(true);
   });
 });
 

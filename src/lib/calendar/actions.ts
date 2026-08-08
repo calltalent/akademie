@@ -18,7 +18,6 @@ import {
   calendarChangeDecisionSchema,
   calendarChangeRequestSchema,
   calendarClockInSchema,
-  calendarHolidayImportSchema,
   calendarProjectMemberIdsSchema,
   calendarProjectSchema,
   calendarProjectStatusSchema,
@@ -37,7 +36,6 @@ import {
   type CalendarChangeDecisionInput,
   type CalendarChangeRequestInput,
   type CalendarClockInInput,
-  type CalendarHolidayImportInput,
   type CalendarProjectInput,
   type CalendarProjectRow,
   type CalendarProjectStatus,
@@ -53,7 +51,6 @@ import {
   type CalendarWorkerTargetInput,
 } from "@/lib/calendar/schema";
 import { buildWeeklySeries, formatDayLabel, formatTimeRange } from "@/lib/calendar/date";
-import { buildHolidays } from "@/lib/calendar/holidays";
 
 /**
  * Server Actions für "Schichtplan" (Block S1, 07.08.2026). Stilvorbild
@@ -79,7 +76,6 @@ type ProjectResult = { ok: true; project: CalendarProjectRow } | { ok: false; er
 type TimeEntryResult = { ok: true; entry: CalendarTimeEntryRow } | { ok: false; error: string };
 type ShiftResult = { ok: true; shift: CalendarAdminShiftRow } | { ok: false; error: string };
 type SlotsCreateResult = { ok: true; created: number } | { ok: false; error: string };
-type HolidayImportResult = { ok: true; inserted: number; skipped: number } | { ok: false; error: string };
 type SelfBookingResult = { ok: true; shiftId: string } | { ok: false; error: string };
 
 const ADMIN_PATH = "/admin/schichtplanung";
@@ -841,68 +837,6 @@ export async function deleteCalendarAbsence(absenceId: string): Promise<ActionRe
     revalidatePath(ADMIN_PATH);
     revalidatePath(LEARN_PATH);
     return { ok: true };
-  } catch (e) {
-    return { ok: false, error: genericErrorMessage(e) };
-  }
-}
-
-/** Lädt vorher bestehende kind='holiday'-Zeilen des Jahres und filtert die neue Liste dagegen (kein Unique-Index auf calendar_absences für diesen Fall, App-seitige Entdopplung, siehe Migrationskopf S1). */
-export async function importCalendarHolidays(input: CalendarHolidayImportInput): Promise<HolidayImportResult> {
-  try {
-    const { tenant, supabase, user } = await requireAdminTenant();
-    const parsed = calendarHolidayImportSchema.safeParse(input);
-    if (!parsed.success) {
-      return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
-    }
-    const data = parsed.data;
-
-    // S5a (08.08.2026): `calendarHolidayImportSchema` akzeptiert seit der
-    // Umbenennung von CALENDAR_HOLIDAY_COUNTRIES auf CALENDAR_HOLIDAY_REGIONS
-    // (schema.ts) alle acht Regionscodes — `buildHolidays()` (holidays.ts)
-    // kennt aber weiterhin nur DE/AT/CH. Der deterministische Import bleibt
-    // bis Block S5c (Ablösung durch die KI-Feiertagsrecherche) auf diese drei
-    // beschränkt; die übrigen fünf Codes bekommen hier eine eigene, klare
-    // Fehlermeldung statt eines TypeScript-Fehlers, der die eigentliche
-    // Ursache verschleiern würde.
-    if (data.country !== "DE" && data.country !== "AT" && data.country !== "CH") {
-      return { ok: false, error: "Für diese Region gibt es noch keinen Feiertagsimport." };
-    }
-
-    const holidays = buildHolidays(data.country, data.year);
-
-    const { data: existingRaw } = await supabase
-      .from("calendar_absences")
-      .select("starts_on")
-      .eq("tenant_id", tenant.id)
-      .eq("kind", "holiday")
-      .gte("starts_on", `${data.year}-01-01`)
-      .lte("starts_on", `${data.year}-12-31`);
-    const existingDates = new Set((existingRaw ?? []).map((r) => r.starts_on as string));
-
-    const toInsert = holidays.filter((h) => !existingDates.has(h.date));
-
-    if (toInsert.length > 0) {
-      const nowIso = new Date().toISOString();
-      const { error } = await supabase.from("calendar_absences").insert(
-        toInsert.map((h) => ({
-          tenant_id: tenant.id,
-          worker_id: null,
-          kind: "holiday" as const,
-          starts_on: h.date,
-          ends_on: h.date,
-          note: h.name,
-          status: "approved" as const,
-          created_by: user.id,
-          decided_by: user.id,
-          decided_at: nowIso,
-        })),
-      );
-      if (error) return { ok: false, error: translateDbError(error) };
-    }
-
-    revalidatePath(ADMIN_PATH);
-    revalidatePath(LEARN_PATH);
-    return { ok: true, inserted: toInsert.length, skipped: holidays.length - toInsert.length };
   } catch (e) {
     return { ok: false, error: genericErrorMessage(e) };
   }

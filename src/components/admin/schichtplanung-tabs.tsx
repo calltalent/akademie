@@ -18,11 +18,13 @@ import type {
   CalendarAbsenceRow,
   CalendarAdminShiftRow,
   CalendarChangeRequestRow,
+  CalendarHolidayRegionCode,
   CalendarProjectRow,
   CalendarSlotRow,
   CalendarWorkerRow,
 } from "@/lib/calendar/schema";
 import type { ShiftPlanJobDetail, ShiftPlanJobListRow } from "@/lib/calendar/ai/queries";
+import type { HolidayResearchJobDetail, HolidayResearchJobListRow } from "@/lib/calendar/ai/holidays/queries";
 
 /**
  * Sechs Reiter (Arbeiter/Projekte/Schichten/Zeitfenster/Abwesenheiten/
@@ -56,7 +58,12 @@ export type SchichtplanungTab = "workers" | "projects" | "shifts" | "slots" | "a
 
 type ShiftsData = { shifts: CalendarAdminShiftRow[]; slots: CalendarSlotRow[]; absences: CalendarAbsenceRow[] } | null;
 type SlotsData = { slots: CalendarSlotRow[] } | null;
-type AbsencesData = { absences: CalendarAbsenceRow[] } | null;
+type AbsencesData = {
+  absences: CalendarAbsenceRow[];
+  holidayRegions: CalendarHolidayRegionCode[];
+  holidayJobs: HolidayResearchJobListRow[];
+  holidayJobDetail: HolidayResearchJobDetail | null;
+} | null;
 type RequestsData = { requests: CalendarChangeRequestRow[]; status: "pending" | "decided" | "all" } | null;
 type KiData = { jobs: ShiftPlanJobListRow[]; jobDetail: ShiftPlanJobDetail | null } | null;
 
@@ -185,7 +192,14 @@ export function SchichtplanungTabs({
         />
       )}
       {activeTab === "absences" && absencesData && (
-        <CalendarAbsencesPanel workers={workers.filter((w) => w.status === "active")} absences={absencesData.absences} year={year} />
+        <CalendarAbsencesPanel
+          workers={workers.filter((w) => w.status === "active")}
+          absences={absencesData.absences}
+          year={year}
+          holidayRegions={absencesData.holidayRegions}
+          holidayJobs={absencesData.holidayJobs}
+          holidayJobDetail={absencesData.holidayJobDetail}
+        />
       )}
       {activeTab === "requests" && requestsData && (
         <CalendarChangeRequestsPanel

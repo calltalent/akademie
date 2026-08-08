@@ -270,23 +270,6 @@ export const calendarAbsenceSchema = z
   });
 export type CalendarAbsenceInput = z.infer<typeof calendarAbsenceSchema>;
 
-/**
- * Deterministischer Feiertagsimport (`importCalendarHolidays()`,
- * calendar/actions.ts, Block S2) — bleibt bis Block S5c bestehen (dann durch
- * die KI-Feiertagsrecherche mit Pflicht-Review ersetzt). Referenziert seit
- * Block S5a `CALENDAR_HOLIDAY_REGIONS` statt der entfallenen
- * `CALENDAR_HOLIDAY_COUNTRIES` — `buildHolidays()` (holidays.ts) kennt aber
- * WEITERHIN nur DE/AT/CH (siehe Kommentar dort). `importCalendarHolidays()`
- * weist die fünf neuen Regionscodes deshalb zur Laufzeit mit einer eigenen
- * Fehlermeldung ab, statt dass die Typdifferenz still am Compiler
- * vorbeirutscht.
- */
-export const calendarHolidayImportSchema = z.object({
-  country: z.enum(CALENDAR_HOLIDAY_REGIONS),
-  year: z.coerce.number().int().min(2020).max(2100),
-});
-export type CalendarHolidayImportInput = z.infer<typeof calendarHolidayImportSchema>;
-
 export const calendarSelfBookingSchema = z.object({
   slotId: z.string().uuid("Ungültiges Zeitfenster."),
 });

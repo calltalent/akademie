@@ -2,21 +2,29 @@
 
 import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
-import {
-  createCalendarAbsence,
-  deleteCalendarAbsence,
-  importCalendarHolidays,
-} from "@/lib/calendar/actions";
-import type { CalendarAbsenceKind, CalendarAbsenceRow } from "@/lib/calendar/schema";
-import type { CalendarHolidayCountry } from "@/lib/calendar/holidays";
+import { createCalendarAbsence, deleteCalendarAbsence } from "@/lib/calendar/actions";
+import type { CalendarAbsenceKind, CalendarAbsenceRow, CalendarHolidayRegionCode } from "@/lib/calendar/schema";
+import { CalendarHolidaysKiPanel } from "@/components/admin/calendar-holidays-ki-panel";
+import { CalendarHolidaysKiReview } from "@/components/admin/calendar-holidays-ki-review";
+import type { HolidayResearchJobDetail, HolidayResearchJobListRow } from "@/lib/calendar/ai/holidays/queries";
 
 /**
  * Abwesenheiten & Feiertage (Block S2, 08.08.2026) — Jahresauswahl, getrennte
  * Listen Feiertage/persönliche Abwesenheiten, Anlageformular (bei
  * kind="holiday" ist das Arbeiter-Feld deaktiviert/geleert — Feiertage
  * gelten mandantenweit, siehe DB-CHECK `(kind = 'holiday') = (worker_id is
- * null)`, Migrationskopf S1), Feiertagsimport-Block.
+ * null)`, Migrationskopf S1).
+ *
+ * Block S5c (08.08.2026): der frühere deterministische Feiertagsimport-Block
+ * (`importCalendarHolidays()`, nur DE/AT/CH) ist VOLLSTÄNDIG ERSETZT durch
+ * die KI-Feiertagsrecherche (`CalendarHolidaysKiPanel`/
+ * `CalendarHolidaysKiReview`, admin-only wie bei der KI-Schichtplanung).
+ * Ohne gewählte Region (`holidayRegions.length === 0`, Mandanten-Einstellung
+ * aus Block S5a) erscheint statt des Formulars ein Hinweis mit Link zu den
+ * Einstellungen — ein geöffneter Auftrag (`holidayJobDetail` gesetzt) zeigt
+ * die Review-Ansicht statt des Auslöse-Formulars.
  *
  * DSGVO-Hinweis (SPEC.md §12, Art. 9 DSGVO): `kind="sick"` ist ein
  * Gesundheitsdatum. Die Notiz zeigt deshalb explizit den Hinweis, KEINE
@@ -26,25 +34,20 @@ import type { CalendarHolidayCountry } from "@/lib/calendar/holidays";
  */
 const KIND_OPTIONS: CalendarAbsenceKind[] = ["vacation", "holiday", "sick", "other"];
 
-/**
- * S5a (08.08.2026): `CALENDAR_HOLIDAY_COUNTRIES` (schema.ts) wurde zu
- * `CALENDAR_HOLIDAY_REGIONS` (acht Werte) umbenannt — der deterministische
- * Import hier bleibt aber bewusst auf DE/AT/CH beschränkt, weil
- * `buildHolidays()` (holidays.ts) nur diese drei kennt. Eine lokale,
- * unveränderte Dreier-Liste statt der erweiterten Konstante, damit das
- * Dropdown weiterhin exakt die drei bisherigen Länder zeigt. Wird in Block
- * S5c durch die KI-Karte abgelöst.
- */
-const IMPORT_COUNTRIES: readonly CalendarHolidayCountry[] = ["DE", "AT", "CH"];
-
 export function CalendarAbsencesPanel({
   workers,
   absences,
   year,
+  holidayRegions,
+  holidayJobs,
+  holidayJobDetail,
 }: {
   workers: { id: string; fullName: string | null; email: string }[];
   absences: CalendarAbsenceRow[];
   year: number;
+  holidayRegions: CalendarHolidayRegionCode[];
+  holidayJobs: HolidayResearchJobListRow[];
+  holidayJobDetail: HolidayResearchJobDetail | null;
 }) {
   const t = useTranslations("admin.shiftCalendar.absences");
   const uid = useId();
@@ -61,6 +64,10 @@ export function CalendarAbsencesPanel({
 
   function goToYear(nextYear: number) {
     router.push(`?tab=absences&year=${nextYear}`);
+  }
+
+  function openHolidayJob(jobId: string) {
+    router.push(`?tab=absences&year=${year}&holidayJob=${jobId}`);
   }
 
   // --- Anlageformular ------------------------------------------------
@@ -102,27 +109,6 @@ export function CalendarAbsencesPanel({
     startRowTransition(async () => {
       const result = await deleteCalendarAbsence(id);
       if (!result.ok) setRowError((prev) => ({ ...prev, [id]: result.error }));
-    });
-  }
-
-  // --- Feiertagsimport ---------------------------------------------------
-  const [importCountry, setImportCountry] = useState<CalendarHolidayCountry>("DE");
-  const [importYear, setImportYear] = useState(String(year));
-  const [importResult, setImportResult] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
-  const [importPending, startImport] = useTransition();
-
-  function handleImport(e: React.FormEvent) {
-    e.preventDefault();
-    setImportError(null);
-    setImportResult(null);
-    startImport(async () => {
-      const result = await importCalendarHolidays({ country: importCountry, year: Number(importYear) });
-      if (!result.ok) {
-        setImportError(result.error);
-        return;
-      }
-      setImportResult(t("holidayImport.result", { inserted: result.inserted, skipped: result.skipped }));
     });
   }
 
@@ -341,59 +327,19 @@ export function CalendarAbsencesPanel({
         )}
       </section>
 
-      <section aria-labelledby={`${uid}-import-heading`} className="rounded-[14px] border border-border-100 bg-white p-[26px_28px]">
-        <h3 id={`${uid}-import-heading`} className="mb-4 text-[17px] font-bold text-ink">
-          {t("holidayImport.heading")}
-        </h3>
-        <form onSubmit={handleImport} className="flex flex-wrap items-end gap-3">
-          <div>
-            <label htmlFor={`${uid}-import-country`} className="mb-1.5 block text-sm font-semibold text-navy">
-              {t("holidayImport.countryLabel")}
-            </label>
-            <select
-              id={`${uid}-import-country`}
-              value={importCountry}
-              onChange={(e) => setImportCountry(e.target.value as CalendarHolidayCountry)}
-              className="rounded-sm border border-border-300 bg-white px-3 py-2.5 text-sm text-ink"
-            >
-              {IMPORT_COUNTRIES.map((c) => (
-                <option key={c} value={c}>
-                  {t(`country.${c}`)}
-                </option>
-              ))}
-            </select>
+      <section className="overflow-hidden rounded-[14px] border border-border-100 bg-white">
+        {holidayRegions.length === 0 ? (
+          <div className="p-[26px_28px]">
+            <h3 className="mb-2 text-[17px] font-bold text-ink">{t("holidayKi.heading")}</h3>
+            <p className="text-sm text-muted-500">{t("holidayKi.noRegions")}</p>
+            <Link href="/admin/einstellungen" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
+              {t("holidayKi.noRegionsLink")}
+            </Link>
           </div>
-          <div>
-            <label htmlFor={`${uid}-import-year`} className="mb-1.5 block text-sm font-semibold text-navy">
-              {t("holidayImport.yearLabel")}
-            </label>
-            <input
-              id={`${uid}-import-year`}
-              type="number"
-              min={2020}
-              max={2100}
-              value={importYear}
-              onChange={(e) => setImportYear(e.target.value)}
-              className="w-28 rounded-sm border border-border-300 bg-white px-3 py-2.5 text-sm text-ink"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={importPending}
-            className="rounded-sm bg-primary px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/40"
-          >
-            {importPending ? t("holidayImport.buttonPending") : t("holidayImport.button")}
-          </button>
-        </form>
-        {importResult && (
-          <p role="status" className="mt-3 text-sm font-semibold text-navy">
-            {importResult}
-          </p>
-        )}
-        {importError && (
-          <p role="alert" className="mt-3 text-sm text-[#B24343]">
-            {importError}
-          </p>
+        ) : holidayJobDetail ? (
+          <CalendarHolidaysKiReview job={holidayJobDetail} backHref={`?tab=absences&year=${year}`} />
+        ) : (
+          <CalendarHolidaysKiPanel holidayRegions={holidayRegions} jobs={holidayJobs} onOpenJob={openHolidayJob} />
         )}
       </section>
     </div>

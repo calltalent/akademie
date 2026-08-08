@@ -1,9 +1,9 @@
 -- "Schichtplan" Block S5a — Vorbereitung fuer die KI-Feiertagsrecherche
 -- (Josips Auftrag, architect-Plan "plane-und-erstelle-mit-floofy-curry-
--- agent-a2931f285e454e395.md" Abschnitt 7). Diese Migration wird laut
--- Bauplan in Block S5a NUR GESCHRIEBEN, nicht angewendet — der Dateiname
--- traegt einen Platzhalter-Zeitstempel und wird beim tatsaechlichen
--- Anwenden (Block S5b) auf den echten Anwendezeitpunkt umbenannt, gleiches
+-- agent-a2931f285e454e395.md" Abschnitt 7). In Block S5a nur GESCHRIEBEN,
+-- in Block S5b per Supabase-MCP LIVE ANGEWENDET (siehe PHASENSTATUS.md,
+-- "Schichtplan — Block S5b: Migration live angewendet") — der Dateiname
+-- wurde dabei auf den tatsaechlichen Anwendezeitpunkt umbenannt, gleiches
 -- Vorgehen wie bei allen bisherigen Schichtplan-Migrationen dieses Projekts.
 --
 -- Kein neues Schema: keine neue Tabelle, keine neue Spalte, kein neuer

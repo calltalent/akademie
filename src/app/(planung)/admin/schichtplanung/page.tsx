@@ -14,8 +14,9 @@ import {
   getPlannerWorkerNames,
 } from "@/lib/calendar/queries";
 import { addDays, formatDayLabel, formatShortDayLabel, isoDateString, startOfIsoWeek } from "@/lib/calendar/date";
-import type { CalendarChangeRequestRow, CalendarWorkerRow } from "@/lib/calendar/schema";
+import { parseTenantHolidayRegions, type CalendarChangeRequestRow, type CalendarWorkerRow } from "@/lib/calendar/schema";
 import { getShiftPlanJob, getShiftPlanJobs } from "@/lib/calendar/ai/queries";
+import { getHolidayResearchJob, getHolidayResearchJobs } from "@/lib/calendar/ai/holidays/queries";
 
 const ADMIN_TAB_IDS: SchichtplanungTab[] = ["workers", "projects", "shifts", "slots", "absences", "requests", "ki"];
 /** Projektleiter (Block S3): NUR lesendes Wochenraster + Änderungsanfragen-Entscheidung — kein Schicht-/Zeitfenster-CRUD, kein Arbeiter-/Projektzugriff (Bauauftrag, "minimal" bewusst so entschieden). */
@@ -76,7 +77,14 @@ function mergeRequestWorkerNames(
 export default async function AdminSchichtplanungPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; week?: string; year?: string; requestStatus?: string; job?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    week?: string;
+    year?: string;
+    requestStatus?: string;
+    job?: string;
+    holidayJob?: string;
+  }>;
 }) {
   const {
     tab: tabParam,
@@ -84,6 +92,7 @@ export default async function AdminSchichtplanungPage({
     year: yearParam,
     requestStatus: requestStatusParam,
     job: jobParam,
+    holidayJob: holidayJobParam,
   } = await searchParams;
   const t = await getTranslations("admin.shiftCalendar");
   const access = await checkShiftPlannerAccess();
@@ -172,8 +181,20 @@ export default async function AdminSchichtplanungPage({
       ? { slots: await getAdminCalendarSlots(supabase, tenant.id, weekStart.toISOString(), weekEnd.toISOString()) }
       : null;
 
+  // Feiertagsrecherche ist admin-only (wie beim Auslösen selbst, siehe
+  // `startHolidayResearchJob()`-Dateikopf) — der "absences"-Reiter ist zwar
+  // bereits nicht in `PLANNER_TAB_IDS`, das `isAdmin`-Gate hier bleibt
+  // trotzdem explizit, statt sich allein auf die Reiterliste zu verlassen.
   const absencesData =
-    activeTab === "absences" ? { absences: await getAdminCalendarAbsences(supabase, tenant.id, yearNum) } : null;
+    activeTab === "absences"
+      ? {
+          absences: await getAdminCalendarAbsences(supabase, tenant.id, yearNum),
+          holidayRegions: parseTenantHolidayRegions(tenant.settings.shift_calendar_holiday_regions ?? []),
+          holidayJobs: isAdmin ? await getHolidayResearchJobs(supabase, tenant.id) : [],
+          holidayJobDetail:
+            isAdmin && holidayJobParam ? await getHolidayResearchJob(supabase, tenant.id, holidayJobParam) : null,
+        }
+      : null;
 
   const requestsData =
     activeTab === "requests"
