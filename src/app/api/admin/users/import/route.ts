@@ -4,6 +4,7 @@ import { requireAdminTenant } from "@/lib/auth/staff";
 import { parseCsv } from "@/lib/users/csv";
 import { importUsers } from "@/lib/users/import";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
+import { verifySameOrigin, CSRF_REJECT_MESSAGE } from "@/lib/security/origin";
 import { genericErrorMessage } from "@/lib/errors/generic";
 
 const bodySchema = z.object({
@@ -16,6 +17,12 @@ const bodySchema = z.object({
  * DoD: 100 Nutzer < 30 s (siehe import.ts, Batch-Parallelisierung).
  */
 export async function POST(request: Request) {
+  // CSRF-Fix (08.08.2026): reine Cookie-Session-Autorisierung ohne
+  // Signatur-/Secret-Header, siehe src/lib/security/origin.ts-Dateikopf.
+  if (!verifySameOrigin(request)) {
+    return NextResponse.json({ error: CSRF_REJECT_MESSAGE }, { status: 403 });
+  }
+
   try {
     const { tenant } = await requireAdminTenant();
 

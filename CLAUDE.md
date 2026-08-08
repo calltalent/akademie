@@ -24,6 +24,11 @@ Sprache: Deutsch (Antworten, Commits, UI-Texte). Code, Bezeichner und Kommentare
 4. Stripe- und Bunny-Webhooks: Signatur prüfen, bevor irgendetwas verarbeitet wird.
 5. Datei-Uploads: Typ- und Größen-Whitelist; Storage-Pfade beginnen mit `{tenant_id}/`.
 6. Keine Secrets, echten E-Mail-Adressen oder Kundendaten in Tests/Fixtures.
+7. Öffentlich erreichbare Formulare (Login, Registrierung, Kontakt, Passwort-Reset, Einladungsannahme) brauchen Bot-Schutz (Rate-Limiting mindestens, CAPTCHA/Honeypot bei besonders exponierten Formularen).
+8. Sitzungen laufen ab (Supabase-Auth-Session-Timeout konfiguriert und dokumentiert), keine unbegrenzt gültige Session.
+9. Server Actions/API-Routen sind gegen CSRF geschützt (Next.js' eingebauter Origin-Check bei Server Actions genügt für diese; state-ändernde `route.ts`-Handler ohne diesen Schutz brauchen eine eigene Prüfung).
+10. Im Client-Bundle/Browser ausschließlich der eingeschränkte `anon`/publishable Supabase-Key — niemals `service_role`. Jede `createAdminClient()`-Verwendung nur serverseitig und mit vorheriger Autorisierungsprüfung.
+11. Keine Passwörter, Tokens, API-Keys oder Kartennummern im Klartext in Logs (`console.log`/`console.error`/Server-Logs) — auch nicht indirekt über `error.message` von Auth-/Zahlungs-SDKs.
 
 ## 3. Produktregeln
 

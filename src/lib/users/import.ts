@@ -357,11 +357,11 @@ export async function importOneUser(
   } catch (e) {
     // e.message kann eine rohe/technische Meldung sein (unerwarteter Fehler
     // irgendwo im Import-Ablauf) — Detail nur loggen, Nutzer/CSV-Bericht
-    // bekommt einen klaren deutschen Satz.
-    console.error("[users/import] Unerwarteter Fehler beim Import einer Zeile.", {
-      email: row.email,
-      error: e instanceof Error ? e.message : e,
-    });
+    // bekommt einen klaren deutschen Satz. KEINE E-Mail-Adresse im Server-Log
+    // (Security-Fix 08.08.2026, Log-Hygiene-Audit NIEDRIG) — der admin-seitige
+    // CSV-Bericht (Rückgabewert unten) trägt die E-Mail bereits, ein
+    // zusätzlicher Klartext-Eintrag in den Server-Logs ist unnötige PII.
+    console.error("[users/import] Unerwarteter Fehler beim Import einer Zeile.", e instanceof Error ? e.message : e);
     return {
       email: row.email,
       status: "error",

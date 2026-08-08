@@ -3644,3 +3644,31 @@ Umsetzung nach dem vom architect-Agenten erstellten S4-Bauauftrag (Josips durchg
 **Zwei Beobachtungen NIEDRIG, kein Fix erforderlich:** (1) Prompt-Injection über das `note`-Freitextfeld ist durch den `UNTRUSTED_DATA_INSTRUCTION`-Marker gemindert und durch zwei nachgelagerte codebasierte Schranken gedeckelt (`mapDraftRows()` akzeptiert nur bekannte Pseudonyme, `detectConflicts()` prüft gegen echte DB-Daten statt gegen Claudes Behauptungen) — Restrisiko gering, da nach dem Fix nur noch Admins dieses Feld befüllen können. (2) `updateAiJob()` filtert selbst nicht zusätzlich nach `tenant_id` (verlässt sich auf die Tenant-Prüfung des Aufrufers) — aktuell durch beide Aufrufer (`applyShiftPlan()`/`deleteShiftPlanJob()`) korrekt abgedeckt, aber keine zweite Verteidigungslinie gegen einen künftigen fehlerhaften Aufrufer; als Beobachtung notiert, keine akute Lücke.
 
 **Status: Freigegeben (nach dem H1-Fix).** Block „Schichtplan S4" damit vollständig abgeschlossen und live verifiziert — KI-gestützte Schichtplanung (Auslösen, Review, Übernahme) läuft produktiv, inklusive eines verifizierten echten Claude-API-Laufs. Damit sind alle vier geplanten Blöcke (S1–S4) des Schichtplan-Features abgeschlossen.
+
+## Projektweiter Fünf-Punkte-Sicherheitsaudit (Josips Auftrag, 08.08.2026) — zwei Funde MITTEL behoben
+
+Josip hat fünf zusätzliche Prüfpunkte für JEDES Sicherheits-Audit vorgegeben (später um drei weitere ergänzt: RLS, Rate-Limiting auf kostenverursachenden Routen, keine Secrets im Frontend — letztere drei waren im Projekt bereits über bestehende Punkte abgedeckt). Dauerhaft in drei Ebenen verankert, nicht nur für diesen einen Durchlauf:
+
+1. `.claude/agents/security-reviewer.md` (dieses Projekt) — Prüfliste um Punkt 8-14 erweitert (Bot-Schutz, Session-Ablauf, CSRF, DB-Schlüssel-Scope, Log-Hygiene, Rate-Limiting auf Kosten-Routen, Secrets-im-Frontend-Gegenprobe).
+2. `CLAUDE.md` (dieses Projekt) §2 — Punkte 7-11 als nicht verhandelbare Sicherheitsregeln ergänzt.
+3. `C:\Users\offic\.claude\CLAUDE.md` (NEU, global, lädt in JEDER Claude-Code-Sitzung unabhängig vom Projektordner) — dieselbe Acht-Punkte-Checkliste, gilt ab sofort für jede künftige App.
+
+**Audit-Ergebnis für Calltalent-Akademie (security-reviewer-Agent, nur lesend):**
+
+| # | Punkt | Befund | Schweregrad |
+|---|---|---|---|
+| 1 | Bot-Schutz auf Formularen | Alle Auth-Formulare (Login, Registrierung, Magic-Link, Passwort-Reset-Anfrage, Kontakt) hatten Rate-Limiting — `setNewPassword()` (Passwort setzen/Einladungsannahme) als einzige Ausnahme ohne. Kein CAPTCHA/Honeypot im Projekt. | MITTEL |
+| 2 | Session-Ablauf | JWT-Laufzeit läuft auf dem Supabase-Dashboard-Standard, nicht im Code konfiguriert; kein "Angemeldet bleiben"; keine Re-Authentifizierung bei E-Mail-Änderung/Löschantrag/Billing-Portal. | NIEDRIG (kein Fix) |
+| 3 | CSRF-Schutz | Next.js' eingebauter Origin-Check für Server Actions aktiv und ungestört. Sechs Route-Handler (`ki/generate`, `users/import`, `bunny/create-video`, `course-assets/upload-url`, `tenant-logo/upload-url`, `submissions/upload-url`) verließen sich rein auf Cookie-Session ohne eigenen Origin-Check — praktisches Risiko durch fehlende CORS-Freigabe gemindert, aber kein expliziter Schutz. | MITTEL |
+| 4 | Eingeschränkter DB-Schlüssel im Client | Sauber getrennt (`src/lib/env.ts` zod-Trennung `publicEnv`/`serverEnv`, `src/lib/supabase/admin.ts` mit `import "server-only"`-Hartabsicherung). Keine `"use client"`-Komponente importiert `createAdminClient`. | OK |
+| 5 | Log-Hygiene | Projektweit diszipliniert (fast durchgängig nur `error.message` geloggt). Zwei kleine Abweichungen: E-Mail-Adresse im CSV-Import-Fehlerlog, volles Error-Objekt statt `.message` in `video/actions.ts`. | NIEDRIG |
+
+**Fix MITTEL (Punkt 1):** `setNewPassword()` (`src/lib/auth/actions.ts`) bekam ein IP-basiertes Rate-Limit (`checkRateLimit("auth-set-password", {maxRequests:5, windowSeconds:300})`), gleiches Muster wie `signUpWithPassword()`.
+
+**Fix MITTEL (Punkt 3):** Neue Hilfsfunktion `verifySameOrigin()` (`src/lib/security/origin.ts`, NEU) — vergleicht den `Origin`-Header eines Requests mit dem eigenen `Host` (Same-Origin-Check, gleiches Prinzip wie Next.js' eingebauter Server-Actions-Schutz, hier für Route Handler nachgebaut). In allen sechs betroffenen Routen als erste Prüfung vor jeder Auth-/Rate-Limit-Logik ergänzt. `csv-import.spec.ts` und `course-generator.spec.ts` (die einzigen zwei e2e-Specs, die reale Browser-Requests gegen zwei der sechs Routen fahren) danach erneut grün — bestätigt, dass echte Same-Origin-Anfragen vom Check nicht fälschlich blockiert werden. Die übrigen vier Routen (`bunny/create-video`, `course-assets/upload-url`, `tenant-logo/upload-url`, `submissions/upload-url`) haben keine bestehende e2e-Abdeckung (vorbestehende Lücke, nicht Teil dieses Fixes) — Code-Review bestätigt identisches Muster.
+
+**Fix NIEDRIG (Punkt 5):** E-Mail-Adresse aus dem Server-Log in `src/lib/users/import.ts` entfernt (steht bereits im admin-seitigen CSV-Bericht, unnötige PII im Server-Log). `video/actions.ts` auf `e.message`-Logging umgestellt (Konsistenz mit dem sonstigen Projektmuster).
+
+**Nicht behoben (Punkt 2, bewusst):** Session-Ablauf-Konfiguration bleibt auf Supabase-Dashboard-Standard — kein akuter Fund, als Beobachtung notiert für einen künftigen dedizierten Auth-Härtungsdurchgang.
+
+`npx tsc --noEmit`/`npm run lint`: sauber. `npx vitest run`: 631 Tests grün (unverändert). **Status: Freigegeben.**

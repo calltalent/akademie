@@ -109,7 +109,10 @@ export async function checkLessonVideoStatus(lessonId: string): Promise<LessonVi
     const { status } = await getBunnyVideo(lesson.video_bunny_id);
     return { ready: status === 4, failed: status === 5 || status === 6 };
   } catch (e) {
-    console.error("[video/actions] checkLessonVideoStatus fehlgeschlagen:", e);
+    // Nur die Fehlermeldung loggen, nicht das rohe Objekt (Security-Fix
+    // 08.08.2026, Log-Hygiene-Audit NIEDRIG — konsistent mit dem sonstigen
+    // Muster im Projekt, Bunny-Fehlerobjekte könnten Header-Rohdaten tragen).
+    console.error("[video/actions] checkLessonVideoStatus fehlgeschlagen:", e instanceof Error ? e.message : e);
     return { ready: false, failed: false };
   }
 }

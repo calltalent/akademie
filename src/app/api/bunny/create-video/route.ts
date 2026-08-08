@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireStaffTenant } from "@/lib/auth/staff";
 import { createBunnyVideo, generateTusCredentials } from "@/lib/bunny/client";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
+import { verifySameOrigin, CSRF_REJECT_MESSAGE } from "@/lib/security/origin";
 import { translateDbError } from "@/lib/errors/db";
 
 const bodySchema = z.object({
@@ -19,6 +20,12 @@ const bodySchema = z.object({
  * Speichern der video_bunny_id über Server Action).
  */
 export async function POST(request: Request) {
+  // CSRF-Fix (08.08.2026): reine Cookie-Session-Autorisierung ohne
+  // Signatur-/Secret-Header, siehe src/lib/security/origin.ts-Dateikopf.
+  if (!verifySameOrigin(request)) {
+    return NextResponse.json({ error: CSRF_REJECT_MESSAGE }, { status: 403 });
+  }
+
   let ctx: Awaited<ReturnType<typeof requireStaffTenant>>;
   try {
     ctx = await requireStaffTenant();

@@ -412,6 +412,15 @@ export async function setNewPassword(
   _prevState: AuthActionState,
   formData: FormData,
 ): Promise<AuthActionState> {
+  // Rate-Limit ergänzt (Security-Fix 08.08.2026, Fünf-Punkte-Audit MITTEL):
+  // dieser Endpunkt lief bisher als einziger Auth-Action ohne
+  // checkRateLimit() — die aktive Recovery-Session begrenzt zwar, WER
+  // versuchen kann, nicht aber WIE OFT. Gleiches IP-basiertes Muster wie
+  // signUpWithPassword() oben.
+  if (!(await checkRateLimit("auth-set-password", { maxRequests: 5, windowSeconds: 300 }))) {
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
   const parsed = newPasswordSchema.safeParse({ password: formData.get("password") });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };

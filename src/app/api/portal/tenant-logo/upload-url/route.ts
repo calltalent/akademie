@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requirePlatformAdmin } from "@/lib/platform/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
+import { verifySameOrigin, CSRF_REJECT_MESSAGE } from "@/lib/security/origin";
 import { imageUploadUrlRequestSchema } from "@/lib/courses/asset-upload-schema";
 
 /** Nur druckbare, dateisystemsichere Zeichen — Rest wird durch "_" ersetzt. */
@@ -26,6 +27,12 @@ function sanitizeFileName(name: string): string {
  * keine zweite Storage-Struktur entsteht.
  */
 export async function POST(request: Request) {
+  // CSRF-Fix (08.08.2026): reine Cookie-Session-Autorisierung ohne
+  // Signatur-/Secret-Header, siehe src/lib/security/origin.ts-Dateikopf.
+  if (!verifySameOrigin(request)) {
+    return NextResponse.json({ error: CSRF_REJECT_MESSAGE }, { status: 403 });
+  }
+
   try {
     await requirePlatformAdmin();
   } catch (e) {
