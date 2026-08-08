@@ -1067,7 +1067,7 @@
         "heading": "AI quota",
         "subtitle": "This month",
         "tutorAnswersLabel": "Tutor answers",
-        "courseGensLabel": "Course generations",
+        "courseGensLabel": "Generations",
         "exhaustedSuffix": " — used up",
         "usedOfLimitAria": "{label}: {used} of {limit} used",
         "planLabels": {
@@ -1291,7 +1291,8 @@
         "shifts": "Shifts",
         "slots": "Time slots",
         "absences": "Absences",
-        "requests": "Change requests"
+        "requests": "Change requests",
+        "ki": "AI planning"
       },
       "workers": {
         "heading": "Workers",
@@ -1316,7 +1317,15 @@
         "preferredShiftLate": "Late",
         "preferredShiftAny": "Any",
         "preferredWeekdaysLabel": "Preferred weekdays",
-        "weekday": { "mon": "Mon", "tue": "Tue", "wed": "Wed", "thu": "Thu", "fri": "Fri", "sat": "Sat", "sun": "Sun" },
+        "weekday": {
+          "mon": "Mon",
+          "tue": "Tue",
+          "wed": "Wed",
+          "thu": "Thu",
+          "fri": "Fri",
+          "sat": "Sat",
+          "sun": "Sun"
+        },
         "noteLabel": "Note (optional)",
         "addButton": "Add worker",
         "addingButton": "Adding …",
@@ -1430,7 +1439,12 @@
         "emptyPersonal": "No personal absences for this year.",
         "addHeading": "Create absence",
         "kindLabel": "Type",
-        "kind": { "vacation": "Vacation", "holiday": "Public holiday", "sick": "Sick leave", "other": "Other" },
+        "kind": {
+          "vacation": "Vacation",
+          "holiday": "Public holiday",
+          "sick": "Sick leave",
+          "other": "Other"
+        },
         "workerLabel": "Worker",
         "workerPlaceholder": "Please select …",
         "workerDisabledForHoliday": "No worker for “Public holiday” — applies company-wide.",
@@ -1450,7 +1464,11 @@
           "buttonPending": "Importing …",
           "result": "{inserted} inserted, {skipped} skipped."
         },
-        "country": { "DE": "Germany", "AT": "Austria", "CH": "Switzerland" }
+        "country": {
+          "DE": "Germany",
+          "AT": "Austria",
+          "CH": "Switzerland"
+        }
       },
       "requests": {
         "heading": "Change requests",
@@ -1477,6 +1495,62 @@
         "statusRejected": "Rejected",
         "decidedAtLabel": "Decided on {date}",
         "conflictHint": "Approval not possible: the proposed time overlaps with another shift of this worker. The request stays open — cancel the overlapping shift first, then try again."
+      },
+      "ki": {
+        "heading": "AI planning",
+        "description": "Generates a shift plan suggestion from a project's worker parameters, absences, and existing shifts — owners and administrators only.",
+        "disclaimer": "These suggestions come from an AI assistant. They only become real shifts after your review and explicit approval.",
+        "formHeading": "Generate a new suggestion",
+        "projectLabel": "Project",
+        "projectPlaceholder": "Please select …",
+        "fromDateLabel": "From",
+        "toDateLabel": "To",
+        "workersLabel": "Workers",
+        "noWorkers": "This project has no active workers yet.",
+        "noteLabel": "Note (optional)",
+        "submitButton": "Generate suggestion",
+        "submittingButton": "Starting …",
+        "jobsHeading": "Runs",
+        "emptyJobs": "No AI runs started yet.",
+        "statusQueued": "In progress",
+        "statusRunning": "In progress",
+        "statusDone": "Ready to review",
+        "statusError": "Failed",
+        "periodLabel": "{from} – {to}",
+        "openButton": "Open",
+        "deleteButton": "Delete",
+        "deleteConfirm": "Really delete this AI run?",
+        "backLink": "Back to overview",
+        "reviewHeading": "Review AI suggestion",
+        "reviewCount": "{count, plural, one {# suggested shift} other {# suggested shifts}}",
+        "notesLabel": "AI note",
+        "selectAllLabel": "Select all",
+        "workerColumnLabel": "Worker",
+        "dateColumnLabel": "Date",
+        "startColumnLabel": "From",
+        "endColumnLabel": "To",
+        "breakColumnLabel": "Break (min.)",
+        "conflictColumnLabel": "Note",
+        "conflict": {
+          "overlap": "Overlaps an existing shift",
+          "absence": "Absence or public holiday",
+          "outside-period": "Outside the period",
+          "duplicate": "Scheduled twice"
+        },
+        "appliedBadge": "Already applied",
+        "summaryHeading": "Hours per worker",
+        "summaryLine": "{name}: {hours} h",
+        "summaryTarget": " (target: {target} h {period})",
+        "periodWeek": "per week",
+        "periodMonth": "per month",
+        "applyButton": "Apply selected",
+        "applyingButton": "Applying …",
+        "applyConfirm": "{count, plural, one {# shift will be created.} other {# shifts will be created.}}",
+        "resultCreated": "{count, plural, one {# shift applied} other {# shifts applied}}",
+        "resultSkipped": "{count, plural, one {# row already applied before} other {# rows already applied before}}",
+        "resultFailedIntro": "{count, plural, one {# row not applied:} other {# rows not applied:}}",
+        "jobNotFound": "Run not found.",
+        "jobError": "Error: {error}"
       }
     }
   },

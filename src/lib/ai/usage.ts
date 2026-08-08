@@ -134,7 +134,15 @@ export async function recordAiJob(params: {
   // unverändert, CLAUDE.md §3) — OHNE angewendete Migration schlägt der
   // INSERT an der DB-Constraint fehl und recordAiJob() loggt das fail-soft
   // (siehe unten), statt zu werfen.
-  kind: "course_gen" | "quiz_gen" | "transcript" | "summary" | "embed" | "translation";
+  // "shift_plan" (Block S4, 08.08.2026, KI-Schichtplanung): erlaubt seit der
+  // S1-Migration (`ai_jobs_kind_check`, supabase/migrations/
+  // 20260807142619_shift_calendar.sql) — kein neuer Migrationsbedarf hier.
+  // `startShiftPlanJob()` (src/lib/calendar/ai/actions.ts) legt den Job
+  // aktuell direkt per Insert an (nicht über `recordAiJob()`, analog
+  // `api/admin/ki/generate/route.ts` beim Kurs-Generator) — die Erweiterung
+  // hier hält den Typ trotzdem vollständig, falls ein künftiger Aufrufer
+  // `recordAiJob()` direkt nutzt.
+  kind: "course_gen" | "quiz_gen" | "transcript" | "summary" | "embed" | "translation" | "shift_plan";
   model: string;
   tokensIn: number;
   tokensOut: number;

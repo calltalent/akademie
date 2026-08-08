@@ -1067,7 +1067,7 @@
         "heading": "KI kontingent",
         "subtitle": "Ovaj mjesec",
         "tutorAnswersLabel": "Odgovori tutora",
-        "courseGensLabel": "Generisanja kurseva",
+        "courseGensLabel": "Generisanja",
         "exhaustedSuffix": " — potrošeno",
         "usedOfLimitAria": "{label}: iskorišteno {used} od {limit}",
         "planLabels": {
@@ -1291,7 +1291,8 @@
         "shifts": "Smjene",
         "slots": "Termini",
         "absences": "Odsustva",
-        "requests": "Zahtjevi za izmjenu"
+        "requests": "Zahtjevi za izmjenu",
+        "ki": "AI planiranje"
       },
       "workers": {
         "heading": "Radnici",
@@ -1316,7 +1317,15 @@
         "preferredShiftLate": "Popodnevna",
         "preferredShiftAny": "Svejedno",
         "preferredWeekdaysLabel": "Preferirani dani u sedmici",
-        "weekday": { "mon": "Pon", "tue": "Uto", "wed": "Sri", "thu": "Čet", "fri": "Pet", "sat": "Sub", "sun": "Ned" },
+        "weekday": {
+          "mon": "Pon",
+          "tue": "Uto",
+          "wed": "Sri",
+          "thu": "Čet",
+          "fri": "Pet",
+          "sat": "Sub",
+          "sun": "Ned"
+        },
         "noteLabel": "Napomena (opciono)",
         "addButton": "Dodaj radnika",
         "addingButton": "Dodavanje …",
@@ -1430,7 +1439,12 @@
         "emptyPersonal": "Nema ličnih odsustava za ovu godinu.",
         "addHeading": "Kreiraj odsustvo",
         "kindLabel": "Vrsta",
-        "kind": { "vacation": "Godišnji odmor", "holiday": "Praznik", "sick": "Bolovanje", "other": "Ostalo" },
+        "kind": {
+          "vacation": "Godišnji odmor",
+          "holiday": "Praznik",
+          "sick": "Bolovanje",
+          "other": "Ostalo"
+        },
         "workerLabel": "Radnik",
         "workerPlaceholder": "Odaberi …",
         "workerDisabledForHoliday": "Kod „Praznik“ nema radnika — vrijedi za cijelog klijenta.",
@@ -1450,7 +1464,11 @@
           "buttonPending": "Uvoz u toku …",
           "result": "{inserted} uneseno, {skipped} preskočeno."
         },
-        "country": { "DE": "Njemačka", "AT": "Austrija", "CH": "Švicarska" }
+        "country": {
+          "DE": "Njemačka",
+          "AT": "Austrija",
+          "CH": "Švicarska"
+        }
       },
       "requests": {
         "heading": "Zahtjevi za izmjenu",
@@ -1477,6 +1495,62 @@
         "statusRejected": "Odbijeno",
         "decidedAtLabel": "Odlučeno {date}",
         "conflictHint": "Odobravanje nije moguće: predloženo vrijeme se preklapa s drugom smjenom ovog radnika. Zahtjev ostaje na čekanju — prvo otkaži smjenu koja se preklapa, pa pokušaj ponovo."
+      },
+      "ki": {
+        "heading": "AI planiranje",
+        "description": "Iz parametara radnika, odsustava i postojećih smjena projekta generiše prijedlog rasporeda smjena — samo za vlasnike i administratore.",
+        "disclaimer": "Prijedlozi dolaze od AI asistenta. Postaju stvarne smjene tek nakon vaše provjere i izričitog preuzimanja.",
+        "formHeading": "Generiši novi prijedlog",
+        "projectLabel": "Projekat",
+        "projectPlaceholder": "Odaberi …",
+        "fromDateLabel": "Od",
+        "toDateLabel": "Do",
+        "workersLabel": "Radnici",
+        "noWorkers": "Ovaj projekat još nema aktivnih radnika.",
+        "noteLabel": "Napomena (opciono)",
+        "submitButton": "Generiši prijedlog",
+        "submittingButton": "Pokretanje …",
+        "jobsHeading": "Nalozi",
+        "emptyJobs": "Još nije pokrenut nijedan AI nalog.",
+        "statusQueued": "U toku",
+        "statusRunning": "U toku",
+        "statusDone": "Za provjeru",
+        "statusError": "Neuspješno",
+        "periodLabel": "{from} – {to}",
+        "openButton": "Otvori",
+        "deleteButton": "Obriši",
+        "deleteConfirm": "Zaista obrisati ovaj AI nalog?",
+        "backLink": "Nazad na pregled",
+        "reviewHeading": "Provjeri AI prijedlog",
+        "reviewCount": "{count, plural, one {# predložena smjena} few {# predložene smjene} other {# predloženih smjena}}",
+        "notesLabel": "Napomena AI-a",
+        "selectAllLabel": "Odaberi sve",
+        "workerColumnLabel": "Radnik",
+        "dateColumnLabel": "Datum",
+        "startColumnLabel": "Od",
+        "endColumnLabel": "Do",
+        "breakColumnLabel": "Pauza (min.)",
+        "conflictColumnLabel": "Napomena",
+        "conflict": {
+          "overlap": "Preklapanje s postojećom smjenom",
+          "absence": "Odsustvo ili praznik",
+          "outside-period": "Izvan perioda",
+          "duplicate": "Duplo planirano"
+        },
+        "appliedBadge": "Već preuzeto",
+        "summaryHeading": "Sati po radniku",
+        "summaryLine": "{name}: {hours} h",
+        "summaryTarget": " (cilj: {target} h {period})",
+        "periodWeek": "sedmično",
+        "periodMonth": "mjesečno",
+        "applyButton": "Preuzmi odabrano",
+        "applyingButton": "Preuzimanje …",
+        "applyConfirm": "{count, plural, one {Bit će kreirana # smjena.} few {Bit će kreirane # smjene.} other {Bit će kreirano # smjena.}}",
+        "resultCreated": "{count, plural, one {# smjena preuzeta} few {# smjene preuzete} other {# smjena preuzeto}}",
+        "resultSkipped": "{count, plural, one {# red već ranije preuzet} few {# reda već ranije preuzeta} other {# redova već ranije preuzeto}}",
+        "resultFailedIntro": "{count, plural, one {# red nije preuzet:} few {# reda nisu preuzeta:} other {# redova nije preuzeto:}}",
+        "jobNotFound": "Nalog nije pronađen.",
+        "jobError": "Greška: {error}"
       }
     }
   },

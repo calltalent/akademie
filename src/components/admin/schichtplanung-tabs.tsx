@@ -12,6 +12,8 @@ import { CalendarShiftsPanel } from "@/components/admin/calendar-shifts-panel";
 import { CalendarSlotsPanel } from "@/components/admin/calendar-slots-panel";
 import { CalendarAbsencesPanel } from "@/components/admin/calendar-absences-panel";
 import { CalendarChangeRequestsPanel } from "@/components/admin/calendar-change-requests-panel";
+import { CalendarKiPanel } from "@/components/admin/calendar-ki-panel";
+import { CalendarKiReview } from "@/components/admin/calendar-ki-review";
 import type {
   CalendarAbsenceRow,
   CalendarAdminShiftRow,
@@ -20,14 +22,18 @@ import type {
   CalendarSlotRow,
   CalendarWorkerRow,
 } from "@/lib/calendar/schema";
+import type { ShiftPlanJobDetail, ShiftPlanJobListRow } from "@/lib/calendar/ai/queries";
 
 /**
- * Fünf Reiter (Arbeiter/Projekte/Schichten/Zeitfenster/Abwesenheiten) für
- * `/admin/schichtplanung` — Block S1 (Arbeiter/Projekte) + Block S2
- * (08.08.2026, Schichten/Zeitfenster/Abwesenheiten). Alle Daten kommen
- * fertig vom Server geladen (`admin/schichtplanung/page.tsx` lädt NUR die
- * Daten des aktiven Reiters), diese Komponente entscheidet nur noch, welcher
- * Panel gerendert wird, und steuert die URL (`?tab=…&week=…&year=…`).
+ * Sechs Reiter (Arbeiter/Projekte/Schichten/Zeitfenster/Abwesenheiten/
+ * Änderungsanfragen) plus ein siebter Admin-exklusiver Reiter "KI-Planung"
+ * für `/admin/schichtplanung` — Block S1 (Arbeiter/Projekte) + Block S2
+ * (08.08.2026, Schichten/Zeitfenster/Abwesenheiten) + Block S4 (08.08.2026,
+ * KI-Planung, `ki` ist NICHT in `PLANNER_TAB_IDS` — siehe Dateikopf
+ * `calendar-ki-panel.tsx`). Alle Daten kommen fertig vom Server geladen
+ * (`admin/schichtplanung/page.tsx` lädt NUR die Daten des aktiven Reiters),
+ * diese Komponente entscheidet nur noch, welcher Panel gerendert wird, und
+ * steuert die URL (`?tab=…&week=…&year=…`, für "ki" zusätzlich `&job=…`).
  *
  * DOKUMENTIERTE ABWEICHUNG vom Bau-Auftrag-Wortlaut ("`<Link href="?tab=...">`
  * statt `onClick`/`useState`"): ein echtes `<Link>` hätte einen
@@ -46,12 +52,13 @@ import type {
  * kann keinen Router-Hook verwenden) — die fünf Panels waren ohnehin bereits
  * `"use client"`.
  */
-export type SchichtplanungTab = "workers" | "projects" | "shifts" | "slots" | "absences" | "requests";
+export type SchichtplanungTab = "workers" | "projects" | "shifts" | "slots" | "absences" | "requests" | "ki";
 
 type ShiftsData = { shifts: CalendarAdminShiftRow[]; slots: CalendarSlotRow[]; absences: CalendarAbsenceRow[] } | null;
 type SlotsData = { slots: CalendarSlotRow[] } | null;
 type AbsencesData = { absences: CalendarAbsenceRow[] } | null;
 type RequestsData = { requests: CalendarChangeRequestRow[]; status: "pending" | "decided" | "all" } | null;
+type KiData = { jobs: ShiftPlanJobListRow[]; jobDetail: ShiftPlanJobDetail | null } | null;
 
 function buildTabHref(tab: SchichtplanungTab, weekIso: string, year: number): string {
   const params = new URLSearchParams();
@@ -82,9 +89,10 @@ export function SchichtplanungTabs({
   slotsData,
   absencesData,
   requestsData,
+  kiData,
 }: {
   activeTab: SchichtplanungTab;
-  /** Rollenfilterung (Block S3) — Admin: alle sechs Reiter, Projektleiter: nur `["shifts", "requests"]`. */
+  /** Rollenfilterung (Block S3) — Admin: alle sieben Reiter, Projektleiter: nur `["shifts", "requests"]`. */
   allowedTabs: SchichtplanungTab[];
   /** Steuert `readOnly` auf dem Schichten-Panel — Projektleiter dürfen NUR lesen (kein Schicht-CRUD). */
   isAdmin: boolean;
@@ -104,6 +112,7 @@ export function SchichtplanungTabs({
   slotsData: SlotsData;
   absencesData: AbsencesData;
   requestsData: RequestsData;
+  kiData: KiData;
 }) {
   const t = useTranslations("admin.shiftCalendar.tabs");
   const router = useRouter();
@@ -115,6 +124,7 @@ export function SchichtplanungTabs({
     slots: t("slots"),
     absences: t("absences"),
     requests: t("requests"),
+    ki: t("ki"),
   };
 
   const activeProjects = projects.filter((p) => p.status === "active");
@@ -183,6 +193,17 @@ export function SchichtplanungTabs({
           status={requestsData.status}
           weekIso={weekIso}
           year={year}
+        />
+      )}
+      {activeTab === "ki" && kiData && kiData.jobDetail && (
+        <CalendarKiReview job={kiData.jobDetail} backHref="?tab=ki" />
+      )}
+      {activeTab === "ki" && kiData && !kiData.jobDetail && (
+        <CalendarKiPanel
+          projects={activeProjects}
+          workers={workers.filter((w) => w.status === "active")}
+          jobs={kiData.jobs}
+          onOpenJob={(jobId) => router.push(`?tab=ki&job=${jobId}`)}
         />
       )}
     </div>

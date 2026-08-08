@@ -1067,7 +1067,7 @@
         "heading": "KI-Kontingent",
         "subtitle": "Dieser Monat",
         "tutorAnswersLabel": "Tutor-Antworten",
-        "courseGensLabel": "Kursgenerierungen",
+        "courseGensLabel": "Generierungen",
         "exhaustedSuffix": " — aufgebraucht",
         "usedOfLimitAria": "{label}: {used} von {limit} verwendet",
         "planLabels": {
@@ -1291,7 +1291,8 @@
         "shifts": "Schichten",
         "slots": "Zeitfenster",
         "absences": "Abwesenheiten",
-        "requests": "Änderungsanfragen"
+        "requests": "Änderungsanfragen",
+        "ki": "KI-Planung"
       },
       "workers": {
         "heading": "Arbeiter",
@@ -1316,7 +1317,15 @@
         "preferredShiftLate": "Spät",
         "preferredShiftAny": "Egal",
         "preferredWeekdaysLabel": "Bevorzugte Wochentage",
-        "weekday": { "mon": "Mo", "tue": "Di", "wed": "Mi", "thu": "Do", "fri": "Fr", "sat": "Sa", "sun": "So" },
+        "weekday": {
+          "mon": "Mo",
+          "tue": "Di",
+          "wed": "Mi",
+          "thu": "Do",
+          "fri": "Fr",
+          "sat": "Sa",
+          "sun": "So"
+        },
         "noteLabel": "Notiz (optional)",
         "addButton": "Arbeiter hinzufügen",
         "addingButton": "Wird angelegt …",
@@ -1430,7 +1439,12 @@
         "emptyPersonal": "Keine persönlichen Abwesenheiten für dieses Jahr.",
         "addHeading": "Abwesenheit anlegen",
         "kindLabel": "Art",
-        "kind": { "vacation": "Urlaub", "holiday": "Feiertag", "sick": "Krankheit", "other": "Sonstiges" },
+        "kind": {
+          "vacation": "Urlaub",
+          "holiday": "Feiertag",
+          "sick": "Krankheit",
+          "other": "Sonstiges"
+        },
         "workerLabel": "Arbeiter",
         "workerPlaceholder": "Bitte auswählen …",
         "workerDisabledForHoliday": "Bei „Feiertag“ kein Arbeiter — gilt mandantenweit.",
@@ -1450,7 +1464,11 @@
           "buttonPending": "Wird importiert …",
           "result": "{inserted} eingefügt, {skipped} übersprungen."
         },
-        "country": { "DE": "Deutschland", "AT": "Österreich", "CH": "Schweiz" }
+        "country": {
+          "DE": "Deutschland",
+          "AT": "Österreich",
+          "CH": "Schweiz"
+        }
       },
       "requests": {
         "heading": "Änderungsanfragen",
@@ -1477,6 +1495,62 @@
         "statusRejected": "Abgelehnt",
         "decidedAtLabel": "Entschieden am {date}",
         "conflictHint": "Genehmigung nicht möglich: Die vorgeschlagene Zeit überschneidet sich mit einer anderen Schicht dieses Arbeiters. Die Anfrage bleibt offen — stornieren Sie zuerst die überlappende Schicht und versuchen Sie es dann erneut."
+      },
+      "ki": {
+        "heading": "KI-Planung",
+        "description": "Lässt aus den Arbeiter-Parametern, Abwesenheiten und bestehenden Schichten eines Projekts einen Schichtplan-Vorschlag erzeugen — nur für Inhaber und Administratoren.",
+        "disclaimer": "Die Vorschläge stammen von einem KI-Assistenten. Sie werden erst nach Ihrer Prüfung und ausdrücklichen Übernahme zu echten Schichten.",
+        "formHeading": "Neuen Vorschlag erzeugen",
+        "projectLabel": "Projekt",
+        "projectPlaceholder": "Bitte auswählen …",
+        "fromDateLabel": "Von",
+        "toDateLabel": "Bis",
+        "workersLabel": "Arbeiter",
+        "noWorkers": "Dieses Projekt hat noch keine aktiven Arbeiter.",
+        "noteLabel": "Notiz (optional)",
+        "submitButton": "Vorschlag erzeugen",
+        "submittingButton": "Wird gestartet …",
+        "jobsHeading": "Aufträge",
+        "emptyJobs": "Noch keine KI-Läufe gestartet.",
+        "statusQueued": "In Arbeit",
+        "statusRunning": "In Arbeit",
+        "statusDone": "Zu prüfen",
+        "statusError": "Fehlgeschlagen",
+        "periodLabel": "{from} – {to}",
+        "openButton": "Öffnen",
+        "deleteButton": "Löschen",
+        "deleteConfirm": "Diesen KI-Auftrag wirklich löschen?",
+        "backLink": "Zurück zur Übersicht",
+        "reviewHeading": "KI-Vorschlag prüfen",
+        "reviewCount": "{count, plural, one {# vorgeschlagene Schicht} other {# vorgeschlagene Schichten}}",
+        "notesLabel": "Hinweis der KI",
+        "selectAllLabel": "Alle auswählen",
+        "workerColumnLabel": "Arbeiter",
+        "dateColumnLabel": "Datum",
+        "startColumnLabel": "Von",
+        "endColumnLabel": "Bis",
+        "breakColumnLabel": "Pause (Min.)",
+        "conflictColumnLabel": "Hinweis",
+        "conflict": {
+          "overlap": "Überschneidung mit bestehender Schicht",
+          "absence": "Abwesenheit oder Feiertag",
+          "outside-period": "Außerhalb des Zeitraums",
+          "duplicate": "Doppelt geplant"
+        },
+        "appliedBadge": "Bereits übernommen",
+        "summaryHeading": "Stunden je Arbeiter",
+        "summaryLine": "{name}: {hours} Std.",
+        "summaryTarget": " (Soll: {target} Std. {period})",
+        "periodWeek": "pro Woche",
+        "periodMonth": "pro Monat",
+        "applyButton": "Ausgewählte übernehmen",
+        "applyingButton": "Wird übernommen …",
+        "applyConfirm": "{count, plural, one {# Schicht wird angelegt.} other {# Schichten werden angelegt.}}",
+        "resultCreated": "{count, plural, one {# Schicht übernommen} other {# Schichten übernommen}}",
+        "resultSkipped": "{count, plural, one {# Zeile bereits vorher übernommen} other {# Zeilen bereits vorher übernommen}}",
+        "resultFailedIntro": "{count, plural, one {# Zeile nicht übernommen:} other {# Zeilen nicht übernommen:}}",
+        "jobNotFound": "Auftrag nicht gefunden.",
+        "jobError": "Fehler: {error}"
       }
     }
   },

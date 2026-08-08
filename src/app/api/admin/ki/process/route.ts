@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getServerEnv } from "@/lib/env";
 import { processNextCourseGenJob } from "@/lib/generator/process";
+import { processNextShiftPlanJob } from "@/lib/calendar/ai/process";
 
 /**
  * Kurs-Generator — Cron-Prozess-Endpunkt (Phase 3, Block 5). Wird vom
@@ -38,8 +39,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await processNextCourseGenJob();
-    return NextResponse.json(result);
+    // Zwei unabhängige Warteschlangen (kind='course_gen'/'shift_plan'), EIN
+    // Schritt/Lauf je Aufruf UND je Warteschlange — beide teilen sich den
+    // Cron-Tick (alle 2 Min., wrangler.jsonc), aber niemals eine Job-Zeile
+    // (Filter über `kind`), daher unabhängig voneinander sicher.
+    const [courseGenResult, shiftPlanResult] = await Promise.all([
+      processNextCourseGenJob(),
+      processNextShiftPlanJob(),
+    ]);
+    return NextResponse.json({ courseGen: courseGenResult, shiftPlan: shiftPlanResult });
   } catch (e) {
     console.error("[ki/process] Unerwarteter Fehler:", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "Verarbeitung fehlgeschlagen." }, { status: 500 });

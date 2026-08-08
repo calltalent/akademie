@@ -15,8 +15,9 @@ import {
 } from "@/lib/calendar/queries";
 import { addDays, formatDayLabel, formatShortDayLabel, isoDateString, startOfIsoWeek } from "@/lib/calendar/date";
 import type { CalendarChangeRequestRow, CalendarWorkerRow } from "@/lib/calendar/schema";
+import { getShiftPlanJob, getShiftPlanJobs } from "@/lib/calendar/ai/queries";
 
-const ADMIN_TAB_IDS: SchichtplanungTab[] = ["workers", "projects", "shifts", "slots", "absences", "requests"];
+const ADMIN_TAB_IDS: SchichtplanungTab[] = ["workers", "projects", "shifts", "slots", "absences", "requests", "ki"];
 /** Projektleiter (Block S3): NUR lesendes Wochenraster + Änderungsanfragen-Entscheidung — kein Schicht-/Zeitfenster-CRUD, kein Arbeiter-/Projektzugriff (Bauauftrag, "minimal" bewusst so entschieden). */
 const PLANNER_TAB_IDS: SchichtplanungTab[] = ["shifts", "requests"];
 const REQUEST_STATUS_VALUES = ["pending", "decided", "all"] as const;
@@ -75,9 +76,15 @@ function mergeRequestWorkerNames(
 export default async function AdminSchichtplanungPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; week?: string; year?: string; requestStatus?: string }>;
+  searchParams: Promise<{ tab?: string; week?: string; year?: string; requestStatus?: string; job?: string }>;
 }) {
-  const { tab: tabParam, week: weekParam, year: yearParam, requestStatus: requestStatusParam } = await searchParams;
+  const {
+    tab: tabParam,
+    week: weekParam,
+    year: yearParam,
+    requestStatus: requestStatusParam,
+    job: jobParam,
+  } = await searchParams;
   const t = await getTranslations("admin.shiftCalendar");
   const access = await checkShiftPlannerAccess();
 
@@ -179,6 +186,16 @@ export default async function AdminSchichtplanungPage({
         }
       : null;
 
+  // "ki" ist Admin-exklusiv (nicht in `PLANNER_TAB_IDS`) — für einen
+  // Projektleiter kann `activeTab` diesen Wert daher nie annehmen.
+  const kiData =
+    activeTab === "ki"
+      ? {
+          jobs: await getShiftPlanJobs(supabase, tenant.id),
+          jobDetail: jobParam ? await getShiftPlanJob(supabase, tenant.id, jobParam) : null,
+        }
+      : null;
+
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);
     return {
@@ -223,6 +240,7 @@ export default async function AdminSchichtplanungPage({
         slotsData={slotsData}
         absencesData={absencesData}
         requestsData={requestsData}
+        kiData={kiData}
       />
     </div>
   );
