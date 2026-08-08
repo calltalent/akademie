@@ -419,6 +419,7 @@
       "emptyDay": "No shift.",
       "emptyWeek": "No shifts are scheduled this week.",
       "noProject": "No project",
+      "unavailableLegend": "Not available",
       "listHeading": "List",
       "listDescription": "All shifts of this week as a list — an equivalent alternative to the grid above.",
       "shiftAriaLabelWithProject": "{day}, {start} to {end}, project {project}",

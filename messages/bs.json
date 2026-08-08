@@ -419,6 +419,7 @@
       "emptyDay": "Nema smjene.",
       "emptyWeek": "Ove sedmice nema planiranih smjena.",
       "noProject": "Bez projekta",
+      "unavailableLegend": "Nedostupno",
       "listHeading": "Lista",
       "listDescription": "Sve smjene ove sedmice kao lista — ravnopravna alternativa mreži iznad.",
       "shiftAriaLabelWithProject": "{day}, {start} do {end}, projekat {project}",

@@ -17,7 +17,21 @@ import {
   getWorkerChangeRequests,
   getWorkerShifts,
 } from "@/lib/calendar/queries";
-import { addDays, formatDayLabel, formatShortDayLabel, formatTimeRange, isoDateString, startOfIsoWeek } from "@/lib/calendar/date";
+import {
+  addDays,
+  formatDayLabel,
+  formatShortDayLabel,
+  formatTimeRange,
+  isoDateString,
+  startOfIsoWeek,
+  toTimeInputValue,
+} from "@/lib/calendar/date";
+
+/** "HH:MM" -> Minuten seit Mitternacht, für die Stunden-Raster-Positionierung in `ShiftCalendarView`. */
+function toMinutesSinceMidnight(date: Date): number {
+  const [hours, minutes] = toTimeInputValue(date).split(":").map(Number);
+  return hours * 60 + minutes;
+}
 
 /**
  * "Mein Schichtplan" (Block S1, 07.08.2026). URL `/schichtplan`, Route-Group
@@ -106,6 +120,12 @@ export default async function SchichtplanPage({
               start: formatTimeRange(startsAt, endsAt).split("–")[0],
               end: formatTimeRange(startsAt, endsAt).split("–")[1],
             });
+        const startMinutes = toMinutesSinceMidnight(startsAt);
+        const endMinutesRaw = toMinutesSinceMidnight(endsAt);
+        // Nachtschicht (Ende liegt kalendarisch am Folgetag, z. B. 22:00–06:00):
+        // für den Raster-Block dieses Tages auf Tagesende kappen. Die volle
+        // Zeit bleibt in `timeRange`/`ariaLabel` und der Liste unten sichtbar.
+        const endMinutes = endMinutesRaw <= startMinutes ? 24 * 60 : endMinutesRaw;
         return {
           id: s.id,
           timeRange,
@@ -113,6 +133,8 @@ export default async function SchichtplanPage({
           projectName: s.projectName,
           projectColor: s.projectColor,
           status: s.status,
+          startMinutes,
+          endMinutes,
         };
       });
     return {
@@ -161,6 +183,7 @@ export default async function SchichtplanPage({
           listDescription={t("listDescription")}
           emptyWeekText={t("emptyWeek")}
           noProjectText={t("noProject")}
+          unavailableLegendText={t("unavailableLegend")}
         />
 
         <ShiftChangeRequestPanel shifts={shifts} requests={changeRequests} />

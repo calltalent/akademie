@@ -419,6 +419,7 @@
       "emptyDay": "Keine Schicht.",
       "emptyWeek": "In dieser Woche sind keine Schichten geplant.",
       "noProject": "Ohne Projekt",
+      "unavailableLegend": "Nicht verfügbar",
       "listHeading": "Liste",
       "listDescription": "Alle Schichten dieser Woche als Liste — gleichwertige Alternative zum Raster oben.",
       "shiftAriaLabelWithProject": "{day}, {start} bis {end} Uhr, Projekt {project}",

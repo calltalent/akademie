@@ -3805,3 +3805,18 @@ Umsetzung nach dem freigegebenen architect-Plan (`plane-und-erstelle-mit-floofy-
 3. Ein in der Review editiertes Datum wird bei der Übernahme nicht erneut gegen Duplikate/Bestand geprüft (Konflikt-Badges beziehen sich auf das ursprüngliche KI-Datum) — Produktqualitäts-Hinweis, kein Zugriffskontroll-Fund (nur ein bereits autorisierter Admin kann das auslösen). Als bekannte Einschränkung notiert, kein Fix in diesem Block.
 
 **Status: Freigegeben.** Block „Schichtplan S5" (KI-Feiertagsrecherche für acht Regionen: DE, AT, CH, HR, RS, Föderation BiH, Republika Srpska, Brčko-Distrikt) damit vollständig abgeschlossen und live verifiziert — Mandanten-Einstellung, asynchroner KI-Weg mit echtem Claude-Testlauf, Pflicht-Review, Übernahme, RLS-Härtung. Damit sind alle fünf geplanten Blöcke (S1–S5) des Schichtplan-Features abgeschlossen.
+
+## „Mein Schichtplan" — Wochenansicht als Stunden-Raster (09.08.2026, Josips Auftrag)
+
+Josips Auftrag: Wochenansicht wie ein Kalender, Tage als Spalten und Stunden als Zeilen, belegte Zeiten in der Projektfarbe, nicht verfügbare Zeiten hellgrau — auf einen Blick erkennbar, wann eine Schicht beginnt und endet. Vorschau per `mcp__visualize__show_widget` abgestimmt, zunächst generisch, nach Rückfrage („passe das Design dem aktuellen Branding an") mit den echten Calltalent-Farbtoken nachgezogen (`#5663AE` Primärfarbe, `#1A1A2E`/`#66679B` Text, `#F5F6FA`/`#E7E8F2` Flächen/Rahmen). Von Josip ausdrücklich freigegeben: „das passt so".
+
+**Erledigt:**
+
+1. `src/components/learn/shift-calendar-view.tsx` — Kartenraster (S1) durch ein Stunden-Raster ersetzt: 06–22 Uhr als Standardbereich, dynamisch erweitert (`computeHourRange()`), falls eine echte Schicht früher beginnt/später endet. Sieben Tagesspalten, Schichten als proportional positionierte, in der Projektfarbe abgetönte Blöcke (`color-mix()`, keine feste Palette — Projektfarben sind freie Hex-Werte), alle übrigen Stunden hellgrau (`#F5F6FA`). Legende (Projektfarben + „Nicht verfügbar") über dem Raster. Die bestehende gleichwertige Listenansicht darunter bewusst UNVERÄNDERT gelassen (Barrierefreiheit, Auftraggeber sehbehindert).
+2. Neue Felder `startMinutes`/`endMinutes` am `ShiftCalendarShift`-Typ. Nachtschicht-Regel: `endMinutes <= startMinutes` → für den sichtbaren Block dieses Tages auf `24*60` gekappt, volle Zeit bleibt in `timeRange`/`ariaLabel`/Liste erhalten.
+3. `src/app/(portal)/schichtplan/page.tsx` — `toMinutesSinceMidnight()` (neu, nutzt `toTimeInputValue()` aus `calendar/date.ts`) berechnet die beiden neuen Felder je Schicht serverseitig.
+4. i18n: neuer Schlüssel `learn.shiftCalendar.unavailableLegend` in allen drei Sprachen (de: „Nicht verfügbar", en: „Not available", bs: „Nedostupno").
+5. Barrierefreiheit: Farbe nie alleiniger Informationsträger (Zeit+Projektname stehen als Text im Block), Stunden-Achse links `aria-hidden` (reines Lineal, Zeitinfo steht bereits im `aria-label`), jede Schicht bleibt ein fokussierbares `<button>` mit demselben sprechenden `aria-label` wie zuvor.
+6. Verifikation: `npx tsc --noEmit` → 0 Fehler. `npm run lint` → 0 Fehler. `npx vitest run` → 41 Dateien, 672 Tests grün. Live-Check im Browser gegen `demo-blau` (temporär geseedete Testdaten: fünf Schichten über die Woche verteilt, zwei Projekte, eine Nachtschicht Samstag→Sonntag zur Prüfung der Kapp-Regel, danach vollständig aufgeräumt inkl. `shift_calendar_enabled` zurückgesetzt) — Raster, Legende, Projektfarben, Heute-Hervorhebung und die Nachtschicht-Kappung sehen wie im freigegebenen Entwurf aus, keine Konsolenfehler.
+
+**Status: Freigegeben, bereit zum Commit.**
