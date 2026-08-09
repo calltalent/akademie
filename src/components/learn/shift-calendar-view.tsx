@@ -167,24 +167,22 @@ export function ShiftCalendarView({
             )}
           </nav>
 
-          {legendProjects.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] text-muted-500">
-              {legendProjects.map(([name, color]) => (
-                <span key={name} className="inline-flex items-center gap-1.5">
-                  <span aria-hidden="true" className="h-2.5 w-2.5 flex-none rounded-sm" style={{ background: color }} />
-                  {name}
-                </span>
-              ))}
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  aria-hidden="true"
-                  className="h-2.5 w-2.5 flex-none rounded-sm border"
-                  style={{ background: "#F5F6FA", borderColor: "#E7E8F2" }}
-                />
-                {unavailableLegendText}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] text-muted-500">
+            {legendProjects.map(([name, color]) => (
+              <span key={name} className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true" className="h-2.5 w-2.5 flex-none rounded-sm" style={{ background: color }} />
+                {name}
               </span>
-            </div>
-          )}
+            ))}
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                aria-hidden="true"
+                className="h-2.5 w-2.5 flex-none rounded-sm border"
+                style={{ background: "#F5F6FA", borderColor: "#E7E8F2" }}
+              />
+              {unavailableLegendText}
+            </span>
+          </div>
         </div>
 
         <div role="grid" aria-label={gridAriaLabel} className="overflow-x-auto">
