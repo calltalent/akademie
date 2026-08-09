@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useEffect, useId, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { createShiftChangeRequest } from "@/lib/calendar/actions";
 import type { CalendarChangeRequestRow, CalendarShiftRow } from "@/lib/calendar/schema";
@@ -8,17 +8,31 @@ import { formatDayLabel, formatTimeRange, isoDateString, toTimeInputValue } from
 
 /**
  * "Änderung beantragen" (Block S3, 09.08.2026) — eigene Sektion unterhalb
- * des Wochenrasters in `(portal)/schichtplan/page.tsx`. `shift-calendar-view.tsx`
- * bleibt bewusst UNANGETASTET (Server Component, S1/S2-Testselektoren
- * dürfen nicht brechen) — diese Komponente ist eine eigenständige,
- * zusätzliche Liste derselben Wochen-Schichten mit eigenen Aktionen.
+ * des Wochenrasters in `(portal)/schichtplan/page.tsx`. Ursprünglich blieb
+ * `shift-calendar-view.tsx` bewusst UNANGETASTET (Server Component,
+ * S1/S2-Testselektoren dürfen nicht brechen); seit Block S6 ist sie
+ * `"use client"`, das S1/S2/S3-DOM bleibt aber unverändert — diese
+ * Komponente ist weiterhin eine eigenständige, zusätzliche Liste derselben
+ * Wochen-Schichten mit eigenen Aktionen.
  *
  * Feldbeschriftungen bewusst NICHT „Von"/„Bis" (Kollisionsgefahr mit dem
  * Schicht-Button-`aria-label`, das „... bis HH:MM Uhr ..." enthält — siehe
  * PHASENSTATUS.md „Schichtplan Block S2" für den entsprechenden
  * Locator-Bug aus S2) — stattdessen „Neue Startzeit"/„Neue Endzeit".
+ *
+ * Block S6 (09.08.2026, Freelancer-Drag-and-Drop im Wochenraster) — neue
+ * optionale Props `externalRequest`/`onExternalRequestHandled`: wenn der
+ * Freelancer eine eigene Schicht im Wochenraster zieht
+ * (`shift-calendar-view.tsx` -> `onProposeChange` -> `ShiftCalendarBoard`),
+ * öffnet sich dieses Formular automatisch im "Zeit ändern"-Modus,
+ * VORBEFÜLLT mit der gezogenen Zeit — der Freelancer muss den Antrag
+ * trotzdem noch explizit abschicken (`createShiftChangeRequest()` bleibt
+ * UNVERÄNDERT der einzige Schreibweg, keine neue Server Action). Der normale
+ * "Zeit ändern"-Knopf (ohne Drag) bleibt exakt wie zuvor: Startwerte kommen
+ * dann von der aktuellen Schicht, nicht von `externalRequest`.
  */
 type FormState = { mode: "change" | "cancel"; shiftId: string } | null;
+type ExternalChangeRequest = { shiftId: string; date: string; startTime: string; endTime: string };
 
 function statusBadgeStyle(status: "pending" | "approved" | "rejected"): { color: string; background: string } {
   if (status === "approved") return { color: "#1F8A5B", background: "#E3F2EA" };
@@ -31,19 +45,26 @@ function ChangeForm({
   pending,
   onSubmit,
   onClose,
+  initialDate,
+  initialStartTime,
+  initialEndTime,
 }: {
   shift: CalendarShiftRow;
   pending: boolean;
   onSubmit: (date: string, startTime: string, endTime: string, breakMinutes: number, reason: string) => void;
   onClose: () => void;
+  /** Block S6 — Vorbefüllung aus einer per Ziehen vorgeschlagenen Zeit. Ohne diese Props (normaler "Zeit ändern"-Knopf): Default bleibt exakt wie zuvor die aktuelle Schicht-Zeit. */
+  initialDate?: string;
+  initialStartTime?: string;
+  initialEndTime?: string;
 }) {
   const t = useTranslations("learn.shiftCalendar.changeRequests");
   const uid = useId();
   const starts = new Date(shift.startsAt);
   const ends = new Date(shift.endsAt);
-  const [date, setDate] = useState(isoDateString(starts));
-  const [startTime, setStartTime] = useState(toTimeInputValue(starts));
-  const [endTime, setEndTime] = useState(toTimeInputValue(ends));
+  const [date, setDate] = useState(initialDate ?? isoDateString(starts));
+  const [startTime, setStartTime] = useState(initialStartTime ?? toTimeInputValue(starts));
+  const [endTime, setEndTime] = useState(initialEndTime ?? toTimeInputValue(ends));
   const [breakMinutes, setBreakMinutes] = useState(String(shift.breakMinutes));
   const [reason, setReason] = useState("");
 
@@ -203,14 +224,36 @@ function CancelForm({
 export function ShiftChangeRequestPanel({
   shifts,
   requests,
+  externalRequest,
+  onExternalRequestHandled,
 }: {
   shifts: CalendarShiftRow[];
   requests: CalendarChangeRequestRow[];
+  /** Block S6 — Drag-Vorschlag aus dem Wochenraster (`ShiftCalendarBoard`). `null`/`undefined` = kein Vorschlag anhängig, alte Aufrufer (ohne diese Props) verhalten sich exakt wie zuvor. */
+  externalRequest?: ExternalChangeRequest | null;
+  onExternalRequestHandled?: () => void;
 }) {
   const t = useTranslations("learn.shiftCalendar.changeRequests");
   const [formState, setFormState] = useState<FormState>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Block S6 — Vorbefüllungs-Werte aus einem Drag-Vorschlag, an ChangeForm
+  // durchgereicht (siehe `prefill?.shiftId === shift.id`-Guard im JSX
+  // unten). Getrennt von `formState`, weil `formState` auch für den
+  // NORMALEN "Zeit ändern"-Knopf gilt (ohne Vorbefüllung).
+  const [prefill, setPrefill] = useState<ExternalChangeRequest | null>(null);
+
+  // `setTimeout(…, 0)` statt direkt im Effect-Body — react-hooks/set-state-in-effect,
+  // gleiches Muster wie in video-trimmer.tsx (siehe dortiger Kommentar).
+  useEffect(() => {
+    if (!externalRequest) return;
+    const timer = setTimeout(() => {
+      setFormState({ mode: "change", shiftId: externalRequest.shiftId });
+      setPrefill(externalRequest);
+      onExternalRequestHandled?.();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [externalRequest, onExternalRequestHandled]);
 
   // `requests` kommt sortiert nach created_at DESC (neueste zuerst,
   // getWorkerChangeRequests()) — bei mehreren Anfragen für dieselbe Schicht
@@ -245,6 +288,7 @@ export function ShiftChangeRequestPanel({
         return;
       }
       setFormState(null);
+      setPrefill(null);
     });
   }
 
@@ -294,7 +338,14 @@ export function ShiftChangeRequestPanel({
                     <button
                       type="button"
                       disabled={isPendingRequest}
-                      onClick={() => setFormState({ mode: "change", shiftId: shift.id })}
+                      onClick={() => {
+                        // Block S6 — ein manuell geöffnetes Formular startet
+                        // IMMER von den aktuellen Schicht-Werten, nie von
+                        // einer evtl. noch für DIESE Schicht gespeicherten
+                        // Drag-Vorbefüllung aus einem früheren Vorschlag.
+                        setPrefill(null);
+                        setFormState({ mode: "change", shiftId: shift.id });
+                      }}
                       className="rounded-sm border border-border-300 bg-white px-3 py-2 text-sm font-semibold text-navy disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/40"
                     >
                       {t("changeButton")}
@@ -320,12 +371,26 @@ export function ShiftChangeRequestPanel({
 
                 {isFormOpen && formState?.mode === "change" && (
                   <ChangeForm
+                    // Block S6 — wechselt der Drag-Vorschlag für DIESELBE
+                    // bereits offene Schicht (zweiter Zug, ohne das
+                    // Formular zwischendurch zu schließen), muss ChangeForm
+                    // neu mounten, damit die `useState`-Startwerte die
+                    // NEUE Vorbefüllung übernehmen (sonst würde React die
+                    // bestehende Instanz nur aktualisieren, `useState`-
+                    // Initialwerte laufen aber nur beim ersten Mount).
+                    key={prefill?.shiftId === shift.id ? `${prefill.startTime}-${prefill.endTime}` : "default"}
                     shift={shift}
                     pending={pending}
                     onSubmit={(date, startTime, endTime, breakMinutes, reason) =>
                       submit(shift.id, "update", { date, startTime, endTime, breakMinutes, reason })
                     }
-                    onClose={() => setFormState(null)}
+                    onClose={() => {
+                      setFormState(null);
+                      setPrefill(null);
+                    }}
+                    initialDate={prefill?.shiftId === shift.id ? prefill.date : undefined}
+                    initialStartTime={prefill?.shiftId === shift.id ? prefill.startTime : undefined}
+                    initialEndTime={prefill?.shiftId === shift.id ? prefill.endTime : undefined}
                   />
                 )}
                 {isFormOpen && formState?.mode === "cancel" && (

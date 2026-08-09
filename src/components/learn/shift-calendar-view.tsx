@@ -1,5 +1,9 @@
+"use client";
+
+import { useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { clampRange, minutesFromPointerY, snapToQuarterHour } from "@/lib/calendar/drag";
 
 /**
  * Wochenansicht "Mein Schichtplan" (Block S1, 07.08.2026 — Stunden-Raster
@@ -10,9 +14,29 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
  * Josips Wunsch aus einer eigenen Box darüber IN diese Karte verschoben,
  * rechtsbündig über der letzten Tagesspalte — siehe `weekNav`-Prop unten).
  * Reine Darstellungskomponente, keine eigene Datenabfrage/Datumsrechnung
- * (übernimmt `(portal)/schichtplan/page.tsx`). Server Component (kein
- * `"use client"` nötig — Schicht-Details/-CRUD kommt erst mit S2/S3, hier
- * nur native `<button>`-/`<Link>`-Fokussierbarkeit).
+ * (übernimmt `(portal)/schichtplan/page.tsx`).
+ *
+ * `"use client"` seit Block S6 (09.08.2026, Freelancer-Drag-and-Drop im
+ * Wochenraster — architect-Plan `plane-und-erstelle-mit-floofy-curry.md`):
+ * Pointer Events brauchen den Client. WICHTIG — bei fehlenden neuen Props
+ * (`openSlots`/`onBookSlot`/`bookingPending`/`onProposeChange`) bleiben DOM
+ * und ARIA-Ausgabe dieser Komponente BYTE-IDENTISCH zum Stand vor S6 (siehe
+ * Kopfkommentar `ShiftCalendarBoard` für die Nicht-Freelancer-Weiche) — die
+ * bestehenden S1/S2/S3-Playwright-Specs (`schichtplan.spec.ts`,
+ * `schichtplan-s2.spec.ts`, `schichtplan-s3.spec.ts`) dürfen dadurch NICHT
+ * brechen. Neu (nur wenn die jeweiligen Props gesetzt sind):
+ * - `openSlots`: offene Zeitfenster werden als zusätzliche, gestrichelte
+ *   Blöcke im Raster gerendert (Klick = ganzer Slot, Ziehen = Teil-Zeitraum,
+ *   `onBookSlot`).
+ * - `onProposeChange`: eigene Schicht-Blöcke werden per Ziehen (verschieben)
+ *   oder an den Rändern (Größe ändern) verstellbar — schreibt NICHTS direkt,
+ *   ruft nur `onProposeChange(shiftId, startMinutes, endMinutes)` auf, damit
+ *   der Aufrufer (`ShiftCalendarBoard`) das bestehende "Zeit ändern"-Formular
+ *   vorbefüllt. Unterhalb der Bewegungsschwelle (reiner Klick) passiert
+ *   NICHTS — die Schicht-Blöcke hatten vorher kein `onClick`, das bleibt so.
+ * Pointer-Muster (`setPointerCapture`/`try-catch`, `touchAction:"none"`,
+ * Bewegungsschwelle gegen einen nachlaufenden Klick) 1:1 übernommen aus
+ * `src/components/editor/video-trimmer.tsx`.
  *
  * DESIGN (per Vorschau im Chat mit Josip abgestimmt, im Calltalent-Branding
  * — `#5663AE` Primärfarbe, `#F5F6FA` Flächen, `#1A1A2E`/`#66679B` Text):
@@ -69,6 +93,32 @@ export type ShiftCalendarDay = {
   shifts: ShiftCalendarShift[];
 };
 
+/**
+ * Offenes Zeitfenster als Raster-Block (Block S6, 09.08.2026) — parallel zu
+ * `ShiftCalendarShift`, aber für die Selbstbuchungs-Blöcke. `timeRange`/
+ * `ariaLabel` werden wie bei `ShiftCalendarShift` bereits fertig formatiert
+ * vom Aufrufer übergeben (`(portal)/schichtplan/page.tsx`) — diese
+ * Komponente übersetzt selbst nichts. `alreadyBooked` wird von dieser
+ * Komponente selbst gefiltert (siehe `bookableOpenSlots` in
+ * `ShiftCalendarView`) — ein bereits vom NUTZER SELBST gebuchtes Zeitfenster
+ * erscheint sonst als optisch verwirrende Dopplung neben dem echten,
+ * bereits gebuchten Schicht-Block UND birgt ein Locator-Kollisionsrisiko in
+ * `schichtplan-s2.spec.ts` Fall 4 (dessen `bookedShift`-Regex sonst auch auf
+ * einen noch sichtbaren "offen"-Block träfe).
+ */
+export type ShiftCalendarOpenSlotBlock = {
+  id: string;
+  isoDate: string;
+  startMinutes: number;
+  endMinutes: number;
+  timeRange: string;
+  ariaLabel: string;
+  projectName: string;
+  capacity: number;
+  freeSeats: number;
+  alreadyBooked: boolean;
+};
+
 /** Wochen-Navigation, rechtsbündig im Kopf dieser Karte gerendert (siehe `ShiftCalendarView`). Gleiche Werte wie zuvor an die eigenständige `ShiftCalendarWeekNav`-Box übergeben — diese Komponente bleibt für die Admin-Ansichten (`calendar-shifts-panel.tsx`/`calendar-slots-panel.tsx`) unverändert bestehen. */
 export type ShiftCalendarWeekNavProps = {
   prevHref: string;
@@ -85,9 +135,20 @@ const FALLBACK_COLOR = "#5663AE";
 const DEFAULT_RANGE_START_HOUR = 6;
 const DEFAULT_RANGE_END_HOUR = 22;
 const HOUR_ROW_HEIGHT_PX = 44;
+/** Farbe der offenen-Zeitfenster-Blöcke (Block S6) — bewusst EINE feste Farbe (Primärfarbe) statt Projektfarbe: die Legende zeigt dafür genau EINEN dritten Punkt, unabhängig davon, aus wie vielen verschiedenen Projekten die offenen Zeitfenster stammen. */
+const OPEN_SLOT_COLOR = "#5663AE";
+/** Bewegungsschwelle (Pixel) zur Unterscheidung Klick vs. Ziehen — gleiches Prinzip wie `video-trimmer.tsx` (dort über `setTimeout`+`draggingRef`, hier zusätzlich über einen Pixel-Schwellwert, weil hier KEIN separates Klick-Ereignis auf einem Track liegt, sondern derselbe Knopf sowohl Klick als auch Ziehen bedienen muss). */
+const DRAG_THRESHOLD_PX = 4;
+/** Höhe der Rand-Ziehzonen (oben/unten) an einer eigenen Schicht, mit denen NUR Start bzw. NUR Ende verschoben wird — Rest des Blocks verschiebt Start+Ende gemeinsam ("Körper" = Position ändern). */
+const RESIZE_HANDLE_PX = 8;
+/** Mindestdauer (Minuten) nach einer Größenänderung — verhindert einen entarteten Null-/Negativ-Bereich beim Ziehen der Ränder. */
+const MIN_DURATION_MINUTES = 15;
 
-/** Standardbereich 06–22 Uhr, erweitert um Stunden, in denen eine echte Schicht liegt (nie schmaler als der Standard). */
-function computeHourRange(days: ShiftCalendarDay[]): { start: number; end: number } {
+/** Standardbereich 06–22 Uhr, erweitert um Stunden, in denen eine echte Schicht ODER ein offenes Zeitfenster liegt (nie schmaler als der Standard). `openSlotBlocks` ist ein optionaler zweiter Parameter (Block S6) — ohne Aufrufer, der ihn übergibt, bleibt das Verhalten exakt wie zuvor. */
+function computeHourRange(
+  days: ShiftCalendarDay[],
+  openSlotBlocks: ShiftCalendarOpenSlotBlock[] = [],
+): { start: number; end: number } {
   let start = DEFAULT_RANGE_START_HOUR;
   let end = DEFAULT_RANGE_END_HOUR;
   for (const day of days) {
@@ -95,6 +156,10 @@ function computeHourRange(days: ShiftCalendarDay[]): { start: number; end: numbe
       start = Math.min(start, Math.floor(shift.startMinutes / 60));
       end = Math.max(end, Math.ceil(shift.endMinutes / 60));
     }
+  }
+  for (const slot of openSlotBlocks) {
+    start = Math.min(start, Math.floor(slot.startMinutes / 60));
+    end = Math.max(end, Math.ceil(slot.endMinutes / 60));
   }
   return { start: Math.max(0, start), end: Math.min(24, end) };
 }
@@ -113,6 +178,12 @@ export function ShiftCalendarView({
   noProjectText,
   unavailableLegendText,
   weekNav,
+  openSlots = [],
+  onBookSlot,
+  bookingPending = false,
+  onProposeChange,
+  openSlotLegendText,
+  dragHintText,
 }: {
   days: ShiftCalendarDay[];
   gridAriaLabel: string;
@@ -123,9 +194,22 @@ export function ShiftCalendarView({
   noProjectText: string;
   unavailableLegendText: string;
   weekNav: ShiftCalendarWeekNavProps;
+  /** Block S6 — offene Zeitfenster als zusätzliche Raster-Blöcke (nur Freelancer, siehe `ShiftCalendarBoard`). */
+  openSlots?: ShiftCalendarOpenSlotBlock[];
+  /** Block S6 — Klick (ganzer Slot) ODER Ziehen (Teil-Zeitraum) auf einen offenen Zeitfenster-Block. */
+  onBookSlot?: (slotId: string, startMinutes: number, endMinutes: number) => void;
+  /** Block S6 — deaktiviert alle offenen-Zeitfenster-Blöcke während eine Buchung läuft. */
+  bookingPending?: boolean;
+  /** Block S6 — Ziehen (verschieben/Rand) einer eigenen Schicht; schreibt NICHTS direkt, siehe Kopfkommentar. */
+  onProposeChange?: (shiftId: string, startMinutes: number, endMinutes: number) => void;
+  openSlotLegendText?: string;
+  dragHintText?: string;
 }) {
   const hasAnyShift = days.some((d) => d.shifts.length > 0);
-  const { start: rangeStart, end: rangeEnd } = computeHourRange(days);
+  // NUR buchbare offene Zeitfenster werden tatsächlich gerendert — siehe
+  // JSDoc bei `ShiftCalendarOpenSlotBlock` (Kollisions-/Dopplungs-Grund).
+  const bookableOpenSlots = openSlots.filter((s) => !s.alreadyBooked);
+  const { start: rangeStart, end: rangeEnd } = computeHourRange(days, bookableOpenSlots);
   const hours = Array.from({ length: rangeEnd - rangeStart }, (_, i) => rangeStart + i);
   const columnHeight = hours.length * HOUR_ROW_HEIGHT_PX;
 
@@ -136,6 +220,108 @@ export function ShiftCalendarView({
         .map((s) => [s.projectName ?? noProjectText, s.projectColor ?? FALLBACK_COLOR] as const),
     ).entries(),
   );
+
+  // --- Block S6 — Pointer-Drag-Handler ------------------------------------
+  // EIN gemeinsames Ref-Paar für alle Drag-Gesten dieser Komponente (Klick
+  // vs. Ziehen, Slot-Teilauswahl, Schicht verschieben/Größe ändern) — es kann
+  // ohnehin immer nur EIN Pointer-Vorgang gleichzeitig laufen. Gleiches
+  // ökonomisches Prinzip wie der geteilte `draggingRef` in
+  // `video-trimmer.tsx`s `TimelineBar` (dort auch für mehrere Segmente/
+  // Griffe gemeinsam genutzt, per Closure-Parameter unterschieden).
+  const dragStartYRef = useRef(0);
+  const dragMovedRef = useRef(false);
+  const suppressClickRef = useRef(false);
+
+  function handleDragPointerDown(e: React.PointerEvent<HTMLElement>) {
+    dragStartYRef.current = e.clientY;
+    dragMovedRef.current = false;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Seltener Edge-Fall (Pointer-ID bereits ungültig) — kein Absturz, siehe video-trimmer.tsx.
+    }
+  }
+
+  function handleDragPointerMove(e: React.PointerEvent<HTMLElement>) {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    if (Math.abs(e.clientY - dragStartYRef.current) > DRAG_THRESHOLD_PX) dragMovedRef.current = true;
+  }
+
+  function releaseDragCapture(e: React.PointerEvent<HTMLElement>) {
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Capture wurde nie erfolgreich hergestellt — nichts freizugeben.
+    }
+  }
+
+  function handleShiftPointerUp(e: React.PointerEvent<HTMLElement>, shift: ShiftCalendarShift) {
+    releaseDragCapture(e);
+    if (!onProposeChange || !dragMovedRef.current) return;
+    const deltaMinutes = ((e.clientY - dragStartYRef.current) / HOUR_ROW_HEIGHT_PX) * 60;
+    const duration = shift.endMinutes - shift.startMinutes;
+    const snappedStart = snapToQuarterHour(shift.startMinutes + deltaMinutes);
+    const clamped = clampRange(snappedStart, snappedStart + duration, { min: 0, max: 24 * 60 });
+    onProposeChange(shift.id, clamped.start, clamped.end);
+  }
+
+  function handleResizeTopPointerUp(e: React.PointerEvent<HTMLElement>, shift: ShiftCalendarShift) {
+    releaseDragCapture(e);
+    if (!onProposeChange || !dragMovedRef.current) return;
+    const deltaMinutes = ((e.clientY - dragStartYRef.current) / HOUR_ROW_HEIGHT_PX) * 60;
+    const newStart = Math.min(
+      Math.max(snapToQuarterHour(shift.startMinutes + deltaMinutes), 0),
+      shift.endMinutes - MIN_DURATION_MINUTES,
+    );
+    onProposeChange(shift.id, newStart, shift.endMinutes);
+  }
+
+  function handleResizeBottomPointerUp(e: React.PointerEvent<HTMLElement>, shift: ShiftCalendarShift) {
+    releaseDragCapture(e);
+    if (!onProposeChange || !dragMovedRef.current) return;
+    const deltaMinutes = ((e.clientY - dragStartYRef.current) / HOUR_ROW_HEIGHT_PX) * 60;
+    const newEnd = Math.max(
+      Math.min(snapToQuarterHour(shift.endMinutes + deltaMinutes), 24 * 60),
+      shift.startMinutes + MIN_DURATION_MINUTES,
+    );
+    onProposeChange(shift.id, shift.startMinutes, newEnd);
+  }
+
+  /**
+   * Ziehen innerhalb eines offenen Zeitfensters — Anker (Pointer-Down-Y) und
+   * aktuelle Position (Pointer-Up-Y) werden über die Tagesspalte
+   * (`[role="row"]`, nächster Vorfahre) in Minuten seit Mitternacht
+   * umgerechnet (`minutesFromPointerY`), auf Viertelstunden gerundet und auf
+   * die Slot-Grenzen geklammert (`clampRange`). Bucht NUR bei echter
+   * Zugbewegung — ein reiner Klick läuft über `handleOpenSlotClick` (siehe
+   * dort), damit ein Klick nicht doppelt bucht (Pointerup UND das
+   * nachfolgende native `click`-Ereignis).
+   */
+  function handleOpenSlotPointerUp(e: React.PointerEvent<HTMLElement>, slot: ShiftCalendarOpenSlotBlock) {
+    releaseDragCapture(e);
+    if (!onBookSlot || !dragMovedRef.current) return;
+    const rowEl = e.currentTarget.closest('[role="row"]') as HTMLElement | null;
+    if (!rowEl) return;
+    const rect = rowEl.getBoundingClientRect();
+    const anchorMinutes = minutesFromPointerY(dragStartYRef.current - rect.top, rangeStart, HOUR_ROW_HEIGHT_PX);
+    const currentMinutes = minutesFromPointerY(e.clientY - rect.top, rangeStart, HOUR_ROW_HEIGHT_PX);
+    const start = snapToQuarterHour(Math.min(anchorMinutes, currentMinutes));
+    let end = snapToQuarterHour(Math.max(anchorMinutes, currentMinutes));
+    if (end - start < MIN_DURATION_MINUTES) end = start + MIN_DURATION_MINUTES;
+    const clamped = clampRange(start, end, { min: slot.startMinutes, max: slot.endMinutes });
+    onBookSlot(slot.id, clamped.start, clamped.end);
+    // Nachlaufenden Klick unterdrücken (gleiches Muster wie TimelineBar in video-trimmer.tsx).
+    suppressClickRef.current = true;
+    setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+  }
+
+  /** Klick (Maus ohne Zugbewegung ODER Tastatur-Aktivierung via Enter/Leertaste) — bucht den GANZEN Slot, Parität zum bestehenden "Buchen"-Knopf in `open-slots-panel.tsx`. */
+  function handleOpenSlotClick(slot: ShiftCalendarOpenSlotBlock) {
+    if (suppressClickRef.current || !onBookSlot) return;
+    onBookSlot(slot.id, slot.startMinutes, slot.endMinutes);
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -156,6 +342,16 @@ export function ShiftCalendarView({
               />
               {unavailableLegendText}
             </span>
+            {bookableOpenSlots.length > 0 && openSlotLegendText && (
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className="h-2.5 w-2.5 flex-none rounded-sm border-2 border-dashed"
+                  style={{ background: "rgba(86,99,174,0.08)", borderColor: OPEN_SLOT_COLOR }}
+                />
+                {openSlotLegendText}
+              </span>
+            )}
           </div>
 
           <nav aria-label={weekNav.weekLabel} className="flex items-center gap-1">
@@ -184,6 +380,10 @@ export function ShiftCalendarView({
             )}
           </nav>
         </div>
+
+        {dragHintText && (bookableOpenSlots.length > 0 || Boolean(onProposeChange)) && (
+          <p className="text-xs text-muted-500">{dragHintText}</p>
+        )}
 
         <div role="grid" aria-label={gridAriaLabel} className="overflow-x-auto">
           <div className="grid min-w-[720px]" style={{ gridTemplateColumns: `52px repeat(7, minmax(0, 1fr))` }}>
@@ -249,14 +449,79 @@ export function ShiftCalendarView({
                           background: `color-mix(in srgb, ${color} 16%, white)`,
                           borderLeftColor: color,
                           color: `color-mix(in srgb, ${color} 65%, black)`,
+                          ...(onProposeChange ? { cursor: "grab", touchAction: "none" } : {}),
                         }}
+                        onPointerDown={handleDragPointerDown}
+                        onPointerMove={handleDragPointerMove}
+                        onPointerUp={(e) => handleShiftPointerUp(e, shift)}
                       >
                         <span className="block truncate text-[11px] font-bold leading-tight">{shift.timeRange}</span>
                         <span className="block truncate text-[10px] leading-tight">{shift.projectName ?? noProjectText}</span>
                       </button>
+                      {/* Block S6 — Rand-Ziehzonen (nur wenn onProposeChange gesetzt ist): oben = nur Start verschieben, unten = nur Ende verschieben. `aria-hidden` — reine Maus-/Touch-Erweiterung ohne eigene Tastatur-Semantik, gleiches Präzedenzprinzip wie die Start-/Ende-Griffe in video-trimmer.tsx. */}
+                      {onProposeChange && (
+                        <>
+                          <div
+                            aria-hidden="true"
+                            onPointerDown={handleDragPointerDown}
+                            onPointerMove={handleDragPointerMove}
+                            onPointerUp={(e) => handleResizeTopPointerUp(e, shift)}
+                            className="absolute inset-x-0 top-0 cursor-ns-resize"
+                            style={{ height: RESIZE_HANDLE_PX, touchAction: "none" }}
+                          />
+                          <div
+                            aria-hidden="true"
+                            onPointerDown={handleDragPointerDown}
+                            onPointerMove={handleDragPointerMove}
+                            onPointerUp={(e) => handleResizeBottomPointerUp(e, shift)}
+                            className="absolute inset-x-0 bottom-0 cursor-ns-resize"
+                            style={{ height: RESIZE_HANDLE_PX, touchAction: "none" }}
+                          />
+                        </>
+                      )}
                     </div>
                   );
                 })}
+
+                {/* Block S6 — offene Zeitfenster-Blöcke (nur die buchbaren, siehe `bookableOpenSlots` oben), gestrichelt statt durchgezogen abgesetzt. Echte, fokussierbare `<button>`s (NICHT `aria-hidden`) — Klick/Enter/Leertaste bucht den ganzen Slot zusätzlich zum bestehenden "Buchen"-Knopf in `open-slots-panel.tsx`, Ziehen wählt einen Teil-Zeitraum (nur Maus/Touch). */}
+                {bookableOpenSlots
+                  .filter((s) => s.isoDate === day.isoDate)
+                  .map((slot) => {
+                    const isFull = slot.freeSeats <= 0;
+                    const top = Math.max(0, ((slot.startMinutes - rangeStart * 60) / 60) * HOUR_ROW_HEIGHT_PX);
+                    const height = Math.max(
+                      18,
+                      ((Math.min(slot.endMinutes, rangeEnd * 60) - slot.startMinutes) / 60) * HOUR_ROW_HEIGHT_PX,
+                    );
+                    return (
+                      <div
+                        key={`open-slot-${slot.id}`}
+                        role="gridcell"
+                        className="absolute left-0.5 right-0.5"
+                        style={{ top, height }}
+                      >
+                        <button
+                          type="button"
+                          aria-label={slot.ariaLabel}
+                          disabled={isFull || bookingPending}
+                          onPointerDown={handleDragPointerDown}
+                          onPointerMove={handleDragPointerMove}
+                          onPointerUp={(e) => handleOpenSlotPointerUp(e, slot)}
+                          onClick={() => handleOpenSlotClick(slot)}
+                          className="flex h-full w-full flex-col items-start justify-center overflow-hidden rounded-sm border-2 border-dashed px-1.5 py-1 text-left focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
+                          style={{
+                            background: "rgba(86,99,174,0.08)",
+                            borderColor: OPEN_SLOT_COLOR,
+                            color: "#3E3F66",
+                            touchAction: "none",
+                          }}
+                        >
+                          <span className="block truncate text-[11px] font-bold leading-tight">{slot.timeRange}</span>
+                          <span className="block truncate text-[10px] leading-tight">{slot.projectName}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
               </div>
             ))}
           </div>

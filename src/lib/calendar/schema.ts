@@ -270,9 +270,33 @@ export const calendarAbsenceSchema = z
   });
 export type CalendarAbsenceInput = z.infer<typeof calendarAbsenceSchema>;
 
-export const calendarSelfBookingSchema = z.object({
-  slotId: z.string().uuid("Ungültiges Zeitfenster."),
-});
+/**
+ * Block S6 (09.08.2026, Freelancer-Drag-and-Drop im Wochenraster) — um
+ * optionale `startTime`/`endTime` erweitert (Berlin-Wanduhrzeit, "HH:MM").
+ * RÜCKWÄRTSKOMPATIBEL: ein Aufruf mit nur `{slotId}` (heutiges Verhalten,
+ * ganzer Slot — der bestehende "Buchen"-Knopf in `open-slots-panel.tsx`)
+ * bleibt unverändert gültig. Werden beide Zeitfelder gesetzt, bucht
+ * `bookOwnShift()` (actions.ts) nur den gezogenen Teil-Zeitraum — die
+ * eigentliche Sicherheitsgrenze bleibt dabei der DB-Trigger
+ * `calendar_slot_capacity_guard()` (Fehlercode CT002), keine neue Migration
+ * nötig (der Trigger prüft `starts_at`/`ends_at` bereits gegen die
+ * Slot-Grenzen, unabhängig davon, ob der volle Slot oder nur ein Teil davon
+ * eingefügt wird).
+ */
+export const calendarSelfBookingSchema = z
+  .object({
+    slotId: z.string().uuid("Ungültiges Zeitfenster."),
+    startTime: calendarTimeSchema.optional(),
+    endTime: calendarTimeSchema.optional(),
+  })
+  .refine((d) => (d.startTime == null) === (d.endTime == null), {
+    message: "Start- und Endzeit müssen zusammen angegeben werden.",
+    path: ["endTime"],
+  })
+  .refine((d) => d.startTime == null || d.startTime !== d.endTime, {
+    message: "Start- und Endzeit dürfen nicht gleich sein.",
+    path: ["endTime"],
+  });
 export type CalendarSelfBookingInput = z.infer<typeof calendarSelfBookingSchema>;
 
 /** Freelancer-Selbstverwaltung (`updateOwnTargetHours`) — nur die zwei Felder, die der Trigger `calendar_workers_guard()` (S2-Migration) Nicht-Admins erlaubt. */

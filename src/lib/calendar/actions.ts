@@ -50,7 +50,7 @@ import {
   type CalendarWorkerStatus,
   type CalendarWorkerTargetInput,
 } from "@/lib/calendar/schema";
-import { buildWeeklySeries, formatDayLabel, formatTimeRange } from "@/lib/calendar/date";
+import { berlinDateTimeToUtc, buildWeeklySeries, formatDayLabel, formatTimeRange, isoDateString } from "@/lib/calendar/date";
 
 /**
  * Server Actions für "Schichtplan" (Block S1, 07.08.2026). Stilvorbild
@@ -844,8 +844,33 @@ export async function deleteCalendarAbsence(absenceId: string): Promise<ActionRe
 
 // --- Freelancer-Selbstbuchung/-Selbstverwaltung (kein requireAdminTenant) -
 
-/** Kein requireAdminTenant() — jeder Freelancer bucht sich selbst in ein offenes Zeitfenster ein. Muster exakt wie clockIn() oben: normaler RLS-Client, auth.getUser(), getTenant(), eigene Arbeiterzeile laden. Die eigentliche Absicherung (Freelancer/aktiv/Projektmitgliedschaft/Kapazität/Projekt-Konsistenz) liegt in der RLS-Policy calendar_shifts_insert + den Triggern (S2-Migration), nicht in dieser Funktion. */
-export async function bookOwnShift(input: { slotId: string }): Promise<SelfBookingResult> {
+/**
+ * Kein requireAdminTenant() — jeder Freelancer bucht sich selbst in ein
+ * offenes Zeitfenster ein. Muster exakt wie clockIn() oben: normaler
+ * RLS-Client, auth.getUser(), getTenant(), eigene Arbeiterzeile laden. Die
+ * eigentliche Absicherung (Freelancer/aktiv/Projektmitgliedschaft/Kapazität/
+ * Projekt-Konsistenz) liegt in der RLS-Policy calendar_shifts_insert + den
+ * Triggern (S2-Migration), nicht in dieser Funktion.
+ *
+ * Block S6 (09.08.2026, Freelancer-Drag-and-Drop im Wochenraster) — optionale
+ * `startTime`/`endTime` (Berlin-Wanduhrzeit, "HH:MM", zod-Schema erzwingt
+ * "beide oder keins"). OHNE beide Felder: exaktes Altverhalten — der ganze
+ * Slot wird 1:1 übernommen (Aufrufer: `open-slots-panel.tsx`, "Buchen"-Knopf,
+ * unverändert). MIT beiden Feldern: `starts_at`/`ends_at` werden über
+ * `berlinDateTimeToUtc()` neu berechnet, verankert auf den KALENDERTAG DES
+ * SLOTS selbst (`isoDateString(new Date(slot.starts_at))`) — NICHT "heute",
+ * ein Slot kann in der Zukunft liegen. Vor dem Insert prüft diese Funktion
+ * zusätzlich freundlich, dass der berechnete Bereich innerhalb
+ * `[slot.starts_at, slot.ends_at]` liegt (Verteidigung in der Tiefe,
+ * gleiches Prinzip wie `decideShiftChangeRequest()`) — die tatsächliche
+ * Sicherheitsgrenze bleibt der DB-Trigger `calendar_slot_capacity_guard()`
+ * (Fehlercode CT002), keine neue Migration nötig.
+ */
+export async function bookOwnShift(input: {
+  slotId: string;
+  startTime?: string;
+  endTime?: string;
+}): Promise<SelfBookingResult> {
   try {
     const supabase = await createClient();
     const {
@@ -877,6 +902,32 @@ export async function bookOwnShift(input: { slotId: string }): Promise<SelfBooki
       .maybeSingle();
     if (!slot) return { ok: false, error: "Zeitfenster nicht gefunden." };
 
+    let startsAtIso: string = slot.starts_at;
+    let endsAtIso: string = slot.ends_at;
+
+    if (data.startTime && data.endTime) {
+      const slotDateIso = isoDateString(new Date(slot.starts_at));
+      const startsAt = berlinDateTimeToUtc(slotDateIso, data.startTime);
+      let endsAt = berlinDateTimeToUtc(slotDateIso, data.endTime);
+      // Nachtschicht-Fall (Ende <= Start): Ende liegt einen Kalendertag
+      // später — gleiche Konvention wie buildWeeklySeries() (date.ts).
+      if (endsAt.getTime() <= startsAt.getTime()) {
+        endsAt = new Date(endsAt.getTime() + 24 * 60 * 60 * 1000);
+      }
+
+      const slotStartsAt = new Date(slot.starts_at);
+      const slotEndsAt = new Date(slot.ends_at);
+      if (startsAt.getTime() < slotStartsAt.getTime() || endsAt.getTime() > slotEndsAt.getTime()) {
+        return { ok: false, error: "Die gewählte Zeit liegt außerhalb des freigegebenen Zeitfensters." };
+      }
+      if (endsAt.getTime() <= startsAt.getTime()) {
+        return { ok: false, error: "Die Endzeit muss nach der Startzeit liegen." };
+      }
+
+      startsAtIso = startsAt.toISOString();
+      endsAtIso = endsAt.toISOString();
+    }
+
     const { data: shift, error } = await supabase
       .from("calendar_shifts")
       .insert({
@@ -884,8 +935,8 @@ export async function bookOwnShift(input: { slotId: string }): Promise<SelfBooki
         worker_id: worker.id,
         project_id: slot.project_id,
         slot_id: slot.id,
-        starts_at: slot.starts_at,
-        ends_at: slot.ends_at,
+        starts_at: startsAtIso,
+        ends_at: endsAtIso,
         break_minutes: 0,
         status: "planned",
         source: "self",

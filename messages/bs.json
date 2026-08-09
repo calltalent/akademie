@@ -481,6 +481,12 @@
         "statusRejected": "Odbijeno",
         "decisionNoteLabel": "Napomena tima",
         "cancelConfirm": "Zaista zatražiti otkazivanje ove smjene?"
+      },
+      "dragBoard": {
+        "dragHint": "Povlačenje u mreži rezerviše otvoreni termin ili predlaže novo vrijeme za tvoju smjenu.",
+        "openSlotLegend": "Otvoreni termin",
+        "openSlotAriaLabel": "{day}, {start} do {end}, projekat {project}, {freeSeats} od {capacity} mjesta slobodno",
+        "openSlotFullAriaLabel": "{day}, {start} do {end}, projekat {project}, popunjeno"
       }
     },
     "module": {

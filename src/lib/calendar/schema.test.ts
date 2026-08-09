@@ -289,6 +289,34 @@ describe("calendarSelfBookingSchema", () => {
     expect(calendarSelfBookingSchema.safeParse({ slotId: "nicht-uuid" }).success).toBe(false);
     expect(calendarSelfBookingSchema.safeParse({ slotId: VALID_UUID }).success).toBe(true);
   });
+
+  // Block S6 (09.08.2026) — optionale startTime/endTime (Teil-Buchung per Drag).
+  it("akzeptiert weiterhin nur slotId (Altverhalten, ganzer Slot)", () => {
+    expect(calendarSelfBookingSchema.safeParse({ slotId: VALID_UUID }).success).toBe(true);
+  });
+
+  it("akzeptiert slotId mit beiden Zeitfeldern", () => {
+    expect(
+      calendarSelfBookingSchema.safeParse({ slotId: VALID_UUID, startTime: "08:00", endTime: "10:00" }).success,
+    ).toBe(true);
+  });
+
+  it("lehnt nur EIN gesetztes Zeitfeld ab (beide oder keins)", () => {
+    expect(calendarSelfBookingSchema.safeParse({ slotId: VALID_UUID, startTime: "08:00" }).success).toBe(false);
+    expect(calendarSelfBookingSchema.safeParse({ slotId: VALID_UUID, endTime: "10:00" }).success).toBe(false);
+  });
+
+  it("lehnt gleiche Start- und Endzeit ab", () => {
+    expect(
+      calendarSelfBookingSchema.safeParse({ slotId: VALID_UUID, startTime: "08:00", endTime: "08:00" }).success,
+    ).toBe(false);
+  });
+
+  it("lehnt eine ungültig formatierte Uhrzeit ab", () => {
+    expect(
+      calendarSelfBookingSchema.safeParse({ slotId: VALID_UUID, startTime: "8:00", endTime: "10:00" }).success,
+    ).toBe(false);
+  });
 });
 
 describe("calendarWorkerTargetSchema", () => {

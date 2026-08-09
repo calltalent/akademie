@@ -4,11 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { getAuthUser } from "@/lib/auth/context";
 import { AppShell } from "@/components/learn/app-shell";
-import { ShiftCalendarView, type ShiftCalendarDay } from "@/components/learn/shift-calendar-view";
+import type { ShiftCalendarDay, ShiftCalendarOpenSlotBlock } from "@/components/learn/shift-calendar-view";
+import { ShiftCalendarBoard } from "@/components/learn/shift-calendar-board";
 import { TimeClockWidget } from "@/components/learn/time-clock-widget";
 import { OpenSlotsPanel } from "@/components/learn/open-slots-panel";
 import { TargetHoursForm } from "@/components/learn/target-hours-form";
-import { ShiftChangeRequestPanel } from "@/components/learn/shift-change-request-panel";
 import {
   getOpenSlotsForWorker,
   getOpenTimeEntry,
@@ -54,11 +54,14 @@ export default async function SchichtplanPage({
 }) {
   const { week } = await searchParams;
   const supabase = await createClient();
-  const [user, tenant, t, tShared] = await Promise.all([
+  const [user, tenant, t, tShared, tDragBoard] = await Promise.all([
     getAuthUser(),
     getTenant(),
     getTranslations("learn.shiftCalendar"),
     getTranslations("learn.shared"),
+    // Block S6 (09.08.2026) — eigener Übersetzer für die per-Slot-Aria-Labels
+    // der Drag-Blöcke, gleiches Muster wie `tShared` oben.
+    getTranslations("learn.shiftCalendar.dragBoard"),
   ]);
 
   if (!tenant) redirect("/");
@@ -145,6 +148,52 @@ export default async function SchichtplanPage({
     };
   });
 
+  // Block S6 (09.08.2026) — offene Zeitfenster in ShiftCalendarOpenSlotBlock[]
+  // umgerechnet (gleiches Muster wie die dayShifts-Umrechnung oben:
+  // toMinutesSinceMidnight() + Nachtschicht-Kappung auf 24*60 für die
+  // Raster-Positionierung; `timeRange` bleibt trotzdem die VOLLE, echte
+  // Zeitspanne). `alreadyBooked` wird durchgereicht — `ShiftCalendarView`
+  // filtert intern selbst (siehe dortiger Kommentar), diese Seite muss
+  // dafür nicht selbst filtern.
+  const openSlotBlocks: ShiftCalendarOpenSlotBlock[] = isFreelancer
+    ? openSlots.map((s) => {
+        const startsAt = new Date(s.startsAt);
+        const endsAt = new Date(s.endsAt);
+        const timeRange = formatTimeRange(startsAt, endsAt);
+        const isFull = s.freeSeats <= 0;
+        const ariaLabel = isFull
+          ? tDragBoard("openSlotFullAriaLabel", {
+              day: formatDayLabel(startsAt),
+              start: timeRange.split("–")[0],
+              end: timeRange.split("–")[1],
+              project: s.projectName,
+            })
+          : tDragBoard("openSlotAriaLabel", {
+              day: formatDayLabel(startsAt),
+              start: timeRange.split("–")[0],
+              end: timeRange.split("–")[1],
+              project: s.projectName,
+              freeSeats: s.freeSeats,
+              capacity: s.capacity,
+            });
+        const startMinutes = toMinutesSinceMidnight(startsAt);
+        const endMinutesRaw = toMinutesSinceMidnight(endsAt);
+        const endMinutes = endMinutesRaw <= startMinutes ? 24 * 60 : endMinutesRaw;
+        return {
+          id: s.id,
+          isoDate: isoDateString(startsAt),
+          startMinutes,
+          endMinutes,
+          timeRange,
+          ariaLabel,
+          projectName: s.projectName,
+          capacity: s.capacity,
+          freeSeats: s.freeSeats,
+          alreadyBooked: s.alreadyBooked,
+        };
+      })
+    : [];
+
   const weekYear = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", year: "numeric" }).format(weekStart);
   const weekLabel = t("weekRangeLabel", {
     startLabel: formatShortDayLabel(weekStart),
@@ -163,7 +212,8 @@ export default async function SchichtplanPage({
       <div className="flex flex-col gap-6">
         <TimeClockWidget initialOpenEntryStartedAt={openEntry?.startedAt ?? null} />
 
-        <ShiftCalendarView
+        <ShiftCalendarBoard
+          isFreelancer={isFreelancer}
           days={days}
           gridAriaLabel={t("gridAriaLabel")}
           emptyDayText={t("emptyDay")}
@@ -182,10 +232,15 @@ export default async function SchichtplanPage({
             todayLabel: t("todayButton"),
           }}
           unavailableLegendText={t("unavailableLegend")}
+          shifts={shifts}
+          requests={changeRequests}
+          openSlots={openSlotBlocks}
         />
 
-        <ShiftChangeRequestPanel shifts={shifts} requests={changeRequests} />
-
+        {/* OpenSlotsPanel/TargetHoursForm bleiben UNVERÄNDERT an ihrer
+            heutigen Stelle (additiv, keine Ablösung — Barrierefreiheits-
+            Präzedenzfall aus video-trimmer.tsx: der Tastatur-Weg bleibt
+            primär, Drag im Raster oben ist rein ergänzend). */}
         {isFreelancer && (
           <>
             <OpenSlotsPanel slots={openSlots} />

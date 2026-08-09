@@ -481,6 +481,12 @@
         "statusRejected": "Abgelehnt",
         "decisionNoteLabel": "Notiz vom Team",
         "cancelConfirm": "Stornierung dieser Schicht wirklich beantragen?"
+      },
+      "dragBoard": {
+        "dragHint": "Ziehen im Raster bucht ein offenes Zeitfenster oder schlägt eine neue Zeit für eine eigene Schicht vor.",
+        "openSlotLegend": "Offenes Zeitfenster",
+        "openSlotAriaLabel": "{day}, {start} bis {end} Uhr, Projekt {project}, {freeSeats} von {capacity} Plätzen frei",
+        "openSlotFullAriaLabel": "{day}, {start} bis {end} Uhr, Projekt {project}, ausgebucht"
       }
     },
     "module": {

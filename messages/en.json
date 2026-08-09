@@ -481,6 +481,12 @@
         "statusRejected": "Rejected",
         "decisionNoteLabel": "Note from your team",
         "cancelConfirm": "Really request cancellation of this shift?"
+      },
+      "dragBoard": {
+        "dragHint": "Dragging in the grid books an open time slot or proposes a new time for one of your own shifts.",
+        "openSlotLegend": "Open time slot",
+        "openSlotAriaLabel": "{day}, {start} to {end}, project {project}, {freeSeats} of {capacity} spots left",
+        "openSlotFullAriaLabel": "{day}, {start} to {end}, project {project}, fully booked"
       }
     },
     "module": {
