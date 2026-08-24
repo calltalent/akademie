@@ -8,6 +8,10 @@ describe("legal/company", () => {
     expect(JSON.stringify(CALLTALENT_LLC)).not.toContain("16591113");
   });
 
+  it("führt die Wyoming Filing ID aus den Gründungsunterlagen", () => {
+    expect(CALLTALENT_LLC.registrationNumber).toBe("2026-002057636");
+  });
+
   it("setzt die Anschrift für Fließtext einzeilig zusammen", () => {
     expect(formatAddress(CALLTALENT_LLC)).toBe(
       "1309 Coffeen Avenue STE 1200, Sheridan, WY 82801, United States",

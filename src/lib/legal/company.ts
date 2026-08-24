@@ -37,14 +37,17 @@ export const legalEntitySchema = z.object({
 export type LegalEntity = z.infer<typeof legalEntitySchema>;
 
 /**
- * Anschrift laut Josips Angabe vom 24.08.2026. Registernummer (Wyoming
- * Filing ID) liegt noch nicht vor -> `null`, siehe Feldkommentar oben.
+ * Anschrift laut Josips Angabe vom 24.08.2026. Filing ID nachgetragen am
+ * selben Tag aus den Gründungsunterlagen (`Articles Of Organization.pdf`,
+ * Google Drive): CALLTALENT LLC, eingetragen beim Wyoming Secretary of State
+ * am 17.08.2026, 8:16 Uhr. Registered Agent: Company Sage Agents LLC,
+ * 1095 Sugarview Dr Ste 100, Sheridan, WY 82801.
  */
 export const CALLTALENT_LLC: LegalEntity = {
   name: "Calltalent LLC",
   addressLines: ["1309 Coffeen Avenue STE 1200", "Sheridan, WY 82801", "United States"],
   email: "office@calltalent.ai",
-  registrationNumber: null,
+  registrationNumber: "2026-002057636",
 };
 
 /** Einzeilige Anschrift für Fließtext ("… , Sheridan, WY 82801, United States"). */
