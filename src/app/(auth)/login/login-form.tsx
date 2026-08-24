@@ -41,6 +41,7 @@ export function LoginForm({
   bgOpacity,
   tenantName,
   logoUrl,
+  showLegalLinks,
 }: {
   heading: string;
   subheading: string;
@@ -48,9 +49,18 @@ export function LoginForm({
   bgOpacity: number;
   tenantName: string;
   logoUrl: string | null;
+  /**
+   * NEU (24.08.2026): blendet die Links auf /privacy und /terms ein — nur für
+   * Mandanten mit hinterlegtem Rechtsträger (`tenants.legal.entity`), weil
+   * die Seiten sonst ohnehin mit 404 antworten (siehe src/app/(legal)/).
+   * Der Login ist die einzige Seite, die jede Person vor der Anmeldung sieht,
+   * also der Ort, an dem Rechtstexte auffindbar sein müssen.
+   */
+  showLegalLinks: boolean;
 }) {
   const t = useTranslations("auth.login");
   const tShared = useTranslations("auth.shared");
+  const tLegal = useTranslations("legal.shell");
   const [pwState, pwAction, pwPending] = useActionState(
     signInWithPassword,
     initialState,
@@ -204,6 +214,19 @@ export function LoginForm({
 
         <div className="relative text-[13px]" style={{ color: "#B9BBDA" }}>
           © {new Date().getFullYear()} {copyright}
+          {showLegalLinks && (
+            <nav aria-label={tLegal("navLabel")} className="mt-2 flex gap-4">
+              <a href="/privacy" className="font-semibold underline-offset-2 hover:underline" style={{ color: "#DDDEEE" }}>
+                {tLegal("navPrivacy")}
+              </a>
+              <a href="/terms" className="font-semibold underline-offset-2 hover:underline" style={{ color: "#DDDEEE" }}>
+                {tLegal("navTerms")}
+              </a>
+              <a href="/legal-notice" className="font-semibold underline-offset-2 hover:underline" style={{ color: "#DDDEEE" }}>
+                {tLegal("navNotice")}
+              </a>
+            </nav>
+          )}
         </div>
       </div>
 
@@ -398,6 +421,27 @@ export function LoginForm({
               (z. B. nur für bestimmte Mandanten) erreichbar bleiben?
             */}
           </div>
+
+          {/* Rechtstexte auch auf kleinen Bildschirmen erreichbar: das
+              Marken-Panel mit derselben Navigation ist unter `lg` komplett
+              ausgeblendet (siehe Mobile-Kopfzeile oben). */}
+          {showLegalLinks && (
+            <nav
+              aria-label={tLegal("navLabel")}
+              className="flex justify-center gap-4 text-[13px] lg:hidden"
+              style={{ color: "#66679B" }}
+            >
+              <a href="/privacy" className="font-semibold no-underline">
+                {tLegal("navPrivacy")}
+              </a>
+              <a href="/terms" className="font-semibold no-underline">
+                {tLegal("navTerms")}
+              </a>
+              <a href="/legal-notice" className="font-semibold no-underline">
+                {tLegal("navNotice")}
+              </a>
+            </nav>
+          )}
         </div>
       </div>
     </div>

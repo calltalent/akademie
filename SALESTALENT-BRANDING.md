@@ -57,6 +57,8 @@ Direkt in `tenants.branding` gesetzt (Supabase, Tenant `salestalent`):
 
 Copyright-Zeile bewusst neutral gehalten ("SalesTalent", keine Rechtsträger-Angabe wie "a Calltalent brand") — die Rechtsträger-Frage ist laut `Entscheidungs-Log.md` (30.07.2026) noch offen. Sobald geklärt, diese Zeile anpassen.
 
+**Nachtrag (24.08.2026):** Rechtsträger-Frage geklärt — Betreiber ist die **Calltalent LLC** (1309 Coffeen Avenue STE 1200, Sheridan, WY 82801, USA). Die Rechtstexte unter `/legal-notice`, `/privacy` und `/terms` nennen sie seitdem (siehe PHASENSTATUS.md, Abschnitt „Rechtsträger-Wechsel"). Die Copyright-Zeile im Login bleibt vorerst unverändert neutral — ob dort „a Calltalent LLC brand" ergänzt wird, ist eine Marken-Entscheidung.
+
 ## 4a. Logo (ergänzt 01.08.2026)
 
 Drei Vektor-Entwürfe generiert (Recraft V4.1, `vector`-Modell, Farbpalette auf `#4655C6` beschränkt, Hintergrund Weiß — bewusst verbundenes, bereits vorhandenes Kreativ-Tool statt einer neuen Pipeline, siehe Entscheidung im Gespräch mit Josip). Kosten: 3 × 2,5 Credits = 7,5 von 23,1 verfügbaren Credits.

@@ -39,7 +39,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   return {
     name,
     short_name: shortName,
-    description: "KI-native Lernplattform von Calltalent Ltd.",
+    description: "KI-native Lernplattform von Calltalent LLC.",
     start_url: "/",
     display: "standalone",
     background_color: safeColor(branding.color_bg, DEFAULT_BRANDING.color_bg!),

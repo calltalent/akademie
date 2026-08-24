@@ -6,6 +6,7 @@ import { LearnMobileNav } from "@/components/layout/LearnMobileNav";
 import { checkPlatformAccess } from "@/lib/platform/auth";
 import { getTenant } from "@/lib/tenant/context";
 import { createClient } from "@/lib/supabase/server";
+import { resolveLegalEntity } from "@/lib/legal/company";
 import { HtmlBackgroundSync } from "@/components/shell/html-background-sync";
 
 /**
@@ -149,6 +150,9 @@ export async function AppShell({
   const topBarUser = { name: userName, email: userEmail, role: t("role") };
   const tenantName = tenant?.name || "Calltalent";
   const logoUrl = tenant?.branding?.logo_url ?? null;
+  // Rechtstexte nur verlinken, wenn dieser Mandant einen Rechtsträger
+  // hinterlegt hat — sonst liefe der Link ins 404 (siehe src/app/(legal)/).
+  const showLegalLinks = resolveLegalEntity(tenant?.legal) !== null;
 
   return (
     <>
@@ -162,6 +166,7 @@ export async function AppShell({
         notifications={[]}
         tenantName={tenantName}
         logoUrl={logoUrl}
+        showLegalLinks={showLegalLinks}
       />
       <div className="flex min-h-screen bg-bg">
         <HtmlBackgroundSync color="#F4F5FA" />
@@ -173,6 +178,7 @@ export async function AppShell({
           showShiftCalendar={showShiftCalendar}
           tenantName={tenantName}
           logoUrl={logoUrl}
+          showLegalLinks={showLegalLinks}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar

@@ -39,6 +39,7 @@ export function LearnMobileNav({
   notifications = [],
   tenantName = "Calltalent",
   logoUrl = null,
+  showLegalLinks = false,
 }: {
   isStaff?: boolean;
   isPlatformAdmin?: boolean;
@@ -51,6 +52,8 @@ export function LearnMobileNav({
   notifications?: NotificationItem[];
   tenantName?: string;
   logoUrl?: string | null;
+  /** Siehe Sidebar.tsx — unverändert an `<Sidebar variant="panel">` durchgereicht. */
+  showLegalLinks?: boolean;
 }) {
   const t = useTranslations("learn.shell");
   const tAuthShared = useTranslations("auth.shared");
@@ -139,6 +142,7 @@ export function LearnMobileNav({
             showShiftCalendar={showShiftCalendar}
             tenantName={tenantName}
             logoUrl={logoUrl}
+            showLegalLinks={showLegalLinks}
           />
         </div>
       )}

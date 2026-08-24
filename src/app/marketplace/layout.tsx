@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { BrandLogo } from "@/components/shell/brand-logo";
+import { CALLTALENT_LLC } from "@/lib/legal/company";
 
 /**
  * Eigene Shell für `marketplace.calltalent.ai` (Marketplace M4, Plan
@@ -65,7 +66,7 @@ export default async function MarketplaceLayout({
 
       <footer className="border-t border-border-100 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-8 text-sm text-muted-400 sm:flex-row sm:items-center sm:justify-between">
-          <p>{t("footerCopyright", { year })}</p>
+          <p>{t("footerCopyright", { year, company: CALLTALENT_LLC.name })}</p>
           <nav aria-label={t("footerNavLabel")} className="flex gap-5">
             <Link
               href="/impressum"

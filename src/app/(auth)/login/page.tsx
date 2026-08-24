@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { getTenant } from "@/lib/tenant/context";
+import { resolveLegalEntity } from "@/lib/legal/company";
 import { LoginForm } from "./login-form";
 
 /**
@@ -18,6 +19,11 @@ import { LoginForm } from "./login-form";
  * durchgereicht — ohne eigenes Logo bleibt die Calltalent-Standardmarke
  * unverändert (siehe LoginForm-Kopfkommentar).
  *
+ * NACHTRAG (24.08.2026, Rechtsträger-Wechsel auf Calltalent LLC): reicht
+ * zusätzlich durch, ob dieser Mandant Rechtstexte hat (`tenants.legal.entity`)
+ * — nur dann zeigt die Login-Seite die Links auf /privacy, /terms und
+ * /legal-notice, sonst führten sie ins 404.
+ *
  * i18n Block C1: die bisherigen hartkodierten deutschen Fallback-Konstanten
  * (DEFAULT_HEADING usw.) kommen jetzt aus `getTranslations("auth.login")` —
  * gleiches Verhalten für Mandanten ohne eigenes Branding, nur sprachabhängig.
@@ -34,6 +40,7 @@ export default async function LoginPage() {
       bgOpacity={typeof branding.login_bg_opacity === "number" ? branding.login_bg_opacity : 100}
       tenantName={tenant?.name || t("defaultTenantName")}
       logoUrl={branding.logo_url ?? null}
+      showLegalLinks={resolveLegalEntity(tenant?.legal) !== null}
     />
   );
 }
