@@ -3867,5 +3867,23 @@ Josips Auftrag: „AGB i privacy za salestalent.app moraju se prebaciti na Callt
 1. **Deploy nötig** — die Seiten sind erst nach `npm run deploy` live (nur Josip, CLAUDE.md §4.6). Die Datenbank ist bereits umgestellt; solange nicht deployt ist, ändert sich am Live-Stand nichts, weil die Routen dort noch nicht existieren.
 2. **Wyoming Filing ID** nachreichen, dann `CALLTALENT_LLC.registrationNumber` setzen und die beiden `tenants.legal.entity`-Datensätze ergänzen — der Registerabschnitt erscheint dann automatisch.
 3. **Anwaltliche Prüfung empfohlen**, bevor echte Käufe laufen: die Texte sind am tatsächlichen Produktstand geschrieben, aber nicht anwaltlich geprüft. Besonders die Kombination US-Rechtsträger + EU-Kundschaft (Art. 27 DSGVO — EU-Vertreter kann für die LLC Pflicht sein, sobald sie Personen in der EU gezielt anspricht; das ist mit `salestalent.app`/`academy.calltalent.ai` der Fall). Ein solcher Vertreter ist bisher nirgends benannt.
-4. **AVV/TOM-Dokumente** (`AVV_Calltalent-Akademie_2026-07-12.docx`, `TOM_...`) nennen weiterhin die Calltalent Ltd. als Auftragnehmerin — nicht Teil dieses Auftrags, sollte aber nachgezogen werden, sonst widersprechen sich Vertrag und Website.
+4. ~~**AVV/TOM-Dokumente** nennen weiterhin die Calltalent Ltd. als Auftragnehmerin~~ — **erledigt am selben Tag, siehe Folgeabschnitt.**
+
+## Folgeauftrag: AVV/TOM und Website calltalent.ai auf die Calltalent LLC (24.08.2026)
+
+**AVV/TOM (Google Drive, Ordner `WORD-DOKUMENTE/` bzw. Markdown-Zwilling):** Neue Fassung 2 statt Überschreiben der alten Dateien — Rechtsdokumente bleiben als historischer Stand erhalten. Neu: `AVV_Calltalent-Akademie_2026-08-24.docx` + `.md`, `TOM_Calltalent-Akademie_2026-08-24.docx` + `.md`.
+
+Inhaltlich über einen reinen Namenstausch hinaus:
+
+1. **Neuer § 11 „Übermittlung in ein Drittland"** im AVV — der Auftragsverarbeiter sitzt jetzt selbst in einem Drittland, das war unter der UK-Gesellschaft nicht nötig. Enthält Standardvertragsklauseln Modul 2 (Durchführungsbeschluss (EU) 2021/914) als neue Anlage 3, deren Vorrang bei Widersprüchen, ergänzende Maßnahmen (Speicherorte bleiben EU, Verschlüsselung, Zugriffsbeschränkung + Protokollierung), den Prozess für behördliche Zugriffsersuchen (Klausel 15) und den offenen Punkt „Vertreter in der Union nach Art. 27 DSGVO noch nicht benannt".
+2. Haftung → § 12, Schlussbestimmungen → § 13; dort „englisches Recht" ersetzt durch Recht des US-Bundesstaats Wyoming für gesellschaftsrechtliche Fragen.
+3. **Neue Anlage 3** mit der Zuordnung der SVK-Anhänge (I.A/I.B/I.C, II = TOM, III = Unterauftragsverarbeiter).
+4. TOM: neuer Abschnitt **2.3 „Übermittlungskontrolle bei Drittlandsbezug"**, Ergänzungen in 1.1/1.2 (US-Sitz ändert die Speicherorte nicht, administrative Zugriffe verschlüsselt und beschränkt), Ansprechpartner „Managing Member".
+5. Wyoming Filing ID liegt nicht vor → steht bewusst in keinem der Dokumente; der Registerabschnitt entfällt, statt eine Nummer zu erfinden.
+
+**Verifikation der Word-Dateien:** Text- und Strukturprüfung per XML-Parse (keine „Ltd."/„16591113"/„Shelton"-Reste außer im bewussten Versionshinweis, Kopfzeile korrekt, Tabellenbreiten 9000 DXA gegen 9306 DXA Satzspiegel geprüft — genau der Fehler, der bei der Erstfassung am 12.07.2026 aufgetreten war). **Keine PDF-Sichtprüfung möglich:** LibreOffice ist in dieser Sitzungsumgebung defekt (`soffice --convert-to` scheitert auch bei einer reinen .txt-Datei), `pdftoppm` fehlt. Empfehlung: beide Dateien vor dem ersten Einsatz einmal in Word öffnen.
+
+**Website `calltalent.ai` (eigenes Repo `calltalent/calltalent-website`, in diese Sitzung nachgeladen):** Josips Fund — dort standen Impressum und Datenschutz weiterhin auf Calltalent Ltd. 18 Dateien geändert (Impressum, Datenschutz, Footer aller Seiten, JSON-LD-Organisationsdaten inkl. PostalAddress, `llms.txt`, `robots.txt`, `README.md`, E-Mail-Footer in `functions/api/_brand.js`). Company No. 16591113 und die Londoner Anschrift kommen dort nirgends mehr vor. Branch `claude/agb-privacy-calltalent-migration-drxlr8` gepusht — **noch nicht in `main` gemerged, geht also noch nicht live** (Cloudflare Pages deployt aus `main`).
+
+**Weiterhin offen:** Wyoming Filing ID; Vertreter in der Union nach Art. 27 DSGVO (Platzhalter steht sowohl im AVV als auch in der Website-Datenschutzerklärung); anwaltliche Prüfung.
 5. `SALESTALENT-BRANDING.md` §3 hielt fest, die Copyright-Zeile im Login (`login_copyright: "SalesTalent. All rights reserved."`) bleibe neutral, „bis die Rechtsträger-Frage geklärt ist". Sie ist jetzt geklärt — ob dort künftig „SalesTalent, a Calltalent LLC brand" o. Ä. stehen soll, ist eine Marken-Entscheidung von Josip, keine technische; unverändert gelassen.
