@@ -145,6 +145,7 @@ export function Sidebar({
   variant = "rail",
   tenantName = "Calltalent",
   logoUrl = null,
+  showLegalLinks = false,
 }: {
   active?: SidebarItemId;
   isStaff?: boolean;
@@ -160,9 +161,17 @@ export function Sidebar({
    * bisherige Calltalent-Aussehen für Mandanten ohne eigenes Logo. */
   tenantName?: string;
   logoUrl?: string | null;
+  /**
+   * NEU (24.08.2026, Rechtsträger-Wechsel auf Calltalent LLC): zeigt im Fuß
+   * die Links auf /privacy und /terms. Default `false` — die Seiten
+   * antworten für Mandanten ohne hinterlegten Rechtsträger
+   * (`tenants.legal.entity`) mit 404, ein Link dorthin wäre eine Sackgasse.
+   */
+  showLegalLinks?: boolean;
 }) {
   const t = useTranslations("learn.shell");
   const tAuthShared = useTranslations("auth.shared");
+  const tLegal = useTranslations("legal.shell");
   const [expanded, setExpanded] = useState(true);
   const pathname = usePathname();
   const activeId = active ?? activeFromPath(pathname);
@@ -383,6 +392,19 @@ export function Sidebar({
           <HelpCircle size={19} aria-hidden="true" className="flex-shrink-0" />
           {showLabels && <span>{t("navHelpContact")}</span>}
         </a>
+        {showLegalLinks && showLabels && (
+          <nav aria-label={tLegal("navLabel")} className="flex flex-wrap gap-x-3 gap-y-1 px-3 pt-2 text-[13px]">
+            <a href="/privacy" className="font-semibold text-muted-400 no-underline">
+              {tLegal("navPrivacy")}
+            </a>
+            <a href="/terms" className="font-semibold text-muted-400 no-underline">
+              {tLegal("navTerms")}
+            </a>
+            <a href="/legal-notice" className="font-semibold text-muted-400 no-underline">
+              {tLegal("navNotice")}
+            </a>
+          </nav>
+        )}
       </div>
     </aside>
   );

@@ -34,14 +34,15 @@ test.describe("Marketplace-Host-Gate (M4)", () => {
     const response = await page.goto(`${MARKETPLACE_URL}/impressum`);
     expect(response?.ok()).toBe(true);
     await expect(page.getByRole("heading", { level: 1, name: "Impressum" })).toBeVisible();
-    // FIX (05.08.2026): "Calltalent Ltd." matcht ohne exact drei Absätze
-    // (Firmenname, Geschäftsführung-Satz, Copyright-Zeile) -> Strict-Mode-
-    // Verstoß. exact:true grenzt auf den alleinstehenden Firmennamen-Absatz ein.
-    await expect(page.getByText("Calltalent Ltd.", { exact: true })).toBeVisible();
-    // "16591113" matcht ohne Eingrenzung ebenfalls zwei Absätze (Company
-    // Number-Zeile UND die Registernummer-Detailzeile) — voller Satz statt
-    // reiner Ziffernfolge.
-    await expect(page.getByText("Company Number: 16591113")).toBeVisible();
+    // AKTUALISIERT (24.08.2026, Rechtsträger-Wechsel): Betreiber ist die
+    // Calltalent LLC (Wyoming, USA) statt der Calltalent Ltd. — die Prüfung
+    // hing vorher am UK-Firmennamen und der Company Number 16591113, die es
+    // auf dieser Seite nicht mehr gibt (siehe lib/legal/company.ts).
+    // `exact: true` weiterhin nötig: "Calltalent LLC" steht zusätzlich im
+    // Rechtsform-Satz, im Vertretungs-Satz und in der Fußzeile — ohne
+    // Eingrenzung wäre das ein Strict-Mode-Verstoß.
+    await expect(page.getByText("Calltalent LLC", { exact: true })).toBeVisible();
+    await expect(page.getByText("Sheridan, WY 82801", { exact: true })).toBeVisible();
   });
 
   test("derselbe Pfad liefert 404 unter einem normalen Mandanten-Host (kein Header-Spoofing)", async ({

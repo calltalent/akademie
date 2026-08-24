@@ -1,5 +1,6 @@
 import type { Locale } from "@/i18n/config";
 import type { CalendarHolidayRegionCode } from "@/lib/calendar/schema";
+import type { LegalEntity } from "@/lib/legal/company";
 
 /**
  * Öffentliche, sichere Teilmenge von `public.tenants` — das ist alles, was
@@ -48,6 +49,15 @@ export type PublicTenant = {
   legal: {
     impressum_url?: string;
     datenschutz_url?: string;
+    /**
+     * NEU (24.08.2026, Josips Auftrag "AGB und Privacy fuer salestalent.app
+     * auf Calltalent LLC umstellen"): Rechtstraeger dieses Mandanten. Quelle
+     * der Rechtsseiten unter /legal-notice, /privacy und /terms
+     * (src/app/(legal)/). Fehlt das Feld -> diese Seiten antworten mit 404,
+     * damit auf der Domain eines White-Label-Kunden nie Calltalents eigene
+     * Firmendaten erscheinen (siehe lib/legal/company.ts).
+     */
+    entity?: LegalEntity;
   };
   settings: {
     payments_enabled?: boolean;

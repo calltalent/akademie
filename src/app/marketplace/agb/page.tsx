@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { CALLTALENT_LLC } from "@/lib/legal/company";
 
 /**
  * AGB für `marketplace.calltalent.ai` (Marketplace M4, Plan Abschnitt 9:
@@ -7,9 +8,14 @@ import { getTranslations } from "next-intl/server";
  * `pendingNotice` stellt ausdrücklich klar, dass der Kauf hier noch nicht
  * existiert — keine bindende Widerrufsregelung für ein nicht vorhandenes
  * Kaufrecht vortäuschen.
+ *
+ * RECHTSTRÄGER-WECHSEL (24.08.2026): Vertragspartner eines künftigen Kaufs
+ * ist die Calltalent LLC (Wyoming, USA), Firmenname aus
+ * `lib/legal/company.ts`.
  */
 export default async function MarketplaceAgbPage() {
   const t = await getTranslations("marketplace.legal.agb");
+  const entity = CALLTALENT_LLC;
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-12">
@@ -17,7 +23,7 @@ export default async function MarketplaceAgbPage() {
 
       <section className="mt-8">
         <h2 className="text-sm font-bold uppercase tracking-[0.03em] text-muted-400">{t("scopeHeading")}</h2>
-        <p className="mt-2 text-base leading-relaxed text-ink">{t("scopeText")}</p>
+        <p className="mt-2 text-base leading-relaxed text-ink">{t("scopeText", { company: entity.name })}</p>
       </section>
 
       <section className="mt-6">
