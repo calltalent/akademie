@@ -1,7 +1,11 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { contactFormSchema } from "@/lib/contact/schema";
 import type { ContactActionState } from "@/lib/contact/state";
+import { classifyContactSubmission } from "@/lib/contact/spam";
+import { CONTACT_HONEYPOT_FIELD, CONTACT_TOKEN_FIELD } from "@/lib/contact/patterns";
+import { verifyContactFormToken } from "@/lib/contact/form-token";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { sendEmail } from "@/lib/email/client";
 import { contactFormNotification } from "@/lib/email/templates";
@@ -21,14 +25,48 @@ import { getTenant } from "@/lib/tenant/context";
  * Host) oder der Mandant noch keine eigene Support-Adresse hinterlegt hat —
  * damit geht keine Anfrage ins Leere.
  *
- * Rate-Limit IP-basiert (kein Login vorausgesetzt, wie bei den
- * Auth-Formularen) — verhindert Formular-Spam auf eine öffentlich
- * erreichbare, ungeschützte Route.
+ * Bot-Schutz NEU (25.08.2026, Josips Fund: SEO-Spam über das Formular,
+ * CLAUDE.md §2.7). Fünf Schichten, in dieser Reihenfolge — die billigen
+ * zuerst, damit ein Bot gar nicht erst DB-/Mail-Kosten verursacht:
+ *
+ *  1. Honeypot-Feld (`website`): für Menschen unsichtbar, Bots füllen es aus.
+ *  2. Zeitfalle: signiertes Token aus der Seite, Absenden in unter drei
+ *     Sekunden oder ganz ohne Token ist maschinell (form-token.ts).
+ *  3. Rate-Limits auf drei Ebenen: IP, Absender-Adresse und Mandant
+ *     insgesamt. Die dritte Ebene ist die Lehre aus dem Vorfall — die
+ *     `rate_limits`-Tabelle zeigt vier Spam-Anfragen von vier verschiedenen
+ *     IPs mit je einem Treffer, ein reines IP-Limit greift dagegen nie.
+ *  4. zod-Schema: keine Links/Markup in Namensfeldern (schema.ts).
+ *  5. Inhaltsbewertung der Nachricht (spam.ts).
+ *
+ * Erkannte Bots (Schicht 1/2) bekommen bewusst dieselbe Erfolgsmeldung wie
+ * Menschen: eine sichtbare Ablehnung ist für den Betreiber eines Spam-Bots
+ * die Rückmeldung, mit der er sein Muster anpasst. Schicht 4/5 melden
+ * dagegen einen konkreten, korrigierbaren Fehler — dort ist ein
+ * Fehlurteil gegen einen echten Absender denkbar, und der soll seine
+ * Anfrage anpassen können statt ins Leere zu schreiben.
  */
 export async function submitContactForm(
   _prevState: ContactActionState,
   formData: FormData,
 ): Promise<ContactActionState> {
+  const honeypot = formData.get(CONTACT_HONEYPOT_FIELD);
+  if (typeof honeypot === "string" && honeypot.trim() !== "") {
+    console.warn("Kontaktformular: Honeypot ausgelöst, Anfrage verworfen.");
+    return { error: null, success: true };
+  }
+
+  const tokenVerdict = await verifyContactFormToken(formData.get(CONTACT_TOKEN_FIELD));
+  if (tokenVerdict === "too-fast" || tokenVerdict === "invalid") {
+    console.warn(`Kontaktformular: Zeitfalle ausgelöst (${tokenVerdict}), Anfrage verworfen.`);
+    return { error: null, success: true };
+  }
+  if (tokenVerdict === "expired") {
+    return {
+      error: "Das Formular ist abgelaufen. Bitte lade die Seite neu und sende erneut.",
+    };
+  }
+
   if (!(await checkRateLimit("contact-form", { maxRequests: 5, windowSeconds: 300 }))) {
     return { error: RATE_LIMIT_MESSAGE };
   }
@@ -49,6 +87,46 @@ export async function submitContactForm(
   const tenant = await getTenant();
   const recipient = tenant?.settings?.support_email?.trim() || "office@calltalent.ai";
   const tenantName = tenant?.name || "Calltalent";
+
+  // Pro Absender-Adresse (sha256-Hash, keine PII im rate_limits-Schlüssel —
+  // gleiches Muster wie "auth-login-email" in auth/actions.ts).
+  const emailKey = createHash("sha256").update(email.toLowerCase()).digest("hex");
+  if (
+    !(await checkRateLimit("contact-form-email", {
+      maxRequests: 3,
+      windowSeconds: 3600,
+      extraKey: emailKey,
+    }))
+  ) {
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
+  // Obergrenze pro Empfänger-Postfach, unabhängig von IP und Absender:
+  // fängt genau den verteilten Bot ab, gegen den die beiden Limits davor
+  // machtlos sind. 30/Stunde liegt weit über dem realen Aufkommen (fünf
+  // Anfragen seit dem 10.07.2026) und deckelt trotzdem eine Flut.
+  if (
+    !(await checkRateLimit("contact-form-recipient", {
+      maxRequests: 30,
+      windowSeconds: 3600,
+      extraKey: recipient.toLowerCase(),
+    }))
+  ) {
+    console.warn(`Kontaktformular: Stundenlimit für ${tenantName} erreicht.`);
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
+  const verdict = classifyContactSubmission({ firstName, lastName, subject, message });
+  if (verdict.blocked) {
+    console.warn(
+      `Kontaktformular: als Spam eingestuft (Score ${verdict.score}, ${verdict.reasons.join(", ")}), nicht zugestellt.`,
+    );
+    return {
+      error: verdict.reasons.includes("links-in-message")
+        ? `Bitte sende deine Nachricht ohne Links — sie wird sonst automatisch als Spam eingestuft. Alternativ erreichst du uns direkt unter ${recipient}.`
+        : `Deine Nachricht wurde automatisch als Spam eingestuft und nicht zugestellt. Bitte formuliere sie ohne Werbeinhalte oder schreibe uns direkt unter ${recipient}.`,
+    };
+  }
 
   const result = await sendEmail({
     to: recipient,

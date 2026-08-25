@@ -3893,3 +3893,38 @@ Nachgetragen in: `lib/legal/company.ts` (`registrationNumber`), `tenants.legal.e
 
 **Weiterhin offen:** Vertreter in der Union nach Art. 27 DSGVO (Platzhalter steht sowohl im AVV als auch in der Website-Datenschutzerklärung); anwaltliche Prüfung.
 5. `SALESTALENT-BRANDING.md` §3 hielt fest, die Copyright-Zeile im Login (`login_copyright: "SalesTalent. All rights reserved."`) bleibe neutral, „bis die Rechtsträger-Frage geklärt ist". Sie ist jetzt geklärt — ob dort künftig „SalesTalent, a Calltalent LLC brand" o. Ä. stehen soll, ist eine Marken-Entscheidung von Josip, keine technische; unverändert gelassen.
+
+## Spam-Vorfall Kontaktformular + Bot-Schutz (25.08.2026)
+
+**Anlass:** Josip bekam am 24.08.2026 um 23:26 Uhr eine Kontaktanfrage über `/kontakt` (SalesTalent-Host), die eine klassische SEO-/Webmaster-Spam-Mail war: Vorname `Dear http://salestalent.app/<pfad>`, Nachname `Administrator Gee`, Nachricht „To the … Webmaster". Auftrag: Datenbanken prüfen und einen Security-Check durchführen, um solchen Spam zu vermeiden.
+
+**Befund Datenbank (Supabase-MCP, Projekt `vklqksdiyiijzoirntyt`):**
+
+1. **Kein Datenleck, kein Einbruch.** Kontaktanfragen werden nirgends gespeichert (es gibt bewusst keine `contact_requests`-Tabelle) — der Spam existierte nur als E-Mail. In `auth.users` steht kein einziges Spam-Konto: die 110 `profiles` sind zu 101 der CSV-Import-Testbestand vom 10.07.2026, der Rest sind Josips eigene Konten, E2E- und API-Testnutzer. Keine fremden Mandanten, keine fremden Mitgliedschaften.
+2. **Der Beleg für die Lücke steht in `rate_limits`:** fünf `contact-form:*`-Schlüssel, vier davon von je einer anderen IP (`203.17.245.196` = der gemeldete Vorfall, `185.240.33.242`, `106.219.122.20`, `172.84.125.72`), **jeder mit `count = 1`**. Der Bot schickt eine Anfrage pro IP und rotiert dann — ein reines IP-Limit (bisher 5 pro 5 Minuten) kann so ein Muster prinzipiell nicht fassen. Von den fünf Absendungen seit dem 10.07.2026 war nur eine (`31.47.30.19`) Josips eigener Test; das reale Aufkommen ist also ~1 legitime Anfrage/Monat gegen 4 Spam-Anfragen.
+3. Empfänger war `office@calltalent.ai`, weil `tenants.settings.support_email` bei `salestalent` (und `demo-blau`) leer ist und der Fallback greift — korrektes Verhalten, aber Josip bekommt dadurch den Spam der Mandanten.
+4. **Kein Injection-Risiko in der Benachrichtigungsmail:** `contactFormNotification()` escaped alle Felder (`escapeHtml`), die klickbaren Links in Gmail entstehen erst durch Gmails eigene Auto-Verlinkung des Klartexts.
+
+**Erledigt (Code, alles neu unter `src/lib/contact/`):**
+
+1. `patterns.ts` (NEU) — Feldnamen der versteckten Felder, Zeitkonstanten und die Link-/Markup-Erkennung (`countLinks`, `containsLink`, `containsMarkup`). E-Mail-Adressen werden vor der Link-Zählung entfernt, damit eine zweite Kontaktadresse in der Nachricht nicht als Link zählt.
+2. `spam.ts` (NEU, `server-only`) — Punktbewertung mit Schwellwert 6: Link/E-Mail/Markup im Namensfeld (+6), Markup in der Nachricht (+5), Links in der Nachricht (1/2/≥3 → +1/+3/+6), Rollen-Anrede „Dear Webmaster"/„To the … Administrator" (+4), SEO-/Werbevokabular (+2 je Treffer, gedeckelt bei +6). Bewusst `server-only`, damit die Phrasenliste nicht im Client-Bundle nachlesbar ist.
+3. `form-token.ts` (NEU) — Zeitfalle: `/kontakt` gibt pro Seitenaufruf einen HMAC-SHA-256-signierten Zeitstempel aus (Schlüsselmaterial vom ohnehin serverseitigen `SUPABASE_SERVICE_ROLE_KEY`, kein neues Secret für Josip). Absenden unter 3 Sekunden oder ohne gültige Signatur (= direktes POST auf die Server Action) ist maschinell; älter als 3 Stunden = Formular abgelaufen.
+4. `schema.ts` — Namensfelder dürfen keine Links, E-Mail-Adressen oder Tags mehr enthalten, Maximallänge von 200 auf 80. Genau darüber lief der Vorfall.
+5. `actions.ts` — fünf Schichten in Kostenreihenfolge: Honeypot → Zeitfalle → Rate-Limits → zod → Inhaltsbewertung. **Neu bei den Limits:** zusätzlich 3 Anfragen/Stunde je Absenderadresse (sha256-Hash als Schlüssel, keine PII) und **30 Anfragen/Stunde je Empfänger-Postfach** — Letzteres ist die eigentliche Antwort auf den verteilten Bot. Erkannte Bots (Honeypot/Zeitfalle) sehen dieselbe Erfolgsmeldung wie Menschen, damit der Betreiber keine Rückmeldung zum Nachjustieren bekommt; die inhaltlichen Regeln melden dagegen einen konkreten, korrigierbaren Fehler samt Support-Adresse, damit ein Fehlurteil keine echte Anfrage verschluckt.
+6. `kontakt-form.tsx` / `page.tsx` — verstecktes Token-Feld und Honeypot (`website`). Der Honeypot steht außerhalb des Sichtfelds statt auf `display:none` (das überspringen viele Bots) und ist per `aria-hidden` + `tabIndex={-1}` für Screenreader und Tastatur unsichtbar — die Falle darf einen blinden Nutzer nie treffen (CLAUDE.md §3.4).
+7. Tests: `spam.test.ts` (13 Fälle, u. a. der nachgebaute Vorfall als Regressionstest — mit erfundener Domain/Adresse, CLAUDE.md §2.6) und `form-token.test.ts` (5 Fälle, inkl. zurückdatiertem Zeitstempel bei gültiger Signatur). Die Hälfte der Fälle prüft bewusst die Gegenrichtung: echte deutsche Anfragen, Namen mit Umlauten/Apostroph/Bindestrich und eine Anfrage mit einem einzelnen Link müssen durchkommen.
+
+**Verifikation:** `npm run lint` → 0 Fehler. `npx tsc --noEmit` → 0 Fehler. `npx vitest run` → 695 grün (18 neu); die zwei roten Dateien (`env.test.ts`, `marketplace/fulfil.test.ts`) scheitern wie in den Vorblöcken ausschließlich an der fehlenden `.env` dieser Sitzungsumgebung — auf dem unveränderten Stand (`git stash`) scheitern sie identisch. Playwright nicht gelaufen (kein Dev-Server/keine `.env`, bekannter Blocker).
+
+**Risiken / bewusste Entscheidungen:**
+
+1. **Kein CAPTCHA.** Cloudflare Turnstile wäre die nächste Eskalationsstufe (Stack-nativ, DSGVO-freundlich, kostenlos), braucht aber Schlüssel aus Josips Cloudflare-Konto und lädt ein Drittanbieter-Skript. Die fünf jetzigen Schichten stoppen diese Bot-Klasse ohne beides. Sollte trotzdem Spam durchkommen: Turnstile nachrüsten.
+2. **Anfragen werden weiterhin nicht in der Datenbank gespeichert.** Das ist datenschutzseitig die sparsamere Variante, heißt aber: keine Historie und keine Auswertung, wie oft der Filter greift. Abgewiesene Anfragen erscheinen nur als `console.warn` (mit Grund und Punktwert, ohne Inhalt) in den Worker-Logs.
+3. **Zwei Fehlurteil-Fälle sind denkbar:** eine echte Nachricht mit drei oder mehr Links, und ein Formular, das länger als 3 Stunden offen stand. Beide melden Klartext, was zu tun ist, und nennen die Support-Adresse als Ausweichweg.
+
+**Noch offen / an Josip:**
+
+1. **Deploy nötig** — der Schutz greift erst nach `npm run deploy` (nur Josip, CLAUDE.md §4.6). Bis dahin ist das Formular live unverändert offen.
+2. **`support_email` je Mandant setzen** (Admin-Einstellungen): solange `salestalent` und `demo-blau` keine eigene Adresse haben, landet jede Anfrage dieser Mandanten — auch der durchgelassene Spam — in Josips Postfach statt beim Mandanten.
+3. Unabhängig vom Vorfall gefunden, unverändert offen (Supabase-Advisor): `marketplace_ledger` und `platform_settings` haben RLS aktiviert, aber keine einzige Policy (damit für alle Rollen dicht — funktional gewollt, aber besser explizit dokumentiert), `btree_gist` liegt im `public`-Schema, und **Leaked Password Protection ist in Supabase Auth deaktiviert** (ein Klick im Dashboard, prüft Passwörter gegen HaveIBeenPwned).

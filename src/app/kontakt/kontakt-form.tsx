@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { submitContactForm } from "@/lib/contact/actions";
 import { initialContactActionState } from "@/lib/contact/state";
 import { CONTACT_SUBJECTS } from "@/lib/contact/schema";
+import { CONTACT_HONEYPOT_FIELD, CONTACT_TOKEN_FIELD } from "@/lib/contact/patterns";
 
 /**
  * Design-Block 4 (12.07.2026, Claude-Design-Export "Kontakt.dc.html") —
@@ -22,12 +23,22 @@ import { CONTACT_SUBJECTS } from "@/lib/contact/schema";
  * selbst über `getTenant()` auf — beide Stellen verwenden denselben Fallback
  * (`settings.support_email` des Mandanten, sonst office@calltalent.ai),
  * bleiben also konsistent, ohne dass der Wert doppelt gepflegt werden muss.
+ *
+ * Bot-Schutz NEU (25.08.2026, siehe lib/contact/patterns.ts + spam.ts): zwei versteckte
+ * Felder — Honeypot und das von page.tsx signierte Zeitstempel-Token. Der
+ * Honeypot liegt bewusst außerhalb des Sichtfelds statt auf `display:none`
+ * (letzteres überspringen viele Bots) und ist per `aria-hidden` +
+ * `tabIndex={-1}` für Screenreader und Tastaturbedienung unsichtbar — die
+ * Falle darf einen sehenden wie einen blinden Nutzer nie treffen
+ * (CLAUDE.md §3.4).
  */
 export function KontaktForm({
+  formToken,
   tenantName,
   logoUrl,
   supportEmail,
 }: {
+  formToken: string;
   tenantName: string;
   logoUrl: string | null;
   supportEmail: string;
@@ -136,6 +147,18 @@ export function KontaktForm({
             </p>
           ) : (
             <form action={action} className="flex flex-col gap-[18px]">
+              <input type="hidden" name={CONTACT_TOKEN_FIELD} value={formToken} />
+              <div aria-hidden="true" className="absolute left-[-9999px] top-auto h-px w-px overflow-hidden">
+                <label htmlFor="kontakt-website">Website (bitte leer lassen)</label>
+                <input
+                  id="kontakt-website"
+                  name={CONTACT_HONEYPOT_FIELD}
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  defaultValue=""
+                />
+              </div>
               <div className="flex gap-4">
                 <label className="flex flex-1 flex-col gap-[7px] text-sm font-semibold" style={{ color: "#3E3F66" }}>
                   Vorname
