@@ -1,3 +1,4 @@
+import { publicEnv } from "@/lib/env";
 import { getTenant } from "@/lib/tenant/context";
 import { issueContactFormToken } from "@/lib/contact/form-token";
 import { KontaktForm } from "./kontakt-form";
@@ -14,6 +15,8 @@ import { KontaktForm } from "./kontakt-form";
  * signiertes Zeitstempel-Token aus, das die Server Action gegenprüft
  * (Zeitfalle). Die Seite ist über `getTenant()` -> `headers()` ohnehin
  * dynamisch gerendert, jeder Aufruf bekommt also ein frisches Token.
+ * `turnstileSiteKey` ist `null`, solange Turnstile nicht konfiguriert ist —
+ * dann rendert das Formular kein Widget (security/turnstile.ts).
  */
 export default async function KontaktPage() {
   const [tenant, formToken] = await Promise.all([getTenant(), issueContactFormToken()]);
@@ -21,6 +24,7 @@ export default async function KontaktPage() {
   return (
     <KontaktForm
       formToken={formToken}
+      turnstileSiteKey={publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? null}
       tenantName={tenant?.name || "Calltalent"}
       logoUrl={tenant?.branding?.logo_url ?? null}
       supportEmail={tenant?.settings?.support_email?.trim() || "office@calltalent.ai"}

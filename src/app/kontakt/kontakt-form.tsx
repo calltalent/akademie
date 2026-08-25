@@ -5,6 +5,7 @@ import { submitContactForm } from "@/lib/contact/actions";
 import { initialContactActionState } from "@/lib/contact/state";
 import { CONTACT_SUBJECTS } from "@/lib/contact/schema";
 import { CONTACT_HONEYPOT_FIELD, CONTACT_TOKEN_FIELD } from "@/lib/contact/patterns";
+import { TurnstileWidget } from "@/components/security/turnstile-widget";
 
 /**
  * Design-Block 4 (12.07.2026, Claude-Design-Export "Kontakt.dc.html") —
@@ -34,11 +35,13 @@ import { CONTACT_HONEYPOT_FIELD, CONTACT_TOKEN_FIELD } from "@/lib/contact/patte
  */
 export function KontaktForm({
   formToken,
+  turnstileSiteKey,
   tenantName,
   logoUrl,
   supportEmail,
 }: {
   formToken: string;
+  turnstileSiteKey: string | null;
   tenantName: string;
   logoUrl: string | null;
   supportEmail: string;
@@ -228,6 +231,10 @@ export function KontaktForm({
                   style={{ borderColor: "#D8DAEA", color: "#1A1A2E" }}
                 />
               </label>
+
+              {turnstileSiteKey && (
+                <TurnstileWidget siteKey={turnstileSiteKey} resetSignal={state.error} />
+              )}
 
               {state.error && (
                 <p role="alert" className="text-sm" style={{ color: "#B24343" }}>

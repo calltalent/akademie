@@ -7,6 +7,11 @@ import { classifyContactSubmission } from "@/lib/contact/spam";
 import { CONTACT_HONEYPOT_FIELD, CONTACT_TOKEN_FIELD } from "@/lib/contact/patterns";
 import { verifyContactFormToken } from "@/lib/contact/form-token";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
+import {
+  TURNSTILE_FAILED_MESSAGE,
+  TURNSTILE_RESPONSE_FIELD,
+  verifyTurnstile,
+} from "@/lib/security/turnstile";
 import { sendEmail } from "@/lib/email/client";
 import { contactFormNotification } from "@/lib/email/templates";
 import { getTenant } from "@/lib/tenant/context";
@@ -36,15 +41,20 @@ import { getTenant } from "@/lib/tenant/context";
  *     insgesamt. Die dritte Ebene ist die Lehre aus dem Vorfall — die
  *     `rate_limits`-Tabelle zeigt vier Spam-Anfragen von vier verschiedenen
  *     IPs mit je einem Treffer, ein reines IP-Limit greift dagegen nie.
- *  4. zod-Schema: keine Links/Markup in Namensfeldern (schema.ts).
- *  5. Inhaltsbewertung der Nachricht (spam.ts).
+ *  4. Cloudflare Turnstile, sobald konfiguriert (security/turnstile.ts) —
+ *     die einzige Schicht, die den Absender selbst als Bot erkennt statt
+ *     seinen Inhalt zu bewerten. Ohne gesetzte Schlüssel übersprungen.
+ *  5. zod-Schema: keine Links/Markup in Namensfeldern (schema.ts).
+ *  6. Inhaltsbewertung der Nachricht (spam.ts).
  *
  * Erkannte Bots (Schicht 1/2) bekommen bewusst dieselbe Erfolgsmeldung wie
  * Menschen: eine sichtbare Ablehnung ist für den Betreiber eines Spam-Bots
  * die Rückmeldung, mit der er sein Muster anpasst. Schicht 4/5 melden
  * dagegen einen konkreten, korrigierbaren Fehler — dort ist ein
  * Fehlurteil gegen einen echten Absender denkbar, und der soll seine
- * Anfrage anpassen können statt ins Leere zu schreiben.
+ * Anfrage anpassen können statt ins Leere zu schreiben. Turnstile liegt
+ * dazwischen: ein ungültiges Token wird abgelehnt, ein Ausfall bei
+ * Cloudflare dagegen durchgelassen (fail-open, siehe turnstile.ts).
  */
 export async function submitContactForm(
   _prevState: ContactActionState,
@@ -69,6 +79,12 @@ export async function submitContactForm(
 
   if (!(await checkRateLimit("contact-form", { maxRequests: 5, windowSeconds: 300 }))) {
     return { error: RATE_LIMIT_MESSAGE };
+  }
+
+  // Nach dem IP-Limit, damit eine Flut nicht ungebremst Anfragen an
+  // Cloudflares siteverify-Endpunkt auslöst.
+  if ((await verifyTurnstile(formData.get(TURNSTILE_RESPONSE_FIELD))) === "failed") {
+    return { error: TURNSTILE_FAILED_MESSAGE };
   }
 
   const parsed = contactFormSchema.safeParse({
