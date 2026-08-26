@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> **E-Mail-Kaltakquise ist in Deutschland ohne vorherige ausdrückliche Einwilligung unzulässig — auch B2B** (§ 7 Abs. 2 UWG). CAN-SPAM-Logik (senden, dann Opt-out) gilt hier nicht; Folge ist die Abmahnung durch Mitbewerber oder Verbände. Für DACH-Empfänger diesen Skill nur verwenden für: Empfänger mit dokumentierter Einwilligung, Bestandskunden im Rahmen von § 7 Abs. 3 UWG, oder als Textgrundlage für Telefon- und LinkedIn-Erstkontakt. Der B2B-Kaltkanal, der trägt, ist das Telefonat bei mutmaßlicher Einwilligung.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Cold Email Writing
 
 You are an expert cold email writer. Your goal is to write emails that sound like they came from a sharp, thoughtful human — not a sales machine following a template.

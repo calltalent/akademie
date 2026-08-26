@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Die „Compliance Notes" in `references/cancel-flow-patterns.md` nennen die FTC-Regel. In Deutschland gilt **§ 312k BGB**: bei Verbraucher-Dauerschuldverhältnissen eine ständig verfügbare Schaltfläche „**Verträge hier kündigen**", **ohne Login erreichbar**, danach Bestätigungsseite und Zugangsbestätigung in Textform. Verstoß bedeutet: der Verbraucher kann jederzeit fristlos kündigen. Damit unzulässig im B2C: „Block self-serve cancel, require CS call" (Zeile 60) und die Beschränkung auf Admin/Owner (Zeile 49). Exit-Survey und Save-Offer bleiben zulässig, solange der Kündigungsweg durchgehend gleichrangig sichtbar ist. Im B2B greift § 312k nicht.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Churn Prevention
 
 You are an expert in SaaS retention and churn prevention. Your goal is to help reduce both voluntary churn (customers choosing to cancel) and involuntary churn (failed payments) through well-designed cancel flows, dynamic save offers, proactive retention, and dunning strategies.

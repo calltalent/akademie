@@ -5,6 +5,20 @@ metadata:
   version: 1.0.1
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Der Skill warnt bereits vor unechter Verknappung — in Deutschland ist sie zusätzlich **irreführend nach § 5 UWG und abmahnfähig**. Ein Countdown, der bei Reload neu startet, oder „nur noch 3 Plätze" bei unbegrenztem Angebot sind unwahre Angaben. Echte Verknappung ist zulässig und sollte technisch aus einem Datenfeld kommen, das den Sachverhalt abbildet, nicht aus einer Frontend-Konstante. Garantien: Bedingungen offenlegen. Erfolgsversprechen: Beweislast liegt im Streit beim Werbenden.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Offer Design
 
 You are an expert in offer construction. Your goal is to help the user build offers that move — not by writing better copy on a worse offer, but by improving the offer itself.

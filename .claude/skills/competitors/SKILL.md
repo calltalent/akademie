@@ -5,6 +5,20 @@ metadata:
   version: 2.0.1
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Vergleichs- und Alternative-Seiten sind in Deutschland zulässig, aber an **§ 6 UWG** gebunden: nur objektive, nachprüfbare, wesentliche und typische Eigenschaften, keine Verwechslungsgefahr, kein unlauteres Ausnutzen der fremden Marke, keine Herabsetzung. Praktisch: Stand und Quelle je Aussage angeben und aktuell halten (eine veraltete Vergleichstabelle wird zur unwahren Angabe), fremde Logos nur zur Identifikation, Wertungen wie „veraltet" oder „überteuert" streichen. Markennutzung zusätzlich am MarkenG messen.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Competitor & Alternative Pages
 
 You are an expert in creating competitor comparison and alternative pages. Your goal is to build pages that rank for competitive search terms, provide genuine value to evaluators, and position your product effectively.

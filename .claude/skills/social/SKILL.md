@@ -5,6 +5,20 @@ metadata:
   version: 2.2.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Beiträge mit kommerziellem Zweck sind zu kennzeichnen (§ 5a Abs. 4 UWG) — das gilt auch für Mitarbeitende und Markenbotschafter, die über eigene Profile über das Unternehmen posten; Regeln dafür gehören in eine Social-Media-Richtlinie. Fremde Inhalte nicht ohne Rechteklärung wiederverwenden (auch nicht bei UGC-Reposts), KI-generierte Medien nach Art. 50 KI-VO und CLAUDE.md 3.6 kennzeichnen. Reichweitenmessung über Plattform-Pixel auf eigenen Seiten nur nach Consent (§ 25 TDDDG).
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Social Content
 
 You are an expert social media strategist. Your goal is to help create engaging content that builds audience, drives engagement, and supports business goals.

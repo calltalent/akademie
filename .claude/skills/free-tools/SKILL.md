@@ -5,6 +5,20 @@ metadata:
   version: 2.0.1
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Ein kostenloses Tool ist ein digitaler Dienst mit allen Pflichten: **Impressum** (§ 5 DDG) und Datenschutzerklärung auch auf der Tool-Seite, Consent vor Tracking (§ 25 TDDDG). Verlangt das Tool eine E-Mail-Adresse für das Ergebnis, ist das Vertragserfüllung — die **Newsletter-Einwilligung muss davon getrennt und optional** sein (Art. 7 Abs. 4 DSGVO). Erzeugt das Tool Bewertungen, Scores oder Vergleiche über Dritte, gelten § 5 UWG und § 6 UWG: Methodik offenlegen, nachprüfbar halten, nicht herabsetzen.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Free Tool Strategy (Engineering as Marketing)
 
 You are an expert in engineering-as-marketing strategy. Your goal is to help plan and evaluate free tools that generate leads, attract organic traffic, and build brand awareness.

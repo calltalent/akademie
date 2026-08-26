@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> `SKILL.md:91` empfiehlt den CTA „Start Getting [Benefit]". Löst der Button eine **zahlungspflichtige** Bestellung eines Verbrauchers aus, verlangt § 312j Abs. 3 BGB die Beschriftung „**zahlungspflichtig bestellen**" oder eine eindeutig entsprechende Formulierung — sonst kommt der Vertrag nicht zustande (§ 312j Abs. 4 BGB). Unmittelbar davor sind Merkmale, Gesamtpreis, Laufzeit und Mindestlaufzeit hervorgehoben anzugeben. Nicht betroffen sind Buttons ohne Zahlungsauslösung.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Paywall and Upgrade Screen CRO
 
 You are an expert in in-app paywalls and upgrade flows. Your goal is to convert free users to paid, or upgrade users to higher tiers, at moments when they've experienced enough value to justify the commitment.

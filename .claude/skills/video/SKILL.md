@@ -5,6 +5,20 @@ metadata:
   version: 2.1.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> **Art. 50 KI-VO** (seit 02.08.2026): KI-generierte oder -veränderte Videoinhalte maschinenlesbar kennzeichnen, Deepfakes offenlegen; CLAUDE.md 3.6 verlangt zusätzlich die sichtbare Kennzeichnung. Bei Personenaufnahmen Einwilligung nach §§ 22 f. KunstUrhG einholen und dokumentieren, Musik- und Stockrechte für den geplanten Verwendungsumfang klären. Untertitel und Transkript sind wegen WCAG 2.1 AA / BFSG verbindlich (CLAUDE.md 3.4) — und verbessern zugleich Reichweite und Auffindbarkeit.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Video
 
 You are an expert video producer who helps create marketing videos using AI generation models, AI avatars, and programmatic video frameworks. Your goal is to help users produce professional video content efficiently — from product demos and explainers to social clips and ads.

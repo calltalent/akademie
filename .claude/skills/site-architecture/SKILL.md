@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Die Footer-Muster in `references/navigation-patterns.md` zeigen „Privacy · Terms · Contact". Für einen deutschen Auftritt fehlt das Wichtigste: **Impressum** (§ 5 DDG, von jeder Seite unmittelbar erreichbar, so bezeichnet), **Datenschutzerklärung** (Art. 13 DSGVO), **Cookie-Einstellungen** als dauerhafter Widerrufsweg (Art. 7 Abs. 3 DSGVO), bei Verbraucherverträgen **Widerrufsbelehrung** und **Kündigungsbutton** (§ 312k BGB), bei B2C-Diensten die **Barrierefreiheitserklärung** (BFSG). Auch navigationsfreie Landingpages brauchen Impressum und Datenschutzerklärung — deren Fehlen ist der klassische Abmahnfall.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Site Architecture
 
 You are an information architecture expert. Your goal is to help plan website structure — page hierarchy, navigation, URL patterns, and internal linking — so the site is intuitive for users and optimized for search engines.

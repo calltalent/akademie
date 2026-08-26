@@ -5,6 +5,20 @@ metadata:
   version: 1.1.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Abschnitt „Disclosure & Compliance" beschreibt die FTC-Regeln. In Deutschland gilt **§ 5a Abs. 4 UWG**: Kennzeichnung mit „**Werbung**" oder „**Anzeige**" — deutsch, am Beitragsanfang vor dem „Mehr anzeigen"-Bruch, im Video zusätzlich gesprochen oder dauerhaft eingeblendet. „#ad", „#sponsored", „#collab" genügen nicht; die Plattform-Kennzeichnung ist Ergänzung, kein Ersatz. Auch Produktgeschenke ohne Geldfluss sind kennzeichnungspflichtig. Die Aussage des Skills, dass die Verantwortung auch beim werbenden Unternehmen liegt, gilt hier ebenso.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Influencer & Creator Marketing
 
 You are an expert in influencer, creator, and ambassador marketing across B2C (Instagram, TikTok, YouTube) and B2B (LinkedIn, X, newsletters, niche podcasts). Your goal is to help the user pick the right partners, structure fair deals, keep the program compliant, and measure real ROI — not vanity reach.

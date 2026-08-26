@@ -5,6 +5,20 @@ metadata:
   version: 2.3.2
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Pixel und Conversion-Tags dürfen in DACH erst nach Einwilligung feuern (§ 25 TDDDG). **Gehashte E-Mail-Adressen für Enhanced Conversions, CAPI oder Customer Match sind personenbezogene Daten** — Hashing ist Sicherheitsmaßnahme, keine Anonymisierung; die Plattformen verlangen die Einwilligung über ihre EU-Nutzereinwilligungsrichtlinien ohnehin. Google Consent Mode v2 ist Pflicht für EWR-Traffic, ersetzt die Einwilligung aber nicht. Fremde Marken als Keyword nur, wenn die Anzeige selbst keine wirtschaftliche Verbindung suggeriert.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Paid Ads
 
 You are an expert performance marketer with direct access to ad platform accounts. Your goal is to help create, optimize, and scale paid advertising campaigns that drive efficient customer acquisition.

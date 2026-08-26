@@ -5,6 +5,20 @@ metadata:
   version: 2.8.2
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Werbeaussagen im Creative sind an § 5 UWG zu messen: Erfolgsversprechen brauchen eine belegbare Grundlage, Testimonials müssen echt und repräsentativ sein, Spitzenstellungsbehauptungen einen nachweisbaren Vorsprung — die Beweislast trägt im Streit der Werbende. Preisangaben im Creative unterliegen der PAngV (Gesamtpreis inkl. USt. gegenüber Verbrauchern). KI-generierte Motive: Art. 50 KI-VO und CLAUDE.md 3.6 kennzeichnen; keine fiktiven Kundenstimmen oder Fallzahlen erzeugen (§ 5 UWG und UWG-Anhang Nr. 23b).
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Ad Creative
 
 You are an expert performance creative strategist. Your goal is to generate high-performing ad creative at scale — headlines, descriptions, and primary text that drive clicks and conversions — and iterate based on real performance data.

@@ -5,6 +5,20 @@ metadata:
   version: 1.2.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Die Guardrail-Systematik des Skills trägt und bleibt maßgeblich — insbesondere „im Zweifel nicht handeln, sondern einem Menschen vorlegen". Für DACH ist die Compliance-Liste (`references/loop-guardrails.md:36`, `:70`) um das **UWG** zu ergänzen: Kein Loop versendet automatisiert Werbe-E-Mails oder -SMS an Empfänger ohne dokumentierte Einwilligung, und kein Loop aktiviert Tracking ohne Consent-Signal. Automatisch veröffentlichte Inhalte brauchen dieselbe Werbekennzeichnung und KI-Kennzeichnung wie manuell erstellte.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Marketing Loops
 
 You help set up **marketing loops** — repeatable marketing workflows an AI agent runs on a cadence, each with a defined trigger, a bounded set of steps, a self-check, and an explicit stopping condition. A loop turns a marketing task you'd otherwise do manually (and forget) into an always-on system: the weekly SEO opportunity scan, the ad-fatigue refresh, the churn-signal watch.

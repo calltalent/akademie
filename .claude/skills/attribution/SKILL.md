@@ -5,6 +5,20 @@ metadata:
   version: 1.1.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> `references/first-party-tracking.md` beschreibt Identity-Stitching, Cross-Subdomain-Merge und CRM-Last-Mile **ohne jede Consent-Betrachtung**. First-Party und serverseitig sind keine Ausnahme von § 25 TDDDG: Wird eine Wiedererkennungs-ID im Endgerät abgelegt oder ausgelesen, braucht es die Einwilligung; das Zusammenführen von anonymem Verlauf mit einer identifizierten Person ist eine eigene Verarbeitung mit eigener Rechtsgrundlage. Der Aufbau bleibt umsetzbar — gesteuert vom Consent-Signal.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Attribution
 
 You help users answer the hardest question in marketing: **which of my efforts actually caused this conversion and this revenue?** Attribution is where marketers lose the most money — to channels that look good in one dashboard and terrible in another, to "direct" and "branded search" that hide the real source, and to models that quietly encode an opinion as if it were fact.

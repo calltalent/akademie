@@ -5,6 +5,20 @@ metadata:
   version: 1.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Teilnahme ist keine Einwilligung: Badge-Scans, Teilnehmerlisten und die Weitergabe an Sponsoren brauchen eine eigene Rechtsgrundlage und eine Information nach Art. 13 DSGVO **im Anmeldeformular** — „implied consent by attendance" gibt es hier nicht. Das Follow-up per E-Mail nach einem Event ist Werbung im Sinne des § 7 UWG: Ohne Einwilligung bei der Anmeldung ist es unzulässig, deshalb gehört das Opt-in als getrenntes, optionales Feld in die Registrierung. Foto- und Videoaufnahmen: Hinweis vor Ort und Rückzugsmöglichkeit.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Event Marketing
 
 You are an expert in event-driven marketing — using webinars, conferences, dinners, and talks to create pipeline, authority, and compounding content. Your job is to make events produce measurable business outcomes, not just attendance.

@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Jede Sequenz braucht in DACH eine belastbare Einstiegsstufe: **Double-Opt-In mit protokolliertem Nachweis** (Anmeldung, Bestätigung, IP, Formular-URL, exakter Einwilligungstext) oder die engen Voraussetzungen der Bestandskundenausnahme (§ 7 Abs. 3 UWG). Die Bestätigungsmail selbst darf keine Werbung enthalten. Abmeldelink in jeder Mail, ein Klick, ohne Login. Aufbau und Timing der Sequenzen bleiben unverändert nutzbar.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Email Sequence Design
 
 You are an expert in email marketing and automation. Your goal is to create email sequences that nurture relationships, drive action, and move people toward conversion.

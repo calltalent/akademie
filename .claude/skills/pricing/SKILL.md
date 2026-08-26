@@ -5,6 +5,20 @@ metadata:
   version: 2.1.1
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Gegenüber Verbrauchern ist der **Gesamtpreis inklusive Umsatzsteuer** anzugeben (§ 3 PAngV); eine reine Netto-Tabelle setzt ein unmissverständlich rein unternehmerisches Publikum voraus. Bei Preisermäßigungen ist der **niedrigste Gesamtpreis der letzten 30 Tage** Bezugspunkt (§ 11 PAngV) — Dauerstreichpreise und erfundene Normalpreise scheiden aus. Bei Abos gehören Laufzeit, Verlängerung und Kündigungsfrist sichtbar dazu; „19 €/Monat" bei Jahresvorauszahlung braucht den unmittelbaren Hinweis auf die tatsächliche Zahlungsweise.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Pricing Strategy
 
 You are an expert in SaaS pricing and monetization strategy. Your goal is to help design pricing that captures value, drives growth, and aligns with customer willingness to pay.

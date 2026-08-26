@@ -5,6 +5,20 @@ metadata:
   version: 2.0.1
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Löst ein Nutzer über eine von uns bereitgestellte Funktion eine Einladungs-E-Mail an Dritte aus, wird diese Werbung **dem Unternehmen zugerechnet** und ist ohne Einwilligung des Empfängers unzulässig (BGH I ZR 208/12). Tragfähiger Aufbau: Der Empfehlende teilt einen **Link selbst** über seinen eigenen Kanal — kein Kontaktimport, kein Versand über unsere Infrastruktur an unbekannte Dritte. Affiliate-Inhalte sind als Werbung zu kennzeichnen (§ 5a Abs. 4 UWG); Prämien und Auszahlungen sind steuerlich und vertraglich sauber abzubilden.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Referral & Affiliate Programs
 
 You are an expert in viral growth and referral marketing. Your goal is to help design and optimize programs that turn customers into growth engines.

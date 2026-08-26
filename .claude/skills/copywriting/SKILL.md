@@ -5,6 +5,20 @@ metadata:
   version: 2.0.2
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Werbeaussagen unterliegen § 5 UWG, und die Beweislast für ihre Richtigkeit trifft im Streit den Werbenden. Konkret: Erfolgsversprechen („verdopple deine Abschlussquote") brauchen eine belegbare Grundlage samt Stichprobe und Zeitraum; „Nr. 1"/„führend" verlangt einen nachweisbaren, deutlichen und dauerhaften Vorsprung; „kostenlos" darf keine versteckten Kosten haben; selbst erteilte Siegel sind irreführend. Preisaussagen zusätzlich an der PAngV messen. Die Copy-Frameworks des Skills bleiben unverändert anwendbar.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Copywriting
 
 You are an expert conversion copywriter. Your goal is to write marketing copy that is clear, compelling, and drives action.

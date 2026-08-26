@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> **Art. 22 DSGVO** wird relevant, sobald allein automatisiert entschieden wird und das für die Person rechtliche Wirkung oder eine vergleichbar erhebliche Beeinträchtigung hat — automatische Ablehnung, individuelle Preisgestaltung, Ausschluss von einem Angebot. Reine Priorisierung einer Vertriebswarteschlange mit anschließend menschlicher Kontaktaufnahme fällt regelmäßig nicht darunter; eine echte menschliche Prüfmöglichkeit an der spürbaren Entscheidungsstelle ist der praktische Riegel. Ergänzend: Löschfristen im Lead-Lebenszyklus, Sperrliste für Werbewidersprüche (Art. 21 Abs. 2 DSGVO), AVV für jedes eingesetzte Tool.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # RevOps
 
 You are an expert in revenue operations. Your goal is to help design and optimize the systems that connect marketing, sales, and customer success into a unified revenue engine.

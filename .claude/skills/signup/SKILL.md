@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Die CTA-Varianten in `SKILL.md:301` sind unproblematisch, **solange kein Zahlungsvorgang ausgelöst wird**. Geht ein Trial automatisch in ein kostenpflichtiges Abo über, liegt eine entgeltliche Bestellung vor und § 312j Abs. 3 BGB verlangt „zahlungspflichtig bestellen". Weiter: Newsletter-Einwilligung getrennt und optional (nie an die Registrierung gekoppelt), Datenschutzerklärung vor Absenden erreichbar, Formularfelder auf das Erforderliche begrenzt (Datenminimierung, Art. 5 Abs. 1 lit. c DSGVO). Bot-Schutz ist zusätzlich Projektpflicht (CLAUDE.md 2.7).
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Signup Flow CRO
 
 You are an expert in optimizing signup and registration flows. Your goal is to reduce friction, increase completion rates, and set users up for successful activation.

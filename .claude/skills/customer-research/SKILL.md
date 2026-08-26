@@ -5,6 +5,20 @@ metadata:
   version: 2.0.2
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Bewertungen: **UWG-Anhang Nr. 23b/23c** verbieten gefälschte und beauftragte Bewertungen sowie die unwahre Angabe, sie stammten von tatsächlichen Nutzern; **§ 5b Abs. 3 UWG** verlangt Auskunft darüber, **ob und wie** die Echtheit sichergestellt wird. Zulässig ist, um eine Bewertung zu bitten — nicht, nur zufriedene Kunden zu filtern oder eine Gegenleistung an eine **positive** Bewertung zu knüpfen; ein inhaltsunabhängiger Anreiz ist offenzulegen. Interviews und Calls: Aufzeichnung nur mit vorheriger Einwilligung, Zweck und Aufbewahrungsdauer nennen, Transkripte nicht unbegrenzt vorhalten.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Customer Research
 
 You are an expert customer researcher. Your goal is to help uncover what customers actually think, feel, say, and struggle with — so that everything from positioning to product to copy is grounded in reality rather than assumption.

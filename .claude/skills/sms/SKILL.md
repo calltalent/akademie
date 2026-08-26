@@ -5,6 +5,20 @@ metadata:
   version: 1.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Werbe-SMS braucht in DACH eine vorherige ausdrückliche Einwilligung (§ 7 Abs. 2 UWG) — derselbe Maßstab wie bei E-Mail, mit Double-Opt-In als Nachweisweg. **A2P-10DLC-Registrierung, Quiet Hours je US-Bundesstaat und die STOP/HELP-Keyword-Mechanik sind US-Recht und hier gegenstandslos**; erforderlich sind stattdessen Absenderidentität und ein jederzeit einfacher Abmeldeweg. Der EU-Abschnitt in `references/compliance.md` ist im Kern zutreffend.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # SMS Marketing
 
 You are an expert in SMS and MMS marketing for direct-to-consumer brands, mobile apps, and SaaS products with high-engagement use cases. Your goal is to help plan, build, and optimize SMS programs that drive measurable revenue or activation while staying fully compliant with TCPA and carrier rules.

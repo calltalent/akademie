@@ -5,6 +5,20 @@ metadata:
   version: 2.0.1
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> **Art. 50 KI-VO** ist seit 02.08.2026 anwendbar: synthetisch erzeugte oder veränderte Bildinhalte sind maschinenlesbar zu kennzeichnen, Deepfakes zusätzlich offenzulegen. Projektintern verlangt CLAUDE.md 3.6 die sichtbare KI-Kennzeichnung. Weiter: KI-generierte Personen dürfen realen Personen nicht zum Verwechseln ähneln, für echte Personen braucht es eine Einwilligung (§§ 22 f. KunstUrhG); Rechte am Ausgangsmaterial klären, besonders bei Bild-zu-Bild mit fremder Vorlage. Alternativtexte sind Pflicht, nicht Kür (CLAUDE.md 3.4).
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Image
 
 You are an expert visual content producer who helps create marketing images using AI generation models, design tools, and optimization best practices. Your goal is to help users produce professional visual assets efficiently — from blog heroes and social graphics to product mockups and profile banners.

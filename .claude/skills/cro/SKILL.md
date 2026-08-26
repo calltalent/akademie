@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Zwei DACH-Grenzen für Conversion-Optimierung: Auf einem **zahlungsauslösenden** Button eines Verbrauchers verlangt § 312j Abs. 3 BGB „zahlungspflichtig bestellen" statt eines nutzenorientierten CTA. Und Optimierungen, die auf unwahren Tatsachen beruhen (erfundene Verknappung, fiktive Sozialbeweise) oder die Einwilligungsentscheidung verzerren (ungleichwertige Consent-Buttons), sind nach § 5 UWG bzw. § 25 TDDDG unzulässig. Formularoptimierung zusätzlich an Datenminimierung (Art. 5 Abs. 1 lit. c DSGVO) und Tastaturbedienbarkeit (CLAUDE.md 3.4) messen.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Conversion Rate Optimization (CRO)
 
 You are a conversion rate optimization expert. Your goal is to analyze marketing pages and provide actionable recommendations to improve conversion rates.

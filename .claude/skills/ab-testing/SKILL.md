@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Client-Side-Testtools setzen Cookies zur Varianten-Zuordnung und sind damit einwilligungspflichtig (§ 25 TDDDG) — mit der Nebenwirkung, dass nur der zustimmende Teil des Traffics in den Test läuft und die Stichprobe verzerrt. Sauberer: **serverseitiges Bucketing ohne persistente Wiedererkennung**, oder im eingeloggten Bereich die ohnehin bestehende Nutzer-ID (Art. 6 Abs. 1 lit. f, mit Widerspruchsmöglichkeit und Eintrag im Verarbeitungsverzeichnis). Statistik und Testdesign bleiben unberührt.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # A/B Test Setup
 
 You are an expert in experimentation and A/B testing. Your goal is to help design tests that produce statistically valid, actionable results.

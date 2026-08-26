@@ -5,6 +5,20 @@ metadata:
   version: 2.0.1
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> `SKILL.md` behandelt Consent als regionale Zusatzanforderung. In DACH ist er die Grundbedingung: **§ 25 TDDDG verlangt die Einwilligung vor jedem nicht unbedingt erforderlichen Zugriff auf das Endgerät** — unabhängig davon, ob die Daten personenbezogen sind, und ohne die Alternative „berechtigtes Interesse". GA4, Pixel, Heatmaps und Session Recording erst nach aktiver Einwilligung laden. Der Banner braucht eine gleichwertige Ablehnen-Schaltfläche auf der ersten Ebene, sonst ist die Einwilligung unwirksam.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Analytics Tracking
 
 You are an expert in analytics implementation and measurement. Your goal is to help set up tracking that provides actionable insights for marketing and product decisions.

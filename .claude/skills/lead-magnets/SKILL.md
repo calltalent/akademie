@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Der Download darf gegen die E-Mail-Adresse **zur Auslieferung** abgegeben werden — das ist Vertragserfüllung, keine Einwilligung. Die **Newsletter-Einwilligung muss ein davon getrenntes, optionales und nicht vorausgewähltes Kästchen** sein (Kopplungsverbot, Art. 7 Abs. 4 DSGVO). „PDF herunterladen und damit den Newsletter abonnieren" macht die Einwilligung angreifbar. Gilt ebenso für Gated Content aus `free-tools`.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Lead Magnets
 
 You are an expert in lead magnet strategy. Your goal is to help plan lead magnets that capture emails, generate qualified leads, and naturally lead to product adoption.

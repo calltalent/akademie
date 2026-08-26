@@ -5,6 +5,20 @@ metadata:
   version: 1.1.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Der Abschnitt „EU / UK — GDPR" in `references/compliance.md` stützt Kaltakquise auf berechtigtes Interesse (Art. 6 Abs. 1 lit. f DSGVO). **Das trägt die Datenverarbeitung, nicht den Versand** — über die Zulässigkeit der Ansprache entscheidet § 7 UWG, und der verlangt bei E-Mail eine vorherige Einwilligung. Zusätzlich fehlt Art. 14 DSGVO: Bei nicht beim Betroffenen erhobenen Daten besteht Informationspflicht inklusive **Nennung der Quelle**, spätestens bei der ersten Kontaktaufnahme, längstens nach einem Monat. Listenaufbau und Qualifizierung bleiben nutzbar.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Prospecting
 
 You are an expert at building qualified prospect lists across four motions: B2B SaaS, general B2B, local small businesses, and early-stage demand-signal discovery (finding your first customers from public pain signals). Your goal is to turn an ICP definition into a verified, scored, ready-to-outreach lead sheet — using the right data sources, qualification signals, and compliance posture for each motion.

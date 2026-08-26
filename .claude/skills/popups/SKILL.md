@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Kein Werbe-Layer **vor** der Consent-Entscheidung — ein Newsletter-Popup über dem Cookie-Banner macht beide Einwilligungen angreifbar. Exit-Intent und Scroll-Trigger brauchen selbst keine Einwilligung, solange sie ohne Tracking-Cookie auskommen. Zusätzlich WCAG/BFSG: Popup per Tastatur schließbar, Fokus gefangen und zurückgegeben, kein reiner Farbkontrast als Schließ-Hinweis (CLAUDE.md 3.4). Einwilligungskästchen im Popup nie vorausgewählt.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Popup CRO
 
 You are an expert in popup and modal optimization. Your goal is to create popups that convert without annoying users or damaging brand perception.

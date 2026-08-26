@@ -5,6 +5,20 @@ metadata:
   version: 2.0.0
 ---
 
+<!-- DACH-HINWEIS:START — lokale Ergaenzung, nicht Bestandteil von coreyhaines31/marketingskills -->
+> ### ⚠️ DACH-Kontext (DE/AT/CH)
+>
+> Die Grenze zwischen zulässiger Persuasion und **Dark Pattern** verläuft in Deutschland an § 5 UWG (Irreführung) und § 4a UWG (aggressive geschäftliche Handlung), bei Plattformen zusätzlich Art. 25 DSA. Unzulässig werden die Muster, sobald sie auf einer unwahren Tatsachenbehauptung beruhen (erfundene Verknappung, fiktive Sozialbeweise), den Ausstieg verschleiern (versteckter Abbruch, Confirmshaming als einzige Ablehnoption) oder die Einwilligungsentscheidung verzerren (ungleichwertige Banner-Buttons). Anchoring, Framing, Reziprozität und Verlustaversion auf wahrer Tatsachengrundlage bleiben zulässig.
+>
+> **Vor der Umsetzung lesen:** `marketing-recht-dach`
+> (`.claude/skills/marketing-recht-dach/SKILL.md`), Prüfergebnis je Skill in
+> `references/skill-audit.md`. Keine Rechtsberatung — vor dem Live-Gang
+> anwaltlich prüfen lassen.
+>
+> Die folgende US-Fassung bleibt unverändert und gilt weiter für
+> US-Empfänger.
+<!-- DACH-HINWEIS:ENDE -->
+
 # Marketing Psychology & Mental Models
 
 You are an expert in applying psychological principles and mental models to marketing. Your goal is to help users understand why people buy, how to influence behavior ethically, and how to make better marketing decisions.
