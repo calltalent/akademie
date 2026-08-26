@@ -102,9 +102,9 @@ REST unter `/api/v1`, Auth über mandantenbezogene API-Keys (Tabelle api_keys, H
 | Phase | Fertig, wenn |
 |---|---|
 | 1 | Zwei Test-Mandanten mit unterschiedlichem Branding laufen parallel; Kurs mit Video anlegen und als Lernender abschließen funktioniert E2E; CSV-Import 100 Nutzer < 30 s; security-reviewer findet keine RLS-Lücke |
-| 2 | Kauf → automatische Einschreibung → Zertifikat nach Abschluss läuft E2E mit Stripe-Testmodus; Reporting-Export stimmt gegen Testdaten |
+| 2 | Kauf → automatische Einschreibung → Zertifikat nach Abschluss läuft E2E mit Stripe-Testmodus; Reporting-Export stimmt gegen Testdaten; Rechtspflichten 13.1–13.3 und 13.7 im Stripe-Pfad nachgewiesen |
 | 3 | Aus 3 PDFs entsteht in < 10 Min. ein übernehmbarer Kursentwurf; Tutor beantwortet 10 Testfragen korrekt mit Quellenangabe und verweigert 2 Off-Topic-Fragen; Kontingent-Abschaltung greift |
-| 4 | Neuer Mandant inkl. Domain in < 5 Min. produktiv; Playwright-Suite grün; Lighthouse ≥ 90; DSGVO-Paket (AVV, TOMs, Exportfunktion) vorhanden |
+| 4 | Neuer Mandant inkl. Domain in < 5 Min. produktiv; Playwright-Suite grün; Lighthouse ≥ 90; DSGVO-Paket (AVV, TOMs, Exportfunktion) vorhanden; Rechtspflichten 13.4–13.6 umgesetzt, Rollenverteilung 13.8 dokumentiert |
 
 ## 9. Offene Entscheidungen
 
@@ -113,6 +113,8 @@ REST unter `/api/v1`, Auth über mandantenbezogene API-Keys (Tabelle api_keys, H
 3. Zertifikats-Design (ein Standard-Template in Phase 2, mandantenfähig via Branding-Farben).
 4. Steuerliche Bestätigung des Merchant-of-Record-Modells (Abschnitt 10) vor dem ersten echten (Nicht-Test-)Marketplace-Verkauf — Rechnungsstellung, OSS-Meldepflicht, ggf. Stripe Tax.
 5. Marketplace-Selbstregistrierung für Käufer ohne bestehendes Konto (aktuell: Verweis auf office@calltalent.ai, kein automatisierter Weg — bewusst zurückgestellt, da Selbstregistrierung ohne Mandantenbezug eine eigene, größere Änderung an einer plattformweiten Kernfunktion wäre).
+6. Rollenverteilung Betreiber ↔ Mandant je Verarbeitung (Art. 26 vs. Art. 28 DSGVO) noch nicht dokumentiert — siehe Abschnitt 13.8; zusammen mit dem noch offenen Vertreter in der Union nach Art. 27 DSGVO (PHASENSTATUS 24.08.2026) anwaltlich zu klären.
+7. Ob der Kündigungsweg nach 13.2 auch Mandanten-Endkundenverträgen bereitgestellt wird oder nur eigenen Verbraucherverträgen von Calltalent — Produktentscheidung, offen.
 
 ## 10. Marketplace (nachträglich ergänzt, 04.08.2026)
 
@@ -126,7 +128,7 @@ Zentraler, mandantenübergreifender Marktplatz nach App-Store-Prinzip unter eige
 
 **DSGVO:** Beim Kauf werden Name/E-Mail/Lernfortschritt an einen vom Käufer nicht als Vertragspartner gewählten Mandanten übermittelt (Art. 6 Abs. 1 lit. b DSGVO, Vertragserfüllung). Hinweis auf der Kurs-Detailseite und im Kaufabschluss mit Namensnennung des Verkäufers.
 
-**Rechtlich:** `marketplace.calltalent.ai` ist ein eigenständiges Telemedienangebot mit eigenem Impressum/Datenschutz/AGB (Calltalent Ltd. als Betreiber), unabhängig von den Mandanten-Rechtsseiten.
+**Rechtlich:** `marketplace.calltalent.ai` ist ein eigenständiges Telemedienangebot mit eigenem Impressum/Datenschutz/AGB (Calltalent LLC als Betreiber, siehe Rechtsträger-Wechsel PHASENSTATUS 24.08.2026), unabhängig von den Mandanten-Rechtsseiten.
 
 **Routen:**
 
@@ -182,3 +184,76 @@ Kalender für Schichtplanung und Zeiterfassung für festangestellte Mitarbeiter 
 **S5-Ergänzung (08.08.2026):** Der bisherige deterministische Feiertagsimport (S2, nur DE/AT/CH über eine im Code berechnete Liste) ist durch eine KI-gestützte Feiertagsrecherche ersetzt, die acht Regionen abdeckt: Deutschland, Österreich, Schweiz, Kroatien, Serbien sowie die drei Entitäten Bosnien und Herzegowinas (Föderation BiH, Republika Srpska, Brčko-Distrikt — kollisionsfrei benannt `BA_FBIH`/`BA_RS`/`BA_BRCKO`, da `RS` bereits der ISO-Code für den Staat Serbien ist). Der Mandant wählt die für ihn relevanten Regionen als eigene Einstellung unter `/admin/einstellungen` (`tenants.settings.shift_calendar_holiday_regions`, Mehrfachauswahl, nur sichtbar bei aktivem Schichtplan). Ablauf im Abwesenheiten-Reiter (`/admin/schichtplanung?tab=absences`): Jahr auslösen (Regionen kommen serverseitig aus der Mandanten-Einstellung, nie vom Client) → asynchroner Job (`ai_jobs.kind='holiday_research'`, gleicher Cron-Prozess-Endpunkt wie S4) → EIN Claude-Sonnet-Aufruf → serverseitiger Abgleich gegen die weiterhin bestehende deterministische DE/AT/CH-Berechnung (Badge „bestätigt"/„nicht in der festen Liste" — für HR/RS/BA_* gibt es keine Referenzliste, das ist offen ausgewiesen) → Konflikterkennung (Datum bereits vorhanden, Datum doppelt über mehrere Regionen, außerhalb des Jahres) → **Pflicht-Review** vor jeder Übernahme (kein Direkt-Insert wie beim alten Import — ein Feiertag ist eine Rechtstatsache mit Entgeltfolge nach § 2 EFZG und wirkt über `detectConflicts()` direkt auf die KI-Schichtplanung). `applyHolidayResearch()` nimmt bewusst keine Region vom Client entgegen (Auflösung ausschließlich über die serverseitig gespeicherte Entwurfszeile, gleiches Prinzip wie `workerId` bei S4). `ai_jobs`-RLS ist für `kind='holiday_research'` ebenfalls auf `calendar_is_admin(tenant_id)` verengt (`supabase/migrations/20260808145112_calendar_holiday_research.sql`) — Begründung ausdrücklich Kostenkontrolle (Rate-Limit-/Kontingent-Umgehung durch einen `trainer`), nicht Geheimhaltung, da Feiertage öffentliche Rechtstatsachen sind. Realer Testlauf (3 Regionen, Jahr 2026): 0,0122 USD, alle 9 deutschen Feiertage korrekt gegen die bestehende Berechnung bestätigt, Republika Srpska sauber von Serbien unterschieden (orthodoxer Kalender, eigener Feiertag „Tag des Dayton-Abkommens").
 
 **S6-Ergänzung (09.08.2026):** Ein Freelancer kann in „Mein Schichtplan" (`/schichtplan`) direkt im Stunden-Raster per Klick oder Ziehen agieren, zusätzlich zu den bestehenden Wegen (Liste „Offene Zeitfenster", Formular „Zeit ändern") — beide bleiben unverändert bestehen (Barrierefreiheit, Auftraggeber sehbehindert: Tastaturweg bleibt primär). Zwei Interaktionen: (1) ein offenes Zeitfenster lässt sich per Klick als Ganzes buchen (wie bisher der „Buchen"-Knopf) oder per Ziehen als Teil-Zeitraum innerhalb der Slot-Grenzen — beides über die um optionale `startTime`/`endTime` erweiterte `bookOwnShift()`, ohne neue Migration (der bestehende Trigger `calendar_slot_capacity_guard()` deckte Teil-Zeiträume schon vorher ab). (2) Ziehen an einer eigenen bestehenden Schicht (verschieben oder an den Rändern die Größe ändern) schreibt NICHTS direkt — es befüllt nur das bestehende „Zeit ändern"-Formular (S3) mit der neuen Zeit vor; der Freelancer muss noch senden, ein Admin weiterhin genehmigen. V1-Einschränkung: Ziehen wirkt nur vertikal (Zeitänderung), keine Tagesänderung per Ziehen über Spalten — dafür bleibt das Datumsfeld im Formular. Festangestellte sehen keine Verhaltensänderung (kein offenes Zeitfenster, kein Drag). `security-reviewer`: 0 KRITISCH/HOCH/MITTEL.
+
+## 13. Rechtspflichten DACH (nachträglich ergänzt, 26.08.2026)
+
+Ergebnis der Prüfung der 50 Marketing-Skills gegen deutsches Recht (PHASENSTATUS 26.08.2026). Fünf der Befunde sind keine Marketing-, sondern Produktanforderungen: Sie betreffen Checkout, Kündigung, Tracking und Pflichtseiten und gehören damit in diese Spezifikation. Rechtlicher Hintergrund und Begründung je Punkt: Skill `marketing-recht-dach` (`.claude/skills/marketing-recht-dach/`), verbindlich gesetzt in CLAUDE.md 3.8.
+
+**Geltungsgrund:** Maßgeblich ist der Markt, auf den sich das Angebot richtet, nicht der Sitz des Anbieters. Der US-Sitz der Calltalent LLC ändert für deutsche Endkunden nichts an UWG, DSGVO, TDDDG und BGB. Zwei Vertragsverhältnisse sind zu unterscheiden: **Calltalent ↔ Endkunde** (Marketplace-Kauf, Merchant of Record nach Abschnitt 10 — hier ist Calltalent selbst in der Pflicht) und **Mandant ↔ dessen Kunden** (hier stellt die Plattform nur die Mittel; der Mandant bleibt verantwortlich, kann seine Pflichten aber nur erfüllen, wenn das Produkt sie zulässt).
+
+### 13.1 Buttonlösung im Checkout (§ 312j Abs. 3 BGB)
+
+Löst eine Schaltfläche eine zahlungspflichtige Bestellung eines **Verbrauchers** aus, muss sie ausschließlich mit „zahlungspflichtig bestellen" oder einer eindeutig entsprechenden Formulierung beschriftet sein. Unmittelbar darüber, hervorgehoben: wesentliche Merkmale, Gesamtpreis, Laufzeit und Mindestlaufzeit. Rechtsfolge bei Verstoß: Der Vertrag kommt nicht zustande (§ 312j Abs. 4 BGB) — das Geld ist eingezogen, der Anspruch fehlt.
+
+Betroffen: der Kauf-Button auf `marketplace.calltalent.ai/kurs/[slug]` (Abschnitt 10) und jeder künftige Abo-Abschluss eines Mandanten über Stripe Checkout (Phase 2). Nicht betroffen: „Kostenlos erwerben" ohne Zahlung, „Konto erstellen", Login. Ein Gratis-Trial, das automatisch in ein kostenpflichtiges Abo übergeht, ist eine zahlungspflichtige Bestellung.
+
+Umsetzung: Der Bestellbutton wird nicht frei aus `messages/de.json` betextet, sondern kommt aus einer festen, nicht mandantenkonfigurierbaren Konstante — sonst überschreibt ein Mandant im White-Label-Branding die Pflichtbeschriftung.
+
+### 13.2 Kündigungsbutton (§ 312k BGB)
+
+Bei Verbraucherverträgen über ein Dauerschuldverhältnis, die online geschlossen werden können, muss online gekündigt werden können: Schaltfläche „**Verträge hier kündigen**", ständig verfügbar, unmittelbar und leicht zugänglich — **ohne Login**. Danach eine Bestätigungsseite und eine Bestätigung des Zugangs in Textform mit Zeitpunkt. Rechtsfolge bei Verstoß: Der Verbraucher kann jederzeit fristlos kündigen.
+
+Betroffen, sobald Phase 2 wiederkehrende Zahlungen einführt. Das Stripe-Kundenportal allein genügt nicht: Es ist erst nach Anmeldung erreichbar. Erforderlich ist eine ungeschützte Route (Vorschlag `/kuendigen` je Mandanten-Domain und auf dem Marketplace-Host) mit Formular, die den Vorgang serverseitig an das Abo bindet und eine Bestätigungsmail über Resend auslöst.
+
+Im **B2B** greift § 312k nicht — die Pflicht gilt nur, wo der Vertragspartner Verbraucher ist. Da die Plattform beides bedient, ist der Kündigungsweg an der Vertragsart festzumachen, nicht global abzuschalten.
+
+### 13.3 Widerruf bei digitalen Inhalten (§ 356 Abs. 5 BGB)
+
+Ein Kursverkauf an Verbraucher unterliegt dem 14-tägigen Widerrufsrecht. Es erlischt vorzeitig nur, wenn der Käufer **ausdrücklich zustimmt**, dass vor Fristablauf mit der Ausführung begonnen wird, **und** bestätigt, dass er damit sein Widerrufsrecht verliert — beides ist zu protokollieren. Ohne diese Doppelbestätigung besteht trotz vollständiger Nutzung 14 Tage lang Widerrufsrecht.
+
+Betroffen: der Sofort-Zugang nach Marketplace-Kauf (Abschnitt 10). Zwei Checkboxen im Kaufabschluss, Zeitstempel im Kauf-Datensatz.
+
+### 13.4 Einwilligung vor Endgerätezugriff (§ 25 TDDDG)
+
+Jedes Cookie, jeder `localStorage`-Zugriff, jedes Pixel jenseits des technisch Erforderlichen braucht eine vorherige Einwilligung — unabhängig davon, ob die Daten personenbezogen sind, und ohne die Alternative „berechtigtes Interesse". Erforderlich sind Session, Warenkorb, Spracheinstellung, CSRF-Token; nicht erforderlich sind Produktanalytik, Heatmaps, Werbepixel und Attribution.
+
+Anforderung an die Plattform: ein Consent-Gate, das Drittanbieter-Skripte erst nach aktiver Einwilligung lädt (nicht vorab „deaktiviert"), mit gleichwertiger Ablehnen-Schaltfläche auf der ersten Ebene, Einwilligung je Zweck, protokolliertem Zustand und einem dauerhaft erreichbaren Widerruf („Cookie-Einstellungen" im Footer). Da Mandanten eigene Skripte einbinden können sollen, gehört das Gate auf Plattformebene — sonst hängt die Rechtmäßigkeit aller Mandanten an der Sorgfalt des einzelnen.
+
+### 13.5 Pflichtseiten je Mandant (§ 5 DDG, Art. 13 DSGVO)
+
+Impressum und Datenschutzerklärung müssen von **jeder** Seite unmittelbar erreichbar sein — auch von Landingpages, die aus Conversion-Gründen navigationsfrei gebaut werden. Bei journalistisch-redaktionellen Inhalten zusätzlich ein Verantwortlicher nach § 18 Abs. 2 MStV.
+
+Anforderung: Die Impressumsangaben eines Mandanten sind **Pflichtfeld bei der Mandanteneinrichtung**, nicht optionale Einstellung; ohne sie kann eine Akademie nicht öffentlich geschaltet werden. Der Footer rendert Impressum, Datenschutz und Cookie-Einstellungen aus Mandantendaten, ohne dass ein Mandant sie im Branding entfernen kann. Für Verbraucherangebote kommen Widerrufsbelehrung und die Barrierefreiheitserklärung nach BFSG hinzu — Letztere fällt mit der ohnehin geltenden Anforderung WCAG 2.1 AA (CLAUDE.md 3.4) zusammen.
+
+### 13.6 E-Mail-Versand über die Plattform (§ 7 UWG)
+
+Werbe-E-Mail ohne vorherige ausdrückliche Einwilligung ist unzulässig, auch im B2B. Was Mandanten über die Plattform versenden, fällt auf die Zustellbarkeit und die Reputation **aller** Mandanten zurück und trifft im Zweifel auch den Betreiber.
+
+Anforderung an die Plattform:
+
+1. **Double-Opt-In-Fähigkeit** für jede nicht-transaktionale Empfängerliste: Anmeldung, werbefreie Bestätigungsmail, Bestätigung; protokolliert mit Zeitstempel, IP, Formular-URL und dem **exakt angezeigten Einwilligungstext in der damaligen Fassung**.
+2. **Abmeldelink erzwungen** in jeder nicht-transaktionalen Mail — technisch, nicht als Bitte an den Mandanten; ein Klick, ohne Login.
+3. **Sperrliste je Mandant**, gegen die jeder Import und jeder Versand läuft, damit ein Widerspruch (Art. 21 Abs. 2 DSGVO) nicht beim nächsten CSV-Import erlischt.
+4. **Einwilligungsnachweise exportierbar** — ein Mandant muss im Streit belegen können, woher eine Adresse stammt.
+5. Trennung von transaktionalen Mails (Einladung, Passwort-Reset, Zertifikat — kein Opt-in nötig) und werblichen Mails im Versandpfad.
+
+Der CSV-Import aus Phase 1 ist davon berührt: Er erzeugt Nutzerkonten, keine Werbeeinwilligung. Ein Import darf keine Werbe-Empfängerliste befüllen.
+
+### 13.7 Preisangaben (PAngV)
+
+Gegenüber Verbrauchern ist der **Gesamtpreis inklusive Umsatzsteuer** anzugeben; eine reine Netto-Darstellung setzt ein unmissverständlich rein unternehmerisches Publikum voraus. Bei Preisermäßigungen ist der niedrigste Gesamtpreis der letzten 30 Tage Bezugspunkt (§ 11 PAngV) — ein Streichpreisfeld im Listing-Datensatz muss diesen Wert führen, sonst ist die Angabe nicht belegbar. Bei Abos gehören Laufzeit, Verlängerung und Kündigungsfrist an die Preisangabe.
+
+Betroffen: Preisfelder der Marketplace-Listings (Abschnitt 10) und die künftige Abo-Preisdarstellung.
+
+### 13.8 Rollenverteilung Betreiber ↔ Mandant
+
+Je Verarbeitung getrennt zu bewerten: Wo Calltalent im Auftrag des Mandanten verarbeitet (Kursdaten, Lernfortschritt), gilt Art. 28 DSGVO — der AVV liegt vor (PHASENSTATUS 24.08.2026). Wo Calltalent eigene Zwecke verfolgt (Marketplace als Merchant of Record, Betreiber-Reporting), ist Calltalent eigener Verantwortlicher; bei gemeinsam festgelegten Zwecken kommt Art. 26 DSGVO mit einer Vereinbarung über die Aufgabenverteilung in Betracht. Diese Zuordnung ist noch nicht dokumentiert — siehe Abschnitt 9.
+
+Ergänzend gehört in die Mandanten-AGB, dass die Plattform nicht für Kaltakquise genutzt werden darf, mit technischer Grenze und Monitoring statt nur einer Klausel.
+
+### 13.9 Auswirkung auf die Definition of Done
+
+- **Phase 2** ist zusätzlich erst fertig, wenn 13.1 (Buttonlösung), 13.2 (Kündigungsbutton), 13.3 (Widerruf) und 13.7 (Preisangaben) im Stripe-Pfad umgesetzt und mit einem Testkauf im Verbraucherfall nachgewiesen sind.
+- **Phase 4** ist zusätzlich erst fertig, wenn 13.4 (Consent-Gate), 13.5 (Pflichtseiten als Einrichtungs-Pflichtfeld) und 13.6 (Versand-Pflichten) stehen und das DSGVO-Paket die Rollenverteilung aus 13.8 enthält.
+
+Die Punkte sind bewusst früh notiert: Sie sind billig einzubauen, solange Checkout und Versandpfad noch nicht stehen, und teuer nachzurüsten.

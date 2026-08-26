@@ -43,6 +43,7 @@ Sprache: Deutsch (Antworten, Commits, UI-Texte). Code, Bezeichner und Kommentare
 5. UI-Standardsprache Deutsch, i18n-Struktur von Anfang an (next-intl), Texte in `messages/de.json`.
 6. KI-Transparenz: Tutor-Antworten sind sichtbar als „KI-Assistent" gekennzeichnet (Art. 50 KI-VO).
 7. KI-Verbrauch: jeder Claude-Aufruf schreibt `ai_jobs`/`tutor_messages` mit Tokens und Kosten; Monats-Kontingente über `usage_counters` durchsetzen.
+8. Rechtsrahmen DACH: Für Marketing-, Verkaufs- und Vertragsflächen gilt der Skill `marketing-recht-dach` (`.claude/skills/marketing-recht-dach/`). Verbindlich auch im Produkt, nicht nur im Marketing: Buttonlösung „zahlungspflichtig bestellen" im Checkout (§ 312j Abs. 3 BGB), Kündigungsbutton „Verträge hier kündigen" bei Verbraucher-Abos (§ 312k BGB), Einwilligung vor jedem nicht erforderlichen Endgerätezugriff (§ 25 TDDDG), Double-Opt-In mit Nachweis für jede Werbe-E-Mail (§ 7 UWG), Impressum und Datenschutzerklärung auf jeder Seite — auch auf Landingpages (§ 5 DDG). Die übrigen 50 Marketing-Skills stammen aus den USA und beschreiben US-Recht; sie gelten insoweit nur für US-Empfänger. Der US-Sitz der Calltalent LLC ändert daran nichts: Maßgeblich ist der Markt, auf den die Maßnahme zielt.
 
 ## 4. Arbeitsweise
 

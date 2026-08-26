@@ -3893,3 +3893,43 @@ Nachgetragen in: `lib/legal/company.ts` (`registrationNumber`), `tenants.legal.e
 
 **Weiterhin offen:** Vertreter in der Union nach Art. 27 DSGVO (Platzhalter steht sowohl im AVV als auch in der Website-Datenschutzerklärung); anwaltliche Prüfung.
 5. `SALESTALENT-BRANDING.md` §3 hielt fest, die Copyright-Zeile im Login (`login_copyright: "SalesTalent. All rights reserved."`) bleibe neutral, „bis die Rechtsträger-Frage geklärt ist". Sie ist jetzt geklärt — ob dort künftig „SalesTalent, a Calltalent LLC brand" o. Ä. stehen soll, ist eine Marken-Entscheidung von Josip, keine technische; unverändert gelassen.
+
+## Marketing-Skills installiert + DACH-Rechtsebene (26.08.2026, Josips Auftrag)
+
+**Erledigt:**
+
+1. **50 Marketing-Skills aus `coreyhaines31/marketingskills` installiert** (MIT, Version 2.11.0, Quell-Commit `becd60e`) nach `.claude/skills/`, dazu das `tools/`-Verzeichnis des Quell-Repos nach `.claude/tools/` — viele Skills verlinken relativ auf `../../tools/REGISTRY.md`, ohne das Verzeichnis wären diese Verweise tot. Bewusst als versionierte Repo-Dateien statt über `/plugin marketplace add`: Die Remote-Container sind flüchtig, eine Plugin-Installation wäre bei der nächsten Sitzung weg. Herkunft, Update-Weg und zwei bekannte Upstream-Linkfehler in `.claude/skills/README.md`.
+
+2. **DACH-Rechtsebene ergänzt** (Josips Folgeauftrag „für DSGVO/UWG-Kontext prüfen und verifizieren/anpassen"). Die Skills sind auf US-Recht geschrieben; für Deutschland gilt teils das Gegenteil. Neuer Skill `marketing-recht-dach` mit Schnellurteil-Tabelle und vier Referenzen (Einwilligung E-Mail/SMS/Telefon, Tracking und Consent, Website- und Vertragspflichten, Werbeaussagen nach UWG). In `references/skill-audit.md` das Prüfergebnis aller 50 Skills mit konkreten Fundstellen, gegliedert nach direktem Rechtskonflikt (7), falschem Rechtsrahmen (7), Lücke (11) und unkritisch (22).
+
+3. **31 Upstream-`SKILL.md` mit markiertem Hinweisblock** unterhalb des Frontmatters versehen. Auf Josips Vorgabe „die US-Versionen sollen auch bleiben" ausschließlich additiv: Der Commit enthält 1361 Einfügungen und null Löschungen; `scripts/dach-hinweise-anwenden.sh --entfernen` stellt den Upstream-Stand bitgenau wieder her (per `diff -rq` gegen den Quell-Klon verifiziert). Das Skript spielt die Blöcke nach einem Upstream-Update erneut ein (idempotent), `--pruefen` meldet fehlende oder veraltete Blöcke mit Exit 1. Blocktexte einzeln unter `scripts/dach-hinweise/<skill>.md` pflegen, nicht in der `SKILL.md`.
+
+4. **CLAUDE.md Regel 3.8** ergänzt: Rechtsrahmen DACH als Produktregel, nicht nur als Marketing-Hinweis.
+
+**Wichtigste Funde der Prüfung:**
+
+1. `cold-email` hat als einzigen Rechtsbezug den Satz „GDPR affects European tone" — der Skill setzt durchgehend CAN-SPAM voraus (senden, dann Opt-out). In Deutschland ist E-Mail-Kaltakquise ohne vorherige ausdrückliche Einwilligung unzulässig, auch B2B (§ 7 Abs. 2 UWG). Größte Lücke im Set.
+2. `prospecting/references/compliance.md` stützt Kaltakquise auf Art. 6 Abs. 1 lit. f DSGVO. Das trägt die Datenverarbeitung, nicht den Versand — darüber entscheidet das UWG. Art. 14 DSGVO (Informationspflicht inkl. Quellenangabe) fehlt ganz.
+3. `paywalls/SKILL.md:91` empfiehlt den CTA „Start Getting [Benefit]". Auf einem zahlungsauslösenden Button eines Verbrauchers verlangt § 312j Abs. 3 BGB „zahlungspflichtig bestellen" — sonst kommt der Vertrag nach § 312j Abs. 4 BGB nicht zustande. **Direkt relevant für Phase 2 (Stripe Checkout).**
+4. `churn-prevention` rät zu „Block self-serve cancel, require CS call" und nennt nur die FTC-Regel. § 312k BGB verlangt im B2C den Button „Verträge hier kündigen", ohne Login erreichbar; Verstoß heißt jederzeit fristlose Kündbarkeit. **Direkt relevant für Phase 2 (Stripe Portal).**
+5. `attribution/references/first-party-tracking.md` beschreibt einen kompletten Identity-Stitching-Aufbau ohne ein Wort zu Consent. First-Party und serverseitig sind keine Ausnahme von § 25 TDDDG.
+6. `site-architecture` zeigt in allen Footer-Mustern „Privacy · Terms · Contact" — **kein Impressum**. Für deutsche Landingpages der klassische Abmahnfall.
+7. `referrals`: Einladungsmails über die Plattform werden dem Unternehmen zugerechnet (BGH I ZR 208/12), nicht dem empfehlenden Nutzer. Tragfähig ist nur Link-Sharing durch den Nutzer selbst.
+
+**Offen:**
+
+1. ~~**Plattformseitige Umsetzung der Befunde 3, 4 und 5 in Phase 2** — Buttonlösung im Checkout, Kündigungsbutton bei Verbraucher-Abos, Consent-Gate vor Drittanbieter-Skripten. Bisher in SPEC.md nicht als Anforderung festgehalten; gehört dort ergänzt, bevor Stripe gebaut wird.~~ **Erledigt am 26.08.2026: SPEC.md Abschnitt 13.**
+2. ~~**Mandantenfähigkeit:** Was Mandanten über die Plattform versenden und veröffentlichen, fällt auf den Betreiber zurück. Erforderliche Plattform-Features: Double-Opt-In-Fähigkeit, erzwungener Abmeldelink, Impressumsfeld je Mandant als Pflichtfeld, exportierbare Einwilligungsnachweise.~~ **Erledigt am 26.08.2026: SPEC.md Abschnitt 13.5/13.6.**
+3. Anwaltliche Prüfung der konkreten Funnels, Einwilligungstexte und Vertragsflows vor dem Live-Gang — die Rechtsebene verhindert offensichtliche Fehler, ersetzt aber keine Beratung.
+
+**Risiken/Entscheidungen:**
+
+1. **Additiv statt Ersetzen.** Josips Vorgabe war, die US-Fassungen zu behalten. Deshalb Hinweisblöcke plus separater Skill statt Umschreiben — das hält die Skills upstream-aktualisierbar. Preis: Nach jedem Update müssen die Blöcke neu eingespielt und die Fundstellen im Audit gegen den neuen Stand geprüft werden (Zeilennummern verschieben sich).
+2. **Der US-Sitz der Calltalent LLC ändert am anwendbaren Marketingrecht nichts.** Maßgeblich ist der Markt, auf den die Maßnahme zielt — für deutsche Empfänger gelten UWG, DSGVO und TDDDG unabhängig vom Sitz des Werbenden. Der bereits im AVV/TOM-Block vermerkte offene Punkt „Vertreter in der Union nach Art. 27 DSGVO" wird dadurch eher dringlicher.
+3. **`.claude/tools/` ist Fremdinhalt**, kein Projektcode: eine Registry von Drittanbieter-Tools, teils bezahlte „Verified Partners" des Skill-Autors (offengelegt in `tools/REGISTRY.md`). Empfehlungen daraus nicht ungeprüft übernehmen, insbesondere nicht bei Tools, die personenbezogene Daten verarbeiten — dort erst AVV und Drittlandbezug klären.
+
+**Nachtrag am selben Tag — SPEC.md Abschnitt 13 „Rechtspflichten DACH" (Josips Freigabe):** Die fünf produktrelevanten Befunde sind jetzt Spezifikation statt Notiz: 13.1 Buttonlösung im Checkout (§ 312j Abs. 3 BGB, Bestellbutton bewusst als feste Konstante statt aus `messages/de.json` — sonst überschreibt ein Mandant im White-Label-Branding die Pflichtbeschriftung), 13.2 Kündigungsbutton (§ 312k BGB, ungeschützte Route `/kuendigen` — das Stripe-Kundenportal genügt nicht, es ist erst nach Anmeldung erreichbar), 13.3 Widerruf bei digitalen Inhalten (§ 356 Abs. 5 BGB, Doppelbestätigung beim Sofort-Zugang), 13.4 Consent-Gate (§ 25 TDDDG, auf Plattformebene statt je Mandant), 13.5 Impressum als Pflichtfeld der Mandanteneinrichtung, 13.6 Versandpflichten (Double-Opt-In, erzwungener Abmeldelink, Sperrliste, exportierbare Nachweise), 13.7 Preisangaben, 13.8 Rollenverteilung Art. 26 vs. Art. 28.
+
+Die Definition of Done in Abschnitt 8 verweist jetzt darauf: Phase 2 hängt zusätzlich an 13.1–13.3 und 13.7, Phase 4 an 13.4–13.6 und 13.8. Zwei neue offene Entscheidungen in Abschnitt 9 (Nr. 6 Rollenverteilung, Nr. 7 ob der Kündigungsweg auch Mandanten-Endkundenverträgen bereitgestellt wird — Produktentscheidung, bewusst offen gelassen).
+
+Dabei aufgefallen und mitkorrigiert: SPEC.md Abschnitt 10 führte den Marketplace-Betreiber weiterhin als „Calltalent Ltd." — ein Rest des Rechtsträger-Wechsels vom 24.08.2026, der damals in AGB, Datenschutz, Website und AVV/TOM nachgezogen wurde, in SPEC.md aber nicht. Jetzt „Calltalent LLC" mit Verweis auf den Wechsel.
