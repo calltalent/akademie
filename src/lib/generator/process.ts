@@ -56,13 +56,30 @@ export async function processNextCourseGenJob(): Promise<ProcessResult> {
   // oben unverändert ist) — reduziert das Risiko einer doppelten
   // Verarbeitung bei zwei nahezu gleichzeitigen Cron-Aufrufen weiter, auch
   // wenn Postgres selbst keine echte Transaktion über beide Anfragen bietet.
-  const { error: lockError } = await admin
+  // BUGFIX (verifizierter Fehler): ein `.update()` OHNE `.select()` liefert
+  // bei 0 tatsächlich betroffenen Zeilen weder einen Fehler noch eine
+  // Zeilenzahl — `lockError` blieb `null`, obwohl das CAS bei zwei
+  // überlappenden Aufrufen für den zweiten Aufruf fehlgeschlagen war (Status
+  // war zwischen dem Lesen oben und diesem Update bereits vom ersten Aufruf
+  // geändert worden). Der Code lief dadurch weiter, als hätte er die Sperre
+  // bekommen — zwei überlappende /api/admin/ki/process-Aufrufe starteten
+  // denselben Claude-Sonnet-Schritt doppelt (doppelte Kosten), das zweite
+  // `output` überschrieb das erste. Fix: `.select("id")` anhängen und bei
+  // leerem Ergebnis `{ processed: false }` zurückgeben.
+  const { data: lockedRows, error: lockError } = await admin
     .from("ai_jobs")
     .update({ status: "running", updated_at: new Date().toISOString() })
     .eq("id", job.id)
-    .eq("status", job.status);
+    .eq("status", job.status)
+    .select("id");
   if (lockError) {
     console.error("[generator/process] Job konnte nicht gesperrt werden:", lockError.message);
+    return { processed: false };
+  }
+  if (!lockedRows || lockedRows.length === 0) {
+    // CAS fehlgeschlagen: ein anderer Aufruf hat den Job zwischen dem Lesen
+    // oben und diesem Update bereits übernommen — kein Fehler, einfach
+    // nichts zu tun für DIESEN Aufruf.
     return { processed: false };
   }
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireStaffTenant } from "@/lib/auth/staff";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { courseGenInputSchema } from "@/lib/generator/schema";
 import { translateDbError } from "@/lib/errors/db";
@@ -82,7 +83,24 @@ export async function deleteDraft(jobId: string): Promise<GeneratorActionState> 
   try {
     const { tenant, supabase } = await requireStaffTenant();
 
-    const { error } = await supabase
+    const { data: job } = await supabase
+      .from("ai_jobs")
+      .select("id")
+      .eq("id", jobId)
+      .eq("tenant_id", tenant.id)
+      .eq("kind", "course_gen")
+      .maybeSingle();
+    if (!job) return { error: "Entwurf nicht gefunden." };
+
+    // ABWEICHUNG (technisch nötig, verifizierter Fehler): `ai_jobs` hat laut
+    // 0001_init.sql KEINE DELETE-Policy für irgendeine Rolle — ein Löschen
+    // über den regulären Tenant-Client liefe wegen RLS still ins Leere (0
+    // betroffene Zeilen, kein Fehler zurückgegeben, Entwurf ist nach Reload
+    // wieder da). Admin-Client wie `deleteShiftPlanJob()`
+    // (src/lib/calendar/ai/actions.ts:339-346), `jobId` ist oben bereits
+    // tenant-geprüft.
+    const admin = createAdminClient();
+    const { error } = await admin
       .from("ai_jobs")
       .delete()
       .eq("id", jobId)

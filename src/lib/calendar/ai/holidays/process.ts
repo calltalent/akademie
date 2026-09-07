@@ -43,13 +43,23 @@ export async function processNextHolidayResearchJob(): Promise<ProcessResult> {
   const job = candidates?.[0];
   if (!job) return { processed: false };
 
-  const { error: lockError } = await admin
+  // BUGFIX (verifizierter Fehler, gleicher Fund wie processNextCourseGenJob(),
+  // src/lib/generator/process.ts): ein `.update()` OHNE `.select()` liefert
+  // bei 0 betroffenen Zeilen weder Fehler noch Zeilenzahl — das CAS-Update
+  // hätte für einen zweiten, überlappenden Cron-Aufruf still "erfolgreich"
+  // gewirkt, obwohl der Status längst vom ersten Aufruf geändert war. Fix:
+  // `.select("id")` anhängen, bei leerem Ergebnis `{ processed: false }`.
+  const { data: lockedRows, error: lockError } = await admin
     .from("ai_jobs")
     .update({ status: "running", updated_at: new Date().toISOString() })
     .eq("id", job.id)
-    .eq("status", job.status);
+    .eq("status", job.status)
+    .select("id");
   if (lockError) {
     console.error("[calendar/ai/holidays/process] Job konnte nicht gesperrt werden:", lockError.message);
+    return { processed: false };
+  }
+  if (!lockedRows || lockedRows.length === 0) {
     return { processed: false };
   }
 
