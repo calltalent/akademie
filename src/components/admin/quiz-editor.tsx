@@ -51,6 +51,7 @@ export function QuizEditor({
     if (!confirm(t("deleteQuizConfirm", { title: initialMeta.title }))) return;
     const result = await deleteQuiz(quizId, courseId);
     if (result.ok) {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- Harte Navigation ist Absicht: das Quiz wurde gerade geloescht, die Kursseite muss ohne Client-Router-Cache neu aufgebaut werden, sonst zeigt sie das geloeschte Quiz weiter an. Regel neu seit eslint-config-next 16.3.4.
       window.location.href = `/admin/kurse/${courseId}`;
     } else {
       alert(result.error);

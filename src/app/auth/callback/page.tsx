@@ -100,8 +100,14 @@ export default function AuthCallbackPage() {
           // Sprache bleibt auf dem bisherigen Stand (Accept-Language/"de") —
           // kein Grund, die Anmeldung abzubrechen.
         }
+        // Harte Navigation ist hier Absicht: die Supabase-Session wurde gerade
+        // erst gesetzt, erst ein vollstaendiger Seitenaufbau laesst den Server
+        // das neue Cookie lesen. router.push() wuerde die Zielseite aus dem
+        // Client-Router-Cache mit dem alten Auth-Zustand rendern — genau der
+        // Fehler vom 26.07.2026, siehe Dateikopf.
         window.location.href = next;
       } catch {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- wie oben: nach fehlgeschlagener Anmeldung muss der Server den Auth-Zustand neu bewerten.
         window.location.href = "/login?fehler=anmeldung";
       }
     })();
