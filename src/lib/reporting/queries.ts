@@ -42,6 +42,58 @@ import { computeCourseProgress, type ModuleSummary } from "@/lib/progress/comput
 
 const DUMMY_UUID = "00000000-0000-0000-0000-000000000000";
 
+/**
+ * Seitengröße für `fetchAllRows()`. Muss <= PostgREST "Max rows" sein (siehe
+ * `fetchAllRows()`-Kommentar) — 1000 ist zugleich der PostgREST-Standardwert
+ * in diesem Projekt, also die größtmögliche Seite ohne serverseitige
+ * Zusatzkonfiguration.
+ */
+const REPORTING_PAGE_SIZE = 1000;
+
+/**
+ * Fund dieser Sitzung: `lessons`/`progress`/`enrollments`/`attempts` wurden
+ * hier bisher ohne `.range()`/`.limit()` geladen. PostgREST kappt Antworten
+ * serverseitig standardmäßig bei "Max rows" (in diesem Projekt: 1000
+ * Zeilen) — OHNE Fehler. Ein Mandant mit mehr als 1000 `progress`-Zeilen
+ * (z. B. 60 Lernende × 20 Lektionen = 1200) verlor damit stillschweigend
+ * Zeilen ab der 1001., wodurch `computeCourseProgress(...).isComplete` für
+ * die betroffenen Lernenden fälschlich `false` wurde — zu niedrige
+ * Abschlussquote im Kursbericht/CSV-Export, Lernende fälschlich "inaktiv".
+ *
+ * Fix: seitenweise über `.range()` durchlaufen, bis eine Seite weniger
+ * Zeilen liefert als `REPORTING_PAGE_SIZE` — gleiches Grundmuster wie
+ * `src/app/api/v1/enrollments/route.ts` (dort einmalig für Client-seitige
+ * Pagination; hier vollständig durchlaufen, weil die Aufrufer ALLE Zeilen
+ * für eine mandantenweite Aggregation brauchen und keine UI-Pagination
+ * anbieten).
+ *
+ * `fetchPage` MUSS eine deterministische Reihenfolge liefern (z. B.
+ * `.order("id", { ascending: true })` vor `.range()`) — ohne stabile
+ * Ordnung garantiert Postgres über mehrere Anfragen hinweg keine
+ * lückenlose/überschneidungsfreie Aufteilung in Seiten.
+ *
+ * Fehler werden hier bewusst NICHT geworfen (gleiches Verhalten wie vor dem
+ * Fix: die Aufrufer lasen `error` an keiner dieser Stellen ohnehin nicht
+ * aus und behandelten `data: null` als leere Liste) — eine fehlgeschlagene
+ * Seite bricht die Schleife einfach ab, statt den gesamten Bericht mit
+ * einer Exception abzuschießen.
+ */
+async function fetchAllRows<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await fetchPage(from, from + REPORTING_PAGE_SIZE - 1);
+    if (error) break;
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < REPORTING_PAGE_SIZE) break;
+    from += REPORTING_PAGE_SIZE;
+  }
+  return rows;
+}
+
 export type CourseReportRow = {
   courseId: string;
   courseTitle: string;
@@ -116,14 +168,18 @@ async function loadCourseStructures(
     .select("id, course_id")
     .eq("tenant_id", tenantId);
 
-  const { data: lessonRows } = await supabase
-    .from("lessons")
-    .select("id, module_id")
-    .eq("tenant_id", tenantId)
-    .eq("status", "published");
+  const lessonRows = await fetchAllRows<{ id: string; module_id: string }>((from, to) =>
+    supabase
+      .from("lessons")
+      .select("id, module_id")
+      .eq("tenant_id", tenantId)
+      .eq("status", "published")
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   const lessonsByModule = new Map<string, string[]>();
-  for (const l of lessonRows ?? []) {
+  for (const l of lessonRows) {
     const list = lessonsByModule.get(l.module_id) ?? [];
     list.push(l.id);
     lessonsByModule.set(l.module_id, list);
@@ -174,13 +230,22 @@ async function loadProgressIndex(
   tenantId: string,
   lessonToCourse: Map<string, string>,
 ): Promise<Map<string, ProgressEntry>> {
-  const { data: progressRows } = await supabase
-    .from("progress")
-    .select("user_id, lesson_id, status, updated_at")
-    .eq("tenant_id", tenantId);
+  const progressRows = await fetchAllRows<{
+    user_id: string;
+    lesson_id: string;
+    status: string;
+    updated_at: string;
+  }>((from, to) =>
+    supabase
+      .from("progress")
+      .select("user_id, lesson_id, status, updated_at")
+      .eq("tenant_id", tenantId)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   const index = new Map<string, ProgressEntry>();
-  for (const p of progressRows ?? []) {
+  for (const p of progressRows) {
     const courseId = lessonToCourse.get(p.lesson_id);
     if (!courseId) continue; // Lektion nicht (mehr) veröffentlicht/gefunden — zählt nicht mit
     const key = `${p.user_id}|${courseId}`;
@@ -223,13 +288,17 @@ export async function getCourseReport(tenantId: string): Promise<CourseReportRow
   const lessonToCourse = buildLessonToCourseMap(structures);
   const progressIndex = await loadProgressIndex(supabase, tenantId, lessonToCourse);
 
-  const { data: enrollmentRows } = await supabase
-    .from("enrollments")
-    .select("course_id, user_id")
-    .eq("tenant_id", tenantId);
+  const enrollmentRows = await fetchAllRows<{ course_id: string; user_id: string }>((from, to) =>
+    supabase
+      .from("enrollments")
+      .select("course_id, user_id")
+      .eq("tenant_id", tenantId)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   const enrollmentsByCourse = new Map<string, string[]>();
-  for (const e of enrollmentRows ?? []) {
+  for (const e of enrollmentRows) {
     const list = enrollmentsByCourse.get(e.course_id) ?? [];
     list.push(e.user_id);
     enrollmentsByCourse.set(e.course_id, list);
@@ -296,18 +365,17 @@ export async function getUserReport(
   const lessonToCourse = buildLessonToCourseMap(structures);
   const progressIndex = await loadProgressIndex(supabase, tenantId, lessonToCourse);
 
-  let enrollmentQuery = supabase
-    .from("enrollments")
-    .select("course_id, user_id")
-    .eq("tenant_id", tenantId);
-  if (courseId) enrollmentQuery = enrollmentQuery.eq("course_id", courseId);
-  const { data: enrollmentRows } = await enrollmentQuery;
+  const enrollmentRows = await fetchAllRows<{ course_id: string; user_id: string }>((from, to) => {
+    let query = supabase.from("enrollments").select("course_id, user_id").eq("tenant_id", tenantId);
+    if (courseId) query = query.eq("course_id", courseId);
+    return query.order("id", { ascending: true }).range(from, to);
+  });
 
-  const userIds = Array.from(new Set((enrollmentRows ?? []).map((e) => e.user_id)));
+  const userIds = Array.from(new Set(enrollmentRows.map((e) => e.user_id)));
   const profiles = await loadProfilesByIds(supabase, userIds);
 
   const rows: UserReportRow[] = [];
-  for (const e of enrollmentRows ?? []) {
+  for (const e of enrollmentRows) {
     const structure = structures.get(e.course_id);
     if (!structure) continue; // Kurs nicht (mehr) im Mandanten gefunden
 
@@ -375,19 +443,28 @@ export async function getQuizReport(tenantId: string): Promise<QuizReportRow[]> 
   const courseTitleById = new Map((courseRows ?? []).map((c) => [c.id, c.title]));
   const quizById = new Map((quizRows ?? []).map((q) => [q.id, q]));
 
-  const { data: attemptRows } = await supabase
-    .from("attempts")
-    .select("quiz_id, user_id, submitted_at, score_pct")
-    .eq("tenant_id", tenantId);
+  const attemptRows = await fetchAllRows<{
+    quiz_id: string;
+    user_id: string;
+    submitted_at: string | null;
+    score_pct: number | null;
+  }>((from, to) =>
+    supabase
+      .from("attempts")
+      .select("quiz_id, user_id, submitted_at, score_pct")
+      .eq("tenant_id", tenantId)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   const profiles = await loadProfilesByIds(
     supabase,
-    Array.from(new Set((attemptRows ?? []).map((a) => a.user_id))),
+    Array.from(new Set(attemptRows.map((a) => a.user_id))),
   );
 
   type Bucket = { attemptsCount: number; bestScorePct: number | null };
   const byQuizUser = new Map<string, Bucket>();
-  for (const a of attemptRows ?? []) {
+  for (const a of attemptRows) {
     const key = `${a.quiz_id}|${a.user_id}`;
     const bucket = byQuizUser.get(key) ?? { attemptsCount: 0, bestScorePct: null };
     bucket.attemptsCount += 1;
