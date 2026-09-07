@@ -50,7 +50,13 @@ import {
   type CalendarWorkerStatus,
   type CalendarWorkerTargetInput,
 } from "@/lib/calendar/schema";
-import { berlinDateTimeToUtc, buildWeeklySeries, formatDayLabel, formatTimeRange, isoDateString } from "@/lib/calendar/date";
+import {
+  buildWeeklySeries,
+  computeSelfBookingWindow,
+  formatDayLabel,
+  formatTimeRange,
+  isoDateString,
+} from "@/lib/calendar/date";
 
 /**
  * Server Actions für "Schichtplan" (Block S1, 07.08.2026). Stilvorbild
@@ -907,13 +913,7 @@ export async function bookOwnShift(input: {
 
     if (data.startTime && data.endTime) {
       const slotDateIso = isoDateString(new Date(slot.starts_at));
-      const startsAt = berlinDateTimeToUtc(slotDateIso, data.startTime);
-      let endsAt = berlinDateTimeToUtc(slotDateIso, data.endTime);
-      // Nachtschicht-Fall (Ende <= Start): Ende liegt einen Kalendertag
-      // später — gleiche Konvention wie buildWeeklySeries() (date.ts).
-      if (endsAt.getTime() <= startsAt.getTime()) {
-        endsAt = new Date(endsAt.getTime() + 24 * 60 * 60 * 1000);
-      }
+      const { startsAt, endsAt } = computeSelfBookingWindow(slotDateIso, data.startTime, data.endTime);
 
       const slotStartsAt = new Date(slot.starts_at);
       const slotEndsAt = new Date(slot.ends_at);

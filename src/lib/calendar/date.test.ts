@@ -4,6 +4,7 @@ import {
   berlinDateTimeToUtc,
   buildWeekGrid,
   buildWeeklySeries,
+  computeSelfBookingWindow,
   formatDayLabel,
   formatTime,
   formatTimeRange,
@@ -77,6 +78,33 @@ describe("startOfIsoWeek/addDays — Zeitumstellung 25.10.2026 (Winterzeit-Begin
     const after = addDays(before, 2); // 2026-10-26 08:00 Berlin (CET, UTC+1)
     expect(formatTime(after)).toBe("08:00");
     expect(after.toISOString()).toBe("2026-10-26T07:00:00.000Z");
+  });
+});
+
+/**
+ * `tester`-Agent-Lauf — Regressionstest für den Jahreswechsel-Fund in
+ * `admin/schichtplanung/page.tsx`: das Jahr für `getAdminCalendarAbsences()`
+ * wurde vor dem Fix über `weekStart.getUTCFullYear()` bestimmt. `weekStart`
+ * ist Montag 00:00 BERLINER Zeit als UTC-Instant — im Winter (CET, UTC+1)
+ * ist das ein UTC-Zeitpunkt am Sonntag 23:00 UTC, also potenziell noch der
+ * VORTAG in UTC. Für die Woche ab Montag 01.01.2024 liegt `weekStart` daher
+ * bei UTC 31.12.2023 23:00 — `getUTCFullYear()` liefert 2023 statt korrekt
+ * 2024, der Feiertag Neujahr würde im Wochenraster fehlen. Der Fix zieht das
+ * Jahr stattdessen aus `isoDateString(weekStart)` (Berlin-Kalendertag).
+ */
+describe("startOfIsoWeek — Jahreswechsel-Falle bei weekStart.getUTCFullYear()", () => {
+  it("Woche ab Montag 01.01.2024: getUTCFullYear() liefert das FALSCHE Jahr 2023, isoDateString() korrekt 2024", () => {
+    const weekStart = startOfIsoWeek(new Date("2024-01-01T12:00:00Z"));
+    expect(weekStart.toISOString()).toBe("2023-12-31T23:00:00.000Z");
+    expect(weekStart.getUTCFullYear()).toBe(2023);
+    expect(Number(isoDateString(weekStart).slice(0, 4))).toBe(2024);
+  });
+
+  it("Woche ab Montag 28.12.2026 umfasst zwei Kalenderjahre (2026 und 2027)", () => {
+    const weekStart = startOfIsoWeek(new Date("2026-12-30T12:00:00Z"));
+    const weekEndDay = addDays(weekStart, 6);
+    expect(Number(isoDateString(weekStart).slice(0, 4))).toBe(2026);
+    expect(Number(isoDateString(weekEndDay).slice(0, 4))).toBe(2027);
   });
 });
 
@@ -182,5 +210,48 @@ describe("buildWeeklySeries", () => {
 
   it("weeks=1 liefert genau 1 Termin", () => {
     expect(buildWeeklySeries("2026-08-10", "08:00", "16:00", 1)).toHaveLength(1);
+  });
+});
+
+/**
+ * `tester`-Agent-Lauf — Regressionstest für den Zeitumstellungsfund in
+ * `bookOwnShift()` (Block S6, `actions.ts`): das Nachtschicht-Ende wurde vor
+ * dem Fix über `endsAt.getTime() + 24 * 60 * 60 * 1000` berechnet — 24
+ * Stunden in Millisekunden, NICHT 24 Berlin-Kalendertage/-Wanduhrzeit. Genau
+ * in der Nacht der Winterzeit-Umstellung (25h-Tag in Europe/Berlin, siehe
+ * Dateikopf oben) weicht das von der korrekten Wanduhrzeit ab.
+ * `computeSelfBookingWindow()` ist der aus `bookOwnShift()` extrahierte,
+ * reine Baustein (siehe dortiger Kopfkommentar).
+ */
+describe("computeSelfBookingWindow — Zeitumstellung 25.10.2026 (Winterzeit-Beginn, 25h-Tag)", () => {
+  it("Nachtschicht 22:00–00:30 über die Umstellungsnacht endet auf der korrekten Berlin-Wanduhrzeit 00:30, nicht 23:30", () => {
+    // 22:00 Berlin (25.10., bereits CET — die Umstellung liegt an diesem Tag
+    // um 03:00 Ortszeit) = 21:00 UTC. Tentatives Ende "00:30 am 25.10."
+    // (CEST, VOR der Umstellung) = 22:30 UTC des 24.10. — liegt vor dem
+    // Start, also Nachtschicht-Fall: das Ende verschiebt sich auf den 26.10.
+    // Die alte "+24h in Millisekunden"-Rechnung würde von diesem VOR der
+    // Umstellung liegenden Zeitpunkt aus nur 24 reale Stunden addieren,
+    // obwohl die Nacht 25 Stunden hat — Ergebnis wäre eine Stunde zu früh
+    // (Wanduhrzeit 23:30 statt 00:30, siehe letzte Prüfung).
+    const { startsAt, endsAt } = computeSelfBookingWindow("2026-10-25", "22:00", "00:30");
+
+    expect(startsAt.toISOString()).toBe("2026-10-25T21:00:00.000Z");
+    // Korrekt: 00:30 Uhr Berlin-Zeit am 26.10. (bereits CET, UTC+1).
+    expect(endsAt.toISOString()).toBe("2026-10-25T23:30:00.000Z");
+    // Was die alte "+24h in Millisekunden"-Rechnung stattdessen geliefert
+    // hätte (Wanduhrzeit 23:30 CEST statt 00:30 CET — eine Stunde zu früh).
+    expect(endsAt.toISOString()).not.toBe("2026-10-25T22:30:00.000Z");
+  });
+
+  it("Nachtschicht komplett nach der Umstellungsstunde (22:00–06:00) bleibt korrekt (Kontrollfall, keine Regression)", () => {
+    // Beide Uhrzeiten liegen an diesem Tag bereits nach der Umstellung
+    // (03:00 Ortszeit) — hier liefert selbst "+24h in Millisekunden" zufällig
+    // dasselbe Ergebnis wie die korrekte, zonenbewusste Rechnung (kein
+    // Umstellungszeitpunkt liegt zwischen Start und Ende+24h). Dient als
+    // Kontrollfall, NICHT als alleiniger Regressionstest für den Fund —
+    // maßgeblich ist der Testfall oben, der tatsächlich divergiert.
+    const { startsAt, endsAt } = computeSelfBookingWindow("2026-10-25", "22:00", "06:00");
+    expect(startsAt.toISOString()).toBe("2026-10-25T21:00:00.000Z");
+    expect(endsAt.toISOString()).toBe("2026-10-26T05:00:00.000Z");
   });
 });
