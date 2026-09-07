@@ -175,14 +175,24 @@ export async function upsertQuestion(
         .eq("quiz_id", quizId);
       if (error) return { error: translateDbError(error) };
     } else {
-      const { count } = await supabase
+      // BUGFIX (Builder, 07.09.2026, tester-Fund, gleiche Ursache wie
+      // courses/actions.ts createModule/createSection/createLesson):
+      // max(position) + 1 statt Zeilenanzahl — sonst dupliziert eine neue
+      // Frage nach dem Löschen einer mittleren Frage die Position einer
+      // bestehenden, und moveQuestion tauscht danach zwei identische
+      // Positionen (No-Op).
+      const { data: existingQuestions } = await supabase
         .from("questions")
-        .select("id", { count: "exact", head: true })
-        .eq("quiz_id", quizId);
+        .select("position")
+        .eq("tenant_id", tenant.id)
+        .eq("quiz_id", quizId)
+        .order("position", { ascending: false })
+        .limit(1);
+      const position = (existingQuestions?.[0]?.position ?? -1) + 1;
       const { error } = await supabase.from("questions").insert({
         tenant_id: tenant.id,
         quiz_id: quizId,
-        position: count ?? 0,
+        position,
         ...row,
       });
       if (error) return { error: translateDbError(error) };
@@ -241,8 +251,20 @@ export async function moveQuestion(
 
     const a = questions[idx];
     const b = questions[swapIdx];
-    await supabase.from("questions").update({ position: b.position }).eq("id", a.id).eq("tenant_id", tenant.id);
-    await supabase.from("questions").update({ position: a.position }).eq("id", b.id).eq("tenant_id", tenant.id);
+    // BUGFIX (07.09.2026, gleicher Fund wie moveModule in courses/actions.ts):
+    // Fehler beider Updates prüfen statt stillschweigend zu verschlucken.
+    const { error: swapErrorA } = await supabase
+      .from("questions")
+      .update({ position: b.position })
+      .eq("id", a.id)
+      .eq("tenant_id", tenant.id);
+    if (swapErrorA) return { error: translateDbError(swapErrorA) };
+    const { error: swapErrorB } = await supabase
+      .from("questions")
+      .update({ position: a.position })
+      .eq("id", b.id)
+      .eq("tenant_id", tenant.id);
+    if (swapErrorB) return { error: translateDbError(swapErrorB) };
 
     revalidatePath(`/admin/kurse/${courseId}/quiz/${quizId}`);
     return { error: null, success: true };
@@ -378,18 +400,31 @@ export async function submitAttempt(quizId: string, answersInput: unknown): Prom
 
     const grading = gradeAttempt(questions, parsedAnswers.data, quizRow.pass_pct);
 
-    const nowIso = new Date().toISOString();
-    const { error: insertError } = await admin.from("attempts").insert({
-      tenant_id: quizRow.tenant_id,
-      quiz_id: quizId,
-      user_id: user.id,
-      started_at: nowIso,
-      submitted_at: nowIso,
-      answers: parsedAnswers.data,
-      score_pct: grading.scorePct,
-      passed: grading.passed,
+    // BUGFIX (Builder, 07.09.2026, tester-Fund): Zählung (oben, `existingAttempts`)
+    // und Insert liefen bisher als ZWEI getrennte Anfragen ohne Sperre — ein
+    // Doppelklick/zwei Tabs konnten beide `count = 0` lesen und beide einen
+    // Versuch anlegen, trotz `attempts_allowed = 1`. Die Zählung oben bleibt
+    // als schneller Vorab-Check (gute UX, spart die Fragen-/Bewertungsarbeit
+    // im Normalfall), ist aber NICHT mehr die durchsetzende Instanz — das
+    // erledigt jetzt atomar die RPC `submit_quiz_attempt` (Zählung+Insert in
+    // EINER Datenbankanweisung/Transaktion samt Advisory-Lock, siehe
+    // Migration 20260907091500_quiz_attempt_limit_rpc.sql). Läuft bewusst
+    // über den regulären RLS-Client (nicht `admin`): die Funktion ist
+    // `security definer`, leitet Mandant/Mitgliedschaft aber selbst aus
+    // `auth.uid()` ab, genau wie die bisherige `attempts_own_insert`-Policy.
+    const { data: attemptRow, error: rpcError } = await supabase.rpc("submit_quiz_attempt", {
+      p_quiz_id: quizId,
+      p_answers: parsedAnswers.data,
+      p_score_pct: grading.scorePct,
+      p_passed: grading.passed,
     });
-    if (insertError) return { ok: false, error: "Speichern fehlgeschlagen: " + translateDbError(insertError) };
+    if (rpcError) {
+      if (rpcError.message === "attempts_limit_reached") {
+        return { ok: false, error: "Versuchslimit erreicht." };
+      }
+      return { ok: false, error: "Speichern fehlgeschlagen: " + translateDbError(rpcError) };
+    }
+    if (!attemptRow) return { ok: false, error: "Speichern fehlgeschlagen." };
 
     // Block 7 (Webhooks): quiz.passed fire-and-forget, NUR wenn bestanden
     // (siehe dispatch.ts).
