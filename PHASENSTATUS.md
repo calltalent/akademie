@@ -3923,3 +3923,125 @@ Drei Fehler aus dem Prüflauf vom 07.09.2026 behoben (gefunden von einem lesende
 **Verifikation:** `npx tsc --noEmit` → 0 Fehler. `npm run lint` → 0 Fehler, 0 Warnungen in allen geänderten/neuen Dateien (die einzige verbleibende Warnung, `src/lib/calendar/actions.ts:54`, liegt außerhalb dieses Scopes und stammt von einem parallel arbeitenden Agenten). `npx vitest run` → 742/743 grün, einziger roter Test `env.test.ts` (bekannt, scheitert ohne `.env` in dieser Sitzungsumgebung, unabhängig von dieser Änderung) — alle 5 neuen Tests grün, keine bestehenden Tests gebrochen.
 
 **Status: Bereit für den tester-Agenten.** Zwei geschriebene, nicht angewendete Migrationen warten auf Josips `supabase db push` — siehe Hinweis zu Punkt 2.2 oben (Prüfungsabschluss ist erst danach wieder voll funktionsfähig; der Positionstausch bleibt bis dahin beim bestehenden, jetzt fehlergeprüften Zwei-Update-Verhalten).
+
+## Projektrevision 07.09.2026: Prüflauf mit vier Agenten, danach Tier-1- und Tier-2-Fixes
+
+Josips Auftrag: das gesamte Projekt revidieren, Fehler und Sicherheitslücken suchen, offene Punkte aus diesem Dokument abarbeiten. Vier lesende Prüf-Agenten parallel (Sicherheitsaudit, Toolchain, Abgleich dieses Dokuments gegen den Code, Korrektheits-Bugjagd), danach fünf Builder-Agenten in zwei Wellen auf getrennten Dateibereichen. Branch `claude/ruflo-swarm-hierarchical-0trzqy`, sieben Commits.
+
+Vorlauf: Josip ließ Ruflo (npm-Paket `ruflo`, v3.38.23, identisch mit dem Repo `ruvnet/ruflo`) global installieren und einen hierarchischen Swarm mit acht Agenten initialisieren. `ruflo swarm start` wurde vom Sicherheits-Klassifikator der Sitzungsumgebung blockiert; ohne `ANTHROPIC_API_KEY` in der Umgebung hätte die Schleife ohnehin keine LLM-Verbindung gehabt. Ausgeführt wurde die Arbeit stattdessen über die in CLAUDE.md §7 vorgeschriebenen Subagenten. `.claude-flow/` und `.swarm/` sind in `.gitignore` aufgenommen, `.claude/settings.json` erlaubt `Bash(ruflo:*)`.
+
+### 1. Ist-Zustand der Toolchain (Prüflauf, nichts geändert)
+
+`npx tsc --noEmit` 0 Fehler, `npm run lint` 0 Fehler und 0 Warnungen, `npx vitest run` 677 von 678 grün.
+
+Neu festgestellt und bisher nirgends dokumentiert: **auch `next build` läuft ohne gesetzte `NEXT_PUBLIC_*`-Variablen nicht durch.** Der Abbruch erfolgt in der Phase „Collecting page data", erster Treffer `src/app/api/admin/ki/generate/route.ts`, Ursache identisch mit den beiden bekannten roten Tests: `src/lib/env.ts:79` (`parsePublicEnv`) wirft. Bisher stand in diesem Dokument nur, dass `env.test.ts` und `marketplace/fulfil.test.ts` umgebungsbedingt scheitern. Wer den Build in einer frischen Umgebung anwirft, hält den Abbruch sonst für eine Regression.
+
+Gegenprobe im selben Lauf: mit Platzhalterwerten für `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` und `SUPABASE_SERVICE_ROLE_KEY` ausschließlich in der Kommandozeile (keine Datei angelegt, keine echten Schlüssel) läuft der Produktionsbuild vollständig durch, 70 statische Seiten, alle Routen im Manifest.
+
+Zwei Build-Warnungen ohne Abbruch: `src/middleware.ts` nutzt die in Next.js 16 abgekündigte `middleware`-Konvention, Nachfolger ist `proxy`. Und `@supabase/supabase-js` greift auf `process.version` zu, eine Edge-Runtime-Warnung aus der Fremdbibliothek.
+
+### 2. Sicherheitsaudit (46 Tabellen, 208 Policies, alle API-Routen und Server Actions)
+
+Keine offenen KRITISCH- oder HOCH-Funde. Als in Ordnung verifiziert: RLS auf allen 46 Tabellen aktiv, die vier Tabellen ohne eigene `tenant_id` (`tenants`, `rate_limits`, `platform_admins`, `tenant_domains`) sind begründete Ausnahmen; kein `"use client"`-Modul importiert `createAdminClient` (alle 48 Fundstellen sind Route-Handler, Server Actions oder `server-only`); Stripe- und Bunny-Webhooks prüfen die Signatur vor jeder Verarbeitung; keine SQL-String-Konkatenation; Auth-Token ausschließlich in Cookies über `@supabase/ssr`; Upload-Whitelists serverseitig und zusätzlich auf Bucket-Ebene; kein Lösungs-Leak über `questions.answer` (die Lernenden-Abfrage in `quiz/load.ts` listet die Spalten explizit auf und lässt `answer` aus).
+
+Zwei neue MITTEL-Funde, beide behoben (siehe Abschnitt 3): fehlendes Rate-Limit bei Einzel-Einladung und erneutem Versand, fehlender CSRF-Schutz auf `auth/signout`.
+
+Bestandsfunde, unverändert offen: kein CAPTCHA/Honeypot auf öffentlichen Formularen (Rate-Limiting greift, hilft aber nicht gegen verteilte Bots mit vielen IPs); keine Content-Security-Policy in `next.config.ts` (die vier übrigen Basis-Header sind gesetzt); Session-Ablauf weiterhin nicht konfiguriert und damit CLAUDE.md §2.8 nicht erfüllt; Leaked-Password-Protection im Supabase-Dashboard weiterhin deaktiviert (per Advisor an diesem Tag erneut bestätigt).
+
+### 3. Behobene Fehler
+
+**Commit `1496e62` — vier Sicherheitsfunde.**
+
+1. Header-Spoofing: `src/middleware.ts` übernahm eingehende `x-tenant-id`/`x-tenant-slug`/`x-tenant-data` unverändert und setzte sie nur im Zweig „Mandant aufgelöst" neu. Auf Portal- und Marketplace-Host sowie bei unbekanntem Host überlebte ein vom Klienten gesetzter `x-tenant-data`-Header bis zu `getTenant()`, das ihm als vollständigem Mandantenobjekt vertraute. Kein Cross-Tenant-Datenleck, RLS hält davon unabhängig, aber Wartungsmodus und Feature-Flags waren umgehbar. Neue reine Funktion `stripSpoofableTenantHeaders()` in `lib/tenant/routing.ts`, aufgerufen direkt nach `new Headers(request.headers)`. Der Punkt stand seit dem 03.08.2026 als „nicht geprüft" im Abschnitt M4.
+2. Offener Redirect in `src/app/auth/callback/page.tsx`: `window.location.href = next` ohne Prüfung. Nutzt jetzt die bereits vorhandene und getestete `resolveSafeNextParam()` aus `lib/marketplace/redirect.ts`, keine zweite Variante derselben Logik.
+3. Rate-Limit für `inviteSingleUser()` und `resendInviteLink()` in `lib/users/actions.ts`: beide lösen echten Resend-Mailversand aus, hatten aber keinen Schutz, während der CSV-Bulk-Import daneben einen hat. 30 Anfragen pro 300 Sekunden je Mandant, getrennte Schlüssel, Prüfung nach `requireAdminTenant()`.
+4. Logout-CSRF: `src/app/auth/signout/route.ts` war die einzige der sieben state-ändernden Routen ohne `verifySameOrigin()`. Nebenbei kam heraus, dass `verifySameOrigin()` trotz sechsfacher Verwendung nie getestet war; `lib/security/origin.test.ts` deckt jetzt sechs Fälle ab, darunter das Fail-Closed-Verhalten bei fehlendem Origin-Header.
+
+**Commit `aa2fa8f` — vier stille Schreibfehlschläge.** Gemeinsame Ursache: Schreibzugriffe über den RLS-Client auf Tabellen ohne passende Policy. PostgREST löscht null Zeilen, meldet keinen Fehler, der Code prüft `error`, bekommt `null` und meldet Erfolg.
+
+1. `lib/reporting/actions.ts`: „Bericht zurücksetzen" löschte nichts. `progress_own_delete` erlaubt nur `user_id = auth.uid()`, für `attempts` existiert seit Migration `20260712234500` gar keine DELETE-Policy. Beim Kursbericht löschte die Funktion still den eigenen Fortschritt des Admins, falls vorhanden. Jetzt Admin-Client nach `requireAdminTenant()`, weiterhin auf `tenant_id` eingeschränkt, mit `.select("id")` und ehrlicher Rückmeldung bei null betroffenen Zeilen.
+2. `lib/generator/apply.ts`: Der Idempotenz-Marker `ai_jobs.output.appliedCourseId` wurde nie persistiert, weil `ai_jobs` keine UPDATE-Policy hat. Der Guard griff deshalb nie und ein Doppelklick auf „Entwurf übernehmen" legte den kompletten Kurs samt Modulen, Lektionen und Quiz ein zweites Mal an. Nutzt jetzt `updateAiJob()`.
+3. `lib/generator/actions.ts`: `deleteDraft()` war wirkungslos, der Entwurf war nach dem Reload wieder da.
+4. Das Compare-and-Swap-Lock in `lib/generator/process.ts`, `lib/calendar/ai/process.ts` und `lib/calendar/ai/holidays/process.ts` sperrte nicht: das Update ohne `.select()` meldet null betroffene Zeilen nicht. Zwei überlappende Aufrufe von `/api/admin/ki/process` starteten denselben Sonnet-Schritt doppelt, und das zweite `output` überschrieb das erste.
+
+**Commit `7650061` — Reporting-Paginierung, Zertifikatsdatum, verwaiste PDFs.**
+
+1. Fünf Abfragen in `lib/reporting/queries.ts` liefen ohne `.range()`. PostgREST kappt serverseitig bei 1000 Zeilen ohne Fehler. Ein Mandant mit 60 Lernenden und 20 Lektionen hat 1200 `progress`-Zeilen; ab der 1001. fehlte der Fortschritt, `computeCourseProgress(...).isComplete` wurde fälschlich `false`, Abschlussquote und CSV-Export waren zu niedrig, Lernende standen auf „inaktiv". Neue Hilfsfunktion `fetchAllRows()` mit `.order("id")` vor `.range()`, weil Postgres sonst über mehrere Anfragen hinweg keine lückenlose Aufteilung garantiert. Alle vier Tabellen haben laut `0001_init.sql` eine `id`-Spalte, gegengeprüft. Die fünfte Stelle (`getUserReport()`) stand nicht im Auftrag, hat aber dasselbe Muster und wurde mitgezogen.
+2. `lib/certificates/pdf.ts`: `toLocaleDateString` ohne `timeZone`. Workers laufen in UTC; wer nachts zwischen 00:00 und 01:00 Berliner Zeit abschloss, bekam im PDF den Vortag, während Datenbank und Oberfläche den richtigen Tag zeigten.
+3. `lib/certificates/issue.ts`: Das PDF wird vor der `certificates`-Zeile hochgeladen. Im 23505-Race-Pfad und bei jedem anderen Insert-Fehler blieb es als verwaiste Datei im privaten Bucket liegen, von keiner Oberfläche erreichbar. Wird jetzt aufgeräumt, ohne dass ein fehlgeschlagenes Aufräumen dem Nutzer als Fehler erscheint.
+
+**Commit `447a8c6`** — Positions-Duplikate, Versuchslimit-Race, Quiz-Mischung. Eigener Abschnitt weiter oben in diesem Dokument, dort auch die beiden neuen Migrationen.
+
+**Commit `8803fb9` — Zeitzonen im Kalender, zwei Marketplace-Fehler.**
+
+1. `bookOwnShift()` in `lib/calendar/actions.ts` addierte für Nachtschichten 24 Stunden in Millisekunden, während der Rest des Moduls zonenbewusst über `addDays()`/`berlinDateTimeToUtc()` rechnet. In der Nacht der Zeitumstellung landete die Rechnung eine Stunde daneben und lehnte legitime Buchungen als außerhalb des Zeitfensters ab. Neue reine Funktion `computeSelfBookingWindow()` in `lib/calendar/date.ts`; sie liegt dort und nicht in `actions.ts`, weil `actions.ts` `"use server"` trägt und beim Import ohne `.env` sofort wirft, also nicht testbar wäre.
+2. `src/app/(planung)/admin/schichtplanung/page.tsx` leitete das Jahr aus `weekStart.getUTCFullYear()` ab. `weekStart` ist Montag 00:00 Berliner Zeit, im Winter also Sonntag 23:00 UTC: die Woche ab dem 01.01. lud die Feiertage des Vorjahres, Neujahr fehlte im Raster. Wochen über den Jahreswechsel luden nur ein Jahr. Das Jahr kommt jetzt aus `isoDateString().slice(0,4)`, und `loadAbsencesForWeek()` lädt bei Bedarf beide Jahre und dedupliziert nach `id`.
+3. `handleMarketplacePurchase()` versendete die Kaufbestätigung unbedingt. Stripe garantiert nur Zustellung mindestens einmal; ein Retry schickte dem Käufer dieselbe Mail erneut. Gated jetzt über `isNewOrder`, wie der Dispatch daneben. Die Freischaltung selbst läuft unverändert.
+4. `acquireFreeListing()` hatte kein `try/catch` um `grantMarketplaceAccess()`, das bei DB-Fehlern bewusst wirft. Der Nutzer landete auf der Next.js-Fehlerseite statt bei einer verständlichen Meldung.
+
+Anmerkung zur Testqualität: Das für Punkt 1 vorgegebene Testdatum 25.10.2026 22:00 bis 06:00 reproduziert den Fehler nicht, weil beide Uhrzeiten hinter der Umstellungsstunde (03:00 Ortszeit) liegen. Der Agent hat das nachgerechnet statt die Vorgabe zu übernehmen und nutzt 22:00 bis 00:30, wo die alte Rechnung nachweislich eine Stunde zu früh landet; die ursprüngliche Variante bleibt als Kontrollfall im Test.
+
+### 4. Abhängigkeiten (Commit `aa89d25`)
+
+`npm audit` meldete 17 Schwachstellen (1 kritisch, 14 hoch, 2 mittel), der Punkt stand seit dem 11.07.2026 offen. Danach sind es 5.
+
+`next` von 16.2.10 auf 16.3.4, dazu `@next/env` und `eslint-config-next` im Gleichschritt (alle drei waren exakt gepinnt). Behebt Middleware-/Proxy-Bypass, SSRF in Server Actions und Cache-Confusion. Ein Patch innerhalb von 16.2.x existiert nicht, der Advisory-Bereich reicht bis `16.3.0-preview.10`. `sanitize-html` von 2.17.6 auf 2.17.7 (Stored XSS über SVG-SMIL) — das Paket säubert das Lektions-HTML und war damit der direkteste Weg in den Lernbereich. Dazu die übrigen nicht-breaking Updates aus `npm audit fix`.
+
+`eslint-config-next` 16.3.4 bringt die Regel `no-location-assign-relative-destination`, die drei bestehende Stellen anmerkt (`auth/callback/page.tsx`, `ki-review-panel.tsx`, `quiz-editor.tsx`). Alle drei navigieren bewusst hart nach einer serverseitigen Mutation, weil `router.push()` die Zielseite aus dem Client-Router-Cache mit veraltetem Zustand rendern würde; bei `auth/callback` ist das genau der Fehler vom 26.07.2026. Deshalb je eine begründete `eslint-disable`-Zeile statt einer Verhaltensänderung.
+
+Offen bleiben 5 Funde, alle an Major-Sprüngen: `unpdf` 1.8.1 (zieht `tar` kritisch, `canvas`, `@mapbox/node-pre-gyp`) und `jsdom` 30. `unpdf` ist der PDF-Parser des Kurs-Generators, ein Major-Wechsel gehört in einen eigenen Block mit Test am echten PDF-Upload. `jsdom` ist reine Testumgebung.
+
+### 5. Korrektur an diesem Dokument: 17 Punkte waren längst erledigt
+
+Der Abgleich-Agent hat alle „Offen"-Abschnitte dieses Dokuments gegen Code, Migrationen und den Live-Advisor geprüft. Folgende Punkte stehen hier als offen, sind aber am Code als erledigt belegt und sollten künftig nicht erneut aufgegriffen werden:
+
+Wyoming Filing ID (`lib/legal/company.ts:50` trägt `2026-002057636`). `messages/de.json` als unbenutztes Scaffolding (überholt: 162 von 430 Dateien nutzen `useTranslations`/`getTranslations`, 1690 Schlüssel, de/en/bs vollständig paritätisch; einzige verbliebene Lücke ist `src/app/portal/**` mit 18 Dateien, die dokumentierte Ausnahme). `enrollments.source = "api"` (eigene Migration). TODO „Stripe-Produktanlage in `submitListing()`" (erledigt in `marketplace/actions.ts:202`). Fehlender E2E-Seed-Mandant `demo-blau`. Fehlender `en`-Testfall für E-Mail-Vorlagen. SPEC.md-Nachtrag Marketplace. Basis-Security-Headers. CSRF-Schutz auf den sechs Route-Handlern. DSGVO-Export ohne `enrollments`. avatars-Bucket-Listing, CSV-Formula-Injection, Secret-Rotation samt Git-Historie. Kurskatalog-Kategorien. Einstellungen-Restrukturierung und Dashboard-Feinschliff. Frage nach Abschaffung der Selbstregistrierung (per Mandanten-Schalter gelöst). Die security-reviewer-Läufe S1/S2/S3. Vier Einträge „nicht angewendete Migrationen" (alle vier sind angewendet, alle 58 Migrationen liegen lokal vor).
+
+Ebenfalls kein Fund: `marketplace_ledger` und `platform_settings` erscheinen im Advisor als „RLS ohne Policy". Das ist ein bewusstes Deny-all, dokumentiert in `20260803100200_marketplace_ledger.sql`, Zugriff ausschließlich über den Admin-Client.
+
+Nebenbefund: Es gibt im gesamten Repo keinen einzigen offenen TODO/FIXME/HACK/XXX mehr. Die drei verbliebenen Treffer sind Rückverweise in Kommentaren.
+
+### 6. Weiterhin offen, im Code lösbar
+
+1. `security definer`-Funktionen sind für `anon` ausführbar. Der Live-Advisor meldet 19 WARN-Einträge (alle `calendar_*`-Helfer plus `can_participate`, `has_enrollment`, `customer_area_can_see`, `is_marketplace_guest`). Die Migrationen machen nur `revoke ... from public`, nicht `from anon`. Praktische Auswirkung gering, weil `auth.uid()` bei `anon` null ist, aber es weicht vom eigenen Härtungsstandard ab (`20260714090000_revoke_check_rate_limit_anon_auth.sql`). Eine additive Migration, klein.
+2. Drei fehlende Deckungsindizes im Marketplace: `marketplace_ledger_listing_id`, `marketplace_listings_product_id`, `marketplace_listings_reviewed_by`.
+3. Zwei tote i18n-Schlüssel: `certificates.profileTitle` und `profilePasswordHint` in `messages/de.json`, nirgends referenziert.
+4. Kein Rate-Limit auf `setLocale()` in `lib/account/actions.ts`.
+5. `shift_calendar_enabled` wird für owner/admin bewusst nicht geprüft (`lib/calendar/access.ts:41`). Produktentscheidung, kein technischer Fehler.
+6. `/profil` und `/lesezeichen` sind nicht übersetzt; in `lesezeichen/page.tsx:93` ist die Fallback-Anrede wörtlich „zurück".
+7. Öffentlicher Marketplace-Katalog ohne Pagination und Rate-Limit (`lib/marketplace/catalog.ts`).
+8. Kein Aufräum-Job für verwaiste Bunny-Videos aus abgebrochenen tus-Uploads. Vierfach in diesem Dokument vermerkt.
+9. Kein UI-Schalter für `courses.settings.certificate_enabled`, obwohl `certificates/issue.ts:103` das Feld auswertet.
+10. `progress_own` in `0001_init.sql:493` prüft beim Insert nur `user_id = auth.uid()`, nicht `tenant_id`. Anwendungsseitig entschärft, per Direktclient aber manipulierbar. Beim Anfassen hohes Risiko, das ist die heißeste Tabelle des Produkts.
+11. Keine axe-core/a11y-Suite. Bei einem sehbehinderten Auftraggeber und CLAUDE.md §3.4 der lohnendste der offenen Punkte.
+12. `findUserByEmail` in `lib/users/import.ts:377` paginiert nicht über 1000 Nutzer.
+13. Magic-Link im Betreiber-Portal springt auf die Haupt-Site zurück, weil `getTenant()` auf dem Portal-Host null ist. Passwort-Login funktioniert.
+14. `NextIntlClientProvider` reicht alle 1690 Messages an jede Client Component.
+15. Kein DOCX/PPTX-Upload im Kurs-Generator (`ALLOWED_GENERATOR_MIME_TYPES` kennt nur PDF). Braucht einen Workers-tauglichen OOXML-Parser, großer Aufwand.
+16. `sendOrderPaidMail()` im regulären Stripe-Pfad (`api/stripe/webhook/route.ts`) hat denselben Idempotenz-Fehler, der in `fulfil.ts` behoben wurde. Bestätigt, aber außerhalb des damaligen Auftragsbereichs gelassen.
+17. `moveCourse` in `courses/actions.ts:348` hat dasselbe nicht-atomare Zwei-Update-Muster wie `moveModule`.
+18. `fetchAllRows()` in `reporting/queries.ts` bricht bei einem Fehler mitten im Seitendurchlauf still ab und liefert die bis dahin geladenen Zeilen. Das war vorher genauso stumm, sauber wäre, den Fehler bis in die Oberfläche zu reichen.
+
+### 7. Weiterhin offen, nur von Josip erledigbar
+
+1. **`supabase db push` vor dem nächsten Deploy.** Zwei neue Migrationen liegen im Repo und sind nicht angewendet. `submitAttempt()` ruft bereits `public.submit_quiz_attempt()` auf; wird deployt, ohne die Migration anzuwenden, schlägt jeder Prüfungsabschluss fehl. Die zweite Migration (`swap_*_positions`) ist bewusst nicht verdrahtet und damit unkritisch.
+2. **`npm run deploy`.** Vier fertige, committete Änderungen wirken erst danach: Wartungsmodus-Bypass für `/portal` (`lib/tenant/routing.ts:129`), die neuen Rechtsseiten, der `marketplace.calltalent.ai`-Fix und `workers_dev: false`. Solange nicht deployt ist, bleibt `/portal` auf `academy.calltalent.ai` blockiert.
+3. Leaked-Password-Protection im Supabase-Dashboard aktivieren. Dashboard-Schalter, erstmals am 11.07.2026 notiert.
+4. Session-Timeout in Supabase Auth setzen und den Wert hier dokumentieren. CLAUDE.md §2.8 verlangt einen dokumentierten, nicht unbegrenzten Wert; der fehlt weiterhin.
+5. Supabase Auth URL Configuration: Redirect-URLs für `https://*.calltalent.ai/auth/callback` und `https://salestalent.app/auth/callback` prüfen. Strukturell offen, weil jede neue Custom Domain dort von Hand nachgetragen werden muss.
+6. Vertreter in der Union nach Art. 27 DSGVO. In Produkt und AVV weiterhin nur ein Platzhalter. Der vorhandene Schlüssel `representativeText` meint die Vertretungsberechtigung der Geschäftsführung, nicht den Art.-27-Vertreter.
+7. Steuerliche Bestätigung des Merchant-of-Record-Modells vor dem ersten echten Marketplace-Verkauf.
+8. Manueller Stripe-Testmodus-Kaufdurchlauf. Der Kaufweg ist bisher nur unit-getestet, nie gegen die echte Stripe-API gefahren.
+9. Bunny-Dashboard: Webhook eintragen (ohne ihn feuert Status 3/9 nie, also keine Transkripte und Untertitel), EN-Untertitel-Erstlauf, Browser-Zyklus Aufnahme bis Upload inklusive Tastatur-only-Durchlauf.
+10. Cloudflare: Git-Auto-Deploy weiterhin defekt, Entscheidung Paid-Plan wegen Build-Größenlimit, Worker-Skriptgröße nach dem Montserrat-Embed nie vermessen.
+11. Lighthouse-Messung gegen das Budget aus CLAUDE.md §3.3.
+12. Inhaltliche Durchsicht von `messages/bs.json`.
+13. Website-Repo: Branch `claude/agb-privacy-calltalent-migration-drxlr8` ist gepusht, aber nicht nach `main` gemerged. `calltalent.ai` zeigt bis dahin die Ltd.
+14. AVV/TOM Fassung 2 einmal in Word öffnen.
+15. Markenentscheidung `login_copyright` für SalesTalent, Produktentscheidung Marketplace-Selbstregistrierung.
+
+### 8. Verifikation des Gesamtstands
+
+`npx tsc --noEmit` 0 Fehler. `npm run lint` 0 Fehler, 0 Warnungen. `npx vitest run` 746 von 747 grün, einziger roter Test `env.test.ts` aus dem in Abschnitt 1 beschriebenen Umgebungsgrund. Die Suite ist im Lauf dieses Blocks von 678 auf 747 Tests gewachsen; jeder Fix hat mindestens einen Test, der den Fehler ohne den Fix reproduziert. `next build` mit Platzhaltervariablen erfolgreich, 70 statische Seiten. Playwright nicht gelaufen (kein Dev-Server, keine `.env` in dieser Umgebung).
+
+**Nächster Schritt für Josip:** `supabase db push`, danach `npm run deploy` — in dieser Reihenfolge, siehe Abschnitt 7 Punkt 1.
