@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifySameOrigin, CSRF_REJECT_MESSAGE } from "@/lib/security/origin";
 
 /**
  * BUGFIX (22.07.2026, Josips Fund: "Abmelden im Portal führt zu einem
@@ -19,6 +20,15 @@ import { createClient } from "@/lib/supabase/server";
  * nach einer erfolgreich verarbeiteten POST-Aktion.
  */
 export async function POST(request: Request) {
+  // CSRF-Fix (Security-Review 07.09.2026): fehlte hier als einzige der
+  // sieben state-ändernden Routen — reine Cookie-Session-Autorisierung ohne
+  // Signatur-/Secret-Header, siehe src/lib/security/origin.ts-Dateikopf.
+  // Ohne diesen Schutz könnte ein fremdes Formular einen eingeloggten
+  // Nutzer unbemerkt ausloggen (Logout-CSRF).
+  if (!verifySameOrigin(request)) {
+    return NextResponse.json({ error: CSRF_REJECT_MESSAGE }, { status: 403 });
+  }
+
   const supabase = await createClient();
   await supabase.auth.signOut();
 
