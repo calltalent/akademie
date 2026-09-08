@@ -4045,3 +4045,17 @@ Nebenbefund: Es gibt im gesamten Repo keinen einzigen offenen TODO/FIXME/HACK/XX
 `npx tsc --noEmit` 0 Fehler. `npm run lint` 0 Fehler, 0 Warnungen. `npx vitest run` 746 von 747 grün, einziger roter Test `env.test.ts` aus dem in Abschnitt 1 beschriebenen Umgebungsgrund. Die Suite ist im Lauf dieses Blocks von 678 auf 747 Tests gewachsen; jeder Fix hat mindestens einen Test, der den Fehler ohne den Fix reproduziert. `next build` mit Platzhaltervariablen erfolgreich, 70 statische Seiten. Playwright nicht gelaufen (kein Dev-Server, keine `.env` in dieser Umgebung).
 
 **Nächster Schritt für Josip:** `supabase db push`, danach `npm run deploy` — in dieser Reihenfolge, siehe Abschnitt 7 Punkt 1.
+
+### Nachtrag am selben Tag: Migrationen angewendet, dabei eigenen Fehler gefunden
+
+Josip hat den Deploy freigegeben. Aus der Sitzungsumgebung heraus ist er nicht ausführbar: kein `CLOUDFLARE_API_TOKEN`, `wrangler whoami` meldet „not authenticated", keine `.env` für den OpenNext-Build. `wrangler login` ist ein interaktiver OAuth-Ablauf. Der Deploy bleibt damit bei Josip.
+
+Die drei Migrationen sind dagegen angewendet, Projekt `vklqksdiyiijzoirntyt` (calltalent-akademie, eu-central-1). Damit ist die in Abschnitt 7 beschriebene Reihenfolge-Falle entschärft: `submit_quiz_attempt()` existiert jetzt, der Deploy kann in beliebiger Reihenfolge erfolgen. Für den aktuell live laufenden Code ändert sich nichts, er ruft keine der neuen Funktionen auf.
+
+**Bei der Gegenprüfung fiel ein Fehler in den beiden Migrationen auf.** `revoke execute ... from public` entfernt das EXECUTE-Recht der Rolle `anon` nicht. Supabase vergibt es über `alter default privileges` als eigenen, expliziten Grant; die PUBLIC-Pseudorolle ist davon unabhängig. Nach dem Anwenden stand auf allen vier neuen Funktionen `anon=EXECUTE`.
+
+Praktisch war kein Zugriff möglich: `auth.uid()` ist bei `anon` null, damit liefert `member_role()` null und `is_staff()` false, beide Funktionen brechen mit einer Exception ab. Es weicht aber vom Härtungsstandard des Projekts ab und hätte den Advisor-Befund aus Abschnitt 6 Punkt 1 um vier weitere Einträge verlängert. Behoben durch `20260907093000_revoke_new_rpcs_from_anon.sql`, angewendet und per `information_schema.routine_privileges` gegengeprüft: `anon` ist auf allen vier Funktionen entfernt, `authenticated` und `service_role` behalten EXECUTE.
+
+Der Fund ist nur aufgefallen, weil die Rechte nach dem Anwenden gegen die Datenbank abgefragt wurden statt sich auf den SQL-Text zu verlassen. Für die 19 bestehenden WARN-Einträge aus Abschnitt 6 Punkt 1 gilt dieselbe Ursache; die Sammelmigration dafür steht weiterhin aus.
+
+**Was für den Deploy jetzt noch fehlt:** nur `npm run deploy` von Josips Rechner. Vorher `git pull` auf `claude/ruflo-swarm-hierarchical-0trzqy`, danach die Prüfungsfunktion einmal manuell testen (Prüfung mit `attempts_allowed = 1` abschließen, zweiter Versuch muss „Versuchslimit erreicht." liefern).
