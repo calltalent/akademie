@@ -41,6 +41,32 @@
  * Portal-Host gewinnt, da er zuerst geprüft wird.
  */
 
+/**
+ * Header-Spoofing-Schutz (Security-Review 07.09.2026, Fund "Header-
+ * Spoofing"): middleware.ts setzt `x-tenant-id`/`x-tenant-slug`/
+ * `x-tenant-data` NUR im Zweig "Mandant aufgelöst" (Host tatsächlich einem
+ * Mandanten zugeordnet) neu. Auf dem Portal-/Marketplace-Host oder bei
+ * unbekanntem Host läuft dieser Zweig nie — `new Headers(request.headers)`
+ * übernimmt eingehende Header aber unverändert, ein vom KLIENTEN selbst
+ * mitgeschickter `x-tenant-data`-Header überlebte deshalb bis zu
+ * `getTenant()` (tenant/context.ts), der ihm als vollständigem
+ * Mandantenobjekt inklusive `settings.maintenance_enabled` und
+ * Feature-Flags vertraut — Wartungsmodus- und Entitlement-Umgehung (kein
+ * Cross-Tenant-Datenleck, RLS hält davon unabhängig).
+ *
+ * Reine Funktion (kein Next.js-Typ nötig — `Headers` ist Web-Standard,
+ * auch unter Vitest ohne jsdom-Mock verfügbar) — middleware.ts ruft sie
+ * GANZ AM ANFANG direkt nach `new Headers(request.headers)` auf, bevor
+ * irgendein Zweig die drei Header ggf. neu setzt.
+ */
+export const SPOOFABLE_TENANT_HEADERS = ["x-tenant-id", "x-tenant-slug", "x-tenant-data"] as const;
+
+export function stripSpoofableTenantHeaders(headers: Headers): void {
+  for (const name of SPOOFABLE_TENANT_HEADERS) {
+    headers.delete(name);
+  }
+}
+
 export type RoutingDecision = {
   /** Tatsächlich zu bedienender Pfad (Portal-Rewrite bereits angewandt). */
   servedPath: string;

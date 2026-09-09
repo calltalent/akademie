@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { decideRouting, isApiPath, isAuthPath, isMaintenanceBypassPath, isSameHost } from "./routing";
+import {
+  decideRouting,
+  isApiPath,
+  isAuthPath,
+  isMaintenanceBypassPath,
+  isSameHost,
+  stripSpoofableTenantHeaders,
+} from "./routing";
 
 const PORTAL_HOST = "portal.calltalent.ai";
 const MARKETPLACE_HOST = "marketplace.calltalent.ai";
@@ -278,6 +285,36 @@ describe("decideRouting — Marketplace-Host (Marketplace M4)", () => {
         marketplaceHost: sameHost,
       }).servedPath,
     ).toBe("/portal/mandanten");
+  });
+});
+
+describe("stripSpoofableTenantHeaders", () => {
+  // REGRESSIONSSCHUTZ (security-reviewer-Fund "Header-Spoofing",
+  // 07.09.2026): auf dem Portal-/Marketplace-Host oder bei unbekanntem Host
+  // läuft der Zweig, der diese Header neu setzt, in middleware.ts nie —
+  // ohne diese Funktion würde ein vom Client selbst mitgeschickter Wert
+  // unverändert bis zu getTenant() durchgereicht.
+  it("löscht x-tenant-id, x-tenant-slug und x-tenant-data, falls vom Client mitgeschickt", () => {
+    const headers = new Headers({
+      "x-tenant-id": "spoofed-id",
+      "x-tenant-slug": "spoofed-slug",
+      "x-tenant-data": "ZmFrZQ==",
+      "x-forwarded-for": "1.2.3.4",
+    });
+
+    stripSpoofableTenantHeaders(headers);
+
+    expect(headers.has("x-tenant-id")).toBe(false);
+    expect(headers.has("x-tenant-slug")).toBe(false);
+    expect(headers.has("x-tenant-data")).toBe(false);
+    // Andere Header bleiben unangetastet — kein pauschales Header-Clearing.
+    expect(headers.get("x-forwarded-for")).toBe("1.2.3.4");
+  });
+
+  it("ist ein No-Op, wenn keiner der drei Header gesetzt ist", () => {
+    const headers = new Headers({ "x-forwarded-for": "1.2.3.4" });
+    expect(() => stripSpoofableTenantHeaders(headers)).not.toThrow();
+    expect(headers.get("x-forwarded-for")).toBe("1.2.3.4");
   });
 });
 

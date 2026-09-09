@@ -4,6 +4,7 @@ import { getTenant } from "@/lib/tenant/context";
 import { formatAddress, resolveLegalEntity } from "@/lib/legal/company";
 import { LEGAL_LAST_UPDATED } from "@/lib/legal/updated";
 import { LegalHeader, LegalSection } from "@/components/legal/legal-section";
+import { isTurnstileConfigured } from "@/lib/security/turnstile";
 
 /**
  * Datenschutzerklärung des Mandanten (24.08.2026, Josips Auftrag). Inhalt
@@ -17,6 +18,16 @@ import { LegalHeader, LegalSection } from "@/components/legal/legal-section";
  * Calltalent LLC (Wyoming, USA). Genau deshalb hat diese Fassung einen
  * eigenen Abschnitt zur Drittlandsübermittlung (Art. 44 ff. DSGVO), den die
  * alte UK-Fassung der Marketplace-Seite nicht brauchte.
+ *
+ * Abschnitt "Spam- und Bot-Schutz" NEU (25.08.2026, nach dem Spam-Vorfall
+ * am Kontaktformular — siehe PHASENSTATUS.md): beschreibt die tatsächlich
+ * stattfindende Verarbeitung (IP, Absendezeitpunkt, Formularinhalt) samt
+ * Rechtsgrundlage. Der Turnstile-Absatz wird NUR gerendert, wenn Turnstile
+ * auch wirklich konfiguriert ist (`isTurnstileConfigured()`) — eine
+ * Datenschutzerklärung, die eine Übermittlung an Cloudflare behauptet, die
+ * gar nicht stattfindet, wäre genauso falsch wie eine, die eine
+ * stattfindende verschweigt. Damit gibt es auch keine Reihenfolge-Falle
+ * beim Scharfschalten: Schlüssel setzen genügt, der Text folgt von selbst.
  */
 const PROCESSOR_KEYS = [
   "hosting",
@@ -40,6 +51,7 @@ export default async function PrivacyPage() {
   const updated = new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(
     new Date(LEGAL_LAST_UPDATED),
   );
+  const turnstileActive = isTurnstileConfigured();
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
@@ -89,6 +101,11 @@ export default async function PrivacyPage() {
 
       <LegalSection heading={t("cookiesHeading")}>
         <p>{t("cookiesText")}</p>
+      </LegalSection>
+
+      <LegalSection heading={t("botHeading")}>
+        <p>{t("botText")}</p>
+        {turnstileActive && <p>{t("botTurnstile")}</p>}
       </LegalSection>
 
       <LegalSection heading={t("retentionHeading")}>

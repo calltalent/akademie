@@ -343,7 +343,24 @@ export async function generateCertificatePdf({
     color: DIVIDER,
   });
 
-  const dateLabel = issuedAt.toLocaleDateString("de-DE", { year: "numeric", month: "long", day: "numeric" });
+  // Fix (Reporting/Zertifikate-Auftrag, tester-Runde): OHNE explizite
+  // `timeZone` rechnet `toLocaleDateString` in der Zeitzone der
+  // JS-Laufzeit — Cloudflare Workers laufen in UTC (keine TZ-Konfiguration
+  // in `wrangler.jsonc`), während DB/Oberfläche Berliner Zeit zeigen. Wer
+  // z. B. am 10.08.2026 um 01:30 Berliner Zeit (23:30 UTC am 09.08.)
+  // abschließt, bekäme sonst "9. August 2026" im PDF statt "10. August
+  // 2026". `CALENDAR_TIME_ZONE` aus src/lib/calendar/date.ts wird hier
+  // bewusst NICHT importiert (paralleler Bau-Auftrag an diesem Modul,
+  // siehe eigener Sitzungsauftrag) — derselbe Zeitzonen-String lokal
+  // dupliziert, minimaler Diff, keine Kopplung an ein Modul außerhalb
+  // dieses Auftragsbereichs.
+  const CERTIFICATE_TIME_ZONE = "Europe/Berlin";
+  const dateLabel = issuedAt.toLocaleDateString("de-DE", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: CERTIFICATE_TIME_ZONE,
+  });
   const footerValueY = 90;
   const footerLabelY = 76;
   const footerLabelSize = 9;

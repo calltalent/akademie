@@ -133,6 +133,19 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => new MockAdminClient(),
 }));
 
+// Für den neuen Erfolgspfad-Test unten (Bestätigungsmail nur bei
+// tatsächlicher Neuanlage der Order) — bewusst gemockt statt echt, damit der
+// Test schnell/deterministisch bleibt und die Aufrufanzahl zählbar ist
+// (gleiches Muster wie `certificates/issue.test.ts`).
+const { sendEmailMock } = vi.hoisted(() => ({ sendEmailMock: vi.fn().mockResolvedValue({ success: true }) }));
+vi.mock("@/lib/email/client", () => ({ sendEmail: sendEmailMock }));
+vi.mock("@/lib/email/templates", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/email/templates")>();
+  return { ...actual, orderPaid: vi.fn().mockResolvedValue("<html></html>") };
+});
+vi.mock("@/i18n/config", () => ({ resolveTenantEmailLocale: vi.fn().mockReturnValue("de") }));
+vi.mock("next-intl/server", () => ({ getTranslations: vi.fn().mockResolvedValue((key: string) => key) }));
+
 import { createAdminClient } from "@/lib/supabase/admin";
 import { computeCommission, grantMarketplaceAccess, handleMarketplacePurchase } from "./fulfil";
 import type Stripe from "stripe";
@@ -166,6 +179,7 @@ function fakeMetadata(overrides: Partial<MarketplaceCheckoutMetadata> = {}): Mar
 beforeEach(() => {
   tablesRef.current = {};
   tablesRef.errors = {};
+  sendEmailMock.mockClear();
 });
 
 describe("computeCommission", () => {
@@ -323,5 +337,41 @@ describe("handleMarketplacePurchase — Wurf-Pfade (security-reviewer-Fund 2 + 3
     await expect(
       handleMarketplacePurchase(mockAdmin(), fakeSession(), fakeMetadata({ tenant_id: "tenant-1" })),
     ).rejects.toThrow(/Listing für Erfüllung nicht gefunden/);
+  });
+});
+
+describe("handleMarketplacePurchase — Bestätigungsmail nur bei Neuanlage der Order (Fund: Stripe-Retry)", () => {
+  function seedHappyPathRows(): void {
+    tablesRef.current.tenants = [
+      { id: "tenant-1", slug: "acme", custom_domain: null, name: "Acme", branding: {}, settings: {} },
+    ];
+    tablesRef.current.courses = [{ id: "course-1", slug: "intro", title: "Intro-Kurs" }];
+    tablesRef.current.profiles = [{ id: "user-1", email: "buyer@example.com", full_name: "Käufer" }];
+    tablesRef.current.marketplace_listings = [{ id: "listing-1", tenant_id: "tenant-1", course_id: "course-1" }];
+  }
+
+  it("verschickt die Bestätigungsmail bei der ERSTEN Zustellung von checkout.session.completed", async () => {
+    seedHappyPathRows();
+
+    await handleMarketplacePurchase(mockAdmin(), fakeSession(), fakeMetadata());
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("verschickt die Bestätigungsmail NICHT ein zweites Mal bei einem Stripe-Retry desselben checkout.session.completed (Fund, behoben)", async () => {
+    // Stripe garantiert Event-Zustellung nur "at least once" — dasselbe
+    // Event kann erneut ankommen (z. B. weil der erste Aufruf NACH dem
+    // Mailversand am marketplace_ledger-Upsert hängen geblieben und ins
+    // Timeout gelaufen ist). VORHER: sendMarketplacePurchaseMail() lief
+    // unbedingt, der Käufer hätte die Bestätigung ein zweites Mal bekommen.
+    // Jetzt: an `isNewOrder` gekoppelt, genau wie die Webhook-Dispatches
+    // daneben (`enrollmentCreated`).
+    seedHappyPathRows();
+    const session = fakeSession();
+
+    await handleMarketplacePurchase(mockAdmin(), session, fakeMetadata());
+    await handleMarketplacePurchase(mockAdmin(), session, fakeMetadata());
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
   });
 });

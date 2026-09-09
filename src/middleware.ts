@@ -2,7 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env";
 import { resolveTenantByHost } from "@/lib/tenant/resolve";
-import { decideRouting, isMaintenanceBypassPath, isSameHost } from "@/lib/tenant/routing";
+import {
+  decideRouting,
+  isMaintenanceBypassPath,
+  isSameHost,
+  stripSpoofableTenantHeaders,
+} from "@/lib/tenant/routing";
 import type { PublicTenant } from "@/lib/tenant/types";
 import { resolveEnabledLocales } from "@/i18n/config";
 import { resolveLocale } from "@/i18n/resolve";
@@ -49,6 +54,14 @@ function utf8ToBase64(value: string): string {
 
 export async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
+
+  // Security-Fix (Header-Spoofing, 07.09.2026, siehe stripSpoofableTenantHeaders()
+  // in lib/tenant/routing.ts): eingehende Header sind NUTZERKONTROLLIERT —
+  // `new Headers(request.headers)` übernimmt sie unverändert, und die drei
+  // Mandanten-Header werden weiter unten nur gesetzt, wenn ein Mandant zum
+  // Host aufgelöst wurde. Deshalb hier bedingungslos löschen, BEVOR
+  // irgendein Zweig sie ggf. neu setzt.
+  stripSpoofableTenantHeaders(requestHeaders);
 
   const host = request.headers.get("host") ?? "";
 

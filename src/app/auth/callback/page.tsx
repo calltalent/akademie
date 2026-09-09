@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { mirrorProfileLocaleCookie } from "@/lib/account/actions";
+import { resolveSafeNextParam } from "@/lib/marketplace/redirect";
 
 /**
  * BUGFIX (26.07.2026, Josips Fund: "Link zum Passwort festlegen führt zum
@@ -61,7 +62,12 @@ export default function AuthCallbackPage() {
 
     (async () => {
       const params = new URLSearchParams(window.location.search);
-      const next = params.get("next") || "/";
+      // Security-Fix (Offener Redirect, 07.09.2026): `next` kommt aus einem
+      // Client-Query-Parameter — ohne Prüfung wäre `?next=https://evil.example`
+      // ein offenes Weiterleitungsziel. resolveSafeNextParam() ist dieselbe,
+      // bereits getestete Funktion wie im Marketplace-Login (siehe dortiger
+      // Kopfkommentar in lib/marketplace/redirect.ts), keine zweite Variante.
+      const next = resolveSafeNextParam(params.get("next")) ?? "/";
       const hashParams = new URLSearchParams(window.location.hash.slice(1));
       const accessToken = hashParams.get("access_token");
       const refreshToken = hashParams.get("refresh_token");
@@ -94,8 +100,14 @@ export default function AuthCallbackPage() {
           // Sprache bleibt auf dem bisherigen Stand (Accept-Language/"de") —
           // kein Grund, die Anmeldung abzubrechen.
         }
+        // Harte Navigation ist hier Absicht: die Supabase-Session wurde gerade
+        // erst gesetzt, erst ein vollstaendiger Seitenaufbau laesst den Server
+        // das neue Cookie lesen. router.push() wuerde die Zielseite aus dem
+        // Client-Router-Cache mit dem alten Auth-Zustand rendern — genau der
+        // Fehler vom 26.07.2026, siehe Dateikopf.
         window.location.href = next;
       } catch {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- wie oben: nach fehlgeschlagener Anmeldung muss der Server den Auth-Zustand neu bewerten.
         window.location.href = "/login?fehler=anmeldung";
       }
     })();

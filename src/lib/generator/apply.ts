@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireStaffTenant } from "@/lib/auth/staff";
 import type { createClient } from "@/lib/supabase/server";
+import { updateAiJob } from "@/lib/ai/usage";
 import { blocksSchema } from "@/lib/courses/schema";
 import { slugify } from "@/lib/courses/slug";
 import { resolveUniqueCourseSlug } from "@/lib/courses/resolve-slug";
@@ -186,15 +187,22 @@ export async function applyDraftAsCourse(jobId: string): Promise<ApplyResult> {
     // Persistiert, dass dieser Entwurf übernommen wurde (Design-Import
     // AdminKiGenerator.dc.html: die Entwürfe-Liste zeigt "Übernommen" statt
     // "Zu prüfen" danach dauerhaft, nicht nur für die laufende Sitzung).
-    // Fail-soft: ein Fehler hier darf den bereits erfolgreich angelegten
-    // Kurs nicht ungeschehen machen — der Job zeigte im schlimmsten Fall
-    // fälschlich weiter "Zu prüfen", ein erneutes Übernehmen würde dank des
-    // `appliedCourseId`-Checks oben ohnehin früh abbrechen.
-    await supabase
-      .from("ai_jobs")
-      .update({ output: { ...parsedOutput.data, appliedCourseId: courseId } })
-      .eq("id", jobId)
-      .eq("tenant_id", tenant.id);
+    // ABWEICHUNG (technisch nötig, verifizierter Fehler): `ai_jobs` hat laut
+    // 0001_init.sql:547-549 nur `_staff_select`/`_staff_insert` — KEINE
+    // UPDATE-Policy für irgendeine Rolle. Ein Update über den regulären
+    // RLS-Client (wie zuvor) läuft also still ins Leere (0 betroffene
+    // Zeilen, kein Fehler) — der `appliedCourseId`-Guard oben griff dadurch
+    // nie, ein Doppelklick auf "Entwurf übernehmen" legte den kompletten
+    // Kurs ein zweites Mal an. Fix: `updateAiJob()` (src/lib/ai/usage.ts),
+    // läuft bereits über den Admin-Client (Vorbild: applyShiftPlan(),
+    // src/lib/calendar/ai/actions.ts:307) — `jobId` ist oben bereits
+    // tenant-geprüft. Fail-soft bleibt unverändert: `updateAiJob()` loggt
+    // einen Fehler hier nur, statt zu werfen, und macht den bereits
+    // erfolgreich angelegten Kurs nicht ungeschehen — der Job zeigte im
+    // schlimmsten Fall fälschlich weiter "Zu prüfen", ein erneutes
+    // Übernehmen würde dank des `appliedCourseId`-Checks oben (sobald der
+    // Marker doch geschrieben wurde) ohnehin früh abbrechen.
+    await updateAiJob(jobId, { output: { ...parsedOutput.data, appliedCourseId: courseId } });
 
     revalidatePath("/admin/kurse");
     revalidatePath("/admin/ki");

@@ -86,6 +86,7 @@ export function KiReviewPanel({
     startRetryTransition(async () => {
       const result = await retryDraft(jobId);
       if (result.error) alert(result.error);
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- Harte Navigation ist Absicht: retryDraft() hat den Job-Status serverseitig geaendert, die Uebersicht muss frisch geladen werden. router.push() wuerde sie aus dem Client-Router-Cache mit dem alten Status rendern. Regel neu seit eslint-config-next 16.3.4.
       else location.href = "/admin/ki";
     });
   }
