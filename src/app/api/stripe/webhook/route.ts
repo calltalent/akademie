@@ -186,6 +186,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     }
   }
 
+  // K1 (Analyse 09.09.2026): Mitgliedschaft VOR der Einschreibung. Ohne sie
+  // liefert keine Lese-Policy den gekauften Kurs aus, der Kaeufer hat gezahlt
+  // und sieht nichts. Reihenfolge ist wichtig: die Einschreibung allein
+  // reicht nicht, die Mitgliedschaft allein waere ohne Einschreibung
+  // wirkungslos.
+  await grantPurchaseMembership(admin, tenantId, userId);
+
   // Einschreibung: einfachste Loesung (mit Josip/architect abgestimmt,
   // siehe PHASENSTATUS.md) - beim ERSTEN erfolgreichen Checkout einschreiben,
   // unabhaengig vom Modus (Einmalkauf ODER Abo). Kuendigungen entfernen die
@@ -193,6 +200,50 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   await enrollFromProduct(admin, tenantId, userId, productId);
 
   await sendOrderPaidMail(admin, tenantId, userId, productId);
+}
+
+/**
+ * K1 (Analyse 09.09.2026): Legt fuer einen Kaeufer ohne bestehende
+ * Mitgliedschaft eine `guest`-Zeile an. Exaktes Vorbild ist der bereits
+ * funktionierende Marketplace-Pfad in src/lib/marketplace/fulfil.ts
+ * Zeile 60-85; abweichend nur `source: "purchase"`, damit ein Mandanten-Admin
+ * in der Teilnehmerliste sieht, dass jemand direkt gekauft hat.
+ *
+ * Bestehende Zeilen bleiben unangetastet: weder wird eine hoeherwertige Rolle
+ * auf `guest` herabgestuft, noch eine vorhandene `guest`-Zeile erneut
+ * angefasst.
+ *
+ * Wirft bei einem Fehlschlag, statt nur zu loggen. Der Webhook antwortet dann
+ * mit 500, Stripe stellt das Event erneut zu ("at least once"). Ein stiller
+ * Fehlschlag hier hiesse: Geld eingenommen, kein Zugriff, und niemand holt
+ * das automatisch nach. Dieselbe Begruendung wie in fulfil.ts Zeile 76-83.
+ */
+async function grantPurchaseMembership(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  userId: string,
+) {
+  const { data: existing, error: readError } = await admin
+    .from("memberships")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (readError) {
+    throw new Error(`memberships-Abfrage fehlgeschlagen: ${readError.message}`);
+  }
+  if (existing) return;
+
+  const { error: insertError } = await admin.from("memberships").insert({
+    tenant_id: tenantId,
+    user_id: userId,
+    role: "guest",
+    source: "purchase",
+    status: "active",
+  });
+  if (insertError) {
+    throw new Error(`memberships-Insert fehlgeschlagen: ${insertError.message}`);
+  }
 }
 
 async function enrollFromProduct(

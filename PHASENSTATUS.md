@@ -4289,3 +4289,78 @@ mit sieben Fällen, darunter ein präparierter Host
 drei Jobs grün. Der Deploy-Lauf 34388575286 scheiterte wie vorgesehen am
 Wächterschritt „Pflichtvariablen pruefen"; alle folgenden Schritte wurden
 übersprungen, es wurde nichts gebaut und nichts ausgeliefert.
+
+## Sofort-Liste, Teil 2: H3, K2 und K1 als Migrationen geschrieben (09.09.2026)
+
+Abschnitt 5.2 der Projektanalyse, Positionen 2, 3 und 4. Drei Migrationen und
+eine Codeänderung. **Noch nicht angewendet**, das braucht Josips Freigabe nach
+CLAUDE.md §4.6.
+
+**H3, `20260909190000_quiz_attempt_allow_guests.sql`.** Die RPC
+`submit_quiz_attempt()` vom 07.09. prüft `member_role(v_tenant_id) is null`
+und wirft sonst `not_a_member`. Marketplace-Gäste haben keine Rolle in
+`memberships`, für sie ist `member_role()` null. Ein über den Marketplace
+gekaufter Kurs lässt sich damit lernen, aber seine Prüfung nicht abschließen,
+und das trifft den einzigen Kaufweg, der technisch vollständig funktioniert.
+Ersetzt durch `can_participate()`, die es seit dem 03.08. genau dafür gibt.
+Geändert ist eine Bedingung; Signatur, Sperre, Versuchszählung und Rechte
+bleiben.
+
+**K2, `20260909191000_tenants_column_guard.sql`.** Zwei Ebenen, weil eine
+nicht reicht.
+
+Erstens Spaltenrechte. Die Abfrage gegen `information_schema` zeigt, dass
+heute `authenticated` UND `anon` UPDATE auf jeder Spalte von `tenants` haben;
+zwischen einem Mandanten-Admin und `plan`, `status`, `slug` und
+`custom_domain` steht allein `tenants_admin_update`, eine Policy ohne
+`with check` und ohne Spaltenliste. Nach der Migration hat `authenticated`
+UPDATE nur noch auf `name`, `branding`, `legal` und `settings`, `anon` gar
+keins mehr. Die Policy bekommt zusätzlich ein `with check` mit demselben
+Ausdruck.
+
+Zweitens ein Trigger für die Betreiber-Schlüssel, weil Mandanten- und
+Betreiber-Werte in derselben `settings`-Spalte liegen. Geschützt sind
+`payments_enabled`, `tutor_enabled`, `course_generator_enabled`,
+`marketplace_enabled`, `shift_calendar_enabled` und
+`marketplace_commission_bp`, also genau die sechs aus
+`platform/actions.ts` Zeile 548 bis 559. Vorbild ist
+`calendar_workers_guard()`: nicht ablehnen, sondern auf die alten Werte
+zurücksetzen. Das verträgt sich mit der Merge-Schreibweise in
+`tenant/actions.ts` und ist im Normalfall ein No-op.
+
+Bewusst ohne `security definer`, weil die Funktion `current_user` sehen muss;
+eingeschränkt werden nur `authenticated` und `anon`. Die jsonb-Logik ist
+lesend gegen die Live-Datenbank geprüft: Provision 500 bleibt 500, wenn ein
+Mandanten-Admin 0 schickt, während `default_locale` und
+`self_signup_enabled` durchgehen.
+
+**K1, `20260909192000_memberships_source_purchase.sql` plus
+`webhook/route.ts`.** Der Webhook legte über `enrollFromProduct()` nur eine
+`enrollments`-Zeile an, nie eine Mitgliedschaft. Beide Lese-Policies
+verlangen aber eine: `courses_member_select` prüft
+`member_role(tenant_id) is not null`, `courses_guest_select` prüft
+`is_marketplace_guest(tenant_id)`. Ein selbstregistrierter Käufer erfüllt
+keines von beidem.
+
+Neu `grantPurchaseMembership()` vor der Einschreibung, exakt nach dem Vorbild
+aus `marketplace/fulfil.ts` Zeile 60 bis 85, mit `role: "guest"` und
+`source: "purchase"`. Bestehende Zeilen bleiben unangetastet. Die Funktion
+wirft bei Fehlschlag statt zu loggen, damit Stripe das Event erneut zustellt;
+ein stiller Fehlschlag hieße Geld eingenommen, kein Zugriff. Die Migration
+erweitert `memberships_source_check` um `purchase`.
+
+**Nebenbefund, noch offen.** `courses_member_select` ist permissiv und wird
+mit `courses_guest_select` ver-ODER-t, und `member_role()` liefert auch für
+die Rolle `guest` einen Wert. Ein Marketplace-Gast sieht dadurch heute alle
+veröffentlichten Kurse des Mandanten, nicht nur den gekauften; die
+restriktive Gast-Policy mit `has_enrollment()` läuft ins Leere. Das gilt seit
+dem 03.08.2026 und ist mit K1 nicht neu entstanden, wird durch K1 aber auch
+auf Direktkäufer ausgeweitet. Gehört zu H1 (Einschreibungs-Gating,
+30-Tage-Liste), weil die saubere Lösung der Kurs-Schalter
+`courses.settings.access` ist und alle Gast-Policies zusammen betrifft. In
+der Live-Datenbank stehen 0 Kurse, es ist heute nichts exponiert.
+
+**Verifikation:** `tsc --noEmit` 0, `eslint` 0, `vitest run` 785 von 785 grün.
+Die drei Migrationen sind nicht angewendet. Ein Testlauf gegen eine
+Wegwerf-Datenbank war hier nicht möglich: kein lokaler Postgres-Server, kein
+Docker-Daemon.
