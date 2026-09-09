@@ -203,7 +203,7 @@ Behebung: Verknüpfungstabelle `product_courses (product_id, course_id, tenant_i
 
 **H29. Kein Backup, und ein Datenverlust ist bereits einmal unbemerkt eingetreten.** Der Datenmodell-Prüfer fand in `PHASENSTATUS.md` einen unerklärten Verlust der Kursdaten von `demo-blau`; ein Restore war mangels Backup nicht möglich. Der Free-Plan sichert nicht, SPEC §4.4 verlangt tägliche Backups. Der Worker liegt außerdem gemessen bei 4,5 MB gzip und damit über dem 3-MiB-Limit des Free-Plans von Cloudflare; dass der Deploy heute funktioniert, ist nur durch den Paid-Plan erklärbar oder ein Zufall der Messung. Status: neu (verschärft 4.2).
 
-Behebung: Sofort-Position „Backup heute" in Abschnitt 5.1, danach die Plan-Entscheidung aus Abschnitt 6.
+Behebung: Sofort-Position „Backup heute" in Abschnitt 5.2, danach die Plan-Entscheidung aus Abschnitt 6.
 
 **H30. Videoaufnahme im Kurs-Editor ist seit dem 08.08.2026 gesperrt.** `next.config.ts`, Zeile 25, setzt für alle Pfade `Permissions-Policy: camera=(), microphone=(), geolocation=()`. Eine leere Klammer ist eine leere Erlaubnisliste und schließt die eigene Seite ein; erlaubt wäre `camera=(self)`. `src/components/editor/video-recorder.tsx` ruft an Zeile 369 `getUserMedia({video, audio})` für die Webcam-Aufnahme und an Zeile 402 `getUserMedia({audio})` für den Mikrofonton der Bildschirmaufnahme. Beide Aufrufe scheitern seither mit `NotAllowedError`. Die Funktion war in drei Stufen im Juli gebaut worden; der Header kam am 08.08. aus dem Sicherheitsaudit dazu, ohne Test der Aufnahme. Der Fund stammt vom Vollständigkeits-Kritiker, ich habe Header und Aufrufstellen selbst geprüft. Status: neu.
 
@@ -366,7 +366,37 @@ Die folgenden Punkte sind auf `claude/ruflo-swarm-hierarchical-0trzqy` behoben u
 
 Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agenten baut. Jede Position nennt, woran der Erfolg messbar ist.
 
-### 5.1 Sofort, diese Woche
+### 5.1 Rangfolge des Strategie-Panels
+
+Drei Strategen haben unabhängig voneinander dieselbe Faktenlage bewertet, jeder aus einem eigenen Blickwinkel: erster zahlender Kunde in 30 Tagen, Betriebssicherheit für einen Alleinbetreiber, Produkt-Differenzierung. Ein vierter Agent hat die drei Vorschläge gegeneinander bewertet, acht Widersprüche entschieden und eine gemeinsame Rangfolge gebildet. Bewertung nach Konkretheit, Wirkung und Realismus: Erster Kunde 9/9/8, Betriebssicherheit 9/7/7, Differenzierung 8/8/8.
+
+Die Rangfolge steht vor den Zeitfenstern 5.2 bis 5.4, weil sie die Frage beantwortet, was zuerst kommt, wenn die Zeit für alles nicht reicht.
+
+| Rang | Maßnahme | Blickwinkel | Zeitfenster |
+|---|---|---|---|
+| 1 | Live-Stand einfrieren: beide Branches mergen, `v0.2.0` taggen, Qualitätstor ins Deploy-Skript | Betriebssicherheit | sofort |
+| 2 | `Permissions-Policy` korrigieren und den ersten echten Kurs produzieren, Generatorlauf zuerst | Erster Kunde und Differenzierung, deckungsgleich | sofort |
+| 3 | Kaufweg schließen: Mitgliedschaft beim Kauf anlegen, `courses.access` einführen | alle drei | sofort und 30 Tage |
+| 4 | Zahlungslebenszyklus: `payment_status`, `charge.refunded`, Dispute, Abo-Ende an `expires_at`, echte Erfolgsseite | Erster Kunde | 30 Tage |
+| 5 | Sichtbarkeit: unbedingtes `console.error`, `/api/health`, externer Uptime-Check mit Push aufs Handy | Betriebssicherheit und Erster Kunde | 30 Tage |
+| 6 | Backup mit nachgewiesenem Restore, Supabase Pro, Betriebskosten als feste Position | Betriebssicherheit | sofort und 30 Tage |
+| 7 | Rechtliche Verkaufsfähigkeit: Stripe Tax, Rechnung, Kündigungsschaltfläche, Widerrufsverzicht, Impressum als Pflichtfeld | Erster Kunde | 30 Tage |
+| 8 | Trial mit echtem Ablauf und Mandanten-Abrechnung über Stripe | Erster Kunde und Differenzierung | 30 Tage |
+| 9 | Schichtplan und Zeiterfassung einfrieren, Fremdschlüssel auf `on delete restrict`, Add-on-Preis festschreiben | Differenzierung | sofort |
+| 10 | Geführter Erststart im Admin mit Live-Status aus einer Abfrage | Erster Kunde und Differenzierung | 30 Tage |
+| 11 | Vertriebspaket: Preisseite, Demo-Mandant mit Gast-Login, Gesprächsleitfaden, 20 Zielkunden aus dem Calltalent-Bestand | Erster Kunde | 30 Tage |
+| 12 | Migrationshistorie mit der Live-Datenbank versöhnen, generierte Typen als Drift-Wächter | Betriebssicherheit | 30 Tage |
+| 13 | Staging-Projekt mit `seed.sql`, E2E-Passwort aus dem Repo, 104 Testkonten räumen | Betriebssicherheit | 30 Tage |
+| 14 | CI-Minimum bei jedem Push, Branch-Schutz auf `main`, Node auf 22 festgenagelt | Betriebssicherheit | 30 Tage |
+| 15 | Kontrast- und Fokus-Tokens, `focus-visible`, Skip-Link, `rem` statt `px`, axe-core in drei E2E-Tests | Erster Kunde und Differenzierung | sofort und 90 Tage |
+
+Vier Entscheidungen hat das Panel selbst getroffen, weil die Strategen sich widersprachen. Erstens: Der erste echte Kurs entsteht in der Produktion im Mandanten `demo-blau`, nicht erst nach dem Staging-Aufbau. Staging läuft parallel und nur für die automatisierte Testsuite, sonst wird es zur Vorbedingung und der Zustand null Kurse bleibt. Zweitens: Der Kurs entsteht zuerst über den Generator, mit protokollierten Tokens, Kosten und Dauer aus `ai_jobs`; bricht der Lauf ab, wird der Kurs am selben Tag von Hand fertig. Null `course_gen`-Aufträge nach zwei Monaten ist die Zahl, die im Verkaufsgespräch am meisten kostet.
+
+Drittens: In den ersten 30 Tagen nur die Prozessarbeit, die Datenverlust oder einen unbemerkten Ausfall verhindert, also die Ränge 1, 5, 6 und 12. RLS-Negativtests, Coverage-Schwellen, `audit_log` und Aufbewahrungsfristen kommen in Woche 5 bis 8. Viertens: Beim Einfrieren der Zeiterfassung werden die zwei bereits erfassten Ist-Zeiten vorher als CSV außerhalb der Datenbank abgelegt, weil für sie die zweijährige Aufbewahrungspflicht gilt und das Einfrieren sonst selbst der Weg ist, auf dem sie verschwinden.
+
+Zwei weitere Widersprüche bleiben Josips Entscheidung und stehen in Abschnitt 6: die Höhe der Einrichtungsgebühr und der Umgang mit dem Marketplace.
+
+### 5.2 Sofort, diese Woche
 
 1. **Branches zusammenführen und von `main` deployen.** `claude/ruflo-swarm-hierarchical-0trzqy` und `claude/contact-request-security-check-78qawq` nach `main` mergen, Konflikte in `PHASENSTATUS.md`, `messages/*.json` und `.env.example` auflösen, danach `npm run deploy` aus `main`. Den Marketing-Skills-Branch nur mergen, wenn die 483 Dateien unter `.claude/tools` gewollt sind; sonst schließen. Messbar: `git log origin/main` enthält e4352b5, Worker-Deploy-Zeitpunkt nach dem Merge.
 2. **H3 beheben.** Migration `submit_quiz_attempt`: `member_role` durch `can_participate` ersetzen. Eine Zeile, vor dem nächsten Marketplace-Verkauf zwingend.
@@ -383,7 +413,7 @@ Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agent
 13. **KI-Modell und Kostensätze** (H10): `claude-sonnet-5`, `claude-haiku-4-5`, Preise aktualisieren, einen Generator-Lauf am echten PDF gegenprüfen. Dazu H18: Stale-Fenster auf 15 Minuten und Versuchszähler, damit kein Job endlos Kosten erzeugt.
 14. **Barrierefreiheit für den täglichen Betrieb** (H20): Abmelden-Knopf auf `onClick`, Token `muted-400` und `muted-300` anheben, Skip-Link und `<main>` in beiden Shells, `prefers-reduced-motion`. Ein bis zwei Tage, spürbar bei jedem Login.
 
-### 5.2 In 30 Tagen
+### 5.3 In 30 Tagen
 
 15. **CI mit GitHub Actions.** Ein Workflow `ci.yml`: `npm ci`, `tsc --noEmit`, `eslint`, `vitest run` mit Platzhalter-Env; Branch-Schutz auf `main` (Pull Request und grüner Check Pflicht). Zweiter Workflow `deploy.yml`: bei Push auf `main` `opennextjs-cloudflare build && deploy` mit `CLOUDFLARE_API_TOKEN` als Repo-Secret. Damit ist `main` per Definition der deployte Stand. Messbar: jeder Commit auf `main` hat einen grünen Check, letzter Deploy-Commit = HEAD.
 16. **Fehlerseiten und Fehlerspuren** (H31, H32, H33): `error.tsx` und `not-found.tsx` je Routengruppe, `global-error.tsx` im Root, `console.error` in `genericErrorMessage`, die 23 `tenant!`-Stellen absichern, Abfragefehler nicht mehr als Leerzustand rendern. Voraussetzung dafür, dass Monitoring überhaupt etwas sieht.
@@ -400,7 +430,7 @@ Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agent
 27. **Onboarding-Checkliste im Admin-Dashboard**: fünf Schritte mit Haken (Logo, Farben, erster Kurs, erste Einladung, Rechtsträger), sichtbar bis alle erledigt sind. Dazu „Kurs anlegen" mit automatisch angelegtem Modul und Sektion (M25), und die Attrappen aus M45 entfernen.
 28. **Wissensarchiv ordnen.** `PHASENSTATUS.md` einfrieren (Archiv), eine neue `STATUS.md` mit zwei Seiten: Was läuft, was ist offen, wie deployt man, wo liegen welche Schlüssel (ohne Werte). `README.md` auf den Ist-Zustand bringen.
 
-### 5.3 In 90 Tagen
+### 5.4 In 90 Tagen
 
 29. **Drei Pilotkunden.** Ein Mandant pro Monat mit echtem Vertrag, echten Inhalten und echter Rechnung. Vorher Trial-Ablauf (`tenants.trial_ends_at`, Erinnerungsmail, Sperre) und eine Preisseite. Die Abrechnung der Mandantenpakete zunächst manuell über Stripe Invoicing, erst bei zehn Mandanten automatisieren.
 30. **Barrierefreiheit belegen.** axe-core in der Playwright-Suite für Login, Dashboard, Lernansicht, Kurs-Editor; die Befunde mit Josip als Betroffenem priorisieren. Das Barrierefreiheitsstärkungsgesetz gilt seit 28.06.2025 für B2C-Dienste; die Lernansicht auf `salestalent.app` fällt darunter, sobald Endkunden dort kaufen.
@@ -411,7 +441,7 @@ Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agent
 35. **DSGVO-Paket zu Ende bauen** (H22, H23, H27, M13, M47, M48): `ON DELETE`-Regeln für die elf Fremdschlüssel auf `profiles`, vollständige Exporte über alle Tabellen mit `tenant_id`, Audit-Log-Schreiber in allen Admin- und Portal-Aktionen, Aufbewahrungsfristen (`rate_limits` 30 Tage, `webhook_deliveries` 90 Tage, Zeiterfassung 2 Jahre gesperrt), MFA und Papierkorb im Portal, Datenschutzerklärung nachziehen. Messbar: ein Löschantrag wird automatisiert innerhalb der Frist erfüllt.
 36. **Benachrichtigungen, die Nutzung auslösen** (M46): Mails bei Kurs-Zuweisung, neuer Abgabe, Bewertung, Zertifikat, Kontingent 80 %, Planänderung; Bounce-Webhook; Reply-To je Mandant. Erst danach Glocke und Push aus derselben Ereignisquelle.
 
-### 5.4 Einfrieren oder streichen
+### 5.5 Einfrieren oder streichen
 
 1. **Marketplace einfrieren**, bis der erste Mandant eigene kostenpflichtige Kurse verkauft. 0 Listings, offene Steuerfrage (Merchant of Record, SPEC §9.4), Käufer-Selbstregistrierung ungeklärt. Der Code bleibt, der Schalter bleibt aus.
 2. **Schichtplan als getrenntes Produkt betrachten.** Er teilt mit dem LMS nur Auth und Mandanten. Entweder er bekommt eigene Vertriebsziele und eine eigene Roadmap, oder er wird nach Block S6 eingefroren. Beides ist vertretbar; parallel weiterzubauen, während der LMS-Kern ungenutzt ist, ist es nicht.
@@ -426,13 +456,13 @@ Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agent
 
 1. **Zielkunde der nächsten 30 Tage.** Entweder ein B2B-Mandant mit eigenen Mitarbeitenden (interne Akademie, CSV-Import, „alle Kurse für alle") oder ein Kursverkäufer mit Endkunden (Einschreibungs-Gating, Stripe, Widerruf, Rechnung). Die Antwort bestimmt, ob Position 19 (Einschreibungs-Gating) oder Position 26 (Self-Service) zuerst kommt.
 2. **Standardverhalten Kurszugriff.** „Alle veröffentlichten Kurse für alle Mitglieder" (heute) als Mandanten-Schalter behalten, oder Einschreibung als Standard; betrifft alle bestehenden Mandanten.
-3. **Laufende Kosten.** Supabase Pro (25 USD/Monat: Backups, Session-Timeouts, keine Pausierung) und Cloudflare Workers Paid (5 USD/Monat: Build-Größe, Logs) freigeben, oder Backups per eigenem Cron lösen.
-4. **Sprachen, die verkauft werden.** Nur Deutsch, Deutsch und Englisch, oder auch Bosnisch; bei Bosnisch sind eine inhaltliche Prüfung von `messages/bs.json` und die Lokalisierung von Admin, Editor und Zertifikat fällig.
-5. Marketing-Skills-Branch mergen oder schließen (483 Dateien im Repo).
-6. Supabase Pro (25 USD/Monat) für Backups und Session-Timeouts, oder eigener `pg_dump`-Cron.
+3. **Höhe der Einrichtungsgebühr.** Die README nennt 2.990 Euro Einrichtung plus 149 Euro im Monat. Der Produkt-Stratege will die Gebühr streichen, weil sie bei null Referenzen die größte Verkaufsbremse ist; der Markt-Stratege will genau diese Pakete aktiv verkaufen. Vorschlag des Panels: 490 Euro Einrichtung, ausgewiesen als Starterkurs, Branding und Datenmigration, dazu 14 Tage Trial ohne Karte. Null Euro macht die Migrationsarbeit unbezahlbar, 2.990 Euro verlangt Vertrauen, das ohne eine einzige Referenz nicht zu holen ist. Überprüft wird die Zahl beim ersten unterschriebenen Angebot, nicht vorher.
+4. **Laufende Kosten.** Supabase Pro (25 USD/Monat: Backups, Session-Timeouts, keine Pausierung) und Cloudflare Workers Paid (5 USD/Monat: Build-Größe, Logs) freigeben, oder Backups per eigenem Cron lösen.
+5. **Sprachen, die verkauft werden.** Nur Deutsch, Deutsch und Englisch, oder auch Bosnisch; bei Bosnisch sind eine inhaltliche Prüfung von `messages/bs.json` und die Lokalisierung von Admin, Editor und Zertifikat fällig.
+6. Marketing-Skills-Branch mergen oder schließen (483 Dateien im Repo).
 7. Stripe: nur Kartenzahlung zulassen oder asynchrone Zahlarten korrekt behandeln (H5).
 8. Schichtplan: eigenes Produkt oder Einfrieren nach S6.
-9. Marketplace: Einfrieren bis zur steuerlichen Klärung des Merchant-of-Record-Modells.
+9. **Marketplace.** Einfrieren bis zur steuerlichen Klärung des Merchant-of-Record-Modells (SPEC §9.4). Der Produkt-Stratege hält dagegen, der Marketplace sei der einzige technisch vollständige Kaufweg und ein echter Ein-Euro-Verkauf dort der schnellste Beweis. Vorschlag des Panels: Direktweg im Stripe-Testmodus, Marketplace bleibt eingefroren und nur für Calltalent selbst freigeschaltet, bis der Steuerberater bestätigt hat. Ein echter Verkauf über ein steuerlich ungeklärtes Modell schafft eine Tatsache, die sich nachträglich nicht sauber korrigieren lässt. Die zwei Geldfehler im Marketplace (Preisänderung schlägt nicht nach Stripe durch, K2 erlaubt das Selbstsetzen der eigenen Provision) werden davon unabhängig sofort geschlossen.
 10. Vertreter in der Union nach Art. 27 DSGVO benennen (offen seit 24.08.).
 11. Anwaltliche Prüfung der AGB, Datenschutz und AVV vor dem ersten echten Kauf.
 12. Trainer-Rolle: SPEC §2 durchsetzen (H8) oder SPEC an das heutige, weitere Rechtebild anpassen.
@@ -442,13 +472,13 @@ Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agent
 
 ## 7. Vorgehen und Grenzen dieser Analyse
 
-1. **Ablauf.** Am 08.09.2026 ab 16:12 UTC: Repo geklont, Abhängigkeiten installiert, Baseline gefahren (tsc, ESLint, Vitest), Live-Datenbank und Cloudflare per MCP gelesen, die drei ungemergten Branches ausgewertet. Danach ein Agenten-Lauf über zunächst 14 Fachbereiche, jeder mit einem lesenden Prüfer und einem Gegenprüfer, dann ein Vollständigkeits-Kritiker, eine Nachrunde über zwei von ihm benannte Lücken und ein Strategie-Panel.
+1. **Ablauf.** Am 08.09.2026 ab 16:12 UTC: Repo geklont, Abhängigkeiten installiert, Baseline gefahren (tsc, ESLint, Vitest), Live-Datenbank und Cloudflare per MCP gelesen, die drei ungemergten Branches ausgewertet. Danach ein Agenten-Lauf über zunächst 14 Fachbereiche, jeder mit einem lesenden Prüfer und einem Gegenprüfer, dann ein Vollständigkeits-Kritiker, eine Nachrunde über zwei von ihm benannte Lücken und zuletzt ein Strategie-Panel aus drei Strategen und einem Juror.
 
-2. **Was gelaufen ist.** Der Lauf wurde mehrfach vom Nutzungslimit unterbrochen und nach jedem Reset fortgesetzt, auf Josips Auftrag vom 09.09. („Wiederhole den Agentenlauf"). Alle 16 Bereichs-Prüfer sind durchgelaufen, zusammen 295 Funde nach Gegenprüfung. Jeder Bereich wurde von einem zweiten Agenten gegengeprüft, in zwei Schritten: technische Widerlegung am Code, danach die Frage nach „bereits erledigt oder bewusste Entscheidung". Ergebnis: 295 Funde geprüft, 290 bestätigt, 5 widerlegt (Anhang B). Schwere und Status im Anhang sind die vom Gegenprüfer korrigierten Werte. Der Vollständigkeits-Kritiker fand selbst zwei Befunde (H30 und H31) und benannte zwei ungeprüfte Bereiche: die Browser-Medienpipeline des Editors und die Fehler- und Ausnahmezustände. Für beide lief eine Nachrunde aus Prüfer und Gegenprüfer; daraus stammen H32 bis H36 und M66 bis M75.
+2. **Was gelaufen ist.** Der Lauf wurde mehrfach vom Nutzungslimit unterbrochen und nach jedem Reset fortgesetzt, auf Josips Auftrag vom 09.09. („Wiederhole den Agentenlauf"). Alle 16 Bereichs-Prüfer sind durchgelaufen, zusammen 295 Funde nach Gegenprüfung. Jeder Bereich wurde von einem zweiten Agenten gegengeprüft, in zwei Schritten: technische Widerlegung am Code, danach die Frage nach „bereits erledigt oder bewusste Entscheidung". Ergebnis: 295 Funde geprüft, 290 bestätigt, 5 widerlegt (Anhang B). Schwere und Status im Anhang sind die vom Gegenprüfer korrigierten Werte. Der Vollständigkeits-Kritiker fand selbst zwei Befunde (H30 und H31) und benannte zwei ungeprüfte Bereiche: die Browser-Medienpipeline des Editors und die Fehler- und Ausnahmezustände. Für beide lief eine Nachrunde aus Prüfer und Gegenprüfer; daraus stammen H32 bis H36 und M66 bis M75. Zum Schluss bewerteten drei Strategen dieselbe Faktenlage aus getrennten Blickwinkeln (erster zahlender Kunde, Betriebssicherheit, Produkt-Differenzierung); ein Juror bewertete die drei Vorschläge nach Konkretheit, Wirkung und Realismus, entschied acht Widersprüche und bildete die Rangfolge in Abschnitt 5.1.
 
 3. **Eigene Prüfung.** Unabhängig von den Agenten habe ich alle kritischen und hohen Befunde aus RLS, Auth, API und Kursen selbst am Code nachvollzogen, ebenso H11, H12, H16, H18, H20, H21, H22, H25, H29 bis H36, M26, M49, M67 und M71 bis M75 sowie die Kontrastwerte der Marken-Tokens.
 
-4. **Widersprüche zwischen Agenten** habe ich aufgelöst, nicht gemittelt. Beispiel: Zum Zustand der Playwright-Suite behauptete ein Prüfer „seit 05.08. rot", ein anderer verwies auf den Eintrag, dass alle zehn Fehler an genau diesem Tag behoben wurden. Die belegbare Fassung steht in H25: behoben ja, ein vollständiger grüner Lauf seither nirgends dokumentiert.
+4. **Widersprüche zwischen Agenten** habe ich aufgelöst, nicht gemittelt; die Widersprüche zwischen den drei Strategen hat der Juror entschieden, seine Begründungen stehen in Abschnitt 5.1 und Abschnitt 6. Beispiel: Zum Zustand der Playwright-Suite behauptete ein Prüfer „seit 05.08. rot", ein anderer verwies auf den Eintrag, dass alle zehn Fehler an genau diesem Tag behoben wurden. Die belegbare Fassung steht in H25: behoben ja, ein vollständiger grüner Lauf seither nirgends dokumentiert.
 
 5. **Nicht geprüft.** Playwright-Suite (keine `.env`, kein Dev-Server in dieser Umgebung), Lighthouse und LCP, ein echter Stripe-Testkauf, Bunny-Upload und Transkription, der Deploy-Ablauf, die Word-Dokumente (AVV, TOM), der Website-Branch im Repo `calltalent-website`, die Inhalte von `messages/bs.json` über Stichproben hinaus.
 
