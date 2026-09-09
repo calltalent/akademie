@@ -22,7 +22,18 @@ const SECURITY_HEADERS = [
   // erzwingt aber auch bei künftigen Subdomains/Custom-Domains kein
   // Downgrade auf HTTP.
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  // `camera=()` ist eine LEERE Erlaubnisliste und schließt die eigene Seite
+  // mit ein. Vom 08.08. bis 09.09.2026 hat dieser Header damit die eigene
+  // Videoaufnahme im Kurs-Editor abgeschaltet: `getUserMedia` in
+  // src/components/editor/video-recorder.tsx (Zeile 369 Webcam, Zeile 402
+  // Mikrofonton der Bildschirmaufnahme) endete mit `NotAllowedError`.
+  // `(self)` erlaubt genau das eigene Origin und keinen eingebetteten
+  // Fremdinhalt. `display-capture` deckt `getDisplayMedia` (Zeile 394) ab.
+  // `geolocation` bleibt vollständig gesperrt, die App fragt es nie ab.
+  {
+    key: "Permissions-Policy",
+    value: "camera=(self), microphone=(self), display-capture=(self), geolocation=()",
+  },
 ];
 
 const nextConfig: NextConfig = {

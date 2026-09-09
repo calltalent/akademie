@@ -14,7 +14,14 @@ import {
   getPlannerWorkerNames,
   loadAbsencesForWeek,
 } from "@/lib/calendar/queries";
-import { addDays, formatDayLabel, formatShortDayLabel, isoDateString, startOfIsoWeek } from "@/lib/calendar/date";
+import {
+  addDays,
+  formatDayLabel,
+  formatShortDayLabel,
+  isoDateString,
+  parseWeekParam,
+  startOfIsoWeek,
+} from "@/lib/calendar/date";
 import { parseTenantHolidayRegions, type CalendarChangeRequestRow, type CalendarWorkerRow } from "@/lib/calendar/schema";
 import { getShiftPlanJob, getShiftPlanJobs } from "@/lib/calendar/ai/queries";
 import { getHolidayResearchJob, getHolidayResearchJobs } from "@/lib/calendar/ai/holidays/queries";
@@ -128,7 +135,7 @@ export default async function AdminSchichtplanungPage({
     ? (requestStatusParam as (typeof REQUEST_STATUS_VALUES)[number])
     : "pending";
 
-  const referenceDate = weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam) ? new Date(`${weekParam}T12:00:00Z`) : new Date();
+  const referenceDate = parseWeekParam(weekParam);
   const weekStart = startOfIsoWeek(referenceDate);
   const weekEnd = addDays(weekStart, 7);
   const currentWeekStart = startOfIsoWeek(new Date());

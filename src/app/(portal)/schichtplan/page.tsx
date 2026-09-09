@@ -22,6 +22,7 @@ import {
   formatShortDayLabel,
   formatTimeRange,
   isoDateString,
+  parseWeekParam,
   startOfIsoWeek,
   toTimeInputValue,
 } from "@/lib/calendar/date";
@@ -71,7 +72,7 @@ export default async function SchichtplanPage({
   const worker = await getOwnCalendarWorker(supabase, tenant.id, user.id);
   if (!worker) redirect("/dashboard");
 
-  const referenceDate = week && /^\d{4}-\d{2}-\d{2}$/.test(week) ? new Date(`${week}T12:00:00Z`) : new Date();
+  const referenceDate = parseWeekParam(week);
   const weekStart = startOfIsoWeek(referenceDate);
   const weekEnd = addDays(weekStart, 7);
   const currentWeekStart = startOfIsoWeek(new Date());

@@ -77,6 +77,16 @@ export async function resolveTenantByCustomDomain(
  * war schon vorher als erste Ebene geplant (SPEC.md §4.3/§9.1) — jetzt
  * konsistent mit dem Mandanten-Schema.
  */
+/**
+ * Zeichenvorrat einer DNS-Bezeichnung (RFC 1123): Buchstaben, Ziffern und
+ * Bindestrich, höchstens 63 Zeichen. Enger als die Trennzeichen der
+ * PostgREST-Filtersyntax, siehe `resolveTenantByHost`.
+ */
+export const TENANT_SLUG_PATTERN = /^[A-Za-z0-9-]{1,63}$/;
+
+/** Vollständiger Hostname: Bezeichnungen mit Punkt getrennt, höchstens 253 Zeichen. */
+export const TENANT_HOSTNAME_PATTERN = /^[A-Za-z0-9.-]{1,253}$/;
+
 export function extractTenantSlugFromHost(host: string): string | null {
   const hostname = host.split(":")[0]; // Port abtrennen
 
@@ -133,9 +143,27 @@ export async function resolveTenantByHost(
   const hostname = host.split(":")[0];
   const slug = extractTenantSlugFromHost(host);
 
+  // H36 (Analyse 09.09.2026): `.or()` nimmt eine Filter-ZEICHENKETTE, in der
+  // Komma und Punkt Trennzeichen sind. Slug und Hostname stammen aus dem
+  // `Host`-Kopf der Anfrage, und `extractTenantSlugFromHost` prüfte kein
+  // einziges Zeichen. Ein eingeschleustes Komma erweitert damit den Filter,
+  // und die Abfrage läuft über `createAdminClient()`, also an RLS vorbei.
+  // CLAUDE.md §2.12 verbietet genau diese Konstruktion.
+  //
+  // Der `.or()`-Aufruf bleibt trotzdem: er ist der Performance-Fix vom
+  // 19.07.2026 (siehe oben) und spart im Produktivfall einen DB-Rundlauf je
+  // Request. Abgesichert wird stattdessen die Eingabe. Beide Muster sind
+  // enger als die Trennzeichen der Filtersyntax, ein Treffer kann also
+  // keine zusätzliche Bedingung mehr einschleusen. Die Werte selbst bleiben
+  // unverändert, damit sich am Trefferverhalten nichts ändert.
+  if (!TENANT_HOSTNAME_PATTERN.test(hostname)) return null;
+  const safeSlug = slug && TENANT_SLUG_PATTERN.test(slug) ? slug : null;
+
   const admin = createAdminClient();
   let query = admin.from("tenants").select(TENANT_COLUMNS).eq("status", "active");
-  query = slug ? query.or(`slug.eq.${slug},custom_domain.eq.${hostname}`) : query.eq("custom_domain", hostname);
+  query = safeSlug
+    ? query.or(`slug.eq.${safeSlug},custom_domain.eq.${hostname}`)
+    : query.eq("custom_domain", hostname);
   const { data } = await query.maybeSingle();
   if (data) return data as unknown as PublicTenant;
 

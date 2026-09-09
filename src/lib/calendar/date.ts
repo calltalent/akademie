@@ -103,6 +103,28 @@ export function isoDateString(date: Date): string {
 }
 
 /**
+ * Wandelt einen `week`-Parameter aus der Adresszeile in ein Bezugsdatum um
+ * und fällt bei allem Unbrauchbaren auf "heute" zurück.
+ *
+ * Bis zum 09.09.2026 prüften `(portal)/schichtplan/page.tsx` Zeile 74 und
+ * `(planung)/admin/schichtplanung/page.tsx` Zeile 130 wortgleich nur gegen
+ * das Muster `\d{4}-\d{2}-\d{2}`. `?week=2026-13-45` besteht dieses Muster,
+ * ergibt aber ein Invalid Date, und `startOfIsoWeek()` wirft darauf einen
+ * `RangeError` — eine Fehlerseite, ausgelöst allein über die Adresszeile.
+ * Deshalb hier zentral, mit echter Datumsprüfung statt nur Musterabgleich.
+ */
+export function parseWeekParam(week: string | null | undefined): Date {
+  if (!week || !/^\d{4}-\d{2}-\d{2}$/.test(week)) return new Date();
+  const candidate = new Date(`${week}T12:00:00Z`);
+  if (Number.isNaN(candidate.getTime())) return new Date();
+  // Rundreise-Vergleich: `2026-02-31` ergibt in JS den 3. März, wäre also
+  // ein gültiges Date, aber nicht der angefragte Tag. Solche Eingaben
+  // gelten hier als unbrauchbar.
+  if (candidate.toISOString().slice(0, 10) !== week) return new Date();
+  return candidate;
+}
+
+/**
  * Montag 00:00 Uhr Berlin-Zeit der ISO-Woche, die `date` enthält — als
  * UTC-Zeitpunkt. Rechnet über Berlin-Kalendertage (nicht UTC-Tage), damit
  * der Wochenanfang für den Nutzer immer korrekt "Montag" ist, unabhängig

@@ -4241,3 +4241,51 @@ mehrere Seiten zusammenführen, und ein PDF ohne Textlayer muss werfen.
 774 von 774 grün (vorher 771), `opennextjs-cloudflare build` erfolgreich,
 `npm audit --omit=dev` 0 Meldungen. Der CI-Schritt „Bekannte Schwachstellen"
 ist deshalb von `continue-on-error` auf blockierend umgestellt.
+
+## Sofort-Liste, Teil 1: H30, H35, H36 behoben (09.09.2026)
+
+Abschnitt 5.2 der Projektanalyse, Positionen 9, 11 und 12. Drei kleine
+Eingriffe mit drei neuen Testdateien beziehungsweise Testblöcken.
+
+**H30, Videoaufnahme wieder freigeschaltet.** `next.config.ts` setzte
+`Permissions-Policy: camera=(), microphone=(), geolocation=()`. Eine leere
+Klammer ist eine leere Erlaubnisliste und schließt die eigene Seite ein; die
+im Juli gebaute Aufnahme im Kurs-Editor endete deshalb seit dem 08.08.2026
+mit `NotAllowedError`. Jetzt `camera=(self), microphone=(self),
+display-capture=(self), geolocation=()`. `display-capture` deckt
+`getDisplayMedia` in `video-recorder.tsx` Zeile 394 ab, `geolocation` bleibt
+gesperrt. Ein echter Browser-Durchlauf steht weiterhin aus, dafür gibt es in
+dieser Umgebung keine Kamera.
+
+**H35 und M72, Wochenparameter.** Die Parselogik stand wortgleich in
+`(portal)/schichtplan/page.tsx` Zeile 74 und
+`(planung)/admin/schichtplanung/page.tsx` Zeile 131 und prüfte nur das Muster
+`\d{4}-\d{2}-\d{2}`. `?week=2026-13-45` bestand das, ergab ein Invalid Date
+und ließ `startOfIsoWeek()` mit `RangeError` abbrechen, also eine Fehlerseite
+allein über die Adresszeile. Neu `parseWeekParam()` in
+`src/lib/calendar/date.ts`, von beiden Seiten benutzt, mit echter
+Datumsprüfung und Rundreise-Vergleich (`2026-02-31` rollt in JS auf den
+3. März weiter und gilt hier als unbrauchbar). Vier Testfälle in
+`date.test.ts`, die es dort vorher für ungültige Daten nicht gab.
+
+**H36, Mandanten-Filter aus dem Host-Kopf.** `resolveTenantByHost` baute den
+PostgREST-Filter per Zeichenkette: `query.or(\`slug.eq.${slug},custom_domain.eq.${hostname}\`)`.
+Komma und Punkt sind in der `or`-Syntax Trennzeichen, beide Werte stammen aus
+dem `Host`-Kopf, und die Abfrage läuft über `createAdminClient()`, also an RLS
+vorbei. Verstoß gegen CLAUDE.md §2.12.
+
+Der `.or()`-Aufruf bleibt bewusst erhalten: er ist der Performance-Fix vom
+19.07.2026 und spart im Produktivfall einen DB-Rundlauf je Request.
+Abgesichert wird stattdessen die Eingabe, über `TENANT_SLUG_PATTERN`
+(`^[A-Za-z0-9-]{1,63}$`) und `TENANT_HOSTNAME_PATTERN`
+(`^[A-Za-z0-9.-]{1,253}$`). Beide Muster sind enger als die Trennzeichen der
+Filtersyntax. Die Werte selbst gehen unverändert in die Abfrage, damit sich am
+Trefferverhalten nichts ändert. Neue Datei `src/lib/tenant/resolve.test.ts`
+mit sieben Fällen, darunter ein präparierter Host
+`demo,id.not.is.null.localhost`.
+
+**Verifikation:** `tsc --noEmit` 0, `eslint` 0, `vitest run` 785 von 785 grün
+(vorher 774). Die erste CI-Runde auf `main` (Lauf 34388575289) war in allen
+drei Jobs grün. Der Deploy-Lauf 34388575286 scheiterte wie vorgesehen am
+Wächterschritt „Pflichtvariablen pruefen"; alle folgenden Schritte wurden
+übersprungen, es wurde nichts gebaut und nichts ausgeliefert.

@@ -5,6 +5,7 @@ import {
   buildWeekGrid,
   buildWeeklySeries,
   computeSelfBookingWindow,
+  parseWeekParam,
   formatDayLabel,
   formatTime,
   formatTimeRange,
@@ -253,5 +254,36 @@ describe("computeSelfBookingWindow — Zeitumstellung 25.10.2026 (Winterzeit-Beg
     const { startsAt, endsAt } = computeSelfBookingWindow("2026-10-25", "22:00", "06:00");
     expect(startsAt.toISOString()).toBe("2026-10-25T21:00:00.000Z");
     expect(endsAt.toISOString()).toBe("2026-10-26T05:00:00.000Z");
+  });
+});
+
+/**
+ * H35/M72 (Analyse 09.09.2026): Bis dahin pruefte die Wochenlogik in zwei
+ * Seiten wortgleich nur das Muster, nicht das Datum. `?week=2026-13-45`
+ * bestand die Pruefung und liess `startOfIsoWeek()` mit RangeError abbrechen.
+ */
+describe("parseWeekParam", () => {
+  it("uebernimmt ein gueltiges Datum", () => {
+    expect(parseWeekParam("2026-09-09").toISOString()).toBe("2026-09-09T12:00:00.000Z");
+  });
+
+  it("faellt bei einem Datum ausserhalb des Kalenders auf heute zurueck", () => {
+    const result = parseWeekParam("2026-13-45");
+    expect(Number.isNaN(result.getTime())).toBe(false);
+    expect(() => startOfIsoWeek(result)).not.toThrow();
+  });
+
+  it("faellt bei einem nicht existierenden Tag im Monat zurueck", () => {
+    // 31. Februar rollt in JS auf den 3. Maerz weiter, ist also nicht der
+    // angefragte Tag.
+    expect(parseWeekParam("2026-02-31").toISOString()).not.toContain("2026-02-31");
+  });
+
+  it("faellt bei leerer, fehlender und formfremder Eingabe zurueck", () => {
+    for (const eingabe of ["", null, undefined, "morgen", "2026-9-9", "2026-09-09T00:00:00Z"]) {
+      const result = parseWeekParam(eingabe);
+      expect(Number.isNaN(result.getTime())).toBe(false);
+      expect(() => startOfIsoWeek(result)).not.toThrow();
+    }
   });
 });
