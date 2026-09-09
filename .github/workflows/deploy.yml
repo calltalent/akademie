@@ -93,11 +93,24 @@ jobs:
           # `case` vergleicht die ganze Zeichenkette, auch ueber Zeilen hinweg.
           # Laenge exakt 40: der Global API Key hat 32 Hex-Zeichen und wuerde
           # bei einer Spanne durchrutschen, funktioniert hier aber nicht.
+          # Der Waechter prueft NUR, ob der Wert ueberhaupt ein Token sein
+          # KANN: keine Leerzeichen, keine Umbrueche, keine Anfuehrungszeichen,
+          # nicht laecherlich kurz. Die Laenge wird bewusst NICHT auf 40
+          # festgenagelt.
+          #
+          # Lauf 8 vom 09.09.2026 hat gezeigt, warum: dort wurden 53 saubere
+          # Zeichen abgewiesen, weil hier vorher "genau 40" stand -- eine
+          # Annahme ueber Cloudflares Format, die dieser Workflow gar nicht
+          # treffen muss. Ob ein Token echt ist, weiss allein Cloudflare, und
+          # die Antwort darauf ist eindeutig und lesbar
+          # ("Authentication failed", code 9106). Ein Tor, das gueltige Werte
+          # abweist, ist schlimmer als eines, das eine Sekunde spaeter am
+          # richtigen Ort scheitert.
           gueltig() {
             case "$1" in
               *[!A-Za-z0-9_-]*) return 1 ;;
             esac
-            [ "${#1}" -eq 40 ]
+            [ "${#1}" -ge 20 ]
           }
 
           # Lauf 7 vom 09.09.2026 mass 145 Zeichen. Das ist die Laenge der
@@ -111,7 +124,7 @@ jobs:
           # wenn dabei GENAU EIN eindeutiger Kandidat bleibt, wird er benutzt.
           # Bei mehreren waere die Wahl geraten, und Raten ist hier falsch.
           if ! gueltig "$sauber"; then
-            kandidaten=$(printf '%s' "$sauber" | tr -c 'A-Za-z0-9_-' '\n' | awk 'length($0)==40' | sort -u)
+            kandidaten=$(printf '%s' "$sauber" | tr -c 'A-Za-z0-9_-' '\n' | awk 'length($0)>=20' | sort -u)
             anzahl=$(printf '%s' "$kandidaten" | grep -c . || true)
             if [ "$anzahl" -eq 1 ]; then
               sauber="$kandidaten"
@@ -120,12 +133,20 @@ jobs:
           fi
 
           if ! gueltig "$sauber"; then
-            echo "::error::CLOUDFLARE_API_TOKEN hat nicht die Form eines Cloudflare-API-Tokens (genau 40 Zeichen aus A-Z a-z 0-9 _ -). Gemessene Laenge: ${#sauber}."
-            echo "Haeufigste Ursachen:"
-            echo "1. Es wurde der Global API Key eingetragen (32 Hex-Zeichen). Der braucht ein anderes Verfahren und funktioniert hier nicht."
-            echo "2. Beim Kopieren kam eine Beschriftung oder eine zweite Zeile mit."
-            echo "3. Der Token wurde zweimal eingefuegt."
-            echo "Neu erzeugen unter https://dash.cloudflare.com/profile/api-tokens, Vorlage 'Edit Cloudflare Workers', und allein einfuegen."
+            # Die beiden Fehlerarten getrennt melden, damit die naechste Runde
+            # nicht wieder raten muss.
+            fremdzeichen="nein"
+            case "$sauber" in
+              *[!A-Za-z0-9_-]*) fremdzeichen="ja" ;;
+            esac
+            echo "::error::CLOUDFLARE_API_TOKEN ist kein brauchbarer Token. Laenge: ${#sauber}. Zeichen ausserhalb von A-Z a-z 0-9 _ - enthalten: ${fremdzeichen}."
+            if [ "$fremdzeichen" = "ja" ]; then
+              echo "Im Wert steht mehr als der Token, etwa eine Beschriftung, eine zweite Zeile oder die curl-Beispielzeile."
+              echo "Im Cloudflare-Dashboard den Kopier-Knopf AM TOKEN nehmen, nicht den an der curl-Zeile darunter."
+            else
+              echo "Der Wert besteht aus zulaessigen Zeichen, ist aber zu kurz (unter 20)."
+            fi
+            echo "Neu erzeugen unter https://dash.cloudflare.com/profile/api-tokens, Vorlage 'Edit Cloudflare Workers'."
             exit 1
           fi
           echo "CLOUDFLARE_API_TOKEN=$sauber" >> "$GITHUB_ENV"

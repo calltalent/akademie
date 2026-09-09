@@ -4472,6 +4472,21 @@ nur wenn dabei genau ein eindeutiger Kandidat bleibt, wird er benutzt. Bei
 mehreren wird abgewiesen, weil die Wahl sonst geraten wäre. Fünf Fälle
 getestet, darunter zwei verschiedene Tokens im selben Wert (abgewiesen).
 
+**Nachtrag, Lauf 8, und eine Korrektur an mir selbst.** Der Wächter wies 53
+saubere Zeichen ab, weil dort „genau 40" stand. Diese Zahl war eine Annahme
+über Cloudflares Tokenformat, die dieser Workflow gar nicht treffen muss. Ein
+Tor, das gültige Werte abweist, ist schlimmer als eines, das eine Sekunde
+später am richtigen Ort scheitert: ob ein Token echt ist, weiß allein
+Cloudflare, und dessen Antwort ist eindeutig („Authentication failed",
+code 9106).
+
+Der Wächter prüft seither nur noch, ob der Wert überhaupt ein Token sein
+KANN: keine Leerzeichen, keine Umbrüche, keine Anführungszeichen, mindestens
+20 Zeichen. Die Fehlermeldung nennt jetzt getrennt die Länge und ob
+Fremdzeichen enthalten sind, damit die nächste Runde nicht wieder raten muss.
+Sechs Fälle getestet, darunter ein sauberer Token mit 53 Zeichen
+(angenommen).
+
 **Nebenbefund ohne Handlungsbedarf.** GitHub meldet, dass `actions/checkout@v4`
 und `actions/setup-node@v4` auf Node 20 zeigen und deshalb auf Node 24
 gezwungen werden. Beide laufen, ein Wechsel auf `@v5` ist irgendwann fällig.
