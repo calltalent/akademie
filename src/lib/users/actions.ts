@@ -6,6 +6,7 @@ import { requireAdminTenant } from "@/lib/auth/staff";
 import { csvRowSchema } from "@/lib/users/csv";
 import { importUsers, buildSetPasswordLink } from "@/lib/users/import";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { sendEmail } from "@/lib/email/client";
 import { welcomeInvite } from "@/lib/email/templates";
 import { resolveTenantEmailLocale } from "@/i18n/config";
@@ -25,6 +26,25 @@ export async function inviteSingleUser(
 ): Promise<CourseActionState> {
   try {
     const { tenant } = await requireAdminTenant();
+
+    // Rate-Limit-Fix (Security-Review 07.09.2026): löst wie der CSV-Bulk-
+    // Import (api/admin/users/import/route.ts) echten Resend-Mailversand
+    // aus, hatte aber bisher keinen Schutz — ein kompromittierter Admin-
+    // Account hätte eine beliebige externe Adresse unbegrenzt oft
+    // anschreiben lassen können. Eigener Schlüssel, Fenster je Mandant
+    // (gleiches Muster wie "csv-import"). Grenzwert bewusst über dem in
+    // diesem Fund selbst genannten Praxisfall ("ein Admin lädt durchaus 20
+    // Personen nacheinander ein") gewählt, damit eine Serie von
+    // Einzel-Einladungen nicht blockiert wird.
+    if (
+      !(await checkRateLimit("invite-single-user", {
+        maxRequests: 30,
+        windowSeconds: 300,
+        extraKey: tenant.id,
+      }))
+    ) {
+      return { error: RATE_LIMIT_MESSAGE };
+    }
 
     const parsed = csvRowSchema.safeParse({
       email: formData.get("email"),
@@ -102,6 +122,20 @@ export async function enableMembership(userId: string): Promise<CourseActionStat
 export async function resendInviteLink(userId: string): Promise<CourseActionState> {
   try {
     const { tenant, supabase } = await requireAdminTenant();
+
+    // Rate-Limit-Fix (Security-Review 07.09.2026, siehe Begründung bei
+    // inviteSingleUser oben): eigener Schlüssel, gleicher Grenzwert — auch
+    // ein erneuter Versand löst echten Mailversand aus und darf nicht
+    // beliebig oft gegen eine fremde Adresse wiederholbar sein.
+    if (
+      !(await checkRateLimit("resend-invite-link", {
+        maxRequests: 30,
+        windowSeconds: 300,
+        extraKey: tenant.id,
+      }))
+    ) {
+      return { error: RATE_LIMIT_MESSAGE };
+    }
 
     const { data: membership, error: membershipError } = await supabase
       .from("memberships")

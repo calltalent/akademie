@@ -247,10 +247,39 @@ export function toTimeInputValue(date: Date): string {
 }
 
 /** `isoDate` um `days` Berlin-Kalendertage verschoben, als "yyyy-mm-dd" (Mitternacht-Anker — an beiden deutschen Umstellungstagen unproblematisch, die Umstellung selbst liegt nachts um 02:00/03:00, nie um 00:00). */
-function shiftIsoDate(isoDate: string, days: number): string {
+export function shiftIsoDate(isoDate: string, days: number): string {
   const [year, month, day] = parseIsoDate(isoDate);
   const anchor = zonedTimeToUtc(year, month, day, 0, 0, 0, CALENDAR_TIME_ZONE);
   return isoDateString(addDays(anchor, days));
+}
+
+/**
+ * Reiner Baustein aus `bookOwnShift()` (Block S6, `actions.ts`) — hierher
+ * ausgelagert (statt in `actions.ts` selbst), damit er ohne Supabase-/
+ * Env-Abhängigkeit unit-testbar bleibt (`actions.ts` trägt `"use server"` und
+ * lädt beim Import u. a. `@/lib/supabase/server`, das ohne konfiguriertes
+ * `.env` sofort mit einer zod-Fehlermeldung wirft — siehe `date.test.ts`).
+ *
+ * `startTime`/`endTime` sind Berlin-Wanduhrzeiten ("HH:MM"), beide verankert
+ * auf `slotDateIso` (Kalendertag DES SLOTS, nicht "heute"). Nachtschicht-Fall
+ * (Ende <= Start, z. B. 22:00 -> 06:00): das Ende liegt einen Berlin-
+ * Kalendertag später — über `shiftIsoDate()`/`berlinDateTimeToUtc()` (gleiche
+ * zonenbewusste Konvention wie `buildWeeklySeries()` unten), NIEMALS über
+ * "+24h in Millisekunden": das ergäbe an einem Umstellungstag (23h- bzw.
+ * 25h-Tag in Europe/Berlin) die FALSCHE Wanduhrzeit — Fehlerfund
+ * Zeitumstellung 25.10.2026, siehe `date.test.ts`.
+ */
+export function computeSelfBookingWindow(
+  slotDateIso: string,
+  startTime: string,
+  endTime: string,
+): { startsAt: Date; endsAt: Date } {
+  const startsAt = berlinDateTimeToUtc(slotDateIso, startTime);
+  let endsAt = berlinDateTimeToUtc(slotDateIso, endTime);
+  if (endsAt.getTime() <= startsAt.getTime()) {
+    endsAt = berlinDateTimeToUtc(shiftIsoDate(slotDateIso, 1), endTime);
+  }
+  return { startsAt, endsAt };
 }
 
 /**

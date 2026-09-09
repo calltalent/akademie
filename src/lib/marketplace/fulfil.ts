@@ -128,6 +128,18 @@ export async function handleMarketplacePurchase(
 ): Promise<void> {
   const { tenant_id: tenantId, product_id: productId, user_id: userId, listing_id: listingId } = metadata;
 
+  // Idempotenz-Fix (gleiches Muster wie `isNewOrder` im regulären Pfad,
+  // `api/stripe/webhook/route.ts::handleCheckoutCompleted()`): VOR dem
+  // Upsert prüfen, ob die Order schon existiert — Stripe liefert
+  // "checkout.session.completed" garantiert nur "at least once", ein Retry
+  // darf die Bestätigungsmail unten NICHT ein zweites Mal auslösen.
+  const { data: existingOrder } = await admin
+    .from("orders")
+    .select("id")
+    .eq("stripe_checkout_id", session.id)
+    .maybeSingle();
+  const isNewOrder = !existingOrder;
+
   // Gleiches Idempotenz-Muster wie im bestehenden Pfad (orders.stripe_checkout_id
   // ist unique) — Stripe liefert Events "at least once".
   const { data: order, error: orderError } = await admin
@@ -226,7 +238,13 @@ export async function handleMarketplacePurchase(
     }).catch(() => {});
   }
 
-  await sendMarketplacePurchaseMail(admin, tenantId, userId, courseId);
+  // Nur bei echter Neuanlage der Order versenden — ein Stripe-Retry
+  // desselben Checkouts (Zustellgarantie "at least once") darf dem Käufer
+  // nicht dieselbe Bestätigungsmail ein zweites Mal schicken (gleiches
+  // Idempotenz-Prinzip wie beim `enrollmentCreated`-Dispatch oben).
+  if (isNewOrder) {
+    await sendMarketplacePurchaseMail(admin, tenantId, userId, courseId);
+  }
 }
 
 /**

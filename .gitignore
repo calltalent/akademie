@@ -19,3 +19,10 @@ supabase/.temp/
 *.tsbuildinfo
 tsc-verify*.json
 tsconfig.check.json
+
+# Ruflo / claude-flow orchestration artifacts (local only)
+.claude-flow/
+.swarm/
+.hive-mind/
+.claude/proven-config.json
+.claude/.proven-config-version

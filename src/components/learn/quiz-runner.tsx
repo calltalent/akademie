@@ -45,15 +45,21 @@ export function QuizRunner({ quiz }: { quiz: LearnerQuiz }) {
   // gesetzt ist — rein clientseitig/kosmetisch, ändert nichts an der
   // serverseitigen Bewertung (die arbeitet über questionId, nicht Position).
   //
-  // Korrektur (Josips Lint-Lauf, 12.07.2026): eslint verlangt ein Array aus
-  // "einfachen Ausdrücken" (Identifier), kein Vergleichsausdruck direkt im
-  // Deps-Array — deshalb vorher in eine benannte Variable ausgelagert,
-  // Verhalten unverändert.
-  const isRunning = phase === "running";
+  // BUGFIX (Builder, 07.09.2026, tester-Fund): vorher hing das Mischen an
+  // `isRunning` (= `phase === "running"`), einer Abhängigkeit, die sich BEI
+  // JEDEM Phasenwechsel ändert — auch beim Übergang "läuft" -> "Ergebnis"
+  // nach dem Absenden. Bei `shuffle = true` wurde die Reihenfolge dadurch in
+  // der Ergebnisphase ERNEUT gemischt und passte nicht mehr zu der
+  // Reihenfolge, die der Lernende beim Absenden gesehen hatte (die
+  // serverseitige Bewertung selbst war davon nie betroffen, sie arbeitet
+  // über `questionId`). Fix: ein Zähler, der ausschließlich in
+  // `handleStart()` erhöht wird — ändert sich also genau einmal pro
+  // tatsächlichem Versuchsstart, nicht bei jedem Phasenwechsel.
+  const [attemptRunCount, setAttemptRunCount] = useState(0);
   const questions = useMemo<LearnerQuestion[]>(
     () => (quiz.shuffle ? shuffle(quiz.questions) : quiz.questions),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isRunning],
+    [attemptRunCount],
   );
 
   useEffect(() => {
@@ -77,6 +83,7 @@ export function QuizRunner({ quiz }: { quiz: LearnerQuiz }) {
     }
     setRemainingS(quiz.timeLimitS);
     setAnswers({});
+    setAttemptRunCount((prev) => prev + 1);
     setPhase("running");
   }
 

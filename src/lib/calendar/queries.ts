@@ -398,6 +398,38 @@ export async function getAdminCalendarAbsences(
 }
 
 /**
+ * Lädt Abwesenheiten für das Wochenraster des "shifts"-Reiters
+ * (`admin/schichtplanung/page.tsx`) — `year`/`endYear` sind Berlin-
+ * Kalenderjahre (`isoDateString(weekStart).slice(0, 4)` bzw. dasselbe für
+ * `weekStart + 6 Tage`), NICHT `weekStart.getUTCFullYear()`: `weekStart` ist
+ * Montag 00:00 BERLINER Zeit als UTC-Instant, im Winter also z. B. Sonntag
+ * 23:00 UTC am 31.12. — `getUTCFullYear()` läge dann ein Jahr zu früh und der
+ * Feiertag Neujahr würde im Wochenraster fehlen (Fehlerfund, siehe
+ * `queries.test.ts`).
+ *
+ * Für `year === endYear` (der Normalfall) exakt ein Query wie bisher. Umfasst
+ * die Woche selbst den Jahreswechsel (z. B. Woche ab Mo. 28.12.), werden
+ * beide Jahre geladen und nach `id` dedupliziert (eine Abwesenheit, die genau
+ * am 31.12./01.01. beginnt bzw. endet, könnte sonst doppelt erscheinen, da
+ * `getAdminCalendarAbsences()` pro Jahr alles ÜBERLAPPENDE liefert).
+ */
+export async function loadAbsencesForWeek(
+  supabase: SupabaseServerClient,
+  tenantId: string,
+  year: number,
+  endYear: number,
+): Promise<CalendarAbsenceRow[]> {
+  if (year === endYear) return getAdminCalendarAbsences(supabase, tenantId, year);
+  const [first, second] = await Promise.all([
+    getAdminCalendarAbsences(supabase, tenantId, year),
+    getAdminCalendarAbsences(supabase, tenantId, endYear),
+  ]);
+  const byId = new Map<string, CalendarAbsenceRow>();
+  for (const row of [...first, ...second]) byId.set(row.id, row);
+  return Array.from(byId.values());
+}
+
+/**
  * Offene Zeitfenster der eigenen Projekte für die Selbstbuchungs-Ansicht
  * (Freelancer) — EIN Aufruf der `security definer`-Funktion
  * `calendar_open_slots()` (S2-Migration), liefert Kapazität/freie

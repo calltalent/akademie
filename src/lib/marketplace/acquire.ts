@@ -62,7 +62,24 @@ export async function acquireFreeListing(publicSlug: string): Promise<Marketplac
     return { error: "Dieser Kurs ist nicht kostenlos verfügbar." };
   }
 
-  await grantMarketplaceAccess(admin, listing.tenant_id, user.id, listing.course_id);
+  try {
+    await grantMarketplaceAccess(admin, listing.tenant_id, user.id, listing.course_id);
+  } catch (e) {
+    // grantMarketplaceAccess() wirft bewusst bei einem memberships-Insert-
+    // oder enrollments-Upsert-Fehler (siehe fulfil.ts) — dort ist das
+    // richtig, weil der aufrufende Stripe-Webhook dadurch mit 500 antwortet
+    // und Stripe automatisch erneut zustellt. Diese Server Action hat kein
+    // Retry-Mechanismus: ein ungefangener Wurf würde den Nutzer nach Klick
+    // auf "Kostenlos holen" nur auf die generische Next.js-Fehlerseite
+    // schicken. Stattdessen eine verständliche deutsche Fehlermeldung
+    // zurückgeben — ein bereits angelegter Teilzustand (z. B. memberships
+    // ohne enrollments) bleibt bestehen, ein erneuter Klick ruft
+    // grantMarketplaceAccess() erneut auf und holt die fehlende Zeile nach
+    // (beide Schreibvorgänge sind idempotent: Insert nur bei
+    // Nicht-Existenz, Upsert mit onConflict).
+    console.error("[marketplace/acquire] grantMarketplaceAccess fehlgeschlagen:", e instanceof Error ? e.message : e);
+    return { error: "Der Kurs konnte nicht freigeschaltet werden. Bitte versuche es erneut." };
+  }
 
   // Marktplatz-relativer Redirect (Plan Abschnitt 5) — diese Server Action
   // wird ausschließlich von einer Client-Komponente auf

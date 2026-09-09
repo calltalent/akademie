@@ -42,6 +42,28 @@ import { translateDbError } from "@/lib/errors/db";
 
 const DUMMY_UUID = "00000000-0000-0000-0000-000000000000";
 
+/**
+ * Räumt ein bereits hochgeladenes, aber nie in `certificates.pdf_path`
+ * referenziertes PDF wieder auf — Fix für den in dieser Sitzung gemeldeten
+ * Fund: Schritt (e) lädt das PDF hoch, ERST DANACH schreibt (f) die
+ * `certificates`-Zeile. Schlägt (f) fehl (Race über den 23505-Pfad oder
+ * jeder andere Insert-Fehler), blieb das PDF bisher für immer verwaist im
+ * privaten Bucket liegen (keine Oberfläche referenziert es, es belegt aber
+ * dauerhaft Speicherkontingent). Rein informativ: ein fehlgeschlagenes
+ * Aufräumen darf NIE den eigentlichen Rückgabewert von
+ * `issueCertificateIfEligible` überschreiben, deshalb wird der Fehler hier
+ * nur geloggt, nie geworfen oder nach oben gereicht.
+ */
+async function removeOrphanedCertificatePdf(
+  admin: ReturnType<typeof createAdminClient>,
+  storagePath: string,
+): Promise<void> {
+  const { error } = await admin.storage.from("certificates").remove([storagePath]);
+  if (error) {
+    console.error("[certificates/issue] Aufräumen des verwaisten PDFs fehlgeschlagen.", error.message);
+  }
+}
+
 export type IssueCertificateResult =
   | { ok: true; alreadyExisted: boolean; certificateId?: string }
   | { ok: false; error: string };
@@ -195,8 +217,15 @@ export async function issueCertificateIfEligible(
           .eq("course_id", courseId)
           .eq("user_id", userId)
           .maybeSingle();
+        // Race gewonnen von einem parallelen Aufruf, dessen Zeile bereits
+        // auf DESSEN eigenes PDF zeigt — unser eben hochgeladenes PDF ist
+        // von keiner Zeile referenziert und muss weg.
+        await removeOrphanedCertificatePdf(admin, storagePath);
         return { ok: true, alreadyExisted: true, certificateId: raceExisting?.id };
       }
+      // Jeder andere Insert-Fehler: PDF liegt bereits im Bucket, aber keine
+      // Zeile verweist darauf und wird es auch nie — ebenfalls aufräumen.
+      await removeOrphanedCertificatePdf(admin, storagePath);
       return { ok: false, error: `Zertifikat-Zeile konnte nicht angelegt werden: ${translateDbError(insertError)}` };
     }
 

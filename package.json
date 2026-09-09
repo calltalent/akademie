@@ -24,7 +24,7 @@
     "@supabase/ssr": "^0.5",
     "@supabase/supabase-js": "^2",
     "lucide-react": "^0.460",
-    "next": "16.2.10",
+    "next": "16.3.4",
     "next-intl": "4.13.2",
     "pdf-lib": "^1",
     "react": "19.2.4",
@@ -37,7 +37,7 @@
     "zod": "^3"
   },
   "devDependencies": {
-    "@next/env": "16.2.10",
+    "@next/env": "16.3.4",
     "@playwright/test": "^1.48",
     "@swc/helpers": "^0.5.23",
     "@tailwindcss/postcss": "^4",
@@ -49,7 +49,7 @@
     "@types/web-push": "^3",
     "@vitejs/plugin-react": "^4",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.3.4",
     "jsdom": "^25",
     "tailwindcss": "^4",
     "typescript": "^5",

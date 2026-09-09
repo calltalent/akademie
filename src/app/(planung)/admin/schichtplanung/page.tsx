@@ -12,6 +12,7 @@ import {
   getCalendarChangeRequests,
   getMembershipsWithoutWorker,
   getPlannerWorkerNames,
+  loadAbsencesForWeek,
 } from "@/lib/calendar/queries";
 import { addDays, formatDayLabel, formatShortDayLabel, isoDateString, startOfIsoWeek } from "@/lib/calendar/date";
 import { parseTenantHolidayRegions, type CalendarChangeRequestRow, type CalendarWorkerRow } from "@/lib/calendar/schema";
@@ -167,12 +168,24 @@ export default async function AdminSchichtplanungPage({
     .filter((m): m is { userId: string; fullName: string | null; email: string } => m !== null);
 
   // Nur der jeweils aktive Reiter lädt seine (teureren) Zusatzdaten.
+  //
+  // Jahr für `getAdminCalendarAbsences()` bewusst über
+  // `isoDateString(weekStart).slice(0, 4)` (Berlin-Kalenderjahr), NICHT über
+  // `weekStart.getUTCFullYear()` — `weekStart` ist Montag 00:00 BERLINER
+  // Zeit als UTC-Instant, im Winter also z. B. Sonntag 23:00 UTC am 31.12.:
+  // `getUTCFullYear()` läge dann ein Jahr zu früh und der Feiertag Neujahr
+  // würde im Wochenraster fehlen. Zusätzlich kann eine Woche den Jahres-
+  // wechsel selbst enthalten (z. B. Woche ab Mo. 28.12.) — dann werden beide
+  // Jahre geladen und zusammengeführt, damit z. B. der 01.01. des Folgejahrs
+  // als Feiertag erkannt wird.
+  const weekStartYear = Number(isoDateString(weekStart).slice(0, 4));
+  const weekEndYear = Number(isoDateString(addDays(weekStart, 6)).slice(0, 4));
   const shiftsData =
     activeTab === "shifts"
       ? {
           shifts: await getAdminCalendarShifts(supabase, tenant.id, weekStart.toISOString(), weekEnd.toISOString()),
           slots: await getAdminCalendarSlots(supabase, tenant.id, weekStart.toISOString(), weekEnd.toISOString()),
-          absences: await getAdminCalendarAbsences(supabase, tenant.id, weekStart.getUTCFullYear()),
+          absences: await loadAbsencesForWeek(supabase, tenant.id, weekStartYear, weekEndYear),
         }
       : null;
 

@@ -71,11 +71,21 @@ export async function createDraftCourse(): Promise<CourseActionState> {
     const slug = await resolveUniqueCourseSlug(supabase, tenant.id, "neuer-kurs");
 
     // Position ans Ende anhängen (Josips Auftrag 23.07.2026, Kursreihenfolge
-    // per Auf/Ab) — gleiches Zähl-Muster wie createSection.
-    const { count } = await supabase
+    // per Auf/Ab). BUGFIX (Builder, 07.09.2026, tester-Fund): NICHT mehr über
+    // die Zeilenanzahl (`count`) — nach Löschen einer mittleren Zeile ist
+    // `count` kleiner als die höchste vergebene `position`, ein neuer Kurs
+    // würde die Position eines bestehenden Kurses duplizieren (kein
+    // unique(tenant_id, position) in 0001_init.sql). `moveCourse` tauscht
+    // dann zwei Zeilen mit identischer Position — ein No-Op, der Auf/Ab-
+    // Knopf wirkt danach kaputt. Stattdessen `max(position) + 1`, exaktes
+    // Muster wie `applyDraftAsCourse` in src/lib/generator/apply.ts:104-111.
+    const { data: existingCourses } = await supabase
       .from("courses")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenant.id);
+      .select("position")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: false })
+      .limit(1);
+    const position = (existingCourses?.[0]?.position ?? -1) + 1;
 
     const { data: created, error } = await supabase
       .from("courses")
@@ -83,7 +93,7 @@ export async function createDraftCourse(): Promise<CourseActionState> {
         tenant_id: tenant.id,
         title: "Neuer Kurs",
         slug,
-        position: count ?? 0,
+        position,
         created_by: user.id,
       })
       .select("id")
@@ -133,15 +143,20 @@ export async function createCourseCategory(
       return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
     }
 
-    const { count } = await supabase
+    // BUGFIX (07.09.2026, gleicher Fund wie createDraftCourse oben):
+    // max(position) + 1 statt Zeilenanzahl.
+    const { data: existingCategories } = await supabase
       .from("course_categories")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenant.id);
+      .select("position")
+      .eq("tenant_id", tenant.id)
+      .order("position", { ascending: false })
+      .limit(1);
+    const position = (existingCategories?.[0]?.position ?? -1) + 1;
 
     const { error } = await supabase.from("course_categories").insert({
       tenant_id: tenant.id,
       name: parsed.data.name,
-      position: count ?? 0,
+      position,
     });
     if (error) return { error: translateDbError(error) };
 
@@ -598,16 +613,25 @@ export async function createModule(
       return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
     }
 
-    const { count } = await supabase
+    // BUGFIX (Builder, 07.09.2026, tester-Fund): max(position) + 1 statt
+    // Zeilenanzahl — siehe ausführlicher Kommentar bei createDraftCourse
+    // oben. Reproduktionsfall: Module A(0),B(1),C(2) anlegen, B löschen,
+    // Modul D anlegen — `count` ist 2, D bekäme dieselbe Position wie C.
+    // Regressionstest: courses/actions.test.ts.
+    const { data: existingModules } = await supabase
       .from("modules")
-      .select("id", { count: "exact", head: true })
-      .eq("course_id", courseId);
+      .select("position")
+      .eq("tenant_id", tenant.id)
+      .eq("course_id", courseId)
+      .order("position", { ascending: false })
+      .limit(1);
+    const position = (existingModules?.[0]?.position ?? -1) + 1;
 
     const { error } = await supabase.from("modules").insert({
       tenant_id: tenant.id,
       course_id: courseId,
       title: parsed.data.title,
-      position: count ?? 0,
+      position,
     });
     if (error) return { error: translateDbError(error) };
 
@@ -660,16 +684,30 @@ export async function moveModule(
 
     const a = modules[idx];
     const b = modules[swapIdx];
-    await supabase
+    // BUGFIX (Builder, 07.09.2026, tester-Fund): beide Update-Ergebnisse
+    // werden jetzt geprüft. Vorher: zwei ungeprüfte, nicht-atomare
+    // update()-Aufrufe — schlug der zweite fehl, teilten sich zwei Zeilen
+    // dauerhaft dieselbe Position, ohne dass irgendjemand das erfuhr. Echte
+    // Atomarität (eine Transaktion für beide Updates) würde eine neue
+    // `security definer`-RPC brauchen (siehe
+    // supabase/migrations/20260907090000_reorder_swap_positions.sql, bewusst
+    // NUR geschrieben, nicht angewendet und nicht verdrahtet — Begründung im
+    // Bericht/PHASENSTATUS.md: eine noch nicht angewendete Migration hätte
+    // diese aktuell funktionierende Funktion bis zu Josips `db push`
+    // lahmgelegt). Diese Prüfung schließt zumindest das stille Verschlucken
+    // eines Fehlers.
+    const { error: swapErrorA } = await supabase
       .from("modules")
       .update({ position: b.position })
       .eq("id", a.id)
       .eq("tenant_id", tenant.id);
-    await supabase
+    if (swapErrorA) return { error: translateDbError(swapErrorA) };
+    const { error: swapErrorB } = await supabase
       .from("modules")
       .update({ position: a.position })
       .eq("id", b.id)
       .eq("tenant_id", tenant.id);
+    if (swapErrorB) return { error: translateDbError(swapErrorB) };
 
     revalidatePath(`/admin/kurse/${courseId}`);
     return { error: null, success: true };
@@ -695,16 +733,21 @@ export async function createSection(
       return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
     }
 
-    const { count } = await supabase
+    // BUGFIX (07.09.2026, gleicher Fund wie createModule oben).
+    const { data: existingSections } = await supabase
       .from("sections")
-      .select("id", { count: "exact", head: true })
-      .eq("module_id", moduleId);
+      .select("position")
+      .eq("tenant_id", tenant.id)
+      .eq("module_id", moduleId)
+      .order("position", { ascending: false })
+      .limit(1);
+    const position = (existingSections?.[0]?.position ?? -1) + 1;
 
     const { error } = await supabase.from("sections").insert({
       tenant_id: tenant.id,
       module_id: moduleId,
       title: parsed.data.title,
-      position: count ?? 0,
+      position,
     });
     if (error) return { error: translateDbError(error) };
 
@@ -767,16 +810,20 @@ export async function moveSection(
 
     const a = sections[idx];
     const b = sections[swapIdx];
-    await supabase
+    // BUGFIX (07.09.2026, gleicher Fund wie moveModule oben): Fehler beider
+    // Updates prüfen statt stillschweigend zu verschlucken.
+    const { error: swapErrorA } = await supabase
       .from("sections")
       .update({ position: b.position })
       .eq("id", a.id)
       .eq("tenant_id", tenant.id);
-    await supabase
+    if (swapErrorA) return { error: translateDbError(swapErrorA) };
+    const { error: swapErrorB } = await supabase
       .from("sections")
       .update({ position: a.position })
       .eq("id", b.id)
       .eq("tenant_id", tenant.id);
+    if (swapErrorB) return { error: translateDbError(swapErrorB) };
 
     revalidatePath(`/admin/kurse/${courseId}`);
     return { error: null, success: true };
@@ -818,17 +865,22 @@ export async function createLesson(
     if (sectionError) return { error: translateDbError(sectionError) };
     if (!section) return { error: "Sektion nicht gefunden." };
 
-    const { count } = await supabase
+    // BUGFIX (07.09.2026, gleicher Fund wie createModule oben).
+    const { data: existingLessons } = await supabase
       .from("lessons")
-      .select("id", { count: "exact", head: true })
-      .eq("section_id", sectionId);
+      .select("position")
+      .eq("tenant_id", tenant.id)
+      .eq("section_id", sectionId)
+      .order("position", { ascending: false })
+      .limit(1);
+    const position = (existingLessons?.[0]?.position ?? -1) + 1;
 
     const { error } = await supabase.from("lessons").insert({
       tenant_id: tenant.id,
       module_id: section.module_id,
       section_id: sectionId,
       title: parsed.data.title,
-      position: count ?? 0,
+      position,
       blocks: [],
     });
     if (error) return { error: translateDbError(error) };
