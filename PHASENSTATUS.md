@@ -3894,6 +3894,72 @@ Nachgetragen in: `lib/legal/company.ts` (`registrationNumber`), `tenants.legal.e
 **Weiterhin offen:** Vertreter in der Union nach Art. 27 DSGVO (Platzhalter steht sowohl im AVV als auch in der Website-Datenschutzerklärung); anwaltliche Prüfung.
 5. `SALESTALENT-BRANDING.md` §3 hielt fest, die Copyright-Zeile im Login (`login_copyright: "SalesTalent. All rights reserved."`) bleibe neutral, „bis die Rechtsträger-Frage geklärt ist". Sie ist jetzt geklärt — ob dort künftig „SalesTalent, a Calltalent LLC brand" o. Ä. stehen soll, ist eine Marken-Entscheidung von Josip, keine technische; unverändert gelassen.
 
+## Spam-Vorfall Kontaktformular + Bot-Schutz (25.08.2026)
+
+**Anlass:** Josip bekam am 24.08.2026 um 23:26 Uhr eine Kontaktanfrage über `/kontakt` (SalesTalent-Host), die eine klassische SEO-/Webmaster-Spam-Mail war: Vorname `Dear http://salestalent.app/<pfad>`, Nachname `Administrator Gee`, Nachricht „To the … Webmaster". Auftrag: Datenbanken prüfen und einen Security-Check durchführen, um solchen Spam zu vermeiden.
+
+**Befund Datenbank (Supabase-MCP, Projekt `vklqksdiyiijzoirntyt`):**
+
+1. **Kein Datenleck, kein Einbruch.** Kontaktanfragen werden nirgends gespeichert (es gibt bewusst keine `contact_requests`-Tabelle) — der Spam existierte nur als E-Mail. In `auth.users` steht kein einziges Spam-Konto: die 110 `profiles` sind zu 101 der CSV-Import-Testbestand vom 10.07.2026, der Rest sind Josips eigene Konten, E2E- und API-Testnutzer. Keine fremden Mandanten, keine fremden Mitgliedschaften.
+2. **Der Beleg für die Lücke steht in `rate_limits`:** fünf `contact-form:*`-Schlüssel, vier davon von je einer anderen IP (`203.17.245.196` = der gemeldete Vorfall, `185.240.33.242`, `106.219.122.20`, `172.84.125.72`), **jeder mit `count = 1`**. Der Bot schickt eine Anfrage pro IP und rotiert dann — ein reines IP-Limit (bisher 5 pro 5 Minuten) kann so ein Muster prinzipiell nicht fassen. Von den fünf Absendungen seit dem 10.07.2026 war nur eine (`31.47.30.19`) Josips eigener Test; das reale Aufkommen ist also ~1 legitime Anfrage/Monat gegen 4 Spam-Anfragen.
+3. Empfänger war `office@calltalent.ai`, weil `tenants.settings.support_email` bei `salestalent` (und `demo-blau`) leer ist und der Fallback greift — korrektes Verhalten, aber Josip bekommt dadurch den Spam der Mandanten.
+4. **Kein Injection-Risiko in der Benachrichtigungsmail:** `contactFormNotification()` escaped alle Felder (`escapeHtml`), die klickbaren Links in Gmail entstehen erst durch Gmails eigene Auto-Verlinkung des Klartexts.
+
+**Erledigt (Code, alles neu unter `src/lib/contact/`):**
+
+1. `patterns.ts` (NEU) — Feldnamen der versteckten Felder, Zeitkonstanten und die Link-/Markup-Erkennung (`countLinks`, `containsLink`, `containsMarkup`). E-Mail-Adressen werden vor der Link-Zählung entfernt, damit eine zweite Kontaktadresse in der Nachricht nicht als Link zählt.
+2. `spam.ts` (NEU, `server-only`) — Punktbewertung mit Schwellwert 6: Link/E-Mail/Markup im Namensfeld (+6), Markup in der Nachricht (+5), Links in der Nachricht (1/2/≥3 → +1/+3/+6), Rollen-Anrede „Dear Webmaster"/„To the … Administrator" (+4), SEO-/Werbevokabular (+2 je Treffer, gedeckelt bei +6). Bewusst `server-only`, damit die Phrasenliste nicht im Client-Bundle nachlesbar ist.
+3. `form-token.ts` (NEU) — Zeitfalle: `/kontakt` gibt pro Seitenaufruf einen HMAC-SHA-256-signierten Zeitstempel aus (Schlüsselmaterial vom ohnehin serverseitigen `SUPABASE_SERVICE_ROLE_KEY`, kein neues Secret für Josip). Absenden unter 3 Sekunden oder ohne gültige Signatur (= direktes POST auf die Server Action) ist maschinell; älter als 3 Stunden = Formular abgelaufen.
+4. `schema.ts` — Namensfelder dürfen keine Links, E-Mail-Adressen oder Tags mehr enthalten, Maximallänge von 200 auf 80. Genau darüber lief der Vorfall.
+5. `actions.ts` — fünf Schichten in Kostenreihenfolge: Honeypot → Zeitfalle → Rate-Limits → zod → Inhaltsbewertung. **Neu bei den Limits:** zusätzlich 3 Anfragen/Stunde je Absenderadresse (sha256-Hash als Schlüssel, keine PII) und **30 Anfragen/Stunde je Empfänger-Postfach** — Letzteres ist die eigentliche Antwort auf den verteilten Bot. Erkannte Bots (Honeypot/Zeitfalle) sehen dieselbe Erfolgsmeldung wie Menschen, damit der Betreiber keine Rückmeldung zum Nachjustieren bekommt; die inhaltlichen Regeln melden dagegen einen konkreten, korrigierbaren Fehler samt Support-Adresse, damit ein Fehlurteil keine echte Anfrage verschluckt.
+6. `kontakt-form.tsx` / `page.tsx` — verstecktes Token-Feld und Honeypot (`website`). Der Honeypot steht außerhalb des Sichtfelds statt auf `display:none` (das überspringen viele Bots) und ist per `aria-hidden` + `tabIndex={-1}` für Screenreader und Tastatur unsichtbar — die Falle darf einen blinden Nutzer nie treffen (CLAUDE.md §3.4).
+7. Tests: `spam.test.ts` (13 Fälle, u. a. der nachgebaute Vorfall als Regressionstest — mit erfundener Domain/Adresse, CLAUDE.md §2.6) und `form-token.test.ts` (5 Fälle, inkl. zurückdatiertem Zeitstempel bei gültiger Signatur). Die Hälfte der Fälle prüft bewusst die Gegenrichtung: echte deutsche Anfragen, Namen mit Umlauten/Apostroph/Bindestrich und eine Anfrage mit einem einzelnen Link müssen durchkommen.
+
+**Verifikation:** `npm run lint` → 0 Fehler. `npx tsc --noEmit` → 0 Fehler. `npx vitest run` → 695 grün (18 neu); die zwei roten Dateien (`env.test.ts`, `marketplace/fulfil.test.ts`) scheitern wie in den Vorblöcken ausschließlich an der fehlenden `.env` dieser Sitzungsumgebung — auf dem unveränderten Stand (`git stash`) scheitern sie identisch. Playwright nicht gelaufen (kein Dev-Server/keine `.env`, bekannter Blocker).
+
+**Risiken / bewusste Entscheidungen:**
+
+1. **Kein CAPTCHA.** Cloudflare Turnstile wäre die nächste Eskalationsstufe (Stack-nativ, DSGVO-freundlich, kostenlos), braucht aber Schlüssel aus Josips Cloudflare-Konto und lädt ein Drittanbieter-Skript. Die fünf jetzigen Schichten stoppen diese Bot-Klasse ohne beides. Sollte trotzdem Spam durchkommen: Turnstile nachrüsten.
+2. **Anfragen werden weiterhin nicht in der Datenbank gespeichert.** Das ist datenschutzseitig die sparsamere Variante, heißt aber: keine Historie und keine Auswertung, wie oft der Filter greift. Abgewiesene Anfragen erscheinen nur als `console.warn` (mit Grund und Punktwert, ohne Inhalt) in den Worker-Logs.
+3. **Zwei Fehlurteil-Fälle sind denkbar:** eine echte Nachricht mit drei oder mehr Links, und ein Formular, das länger als 3 Stunden offen stand. Beide melden Klartext, was zu tun ist, und nennen die Support-Adresse als Ausweichweg.
+
+**Noch offen / an Josip:**
+
+1. **Deploy nötig** — der Schutz greift erst nach `npm run deploy` (nur Josip, CLAUDE.md §4.6). Bis dahin ist das Formular live unverändert offen.
+2. **`support_email` je Mandant setzen** (Admin-Einstellungen): solange `salestalent` und `demo-blau` keine eigene Adresse haben, landet jede Anfrage dieser Mandanten — auch der durchgelassene Spam — in Josips Postfach statt beim Mandanten.
+3. Unabhängig vom Vorfall gefunden, unverändert offen (Supabase-Advisor): `marketplace_ledger` und `platform_settings` haben RLS aktiviert, aber keine einzige Policy (damit für alle Rollen dicht — funktional gewollt, aber besser explizit dokumentiert), `btree_gist` liegt im `public`-Schema, und **Leaked Password Protection ist in Supabase Auth deaktiviert** (ein Klick im Dashboard, prüft Passwörter gegen HaveIBeenPwned).
+
+### Nachtrag: Cloudflare Turnstile als sechste Schicht (25.08.2026)
+
+Josips Entscheidung nach dem obigen Befund: die als „nächste Eskalationsstufe" genannte CAPTCHA-Schicht wird gebaut. Umgesetzt als **abschaltbare Schicht** — solange keine Schlüssel gesetzt sind, verhält sich das Formular exakt wie im Block davor, es gibt also keinen Zwischenzustand, in dem etwas halb aktiv ist.
+
+1. `src/lib/security/turnstile.ts` (NEU, `server-only`) — `verifyTurnstile()` gegen Cloudflares `siteverify`-Endpunkt, mit `remoteip` aus `cf-connecting-ip` und 10-Sekunden-Zeitlimit. Vier Ergebnisse: `skipped` (nicht konfiguriert), `ok`, `failed` (Token fehlt, gefälscht, abgelaufen oder bereits benutzt → Ablehnung) und `unavailable`. **Fail-open bei `unavailable`** — gleiche Abwägung wie beim Rate-Limiter: ein Ausfall bei Cloudflare darf keine echte Kundenanfrage verschlucken, und fünf weitere Schichten greifen unabhängig davon. Ein ungültiges Token führt dagegen immer zur Ablehnung; das ist kein Ausfall, sondern ein Befund.
+2. `src/components/security/turnstile-widget.tsx` (NEU) — explizites Rendern per `turnstile.render()` statt des impliziten `class="cf-turnstile"`-Modus (das Formular ist eine Client-Komponente, das Ziel-Element existiert beim Skriptstart nicht zwingend). **Turnstile-Token sind einmalig:** nach einer fehlgeschlagenen Absendung wäre der zweite Versuch an `timeout-or-duplicate` gescheitert — die Komponente nimmt deshalb ein `resetSignal` (den Fehlerzustand des Formulars) und setzt das Widget bei jeder Änderung zurück. Sprache fest auf `de`, damit die Aufgabe nicht in der Browsersprache erscheint. Bewusst generisch gehalten, also ohne Änderung auch vor Login/Registrierung/Passwort-Reset hängbar.
+3. `contact/actions.ts` — Prüfung als vierte Schicht, direkt **nach** dem IP-Rate-Limit: eine Flut soll nicht ungebremst Anfragen an Cloudflares Endpunkt auslösen.
+4. `env.ts` + `.env.example` — `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (öffentlich, steht ohnehin im HTML) und `TURNSTILE_SECRET_KEY` (nur serverseitig), beide optional.
+5. Tests: `src/lib/security/turnstile.test.ts` (6 Fälle) — abgeschaltet ohne Schlüssel und ohne Netzaufruf, abgeschaltet auch wenn nur einer der beiden Schlüssel gesetzt ist, gültiges Token, fehlendes/leeres Token ohne Netzaufruf, verbrauchtes Token, und beide Ausfallwege (503 und Netzfehler) als fail-open.
+
+**Verifikation:** `npm run lint` → 0 Fehler, `npx tsc --noEmit` → 0 Fehler, `npx vitest run` → 701 grün (24 neu insgesamt in diesem Block); die beiden roten Dateien sind unverändert die `.env`-abhängigen aus der Sitzungsumgebung. `npx next build` mit Platzhalter-Env → erfolgreich. **Secret-Scan im Client-Bundle** (mit absichtlich unterscheidbaren Platzhaltern, weil ein erster Durchlauf mit identischen Werten einen Fehlalarm erzeugte): Site Key und Anon Key sind wie vorgesehen im Bundle, `TURNSTILE_SECRET_KEY` und `SUPABASE_SERVICE_ROLE_KEY` **nicht** — im Client-Chunk steht nur der zod-Schemaname `TURNSTILE_SECRET_KEY:` ohne Wert, genau wie bei den bestehenden `STRIPE_SECRET_KEY`/`CRON_PROCESS_SECRET` (CLAUDE.md §2.2 eingehalten). Keine Content-Security-Policy im Projekt, das Widget-Skript wird also nicht blockiert.
+
+**Was Josip tun muss, damit Turnstile scharf wird** (die Widget-Erstellung geht nicht per MCP — die Cloudflare-Tools dieser Sitzung decken nur D1/KV/R2/Workers ab, nicht Turnstile):
+
+1. Cloudflare-Dashboard → **Turnstile** → *Add Widget*. Modus **Managed**, Domains: `academy.calltalent.ai`, `salestalent.app`, jede weitere Mandanten-Domain und für lokale Tests `localhost`.
+2. Beide erzeugten Werte als Worker-Variablen eintragen: `NEXT_PUBLIC_TURNSTILE_SITE_KEY` als normale Variable, `TURNSTILE_SECRET_KEY` als **Secret**.
+3. `npm run deploy` — ab dann greift die Prüfung von selbst.
+4. Für lokale Entwicklung und Playwright gibt es Cloudflares Test-Schlüssel, die immer bestehen: Site Key `1x00000000000000000000AA`, Secret `1x0000000000000000000000000000000AA`. Damit läuft die E2E-Suite ohne echte Challenge.
+
+**Risiko/Abwägung:** Das Widget lädt ein Skript von `challenges.cloudflare.com` — der erste Drittanbieter im Frontend dieses Projekts. Turnstile setzt keine Cookies und ist nicht auf Nutzerprofilbildung ausgelegt, die IP-Verarbeitung gehört aber in die Datenschutzerklärung (Art. 6 Abs. 1 lit. f DSGVO, berechtigtes Interesse Spam-Abwehr). **Der Abschnitt fehlt dort noch** — nachtragen, bevor Turnstile scharfgeschaltet wird, nicht danach.
+
+**Nachtrag Datenschutzerklärung (25.08.2026):** Der oben als offen vermerkte Punkt ist erledigt. Die Mandanten-Datenschutzerklärung (`src/app/(legal)/privacy/page.tsx`, Texte in `messages/{de,en,bs}.json` unter `legal.privacy`) hat einen neuen Abschnitt **„Spam- und Bot-Schutz"** zwischen „Cookies und Sitzung" und „Speicherdauer":
+
+1. `botText` (immer sichtbar) beschreibt die tatsächlich stattfindende Verarbeitung: IP-Adresse, Absendezeitpunkt und Formularinhalt, die drei Limit-Ebenen, die automatische Spam-Einstufung und ausdrücklich, dass abgewiesene Nachrichten weder zugestellt noch gespeichert werden (protokolliert wird nur die Abweisung ohne Inhalt). Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO.
+2. `botTurnstile` wird **nur gerendert, wenn Turnstile wirklich konfiguriert ist** (`isTurnstileConfigured()`). Eine Erklärung, die eine Übermittlung an Cloudflare behauptet, die gar nicht stattfindet, wäre genauso falsch wie eine, die eine stattfindende verschweigt — und es entfällt die Reihenfolge-Falle: Josip setzt die Schlüssel, der Absatz erscheint von selbst.
+3. Cloudflare stand als Auftragsverarbeiter („Auslieferung der Anwendung und Schutz vor Angriffen") bereits in der Liste, die Drittlandsübermittlung in die USA deckt der bestehende Abschnitt „Übermittlung in Drittländer" ab — beide blieben unverändert.
+4. `LEGAL_LAST_UPDATED` auf `2026-08-25` gesetzt (die Datei verlangt das bei jedem inhaltlichen Eingriff). Impressum und AGB sind inhaltlich unverändert, teilen sich aber diese eine Stand-Konstante und zeigen deshalb ebenfalls das neue Datum.
+5. **Marketplace-Datenschutzseite bewusst nicht angefasst:** `/kontakt` wird auf dem Marketplace- und dem Portal-Host per `decideRouting()` auf `/marketplace/kontakt` bzw. `/portal/kontakt` umgeschrieben — beide Routen existieren nicht. Das Formular und damit Turnstile laufen ausschließlich auf Mandanten-Hosts.
+
+Verifikation: `npx vitest run` → 701 grün (der Schlüsselparitätstest `src/i18n/messages.test.ts` deckt ab, dass de/en/bs dieselben neuen Schlüssel haben), `npm run lint` und `npx tsc --noEmit` → 0 Fehler, `npx next build` → erfolgreich. Anwaltliche Prüfung bleibt wie für die übrigen Rechtstexte empfohlen.
+
 ## Bugfixes: Positions-Duplikate, Versuchslimit-Race, Shuffle nach Absenden (07.09.2026, builder)
 
 Drei Fehler aus dem Prüflauf vom 07.09.2026 behoben (gefunden von einem lesenden Prüf-Agenten, nicht vom tester). Geändert ausschließlich `src/lib/courses/actions.ts`, `src/lib/quiz/actions.ts`, `src/components/learn/quiz-runner.tsx` sowie zwei neue Migrationsdateien — parallel arbeiteten andere Agenten an Reporting/Zertifikaten/Kalender/Planung/Marketplace, keine Berührung mit deren Dateien.

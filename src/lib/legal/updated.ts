@@ -6,5 +6,9 @@
  *
  * 24.08.2026: Erstfassung der Mandanten-Rechtstexte unter der Calltalent LLC
  * (Wyoming, USA) — vorher gab es auf Mandanten-Domains keine Rechtstexte.
+ * 25.08.2026: Datenschutzerklärung um den Abschnitt "Spam- und Bot-Schutz"
+ * erweitert (Folge des Spam-Vorfalls am Kontaktformular). Impressum und AGB
+ * sind inhaltlich unverändert, teilen sich aber bewusst diese eine
+ * Stand-Konstante.
  */
-export const LEGAL_LAST_UPDATED = "2026-08-24";
+export const LEGAL_LAST_UPDATED = "2026-08-25";

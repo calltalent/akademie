@@ -37,6 +37,11 @@ const publicSchema = z.object({
   // Push-Dienst, ist kein Geheimnis) — das Gegenstück
   // VAPID_PRIVATE_KEY liegt bewusst in serverOnlySchema.
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: optionalString,
+  // Bot-Schutz Kontaktformular (25.08.2026, Folge des Spam-Vorfalls —
+  // src/lib/security/turnstile.ts): Cloudflare-Turnstile-Site-Key. Öffentlich
+  // (steht im HTML des Widgets), das Gegenstück TURNSTILE_SECRET_KEY liegt in
+  // serverOnlySchema. Beide optional — ohne sie bleibt Turnstile aus.
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: optionalString,
 });
 
 const serverOnlySchema = z.object({
@@ -65,6 +70,7 @@ const serverOnlySchema = z.object({
   // Push-Dienst bei Problemen den Absender kontaktieren muss.
   VAPID_PRIVATE_KEY: optionalString,
   VAPID_SUBJECT: optionalString,
+  TURNSTILE_SECRET_KEY: optionalString,
 });
 
 function parsePublicEnv() {
@@ -74,6 +80,7 @@ function parsePublicEnv() {
     NEXT_PUBLIC_PORTAL_HOST: process.env.NEXT_PUBLIC_PORTAL_HOST,
     NEXT_PUBLIC_MARKETPLACE_HOST: process.env.NEXT_PUBLIC_MARKETPLACE_HOST,
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   });
   if (!result.success) {
     throw new Error(
@@ -99,6 +106,7 @@ function parseServerEnv() {
     CRON_PROCESS_SECRET: process.env.CRON_PROCESS_SECRET,
     VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
     VAPID_SUBJECT: process.env.VAPID_SUBJECT,
+    TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
   });
   if (!result.success) {
     throw new Error(
