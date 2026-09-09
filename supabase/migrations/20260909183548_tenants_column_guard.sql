@@ -70,9 +70,17 @@ create policy tenants_admin_update on public.tenants
 -- BEWUSST OHNE `security definer`: die Funktion muss `current_user` sehen,
 -- also die Rolle, unter der die Anweisung tatsaechlich laeuft. Mit
 -- `security definer` waere das immer der Eigentuemer der Funktion.
--- PostgREST setzt fuer Client-Anfragen `authenticated` bzw. `anon`, fuer den
--- Admin-Client `service_role`; Migrationen laufen als `postgres` oder
--- `supabase_admin`. Nur die ersten beiden werden eingeschraenkt.
+-- Empirisch geprueft am 09.09.2026: `set local role authenticated` laesst
+-- `current_user` auf 'authenticated' stehen, waehrend `session_user`
+-- 'postgres' bleibt -- genau das Verhalten, auf dem diese Pruefung aufsetzt.
+--
+-- Die Pruefung ist eine ERLAUBNISLISTE, keine Sperrliste. Eine Sperrliste
+-- ('authenticated','anon') wuerde bei einer kuenftigen, hier unbekannten
+-- Rolle stillschweigend oeffnen. Die Erlaubnisliste schliesst stattdessen:
+-- wer nicht genannt ist, darf die Betreiber-Schluessel nicht aendern. Die
+-- drei Rollen sind gegen `pg_roles` geprueft; `service_role` ist die Rolle
+-- des Admin-Clients (createAdminClient), `postgres` und `supabase_admin`
+-- fahren Migrationen und Dashboard-Eingriffe.
 create or replace function public.tenants_operator_settings_guard()
 returns trigger
 language plpgsql
@@ -92,7 +100,7 @@ declare
   bewahrt jsonb := '{}'::jsonb;
   schluessel text;
 begin
-  if current_user not in ('authenticated', 'anon') then
+  if current_user in ('postgres', 'supabase_admin', 'service_role') then
     return new;
   end if;
 

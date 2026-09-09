@@ -4364,3 +4364,59 @@ der Live-Datenbank stehen 0 Kurse, es ist heute nichts exponiert.
 Die drei Migrationen sind nicht angewendet. Ein Testlauf gegen eine
 Wegwerf-Datenbank war hier nicht möglich: kein lokaler Postgres-Server, kein
 Docker-Daemon.
+
+## Sofort-Liste, Teil 2 angewendet: H3, K2, K1 in der Live-Datenbank (09.09.2026)
+
+Freigabe von Josip im Chat nach CLAUDE.md §4.6. Alle drei Migrationen laufen,
+jede einzeln gegengeprüft. Vor dem Eingriff wurde der Ist-Zustand gesichert
+(Funktionskörper, Policy-Ausdruck, Constraint-Definition).
+
+**Eine Korrektur vorab.** Der K2-Trigger prüfte in der geschriebenen Fassung
+`current_user not in ('authenticated','anon')`, also eine Sperrliste. Bei
+einer künftigen, dort nicht genannten Rolle hätte er stillschweigend
+geöffnet. Vor dem Anwenden auf eine Erlaubnisliste umgestellt:
+`current_user in ('postgres','supabase_admin','service_role')`. Die drei
+Rollen sind gegen `pg_roles` geprüft. Empirisch bestätigt, dass
+`set local role authenticated` den `current_user` tatsächlich auf
+`authenticated` setzt, während `session_user` `postgres` bleibt.
+
+**Live-Versionen:** `20260909183521` (H3), `20260909183548` (K2),
+`20260909183704` (K1). Die Repo-Dateien wurden auf genau diese Nummern
+umbenannt, damit der Drift aus H26 nicht weiter wächst. Damit stimmen für
+diese drei Migrationen Repo und Live-Datenbank überein.
+
+**Gegenprüfung H3.** `member_role` steht im Funktionskörper nur noch im
+Kommentar, die Bedingung läuft über `can_participate`. Rechte:
+`authenticated=EXECUTE`, `service_role=EXECUTE`, kein `anon`.
+
+**Gegenprüfung K2, vier Fälle, alle in einer Transaktion mit Rollback.**
+
+1. Mandanten-Admin versucht `tutor_enabled` auf false und
+   `marketplace_commission_bp` auf 0 zu setzen, zusammen mit einer erlaubten
+   Änderung: `tutor_enabled` blieb `true`, die Provision blieb ungesetzt,
+   `self_signup_enabled` wurde übernommen. Der Trigger greift also punktgenau.
+2. Mandanten-Admin versucht `plan = 'enterprise'`: abgewiesen mit
+   `42501 permission denied for table tenants`.
+3. Mandanten-Admin versucht `custom_domain = 'academy.calltalent.ai'`:
+   dieselbe Abweisung. Damit ist der Weg zu, über den ein fremder Mandant
+   offline genommen werden konnte.
+4. Betreiber über `service_role` setzt `plan`, `tutor_enabled` und
+   `marketplace_commission_bp`: alle drei gehen durch. Das Betreiber-Portal
+   bleibt voll handlungsfähig.
+
+Spaltenrechte nach der Migration: `authenticated` darf nur noch `branding`,
+`legal`, `name` und `settings` ändern, `anon` gar keine Spalte mehr. Die
+Policy hat jetzt zusätzlich `with check`.
+
+**Gegenprüfung K1.** `memberships_source_check` erlaubt jetzt `invite`,
+`import`, `marketplace` und `purchase`.
+
+**Daten unverändert:** 3 Mandanten, 5 Mitgliedschaften, `demo-blau` steht
+weiterhin auf Name „Demo Blau", Plan `komplett`, `tutor_enabled` true,
+`default_locale` de. Alle Testtransaktionen wurden zurückgerollt.
+
+**Advisor nach dem Eingriff:** keine neuen Befunde. Die 17 `anon`-Einträge
+zu SECURITY-DEFINER-Funktionen, `btree_gist` im public-Schema, die zwei
+Tabellen mit RLS ohne Policy und die abgeschaltete
+Leaked-Password-Protection bestanden alle vorher. `submit_quiz_attempt`
+taucht in der `anon`-Liste nicht mehr auf.
