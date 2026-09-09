@@ -4544,3 +4544,31 @@ aus welchem gescheiterten Lauf stammt.
 die Warnung im Protokoll erscheint. Er funktioniert, der Wächter löst ihn
 heraus. Sauber setzen heißt: im Cloudflare-Dashboard den Kopier-Knopf am Token
 nehmen, nicht den an der curl-Zeile darunter, und das Secret neu eintragen.
+
+## Aufräumpunkte erledigt: Token sauber, Actions auf v7 (09.09.2026, 21:59 UTC)
+
+Lauf `34406716593`, Versuch 2: erfolgreich in 3 Minuten 39 Sekunden, ohne eine
+einzige Warnung. Damit sind beide offenen Kleinigkeiten geschlossen.
+
+**Der Token hat 53 Zeichen.** Cloudflares eigene Prüfung
+(`/user/tokens/verify`) antwortet mit `"status":"active"` und
+`"This API Token is valid and active"`. Das belegt endgültig, dass ein
+Cloudflare-API-Token nicht 40 Zeichen haben muss. Die ursprüngliche Regel
+„genau 40" im Wächter hätte genau diesen echten, funktionierenden Token
+dauerhaft abgewiesen. Die Rücknahme dieser Annahme war also nicht nur
+vertretbar, sondern notwendig.
+
+**Actions in v7 bestätigt.** Die Schrittnamen im Protokoll lauten
+`Run actions/checkout@v7` und `Run actions/setup-node@v7`, die
+Node-20-Abkündigungswarnung erscheint nicht mehr.
+
+**Kein Extraktions-Hinweis mehr.** Die Warnung „Der Token wurde eindeutig
+herausgeloest" bleibt aus, das Secret enthält jetzt nur noch den Token.
+
+**Lehre für die nächste Fehlersuche.** Vier der acht gescheiterten Läufe
+gingen auf den Wert im Secret zurück, und keiner davon war am Protokoll allein
+zu klären. Entschieden hat erst die lokale Gegenprobe gegen
+`/user/tokens/verify`: sie trennt „Wert falsch übertragen" von „Token
+ungültig" von „Berechtigung fehlt", bevor eine Freigabe verbraucht wird. Bei
+einem Secret, das dreimal hintereinander abgelehnt wird, gehört dieser Test an
+den Anfang, nicht ans Ende.
