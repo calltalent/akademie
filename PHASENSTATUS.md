@@ -3893,3 +3893,13 @@ Nachgetragen in: `lib/legal/company.ts` (`registrationNumber`), `tenants.legal.e
 
 **Weiterhin offen:** Vertreter in der Union nach Art. 27 DSGVO (Platzhalter steht sowohl im AVV als auch in der Website-Datenschutzerklärung); anwaltliche Prüfung.
 5. `SALESTALENT-BRANDING.md` §3 hielt fest, die Copyright-Zeile im Login (`login_copyright: "SalesTalent. All rights reserved."`) bleibe neutral, „bis die Rechtsträger-Frage geklärt ist". Sie ist jetzt geklärt — ob dort künftig „SalesTalent, a Calltalent LLC brand" o. Ä. stehen soll, ist eine Marken-Entscheidung von Josip, keine technische; unverändert gelassen.
+
+## Projektanalyse „Was funktioniert nicht, was fehlt, was verbessern" (08./09.09.2026)
+
+Josips Auftrag per Swarm-Kommando. Ergebnis: `PROJEKTANALYSE_2026-09-08.md` (596 Zeilen) auf Branch `claude/projekt-analyse-verbesserungen-2498k4`, Commits `5a3cc7c` und `78ea9f1`.
+
+**Vorgehen:** Baseline auf `main` (tsc 0, ESLint 0, Vitest 694 grün), Live-Abgleich per Supabase- und Cloudflare-MCP (nur lesend), drei ungemergte Branches gelesen, 11 lesende Bereichs-Prüfagenten plus Synthese; die automatische Gegenprüfung fiel dem Sitzungslimit zum Opfer, kritische und hohe Befunde wurden vom Orchestrator selbst am Code bestätigt.
+
+**Kernbefunde:** 217 Funde (3 kritisch, 44 hoch). `main` ist nicht der deployte Stand (Worker vom 08.09. 08:19 UTC, `main` vom 24.08.; Ruflo-Branch mit drei live angewendeten Migrationen ungemergt). Live-DB: 0 Kurse, 110 Auth-Konten, davon 100 `testN@example.com` vom 10.07. Kritisch: Stripe-Kauf ohne Mitgliedschaft ergibt keinen Zugriff (`webhook/route.ts:175`); `tenants_admin_update` ohne Spaltenbeschränkung (`0001_init.sql:442`). Hoch u. a.: Einschreibungen steuern keinen Zugriff, `submit_quiz_attempt` sperrt Gäste (Regression 07.09.), Lektionsreihenfolge bei mehreren Sektionen, Webhook-Retry wird nie aufgerufen, Portal-Status „Trial" schaltet die Akademie ab, Löschanträge werden nie ausgeführt, KI-Kostensätze seit 01.09. veraltet.
+
+**Nächste Schritte (Abschnitt 5.1 des Dokuments):** Branches mergen und von `main` deployen, H3/K2/K1/H6/H7/H21 beheben, Testkonten löschen, Supabase-Dashboard-Schalter, KI-Modell auf `claude-sonnet-5`, Barrierefreiheits-Sofortpaket. Entscheidungen für Josip in Abschnitt 6, zuerst: Zielkunde der nächsten 30 Tage (interne Akademie oder Kursverkäufer).
