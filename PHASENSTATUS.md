@@ -4490,3 +4490,43 @@ Sechs Fälle getestet, darunter ein sauberer Token mit 53 Zeichen
 **Nebenbefund ohne Handlungsbedarf.** GitHub meldet, dass `actions/checkout@v4`
 und `actions/setup-node@v4` auf Node 20 zeigen und deshalb auf Node 24
 gezwungen werden. Beide laufen, ein Wechsel auf `@v5` ist irgendwann fällig.
+
+## Erster Deploy über GitHub Actions erfolgreich (09.09.2026, 21:13 UTC)
+
+Lauf `34404447666`, Versuch 2. `Deployt aus d185d54 auf https://academy.calltalent.ai`,
+Dauer 2 Minuten 35 Sekunden. Damit sind H30, H35, H36 und der Webhook-Teil von
+K1 in Produktion.
+
+**Der Weg dorthin brauchte fünf Anläufe, vier davon wegen des Cloudflare-Tokens.**
+Der Reihe nach, weil jeder Schritt etwas anderes zeigte:
+
+1. Lauf 5: `Headers.set: "..." is an invalid header value`. Zeilenumbruch im
+   Secret. Scheiterte erst nach drei Minuten Build.
+2. Lauf 6: `Invalid format for Authorization header [code: 6111]`. Mein
+   Entfernen allen Leerraums hatte die Bruchstücke zusammengeklebt und die
+   Diagnose verschleiert.
+3. Lauf 7: Wächter bricht nach 7 Sekunden ab, gemessene Länge 145. Das ist die
+   Länge der curl-Beispielzeile, die Cloudflare unter dem Token anzeigt. Token
+   und Beispiel haben je einen eigenen Kopier-Knopf, direkt untereinander.
+4. Lauf 8: Länge 53, kein 40-Zeichen-Block gefunden. Hier lag der Fehler bei
+   mir: „genau 40 Zeichen" war eine Annahme über Cloudflares Format, die dieser
+   Workflow nicht treffen muss. Zurückgenommen.
+5. Lauf 9, Versuch 1: `/zones/e6a00ac5.../workers/routes` scheitert mit
+   `Authentication error [code: 10000]`. Dem Token fehlte die Zone-Berechtigung
+   `Workers Routes`. `wrangler.jsonc` trägt vier Routen auf zwei Zonen ein.
+   Der Fehler kam vor dem Hochladen, es wurde nichts ausgeliefert.
+6. Lauf 9, Versuch 2 nach Ergänzung der Berechtigung: erfolgreich.
+
+**Was daran gut lief.** Die Umgebungsregel hat jeden einzelnen Lauf angehalten,
+bis Josip freigab. Der Wächter hat ab Lauf 7 in Sekunden statt in Minuten
+geantwortet und die Ursache jedes Mal beim Namen genannt. Kein einziger der
+gescheiterten Läufe hat etwas ausgeliefert.
+
+**Neu: `paths-ignore` im Deploy-Workflow** für `**.md`, `PRIPREMA/**` und
+`ZAKONI/**`. Ein Commit, der nur Dokumentation ändert, fordert damit keine
+Deploy-Freigabe mehr an. `ci.yml` prüft weiterhin jeden Push.
+
+**Offen:** Der Token trägt weiterhin zusätzlichen Text, solange die Warnung im
+Protokoll erscheint. Funktioniert, gehört bei Gelegenheit sauber gesetzt.
+Ebenso offen: `actions/checkout` und `actions/setup-node` auf `@v5` heben,
+GitHub meldet Node 20 als abgekündigt.

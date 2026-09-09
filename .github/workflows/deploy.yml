@@ -11,6 +11,14 @@ name: Deploy
 on:
   push:
     branches: [main]
+    # Ein Commit, der ausschliesslich Dokumentation aendert, braucht keinen
+    # Deploy und soll Josip keine Freigabe abverlangen. `paths-ignore` greift
+    # nur, wenn ALLE geaenderten Dateien passen; sobald Code dabei ist, laeuft
+    # der Workflow normal. `ci.yml` prueft weiterhin jeden Push.
+    paths-ignore:
+      - "**.md"
+      - "PRIPREMA/**"
+      - "ZAKONI/**"
   workflow_dispatch:
 
 # Zwei gleichzeitige Deploys wuerden sich gegenseitig ueberschreiben.
