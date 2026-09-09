@@ -32,9 +32,12 @@
     "sanitize-html": "^2",
     "stripe": "^18",
     "tus-js-client": "^4",
-    "unpdf": "^0.12",
+    "unpdf": "^1.8",
     "web-push": "^3",
     "zod": "^3"
+  },
+  "overrides": {
+    "sharp": "0.35.4"
   },
   "devDependencies": {
     "@next/env": "16.3.4",

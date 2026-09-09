@@ -83,9 +83,15 @@ jobs:
     name: Bekannte Schwachstellen
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Blockiert den Merge nicht: eine neue Meldung in einer Abhaengigkeit soll
-    # sichtbar sein, aber nicht die Arbeit anhalten. Der Wert liegt im Signal.
-    continue-on-error: true
+    # Blockierend, weil die Produktionsabhaengigkeiten seit dem 09.09.2026
+    # sauber sind (0 Meldungen). Ein Schritt, der immer durchgeht, wird nach
+    # zwei Wochen nicht mehr gelesen.
+    #
+    # Geht er rot, zuerst `npm audit --omit=dev` lesen und die Ursache
+    # bestimmen. `npm audit fix --force` NICHT blind ausfuehren: am 09.09.
+    # haette es @opennextjs/cloudflare von 1.20 auf 1.1.0 heruntergestuft.
+    # Entwicklungsabhaengigkeiten sind hier bewusst ausgenommen, sie laufen
+    # nie in Produktion.
     steps:
       - uses: actions/checkout@v4
 

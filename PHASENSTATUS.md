@@ -4169,12 +4169,8 @@ Josip beziehungsweise künftig beim Deploy-Workflow.
 jedem Push auf `main`, in drei Jobs. Erstens Typprüfung, ESLint, Vitest und
 `next build`. Zweitens `opennextjs-cloudflare build` als Worker-Smoke, weil
 der reine Next-Build die Fehlerklasse vom 14.07.2026 nicht zeigt (lokal grün,
-Deploy kaputt). Drittens `npm audit --omit=dev --audit-level=high`, bewusst
-mit `continue-on-error`, damit eine neue Meldung sichtbar wird, ohne die
-Arbeit anzuhalten. Der Audit meldet heute acht Schwachstellen, sieben hoch und
-eine kritisch, aus zwei Ketten: `unpdf` über `canvas` und
-`@mapbox/node-pre-gyp` auf `tar`, sowie `@opennextjs/cloudflare` über
-`wrangler` und `miniflare` auf `sharp`.
+Deploy kaputt). Drittens `npm audit --omit=dev --audit-level=high`,
+blockierend, siehe den folgenden Abschnitt zu den Schwachstellen.
 
 **Neu: `.github/workflows/deploy.yml`.** Läuft bei Push auf `main` und per
 Hand, hängt an der GitHub-Umgebung `production`. Trägt Josip sich dort als
@@ -4194,3 +4190,54 @@ Workflows, damit CI und Josips Rechner dieselbe Node-Version benutzen.
 Variablen, Umgebung `production`, Branch-Schutz auf `main`). Die drei
 Statusprüfungen erscheinen in der Auswahlliste des Rulesets erst, nachdem
 `ci.yml` einmal gelaufen ist.
+
+## Schwachstellen der Abhängigkeiten geprüft und behoben (09.09.2026)
+
+Josips Auftrag, die Audit-Angabe aus dem CI-Block nachzuprüfen. Die Prüfung
+hat die eigene erste Darstellung teilweise widerlegt.
+
+**Was falsch war:** Von den acht gemeldeten Paketen waren drei überhaupt nicht
+installiert. `canvas`, `@mapbox/node-pre-gyp` und `tar` stehen im Lockfile mit
+`optional: true`, weil `unpdf@0.12.2` `canvas` als optionale Abhängigkeit
+führt. `npm audit` liest das Lockfile und meldet sie trotzdem. Ebenso war
+`sharp@0.35.4` in `node_modules/sharp` bereits die gepatchte Fassung; verwundbar
+war allein die verschachtelte `node_modules/miniflare/node_modules/sharp@0.35.2`,
+die `miniflare` exakt pinnt. Der Meldungsbereich der Warnung ist `<0.35.4`.
+
+**Was behoben ist.** `unpdf` von `^0.12` auf `^1.8` (installiert 1.8.1): die
+1.x-Reihe ersetzt `canvas` durch `@napi-rs/canvas`, das nur vorgebaute
+Plattform-Binärpakete mitbringt, kein `node-pre-gyp` und kein `tar`. Damit
+verschwindet die kritische Kette vollständig. Dazu ein `overrides`-Eintrag
+`"sharp": "0.35.4"` in `package.json`, der die gepinnte 0.35.2 unter
+`miniflare` mit anhebt. Ergebnis: `npm audit --omit=dev` meldet 0
+Schwachstellen, vorher 8.
+
+**Warum nicht `npm audit fix --force`:** Der Vorschlag von npm war für die
+OpenNext-Kette `@opennextjs/cloudflare@1.1.0`, also eine Herabstufung von
+1.20.1 um eine Hauptversion zurück. Für die unpdf-Kette schlug npm dieselbe
+Zielversion vor, die jetzt von Hand gesetzt ist.
+
+**Nicht behoben, mit Begründung.** In den Entwicklungsabhängigkeiten bleiben
+fünf Meldungen. Sie laufen über `jsdom@25`, das `canvas@^2.11.2` als
+optionalen Peer deklariert; `canvas` ist auch hier nicht installiert. Der
+Sprung auf `jsdom@26` (Peer `canvas@^3`, ohne `tar`-Kette) wurde versucht und
+wieder verworfen: npm 10.9.7 bricht beim Auflösen mit
+`Cannot read properties of null (reading 'edgesOut')` ab, reproduzierbar auch
+nach vollständigem Neuaufbau von `node_modules` und Lockfile. Das ist ein
+Fehler im npm-Resolver bei optionalen Peer-Abhängigkeiten, nicht im Projekt.
+Wiederholen, sobald npm das behoben hat. Zwei weitere moderate Meldungen
+betreffen `@vitest/mocker` in Vitest 4.1.10; 4.1.11 wäre gepatcht, löst aber
+denselben Resolver-Fehler aus.
+
+**`unpdf` war ein Hauptversionssprung ohne Testabdeckung.** `extractTextFromPdf`
+in `src/lib/generator/extract.ts` ist die einzige Stelle, die den
+unpdf-Vertrag benutzt (`getDocumentProxy` und `extractText(pdf,
+{ mergePages: true })`), und hatte keinen Test. Erst als Laufzeitprobe mit
+einem per `pdf-lib` erzeugten PDF geprüft, danach drei Testfälle in
+`src/lib/generator/extract.test.ts` ergänzt: Text einer Seite auslesen,
+mehrere Seiten zusammenführen, und ein PDF ohne Textlayer muss werfen.
+
+**Verifikation:** `tsc --noEmit` 0 Fehler, `eslint` 0 Fehler, `vitest run`
+774 von 774 grün (vorher 771), `opennextjs-cloudflare build` erfolgreich,
+`npm audit --omit=dev` 0 Meldungen. Der CI-Schritt „Bekannte Schwachstellen"
+ist deshalb von `continue-on-error` auf blockierend umgestellt.

@@ -87,14 +87,21 @@ Bei jedem Push auf `main` laufen dieselben Prüfungen noch einmal, danach
 wartet der Deploy auf deine Freigabe und liefert aus. `npm run deploy` von
 Hand brauchst du ab dann nicht mehr.
 
-## Bekannte Meldung im Prüfschritt „Bekannte Schwachstellen"
+## Der Prüfschritt „Bekannte Schwachstellen"
 
-`npm audit --omit=dev --audit-level=high` meldet heute acht Schwachstellen,
-sieben hoch und eine kritisch. Alle stammen aus zwei Ketten:
-`unpdf` über `canvas` und `@mapbox/node-pre-gyp` auf `tar` (kritisch), sowie
-`@opennextjs/cloudflare` über `wrangler` und `miniflare` auf `sharp`.
+`npm audit --omit=dev --audit-level=high` meldet seit dem 09.09.2026 null
+Schwachstellen in den Produktionsabhängigkeiten. Der Schritt blockiert
+deshalb, statt nur zu melden.
 
-Der Schritt ist deshalb auf `continue-on-error` gestellt und blockiert
-nichts. `npm audit fix --force` würde Hauptversionen anheben und den Build
-brechen; die beiden Ketten gehören einzeln geprüft, sobald der erste Kunde
-steht.
+Geht er rot, lies zuerst `npm audit --omit=dev` und bestimme die Ursache.
+Führe `npm audit fix --force` nicht blind aus: am 09.09. hätte es
+`@opennextjs/cloudflare` von 1.20 auf 1.1.0 heruntergestuft, also eine
+Hauptversion zurück.
+
+Entwicklungsabhängigkeiten sind ausgenommen. Dort stehen heute fünf
+Meldungen, alle über optionale Pakete, die gar nicht installiert werden:
+`jsdom` deklariert `canvas` als optionalen Peer, und darüber hängen
+`@mapbox/node-pre-gyp` und `tar`. Ein Sprung auf `jsdom@26` würde die Kette
+auflösen, bringt aber npm 10.9.7 beim Auflösen zum Absturz
+(`Cannot read properties of null (reading 'edgesOut')`). Das gehört
+wiederholt, sobald npm den Fehler behoben hat.
