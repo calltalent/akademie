@@ -4526,7 +4526,21 @@ gescheiterten Läufe hat etwas ausgeliefert.
 `ZAKONI/**`. Ein Commit, der nur Dokumentation ändert, fordert damit keine
 Deploy-Freigabe mehr an. `ci.yml` prüft weiterhin jeden Push.
 
-**Offen:** Der Token trägt weiterhin zusätzlichen Text, solange die Warnung im
-Protokoll erscheint. Funktioniert, gehört bei Gelegenheit sauber gesetzt.
-Ebenso offen: `actions/checkout` und `actions/setup-node` auf `@v5` heben,
-GitHub meldet Node 20 als abgekündigt.
+**Actions aktualisiert (09.09.2026, direkt danach).** `actions/checkout` und
+`actions/setup-node` von `@v4` auf `@v7` in beiden Workflows, acht Stellen.
+Damit ist die Node-20-Abkündigungswarnung weg. Meine erste Angabe „auf `@v5`
+heben" war falsch: der aktuelle Hauptstand beider Actions ist v7, nachgesehen
+statt geraten. `setup-node` v6 hatte die einzige nennenswerte Änderung
+(automatisches Cachen nur noch für npm); dieses Projekt setzt `cache: npm`
+ausdrücklich und ist davon nicht betroffen.
+
+Bei der Gelegenheit die Kommentare im Wächterschritt zusammengeführt. Durch
+die fünf aufeinanderfolgenden Korrekturen stand dort noch „genau 40 Zeichen",
+während der Code längst 20 prüfte. Ein Kommentar, der dem Code widerspricht,
+ist schlimmer als keiner. Der Block erzählt jetzt in einem Stück, welche Regel
+aus welchem gescheiterten Lauf stammt.
+
+**Offen, gehört Josip:** Der Token trägt weiterhin zusätzlichen Text, solange
+die Warnung im Protokoll erscheint. Er funktioniert, der Wächter löst ihn
+heraus. Sauber setzen heißt: im Cloudflare-Dashboard den Kopier-Knopf am Token
+nehmen, nicht den an der curl-Zeile darunter, und das Secret neu eintragen.

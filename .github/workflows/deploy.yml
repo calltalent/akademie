@@ -39,9 +39,9 @@ jobs:
       name: production
       url: https://academy.calltalent.ai
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -74,46 +74,34 @@ jobs:
           fi
           echo "Alle Pflichtvariablen gesetzt."
 
-          # Lauf 5 vom 09.09.2026 scheiterte nach drei Minuten Build an
-          # `Headers.set: "..." is an invalid header value`. Ursache war ein
-          # Zeilenumbruch im eingefuegten CLOUDFLARE_API_TOKEN: wrangler setzt
-          # ihn in einen Authorization-Header, und Header-Werte duerfen keinen
-          # Umbruch enthalten. Ein Einfuege-Artefakt, kein falscher Token.
+          # Der Waechter prueft NUR, ob der Wert ueberhaupt ein Token sein KANN:
+          # kein Leerraum, keine Anfuehrungszeichen, mindestens 20 Zeichen. Ob
+          # ein Token echt ist und die noetigen Rechte hat, weiss allein
+          # Cloudflare, und dessen Antworten sind eindeutig lesbar
+          # ("Authentication failed" code 9106, "Authentication error"
+          # code 10000). Ein Tor, das gueltige Werte abweist, ist schlimmer als
+          # eines, das eine Sekunde spaeter am richtigen Ort scheitert.
           #
-          # Ein Cloudflare-API-Token besteht aus 40 Zeichen aus Buchstaben,
-          # Ziffern, Bindestrich und Unterstrich. Nur AUSSEN wird Leerraum
-          # entfernt (Einfuege-Artefakt). Innen liegender Leerraum wird NICHT
-          # wegge-tr-t: Lauf 6 vom 09.09.2026 hat gezeigt, wohin das fuehrt.
-          # Dort klebte das Entfernen zwei Bruchstuecke zusammen, wrangler
-          # bekam eine Zeichenkette, die kein Token ist, und antwortete mit
-          # `Invalid format for Authorization header [code: 6111]` statt mit
-          # einer brauchbaren Diagnose. Ein zusammengeklebter Wert ist kein
-          # Token, sondern ein anderer Fehler.
-          # Trimmen per Bash-Parametererweiterung, nicht per sed oder grep:
-          # beide arbeiten ZEILENWEISE. Ein mehrzeiliger Wert haette die
-          # Pruefung sonst bestanden, sobald irgendeine Zeile passt. Genau das
-          # ist beim Testen aufgefallen, bevor es hier landen konnte.
+          # Die Regeln stammen aus fuenf gescheiterten Laeufen am 09.09.2026:
+          #   Lauf 5: Zeilenumbruch im Secret -> `Headers.set: "..." is an
+          #           invalid header value`, erst nach drei Minuten Build.
+          #   Lauf 6: alles an Leerraum zu entfernen klebte die Bruchstuecke
+          #           zusammen und verschleierte die Diagnose. Deshalb wird
+          #           heute nur AUSSEN getrimmt.
+          #   Lauf 7: 145 Zeichen, die curl-Beispielzeile aus dem Dashboard.
+          #   Lauf 8: 53 saubere Zeichen wurden abgewiesen, weil hier "genau 40"
+          #           stand. Diese Zahl war eine Annahme ueber Cloudflares
+          #           Format und ist zurueckgenommen.
+          #
+          # Getrimmt wird per Bash-Parametererweiterung, nicht per sed oder
+          # grep: beide arbeiten ZEILENWEISE, ein mehrzeiliger Wert haette die
+          # Pruefung bestanden, sobald irgendeine Zeile passt. `case` unten
+          # vergleicht dagegen die ganze Zeichenkette, auch ueber Zeilen hinweg.
           sauber="${CLOUDFLARE_API_TOKEN#"${CLOUDFLARE_API_TOKEN%%[![:space:]]*}"}"
           sauber="${sauber%"${sauber##*[![:space:]]}"}"
           if [ "$sauber" != "$CLOUDFLARE_API_TOKEN" ]; then
             echo "::warning::Leerraum am Anfang oder Ende von CLOUDFLARE_API_TOKEN entfernt."
           fi
-          # `case` vergleicht die ganze Zeichenkette, auch ueber Zeilen hinweg.
-          # Laenge exakt 40: der Global API Key hat 32 Hex-Zeichen und wuerde
-          # bei einer Spanne durchrutschen, funktioniert hier aber nicht.
-          # Der Waechter prueft NUR, ob der Wert ueberhaupt ein Token sein
-          # KANN: keine Leerzeichen, keine Umbrueche, keine Anfuehrungszeichen,
-          # nicht laecherlich kurz. Die Laenge wird bewusst NICHT auf 40
-          # festgenagelt.
-          #
-          # Lauf 8 vom 09.09.2026 hat gezeigt, warum: dort wurden 53 saubere
-          # Zeichen abgewiesen, weil hier vorher "genau 40" stand -- eine
-          # Annahme ueber Cloudflares Format, die dieser Workflow gar nicht
-          # treffen muss. Ob ein Token echt ist, weiss allein Cloudflare, und
-          # die Antwort darauf ist eindeutig und lesbar
-          # ("Authentication failed", code 9106). Ein Tor, das gueltige Werte
-          # abweist, ist schlimmer als eines, das eine Sekunde spaeter am
-          # richtigen Ort scheitert.
           gueltig() {
             case "$1" in
               *[!A-Za-z0-9_-]*) return 1 ;;
@@ -121,16 +109,12 @@ jobs:
             [ "${#1}" -ge 20 ]
           }
 
-          # Lauf 7 vom 09.09.2026 mass 145 Zeichen. Das ist die Laenge der
-          # Beispielzeile, die Cloudflare unter dem Token anzeigt:
-          #   curl "https://api.cloudflare.com/.../tokens/verify" \
-          #     -H "Authorization: Bearer <40 Zeichen>"
-          # Token und Beispiel haben je einen eigenen Kopier-Knopf, direkt
-          # untereinander. Statt den Lauf daran scheitern zu lassen, wird der
-          # Token herausgezogen: an jedem Zeichen ausserhalb des Token-Alphabets
-          # trennen und die Teilstuecke mit genau 40 Zeichen einsammeln. Nur
-          # wenn dabei GENAU EIN eindeutiger Kandidat bleibt, wird er benutzt.
-          # Bei mehreren waere die Wahl geraten, und Raten ist hier falsch.
+          # Steht im Secret mehr als der Token (Lauf 7: die curl-Beispielzeile,
+          # deren Kopier-Knopf direkt unter dem des Tokens sitzt), wird der
+          # Token herausgezogen: an jedem Zeichen ausserhalb des Alphabets
+          # trennen, Teilstuecke ab 20 Zeichen einsammeln. Nur wenn dabei GENAU
+          # EIN eindeutiger Kandidat bleibt, wird er benutzt. Bei mehreren waere
+          # die Wahl geraten, und Raten ist hier falsch.
           if ! gueltig "$sauber"; then
             kandidaten=$(printf '%s' "$sauber" | tr -c 'A-Za-z0-9_-' '\n' | awk 'length($0)>=20' | sort -u)
             anzahl=$(printf '%s' "$kandidaten" | grep -c . || true)
