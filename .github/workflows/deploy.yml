@@ -93,11 +93,33 @@ jobs:
           # `case` vergleicht die ganze Zeichenkette, auch ueber Zeilen hinweg.
           # Laenge exakt 40: der Global API Key hat 32 Hex-Zeichen und wuerde
           # bei einer Spanne durchrutschen, funktioniert hier aber nicht.
-          form_ok=1
-          case "$sauber" in
-            *[!A-Za-z0-9_-]*) form_ok=0 ;;
-          esac
-          if [ "$form_ok" -eq 0 ] || [ "${#sauber}" -ne 40 ]; then
+          gueltig() {
+            case "$1" in
+              *[!A-Za-z0-9_-]*) return 1 ;;
+            esac
+            [ "${#1}" -eq 40 ]
+          }
+
+          # Lauf 7 vom 09.09.2026 mass 145 Zeichen. Das ist die Laenge der
+          # Beispielzeile, die Cloudflare unter dem Token anzeigt:
+          #   curl "https://api.cloudflare.com/.../tokens/verify" \
+          #     -H "Authorization: Bearer <40 Zeichen>"
+          # Token und Beispiel haben je einen eigenen Kopier-Knopf, direkt
+          # untereinander. Statt den Lauf daran scheitern zu lassen, wird der
+          # Token herausgezogen: an jedem Zeichen ausserhalb des Token-Alphabets
+          # trennen und die Teilstuecke mit genau 40 Zeichen einsammeln. Nur
+          # wenn dabei GENAU EIN eindeutiger Kandidat bleibt, wird er benutzt.
+          # Bei mehreren waere die Wahl geraten, und Raten ist hier falsch.
+          if ! gueltig "$sauber"; then
+            kandidaten=$(printf '%s' "$sauber" | tr -c 'A-Za-z0-9_-' '\n' | awk 'length($0)==40' | sort -u)
+            anzahl=$(printf '%s' "$kandidaten" | grep -c . || true)
+            if [ "$anzahl" -eq 1 ]; then
+              sauber="$kandidaten"
+              echo "::warning::CLOUDFLARE_API_TOKEN enthielt zusaetzlichen Text (${#CLOUDFLARE_API_TOKEN} Zeichen). Der Token wurde eindeutig herausgeloest und dieser Lauf benutzt ihn. Trage das Secret trotzdem sauber neu ein: im Cloudflare-Dashboard den Kopier-Knopf AM TOKEN nehmen, nicht den an der curl-Beispielzeile darunter."
+            fi
+          fi
+
+          if ! gueltig "$sauber"; then
             echo "::error::CLOUDFLARE_API_TOKEN hat nicht die Form eines Cloudflare-API-Tokens (genau 40 Zeichen aus A-Z a-z 0-9 _ -). Gemessene Laenge: ${#sauber}."
             echo "Haeufigste Ursachen:"
             echo "1. Es wurde der Global API Key eingetragen (32 Hex-Zeichen). Der braucht ein anderes Verfahren und funktioniert hier nicht."

@@ -4460,6 +4460,18 @@ Key mit 32 Hex-Zeichen durchgelassen, der hier nicht funktioniert; jetzt sind
 es exakt 40. Sechs Fälle getestet: echter Token, Umbruch außen, Beschriftung
 mitkopiert, Global API Key, doppelt eingefügt, leer.
 
+**Nachtrag, Lauf 7.** Der Wächter brach nach 7 Sekunden ab statt nach vier
+Minuten und nannte die Ursache: gemessene Länge 145. Das ist die Länge der
+Beispielzeile, die Cloudflare unter dem Token anzeigt
+(`curl ... -H "Authorization: Bearer <Token>"`). Token und Beispiel haben je
+einen eigenen Kopier-Knopf, direkt untereinander.
+
+Der Wächter löst den Token seither selbst heraus: an jedem Zeichen außerhalb
+des Token-Alphabets trennen, Teilstücke mit genau 40 Zeichen einsammeln, und
+nur wenn dabei genau ein eindeutiger Kandidat bleibt, wird er benutzt. Bei
+mehreren wird abgewiesen, weil die Wahl sonst geraten wäre. Fünf Fälle
+getestet, darunter zwei verschiedene Tokens im selben Wert (abgewiesen).
+
 **Nebenbefund ohne Handlungsbedarf.** GitHub meldet, dass `actions/checkout@v4`
 und `actions/setup-node@v4` auf Node 20 zeigen und deshalb auf Node 24
 gezwungen werden. Beide laufen, ein Wechsel auf `@v5` ist irgendwann fällig.
