@@ -72,20 +72,42 @@ jobs:
           # ihn in einen Authorization-Header, und Header-Werte duerfen keinen
           # Umbruch enthalten. Ein Einfuege-Artefakt, kein falscher Token.
           #
-          # Cloudflare-API-Tokens bestehen aus Buchstaben, Ziffern, Bindestrich
-          # und Unterstrich, nie aus Leerraum. Whitespace wird deshalb entfernt
-          # statt den Lauf abzubrechen, und der bereinigte Wert geht ueber
-          # GITHUB_ENV an die folgenden Schritte. Der Wert bleibt dabei
-          # maskiert, weil GitHub ihn als Secret kennt.
-          sauber=$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '[:space:]')
+          # Ein Cloudflare-API-Token besteht aus 40 Zeichen aus Buchstaben,
+          # Ziffern, Bindestrich und Unterstrich. Nur AUSSEN wird Leerraum
+          # entfernt (Einfuege-Artefakt). Innen liegender Leerraum wird NICHT
+          # wegge-tr-t: Lauf 6 vom 09.09.2026 hat gezeigt, wohin das fuehrt.
+          # Dort klebte das Entfernen zwei Bruchstuecke zusammen, wrangler
+          # bekam eine Zeichenkette, die kein Token ist, und antwortete mit
+          # `Invalid format for Authorization header [code: 6111]` statt mit
+          # einer brauchbaren Diagnose. Ein zusammengeklebter Wert ist kein
+          # Token, sondern ein anderer Fehler.
+          # Trimmen per Bash-Parametererweiterung, nicht per sed oder grep:
+          # beide arbeiten ZEILENWEISE. Ein mehrzeiliger Wert haette die
+          # Pruefung sonst bestanden, sobald irgendeine Zeile passt. Genau das
+          # ist beim Testen aufgefallen, bevor es hier landen konnte.
+          sauber="${CLOUDFLARE_API_TOKEN#"${CLOUDFLARE_API_TOKEN%%[![:space:]]*}"}"
+          sauber="${sauber%"${sauber##*[![:space:]]}"}"
           if [ "$sauber" != "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::warning::CLOUDFLARE_API_TOKEN enthielt Leerraum oder einen Zeilenumbruch und wurde fuer diesen Lauf bereinigt. Trage das Secret sauber neu ein."
+            echo "::warning::Leerraum am Anfang oder Ende von CLOUDFLARE_API_TOKEN entfernt."
           fi
-          if [ -z "$sauber" ]; then
-            echo "::error::CLOUDFLARE_API_TOKEN besteht nur aus Leerraum."
+          # `case` vergleicht die ganze Zeichenkette, auch ueber Zeilen hinweg.
+          # Laenge exakt 40: der Global API Key hat 32 Hex-Zeichen und wuerde
+          # bei einer Spanne durchrutschen, funktioniert hier aber nicht.
+          form_ok=1
+          case "$sauber" in
+            *[!A-Za-z0-9_-]*) form_ok=0 ;;
+          esac
+          if [ "$form_ok" -eq 0 ] || [ "${#sauber}" -ne 40 ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN hat nicht die Form eines Cloudflare-API-Tokens (genau 40 Zeichen aus A-Z a-z 0-9 _ -). Gemessene Laenge: ${#sauber}."
+            echo "Haeufigste Ursachen:"
+            echo "1. Es wurde der Global API Key eingetragen (32 Hex-Zeichen). Der braucht ein anderes Verfahren und funktioniert hier nicht."
+            echo "2. Beim Kopieren kam eine Beschriftung oder eine zweite Zeile mit."
+            echo "3. Der Token wurde zweimal eingefuegt."
+            echo "Neu erzeugen unter https://dash.cloudflare.com/profile/api-tokens, Vorlage 'Edit Cloudflare Workers', und allein einfuegen."
             exit 1
           fi
           echo "CLOUDFLARE_API_TOKEN=$sauber" >> "$GITHUB_ENV"
+          echo "Token-Form plausibel (${#sauber} Zeichen)."
 
       - name: Abhaengigkeiten installieren
         run: npm ci

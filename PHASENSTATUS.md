@@ -4446,10 +4446,19 @@ ein `env:` auf Schrittebene hat Vorrang und hätte die Bereinigung aufgehoben.
 Die Logik ist in drei Fällen getestet (sauber, Umbruch mittendrin, nur
 Leerraum).
 
-Die Bereinigung ist ein Netz, kein Ersatz. Sie fügt einen umbrochenen Token
-korrekt zusammen; war der Wert aus einem anderen Grund kaputt, scheitert der
-Deploy jetzt mit einem Authentifizierungsfehler statt mit einem
-Header-Fehler. Das Secret gehört sauber neu eingetragen.
+**Nachtrag, Lauf 6.** Das Entfernen allen Leerraums war zu grob. Es klebte die
+Bruchstücke zusammen, wrangler bekam eine Zeichenkette, die kein Token ist,
+und antwortete mit `Invalid format for Authorization header [code: 6111]`.
+Ersetzt durch eine echte Formprüfung: außen trimmen, innen nichts entfernen,
+danach genau 40 Zeichen aus `A-Za-z0-9_-` verlangen.
+
+Zwei Fehler fielen dabei beim Testen auf, bevor sie in den Workflow kamen.
+`grep -E` und `sed` arbeiten zeilenweise, ein mehrzeiliger Wert hätte die
+Prüfung bestanden, sobald irgendeine Zeile passt; jetzt vergleicht `case` die
+ganze Zeichenkette. Und eine Längenspanne von 30 bis 60 hätte den Global API
+Key mit 32 Hex-Zeichen durchgelassen, der hier nicht funktioniert; jetzt sind
+es exakt 40. Sechs Fälle getestet: echter Token, Umbruch außen, Beschriftung
+mitkopiert, Global API Key, doppelt eingefügt, leer.
 
 **Nebenbefund ohne Handlungsbedarf.** GitHub meldet, dass `actions/checkout@v4`
 und `actions/setup-node@v4` auf Node 20 zeigen und deshalb auf Node 24
