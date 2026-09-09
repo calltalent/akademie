@@ -408,11 +408,19 @@ Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agent
 
 ## 7. Vorgehen und Grenzen dieser Analyse
 
-1. **Ablauf.** Am 08.09.2026 ab 16:12 UTC: Repo geklont, Abhängigkeiten installiert, Baseline (tsc, ESLint, Vitest) gefahren, Live-Datenbank und Cloudflare per MCP abgefragt, die drei ungemergten Branches gelesen. Danach ein Agenten-Lauf mit 14 geplanten Fachbereichen, je einem lesenden Prüf-Agenten und einem Gegenprüfer, einem Vollständigkeits-Kritiker und einem Strategie-Panel.
-2. **Was tatsächlich lief.** Der Lauf wurde dreimal vom Nutzungslimit der Sitzung unterbrochen (Reset 20:50 UTC und 01:50 UTC). Durchgelaufen sind 14 Bereichs-Prüfer mit zusammen 267 Funden sowie eine abschließende Synthese, deren Roadmap ich mit meiner eigenen abgeglichen und in die Abschnitte 5 und 6 eingearbeitet habe (übernommen: Portal-Status, Self-Service, DSGVO-Paket, Attrappen, Einfrier-Liste, Zielkunden-Entscheidung). Die drei Bereiche Toolchain/Betrieb, Performance und Datenmodell habe ich ohne Agenten selbst geprüft; ihre Befunde stehen in den Abschnitten 2, 4.2 und 3.3 (M11). Die automatische Gegenprüfung ist ausgefallen. Ersatzweise habe ich alle kritischen und hohen Befunde aus den Bereichen RLS, Auth, API und Kurse selbst am Code nachvollzogen, ebenso H11, H12, H16, H18, H20, H21, H22, M26, M49 und die Kontrastwerte. Befunde ohne diesen Vermerk stammen aus der Agenten-Prüfung mit Beleg (Datei und Zeile), sind aber nicht unabhängig bestätigt; Anhang A führt sie vollständig.
-3. **Nicht geprüft.** Playwright-Suite (keine `.env`, kein Dev-Server), Lighthouse und LCP, ein echter Stripe-Testkauf, Bunny-Upload und Transkription, Deploy-Ablauf, die Word-Dokumente (AVV, TOM), der Website-Branch im Repo `calltalent-website`, die Inhalte von `messages/bs.json` über Stichproben hinaus.
-4. **Live-Zugriff.** Nur lesend: Advisor, Migrationsliste, Zeilenzahlen, Mandantenliste, Muster der Auth-Konten. Es wurde nichts in Supabase, Cloudflare oder im Repo `main` verändert.
-5. **Vorarbeit.** Der Ruflo-Bericht vom 07.09. (Branch `claude/ruflo-swarm-hierarchical-0trzqy`, PHASENSTATUS-Abschnitt „Projektrevision 07.09.2026") war Ausgangspunkt; seine 18 offenen Code-Punkte und 15 Punkte für Josip gelten weiter und sind hier nicht wiederholt, außer wo sich Schwere oder Lösung geändert hat.
+1. **Ablauf.** Am 08.09.2026 ab 16:12 UTC: Repo geklont, Abhängigkeiten installiert, Baseline gefahren (tsc, ESLint, Vitest), Live-Datenbank und Cloudflare per MCP gelesen, die drei ungemergten Branches ausgewertet. Danach ein Agenten-Lauf über 14 Fachbereiche, jeder mit einem lesenden Prüfer und einem Gegenprüfer, dazu ein Vollständigkeits-Kritiker und ein Strategie-Panel.
+
+2. **Was gelaufen ist.** Der Lauf wurde mehrfach vom Nutzungslimit unterbrochen und nach jedem Reset fortgesetzt, auf Josips Auftrag vom 09.09. („Wiederhole den Agentenlauf"). Alle 14 Bereichs-Prüfer sind durchgelaufen, zusammen 267 Funde nach Gegenprüfung. Jeder Bereich wurde von einem zweiten Agenten gegengeprüft, in zwei Schritten: technische Widerlegung am Code, danach die Frage nach „bereits erledigt oder bewusste Entscheidung". Ergebnis: 267 Funde geprüft, 265 bestätigt, 5 widerlegt (Anhang B). Schwere und Status im Anhang sind die vom Gegenprüfer korrigierten Werte. Der Vollständigkeits-Kritiker suchte anschließend nach nicht abgedeckten Bereichen und fand zwei, die zu H30 und H31 geführt haben.
+
+3. **Eigene Prüfung.** Unabhängig von den Agenten habe ich alle kritischen und hohen Befunde aus RLS, Auth, API und Kursen selbst am Code nachvollzogen, ebenso H11, H12, H16, H18, H20, H21, H22, H25, H29, H30, H31, M26, M49 und die Kontrastwerte der Marken-Tokens.
+
+4. **Widersprüche zwischen Agenten** habe ich aufgelöst, nicht gemittelt. Beispiel: Zum Zustand der Playwright-Suite behauptete ein Prüfer „seit 05.08. rot", ein anderer verwies auf den Eintrag, dass alle zehn Fehler an genau diesem Tag behoben wurden. Die belegbare Fassung steht in H25: behoben ja, ein vollständiger grüner Lauf seither nirgends dokumentiert.
+
+5. **Nicht geprüft.** Playwright-Suite (keine `.env`, kein Dev-Server in dieser Umgebung), Lighthouse und LCP, ein echter Stripe-Testkauf, Bunny-Upload und Transkription, der Deploy-Ablauf, die Word-Dokumente (AVV, TOM), der Website-Branch im Repo `calltalent-website`, die Inhalte von `messages/bs.json` über Stichproben hinaus.
+
+6. **Live-Zugriff.** Nur lesend: Advisor, Migrationsliste, Zeilenzahlen, Mandantenliste, Muster der Auth-Konten. In Supabase, Cloudflare und im Zweig `main` wurde nichts verändert.
+
+7. **Vorarbeit.** Der Ruflo-Bericht vom 07.09. (Branch `claude/ruflo-swarm-hierarchical-0trzqy`, PHASENSTATUS-Abschnitt „Projektrevision 07.09.2026") war Ausgangspunkt. Seine 18 offenen Code-Punkte und 15 Punkte für Josip gelten weiter und sind hier nicht wiederholt, außer wo sich Schwere oder Lösung geändert hat.
 
 ---
 
