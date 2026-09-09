@@ -4135,3 +4135,62 @@ Josips Auftrag per Swarm-Kommando. Ergebnis: `PROJEKTANALYSE_2026-09-08.md` (809
 **Kernbefunde:** 295 Funde aus 16 Bereichen, alle gegengeprüft (290 bestätigt, 5 widerlegt); nach Korrektur durch die Gegenprüfer 3 kritisch, 47 hoch, 151 mittel, 94 niedrig. `main` ist nicht der deployte Stand (Worker vom 08.09. 08:19 UTC, `main` vom 24.08.; Ruflo-Branch mit drei live angewendeten Migrationen ungemergt). Live-DB: 0 Kurse, 110 Auth-Konten, davon 100 `testN@example.com` vom 10.07. Kritisch: Stripe-Kauf ohne Mitgliedschaft ergibt keinen Zugriff (`webhook/route.ts:175`); `tenants_admin_update` ohne Spaltenbeschränkung (`0001_init.sql:442`). Hoch u. a.: Einschreibungen steuern keinen Zugriff, `submit_quiz_attempt` sperrt Gäste (Regression 07.09.), Lektionsreihenfolge bei mehreren Sektionen, Webhook-Retry wird nie aufgerufen, Portal-Status „Trial" schaltet die Akademie ab, Löschanträge werden nie ausgeführt, KI-Kostensätze seit 01.09. veraltet. Aus der Wiederholung neu: `Permissions-Policy` in `next.config.ts:25` sperrt seit dem 08.08. Kamera und Mikrofon der eigenen App und macht die im Juli gebaute Videoaufnahme unbenutzbar (H30); im gesamten `src/app` existiert keine `error.tsx`, `global-error.tsx` oder `not-found.tsx` (H31); `resolveTenantByHost` baut den PostgREST-Filter per Zeichenkette aus dem `Host`-Kopf zusammen (`resolve.ts:138`, Verstoß gegen CLAUDE.md §2.12, H36).
 
 **Nächste Schritte (Abschnitt 5.1 des Dokuments):** Branches mergen und von `main` deployen, H3/K2/K1/H6/H7/H21 beheben, Testkonten löschen, Supabase-Dashboard-Schalter, KI-Modell auf `claude-sonnet-5`, Barrierefreiheits-Sofortpaket, dazu die drei Einzeiler H30 (`Permissions-Policy`), H35 (`week`-Parameter) und H36 (Mandanten-Filter). Entscheidungen für Josip in Abschnitt 6, zuerst: Zielkunde der nächsten 30 Tage (interne Akademie oder Kursverkäufer).
+
+## Branches nach `main` gemergt und CI/Deploy als GitHub Actions (09.09.2026)
+
+Rang 1 und Rang 14 der Panel-Rangfolge aus `PROJEKTANALYSE_2026-09-08.md`,
+Abschnitt 5.1. Freigabe von Josip nach CLAUDE.md §4.6 im Chat erteilt.
+
+**Merge nach `main` (Commit `d612573`, gepusht).** `claude/ruflo-swarm-hierarchical-0trzqy`
+(51 Dateien) und `claude/contact-request-security-check-78qawq` (20 Dateien)
+zusammengeführt, zusammen 70 Dateien, 5.614 Zeilen hinzu. Der Ruflo-Merge lief
+konfliktfrei, beim Kontaktformular-Merge kollidierte nur `PHASENSTATUS.md`;
+beide Seiten waren reine Anhänge und stehen jetzt chronologisch hintereinander.
+`claude/agb-privacy-calltalent-migration-drxlr8` wurde nicht gemergt, weil er
+gegen `main` null Dateien Unterschied hat; der gleichnamige ungemergte Branch
+liegt im Repo `calltalent-website`. `claude/install-marketing-skills-nsdemx`
+bleibt draußen (Analyse Abschnitt 5.5).
+
+**Verifikation auf dem zusammengeführten Stand:** `npm ci` sauber,
+`tsc --noEmit` 0 Fehler, `eslint` 0 Fehler, `vitest run` 771 von 771 grün,
+`next build --webpack` erfolgreich, `opennextjs-cloudflare build` erfolgreich.
+Der erste Vitest-Lauf meldete einen Fehler in `src/lib/env.test.ts`, weil in
+der Agentenumgebung keine `.env` liegt; mit gesetztem `NEXT_PUBLIC_SUPABASE_URL`
+und `NEXT_PUBLIC_SUPABASE_ANON_KEY` läuft er durch. Der Test existierte schon
+vorher auf `main`, das ist keine Regression.
+
+**Tag `v0.2.0` und Deploy offen.** Der Tag-Push scheitert mit HTTP 403: das
+GitHub-Token der Agentensitzung darf Branches schreiben, Tags nicht. Der
+Deploy scheitert doppelt, `CLOUDFLARE_API_TOKEN` fehlt in der Agentenumgebung
+und der Egress-Proxy lehnt `api.cloudflare.com` mit 403 ab. Beides liegt bei
+Josip beziehungsweise künftig beim Deploy-Workflow.
+
+**Neu: `.github/workflows/ci.yml`.** Läuft bei jedem Pull Request und bei
+jedem Push auf `main`, in drei Jobs. Erstens Typprüfung, ESLint, Vitest und
+`next build`. Zweitens `opennextjs-cloudflare build` als Worker-Smoke, weil
+der reine Next-Build die Fehlerklasse vom 14.07.2026 nicht zeigt (lokal grün,
+Deploy kaputt). Drittens `npm audit --omit=dev --audit-level=high`, bewusst
+mit `continue-on-error`, damit eine neue Meldung sichtbar wird, ohne die
+Arbeit anzuhalten. Der Audit meldet heute acht Schwachstellen, sieben hoch und
+eine kritisch, aus zwei Ketten: `unpdf` über `canvas` und
+`@mapbox/node-pre-gyp` auf `tar`, sowie `@opennextjs/cloudflare` über
+`wrangler` und `miniflare` auf `sharp`.
+
+**Neu: `.github/workflows/deploy.yml`.** Läuft bei Push auf `main` und per
+Hand, hängt an der GitHub-Umgebung `production`. Trägt Josip sich dort als
+Required reviewer ein, wartet jeder Deploy auf seinen Klick; damit bleibt
+CLAUDE.md §4.6 gewahrt und die Handarbeit entfällt. Ein Wächterschritt bricht
+ab, solange `CLOUDFLARE_API_TOKEN`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` oder eine
+der drei Variablen `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SITE_URL`,
+`NEXT_PUBLIC_PORTAL_HOST`, `NEXT_PUBLIC_MARKETPLACE_HOST` leer ist. Grund:
+diese Werte werden beim Bauen fest ins Browser-Bundle geschrieben, und ein
+fehlender `NEXT_PUBLIC_PORTAL_HOST` würde `portal.localhost` ausliefern und
+das Betreiber-Portal unerreichbar machen, ohne dass ein Prüfschritt rot wird.
+
+**Neu: `.nvmrc` mit `22`** und `node-version-file: .nvmrc` in beiden
+Workflows, damit CI und Josips Rechner dieselbe Node-Version benutzen.
+
+**Offen für Josip:** die vier Schritte in `.github/DEPLOY.md` (Secrets,
+Variablen, Umgebung `production`, Branch-Schutz auf `main`). Die drei
+Statusprüfungen erscheinen in der Auswahlliste des Rulesets erst, nachdem
+`ci.yml` einmal gelaufen ist.

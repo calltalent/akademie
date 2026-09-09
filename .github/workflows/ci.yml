@@ -1,0 +1,98 @@
+# Qualitaetstor fuer jeden Pull Request und jeden Push auf main.
+#
+# Warum: bis zum 09.09.2026 liefen tsc, ESLint und die Vitest-Suite
+# ausschliesslich auf Josips Rechner und nur, wenn er daran dachte. Damit war
+# jeder Push auf main ungeprueft. Dieser Workflow macht die Pruefung zur
+# Vorbedingung (zusammen mit dem Branch-Schutz, siehe README-Abschnitt "CI").
+#
+# Die beiden NEXT_PUBLIC_*-Platzhalter unten sind noetig, weil src/lib/env.ts
+# `publicEnv` beim Import sofort per zod validiert (Zeile 119). Ohne sie
+# scheitert src/lib/env.test.ts und jeder Build. Es sind bewusst KEINE echten
+# Werte: CLAUDE.md §2.6 verbietet Secrets und Kundendaten in Tests.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Ein laufender Lauf zum selben Branch wird abgebrochen, wenn ein neuer Push
+# kommt. Spart Minuten im kostenlosen Kontingent.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: https://ci-platzhalter.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-platzhalter-kein-echter-schluessel
+
+jobs:
+  pruefung:
+    name: Typen, Lint, Tests, Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+
+      - name: TypeScript pruefen
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Vitest
+        run: npm run test
+
+      - name: Next-Build
+        run: npm run build
+
+  worker-build:
+    name: OpenNext-Worker-Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+
+      # Faengt Fehler, die der reine Next-Build nicht zeigt: Node-APIs ohne
+      # Workers-Entsprechung, ueberschrittene Bundle-Groessen, kaputte
+      # wrangler.jsonc. Genau diese Klasse hat am 14.07.2026 den Deploy
+      # zerlegt, nachdem lokal alles lief. Baut nur, deployt nichts.
+      - name: OpenNext-Bundle bauen
+        run: npx opennextjs-cloudflare build
+
+  abhaengigkeiten:
+    name: Bekannte Schwachstellen
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Blockiert den Merge nicht: eine neue Meldung in einer Abhaengigkeit soll
+    # sichtbar sein, aber nicht die Arbeit anhalten. Der Wert liegt im Signal.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: npm audit (Produktionsabhaengigkeiten)
+        run: npm audit --omit=dev --audit-level=high

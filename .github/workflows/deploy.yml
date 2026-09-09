@@ -1,0 +1,99 @@
+# Deploy nach Cloudflare Workers. Ab hier ist `main` per Definition der
+# Stand, der laeuft. Der Drift zwischen Repo und Produktion (main vom
+# 24.08., Worker vom 08.09.) war der teuerste Zustand des Projekts.
+#
+# CLAUDE.md §4.6 verlangt fuer jeden Deploy Josips ausdrueckliche Freigabe.
+# Deshalb haengt der Job an der GitHub-Umgebung `production`: traegt Josip
+# dort unter "Required reviewers" sich selbst ein, wartet jeder Lauf auf
+# seinen Klick. Die Freigabe bleibt, die Handarbeit entfaellt.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Zwei gleichzeitige Deploys wuerden sich gegenseitig ueberschreiben.
+# cancel-in-progress bleibt aus: ein laufender Deploy wird zu Ende gefahren.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build und Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://academy.calltalent.ai
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # NEXT_PUBLIC_*-Werte werden beim Build fest ins Client-Bundle
+      # geschrieben. Fehlt einer, deployt der Lauf trotzdem, nur mit den
+      # Dev-Standardwerten aus src/lib/env.ts. Konkret hiesse das:
+      # `portal.localhost` statt `portal.calltalent.ai`, das Betreiber-Portal
+      # waere in Produktion nicht erreichbar, und niemand wuerde es am
+      # gruenen Haken sehen. Deshalb bricht der Lauf hier ab.
+      - name: Pflichtvariablen pruefen
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_PORTAL_HOST: ${{ vars.NEXT_PUBLIC_PORTAL_HOST }}
+          NEXT_PUBLIC_MARKETPLACE_HOST: ${{ vars.NEXT_PUBLIC_MARKETPLACE_HOST }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          fehlt=""
+          for name in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY \
+                      NEXT_PUBLIC_SITE_URL NEXT_PUBLIC_PORTAL_HOST \
+                      NEXT_PUBLIC_MARKETPLACE_HOST CLOUDFLARE_API_TOKEN; do
+            if [ -z "${!name}" ]; then fehlt="$fehlt $name"; fi
+          done
+          if [ -n "$fehlt" ]; then
+            echo "::error::Deploy abgebrochen. Nicht gesetzt:$fehlt"
+            echo "Variablen unter Settings -> Secrets and variables -> Actions eintragen."
+            exit 1
+          fi
+          echo "Alle Pflichtvariablen gesetzt."
+
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+
+      # Dieselben Pruefungen wie in ci.yml. Der Push auf main kam vielleicht
+      # aus einem Merge, dessen Ergebnis so nie getestet wurde.
+      - name: TypeScript, Lint und Tests
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-platzhalter.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-platzhalter-kein-echter-schluessel
+        run: |
+          npx tsc --noEmit
+          npm run lint
+          npm run test
+
+      # `opennextjs-cloudflare build && opennextjs-cloudflare deploy`.
+      # account_id und routes stehen in wrangler.jsonc, `keep_vars: true`
+      # dort schuetzt die im Dashboard gesetzten Secrets vor dem Deploy.
+      - name: Bauen und ausliefern
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_PORTAL_HOST: ${{ vars.NEXT_PUBLIC_PORTAL_HOST }}
+          NEXT_PUBLIC_MARKETPLACE_HOST: ${{ vars.NEXT_PUBLIC_MARKETPLACE_HOST }}
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run deploy
+
+      - name: Ergebnis
+        run: echo "Deployt aus ${{ github.sha }} auf https://academy.calltalent.ai"
