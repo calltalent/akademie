@@ -66,6 +66,27 @@ jobs:
           fi
           echo "Alle Pflichtvariablen gesetzt."
 
+          # Lauf 5 vom 09.09.2026 scheiterte nach drei Minuten Build an
+          # `Headers.set: "..." is an invalid header value`. Ursache war ein
+          # Zeilenumbruch im eingefuegten CLOUDFLARE_API_TOKEN: wrangler setzt
+          # ihn in einen Authorization-Header, und Header-Werte duerfen keinen
+          # Umbruch enthalten. Ein Einfuege-Artefakt, kein falscher Token.
+          #
+          # Cloudflare-API-Tokens bestehen aus Buchstaben, Ziffern, Bindestrich
+          # und Unterstrich, nie aus Leerraum. Whitespace wird deshalb entfernt
+          # statt den Lauf abzubrechen, und der bereinigte Wert geht ueber
+          # GITHUB_ENV an die folgenden Schritte. Der Wert bleibt dabei
+          # maskiert, weil GitHub ihn als Secret kennt.
+          sauber=$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '[:space:]')
+          if [ "$sauber" != "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN enthielt Leerraum oder einen Zeilenumbruch und wurde fuer diesen Lauf bereinigt. Trage das Secret sauber neu ein."
+          fi
+          if [ -z "$sauber" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN besteht nur aus Leerraum."
+            exit 1
+          fi
+          echo "CLOUDFLARE_API_TOKEN=$sauber" >> "$GITHUB_ENV"
+
       - name: Abhaengigkeiten installieren
         run: npm ci
 
@@ -92,7 +113,9 @@ jobs:
           NEXT_PUBLIC_MARKETPLACE_HOST: ${{ vars.NEXT_PUBLIC_MARKETPLACE_HOST }}
           NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # CLOUDFLARE_API_TOKEN steht hier bewusst NICHT: der Wächterschritt
+          # legt den bereinigten Wert in GITHUB_ENV ab. Ein `env:` auf
+          # Schrittebene hätte Vorrang und würde die Bereinigung aufheben.
         run: npm run deploy
 
       - name: Ergebnis

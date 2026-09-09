@@ -4420,3 +4420,37 @@ zu SECURITY-DEFINER-Funktionen, `btree_gist` im public-Schema, die zwei
 Tabellen mit RLS ohne Policy und die abgeschaltete
 Leaked-Password-Protection bestanden alle vorher. `submit_quiz_attempt`
 taucht in der `anon`-Liste nicht mehr auf.
+
+## Erster Deploy über GitHub Actions: Wächter grün, Auslieferung gescheitert (09.09.2026)
+
+Lauf 5 (`34399585831`), von Hand ausgelöst, von Josip in der Umgebung
+`production` freigegeben.
+
+**Was funktioniert hat.** Die Umgebungsregel greift: der Lauf stand auf
+`waiting` und hat vor der Freigabe keinen einzigen Schritt gestartet. Danach
+liefen Wächterschritt, `npm ci`, Typprüfung, ESLint, 785 von 785 Tests und der
+OpenNext-Build sauber durch („Worker saved in `.open-next/worker.js`").
+
+**Woran es lag.** `wrangler deploy` brach ab mit
+`Headers.set: "..." is an invalid header value`, wobei der maskierte Wert über
+zwei Zeilen ging. Im Secret `CLOUDFLARE_API_TOKEN` steckte ein Zeilenumbruch.
+Wrangler setzt den Token in einen `Authorization`-Header, und Header-Werte
+dürfen keinen Umbruch enthalten. Ein Einfüge-Artefakt, kein falscher Token.
+Ausgeliefert wurde nichts, der laufende Stand blieb unverändert.
+
+**Gehärtet.** Der Wächterschritt entfernt jetzt Leerraum aus dem Token, warnt
+sichtbar, wenn er etwas entfernen musste, und bricht ab, wenn nur Leerraum
+übrig bleibt. Der bereinigte Wert geht über `GITHUB_ENV` weiter. Dafür musste
+`CLOUDFLARE_API_TOKEN` aus dem `env:` des Deploy-Schritts entfernt werden:
+ein `env:` auf Schrittebene hat Vorrang und hätte die Bereinigung aufgehoben.
+Die Logik ist in drei Fällen getestet (sauber, Umbruch mittendrin, nur
+Leerraum).
+
+Die Bereinigung ist ein Netz, kein Ersatz. Sie fügt einen umbrochenen Token
+korrekt zusammen; war der Wert aus einem anderen Grund kaputt, scheitert der
+Deploy jetzt mit einem Authentifizierungsfehler statt mit einem
+Header-Fehler. Das Secret gehört sauber neu eingetragen.
+
+**Nebenbefund ohne Handlungsbedarf.** GitHub meldet, dass `actions/checkout@v4`
+und `actions/setup-node@v4` auf Node 20 zeigen und deshalb auf Node 24
+gezwungen werden. Beide laufen, ein Wechsel auf `@v5` ist irgendwann fällig.
