@@ -16,7 +16,9 @@
 
 4. Es gibt keine CI, kein Monitoring, kein Backup-Konzept und keinen Deploy-Weg außer dem Rechner des Auftraggebers. Für einen Einzelbetreiber ist das der größte Betriebsrisikofaktor.
 
-5. Empfehlung in einem Satz: zwei Wochen Konsolidierung (mergen, deployen, die vier Kernlücken schließen, CI aufsetzen), danach den ersten echten Kurs mit echten Lernenden auf `academy.calltalent.ai` betreiben, bevor weitere Funktionsbereiche entstehen.
+5. Die Kette „Mandant anlegen, ersten Kurs bauen, Lernende einladen, Kurs zuweisen oder verkaufen, Zugriff, Zertifikat" ist an mindestens vier Stellen unterbrochen: Käufer ohne Zugriff, Einschreibung ohne Wirkung, kein Self-Service für Rollen und Zuweisung, `main` ungleich Produktion. Das erklärt die leere Datenbank besser als jeder Einzelfehler.
+
+6. Empfehlung in einem Satz: zwei Wochen Konsolidierung (mergen, deployen, die Kernlücken schließen, CI aufsetzen), danach den ersten echten Kurs mit echten Lernenden auf `academy.calltalent.ai` betreiben, bevor weitere Funktionsbereiche entstehen. Vorher ist eine Entscheidung fällig, ob der erste Kunde eine interne Akademie oder ein Kursverkäufer ist (Abschnitt 6).
 
 ---
 
@@ -165,6 +167,22 @@ Behebung: Minutenkontingent je Plan in `usage_counters`, Abbruch mit Meldung im 
 
 Behebung: `onClick` statt `onPointerDown`; `muted-400` auf mindestens #6b6d95, `muted-300` nur für dekorative Elemente; Skip-Link und `<main>` in beiden Shells; Schriftgrößen auf `rem` mit Basis 16 px. Das sind zusammen ein bis zwei Tage.
 
+**H21. Portal-Status „Trial" schaltet die Akademie ab.** `tenants.status` erlaubt `active`, `trial`, `suspended` (0001_init.sql, Zeile 20); das Betreiber-Portal bietet alle drei an. `resolveTenantByHost()` und drei weitere Auflösungen in `src/lib/tenant/resolve.ts` (Zeilen 27, 42, 108, 137) filtern aber auf `status = 'active'` (selbst geprüft). Ein Mandant, den der Betreiber auf „Trial" stellt, ist für seine Nutzer sofort nicht mehr erreichbar; ein gesperrter Mandant zeigt statt einer Sperrseite die Entwickler-Startseite. API-Keys gesperrter Mandanten laufen weiter. Status: neu.
+
+Behebung: `trial` wie `active` auflösen und stattdessen `tenants.trial_ends_at` prüfen; `suspended` auf eine Sperrseite mit Kontakt leiten; API-Key-Prüfung um den Mandantenstatus ergänzen.
+
+**H22. Löschanträge werden nie ausgeführt.** `src/app/profil/actions.ts`, Zeile 63, schreibt einen Antrag in `deletion_requests`; im gesamten Code gibt es keinen Aufruf von `auth.admin.deleteUser` und keine Oberfläche, die Anträge anzeigt (selbst geprüft). Art. 17 DSGVO verlangt Löschung „unverzüglich", in der Praxis binnen eines Monats; AVV und TOM sagen die Löschung zu. Status: neu.
+
+Behebung: Antrags-Inbox im Betreiber-Portal mit Fristanzeige, Lösch-Job (`auth.users` löschen, `orders` und `webhook_deliveries` anonymisieren), Bestätigungsmail.
+
+**H23. DSGVO-Exporte unvollständig, neue Mandanten ohne Impressum.** Der Mandanten-Export (`src/app/portal/mandanten/[id]/export/route.ts`, Zeile 102) kennt die seit August hinzugekommenen Tabellen nicht (alle `calendar_*`, Kunden-Area, Lesezeichen, Push); der Selbst-Export ebenso. `tenants.legal.entity` ist weder im Portal noch im Admin pflegbar (`src/app/(legal)/layout.tsx`, Zeile 38); jeder neue Mandant antwortet auf `/legal-notice` mit 404, bis jemand SQL ausführt. Nicht gegengeprüft, deckt sich aber mit dem PHASENSTATUS-Eintrag vom 24.08. Status: neu.
+
+Behebung: Export über eine Tabellenliste aus `information_schema` (alle Tabellen mit `tenant_id`), Rechtsträger-Felder im Portal-Formular und im Admin, Mandant ohne Rechtsträger nicht auf `active` setzen.
+
+**H24. Keine Rollenverwaltung und keine Kurs-Zuweisung in der Oberfläche.** Einladung und CSV-Import erzeugen immer `member` (`src/lib/users/import.ts`, Zeile 313); es gibt keinen Weg, jemanden zum Trainer oder Admin zu machen, außer per SQL. Die Teilnehmer-Detailseite bietet keine Kurs-Zuweisung für bestehende Nutzer (SPEC §4.2 „Kurs-Zuweisung, Fortschritts-Popup"). Branding (Farbe, Radius, Schrift) ist im Admin dagegen vorhanden; Tutor-Schalter, Domain und Rechtsträger bleiben Betreiber-Sache. Ein Kunde kann also seine Akademie ohne Josip nicht einrichten. Status: neu.
+
+Behebung: Rollenwahl in Einladung und Teilnehmerliste (owner darf admin/trainer vergeben), Kurs zuweisen und entziehen auf der Teilnehmer-Detailseite, beides mit Audit-Eintrag.
+
 ### 3.3 Mittel
 
 | Nr. | Bereich | Befund und Fundstelle | Behebung |
@@ -212,6 +230,14 @@ Behebung: `onClick` statt `onPointerDown`; `muted-400` auf mindestens #6b6d95, `
 | M41 | i18n | Admin-Navigation, Admin-Dashboard, Editor-Werkzeuge und Player-Titel hartkodiert deutsch (`src/components/layout/AdminSidebar.tsx`, Zeile 112); rund 20 feste `de-DE`-Formatierungen in Lernansicht, Schichtplan und Zertifikat. | in `messages/*` überführen, `Intl`-Formatierung mit der aktiven Locale |
 | M42 | Barrierefreiheit | Keine Kontrastprüfung bei der Mandanten-Akzentfarbe (`tenant-branding-form.tsx`, Zeile 65): ein heller Akzent erzeugt unlesbare weiße Beschriftung. Menüs mit `role="menu"` ohne `menuitem`, ohne Escape (`topbar-menus.tsx`, Zeile 110). Div-Listen ohne Tabellensemantik, `<th>` ohne `scope`. Formularfehler ohne `aria-invalid`. | Kontrastwarnung im Formular, Menü-Semantik oder `role` entfernen, echte Tabellen, `aria-describedby` |
 | M43 | Barrierefreiheit | Kein Dark Mode, kein High-Contrast-Modus, kein `prefers-reduced-motion` (`src/app/globals.css`); keine Erklärung zur Barrierefreiheit (BFSG). | `prefers-reduced-motion` sofort, Erklärung als Seite unter `(legal)`, Dark Mode nach dem ersten Kunden |
+| M44 | Portal | CSV-Import verschickt alle Willkommensmails gleichzeitig (`src/lib/users/import.ts`, Zeile 105) und scheitert damit am Resend-Standardlimit; der Fehler bleibt in der Oberfläche unsichtbar. Der DoD-Wert „100 Nutzer < 30 s" ist damit nicht mehr belegt. | Versand in Stapeln von 10 je Sekunde, Fehlerliste im Import-Ergebnis |
+| M45 | Portal | Attrappen: Die Benachrichtigungs-Einstellungen (`src/lib/account/actions.ts`, Zeile 105) werden von keinem Mailpfad gelesen, fünf von sechs Schaltern beschreiben Mails, die es nicht gibt; die Benachrichtigungsglocke (`src/components/learn/app-shell.tsx`, Zeile 166) ist immer leer. | Schalter ohne Wirkung entfernen, Glocke erst mit echter Ereignisquelle zeigen |
+| M46 | Portal | Fehlende Ereignis-Mails gegenüber SPEC „E-Mail-Benachrichtigungen": neue Abgabe an Trainer, Kurs-Zuweisung, Löschantrag, Kontingent-Ende, Trial-Ablauf, Planänderung im Schichtplan. Kein Bounce- und Complaint-Handling (`src/lib/email/client.ts`, Zeile 73): harte Bounces werden weiter angeschrieben, die Domain-Reputation von `calltalent.ai` trägt alle Mandanten. Absender fest `noreply@calltalent.ai`, kein Reply-To. | Ereignis-Mails aus einer Quelle, Resend-Webhook für Bounces, Reply-To auf die Support-Adresse des Mandanten |
+| M47 | Portal | Datenschutzerklärung deckt die reale Verarbeitung nicht ab: Zeiterfassung (Art. 9 bei Krankmeldungen), Web-Push, Bunny-Transkription, Generator-Uploads fehlen; kein Abschnitt zum Art.-27-Vertreter (`src/app/(legal)/privacy/page.tsx`, Zeile 22). | Abschnitte ergänzen, anwaltlich prüfen lassen |
+| M48 | Portal | Betreiber-Portal ohne MFA, ohne zweiten Admin, ohne Papierkorb (`src/lib/platform/auth.ts`, Zeile 35): ein kompromittiertes Platform-Admin-Konto löscht Mandanten endgültig. | TOTP für `platform_admins`, Soft-Delete mit 30 Tagen Frist |
+| M49 | Produkt | Semantische Suche für Lernende unerreichbar: der Sidebar-Knopf „Suchen" klappt nur die Sidebar ein (`src/components/layout/Sidebar.tsx`, Zeile 308, selbst geprüft); `/suche` ist in keiner Navigation verlinkt. | Knopf auf `/suche` verlinken |
+| M50 | Produkt | Migrations-Importer akzeptiert nur ein hausinternes JSON ohne Format-Dokumentation (`src/lib/import/course-import.ts`, Zeile 29); CLAUDE.md §6.4 verlangt „CSV + Video-Reupload". Kein Kurs-Duplizieren, keine Vorlage, kein „Kurs in Kundenmandant kopieren", also kein Weg, Calltalent-Inhalte an Kunden zu verteilen. | Beispieldatei und Doku, „Kurs kopieren nach Mandant" im Portal |
+| M51 | Produkt | PWA: Manifest-Sprache fest `de`, Offline-Shell praktisch leer, Installierbarkeit und Push nie live bestätigt (`src/app/manifest.ts`, Zeile 47); live 0 Push-Abonnements. | einfrieren, bis Ereignisse per Mail laufen |
 
 ### 3.4 Behoben, aber nicht in `main`
 
@@ -252,12 +278,13 @@ Die folgenden Punkte sind auf `claude/ruflo-swarm-hierarchical-0trzqy` behoben u
 ### 4.3 Für den Verkauf
 
 1. Keine Abrechnung der Mandanten selbst. Das Preismodell (2.990 € Einrichtung, 149 oder 249 €/Monat) existiert nur in `README.md`. Das Betreiber-Portal setzt `plan` von Hand; Rechnung, Zahlung und Mahnung laufen außerhalb des Systems. Für drei Mandanten ist das tragbar, für zehn nicht.
-2. Kein Onboarding. Ein neuer Mandanten-Admin sieht nach dem ersten Login ein leeres Dashboard ohne Erstkurs-Assistenten, ohne Beispielkurs, ohne Checkliste („Logo hochladen, ersten Kurs anlegen, erste Person einladen").
+2. Kein Onboarding. Ein neuer Mandanten-Admin sieht nach dem ersten Login ein leeres Dashboard ohne Erstkurs-Assistenten, ohne Beispielkurs, ohne Checkliste („Logo hochladen, ersten Kurs anlegen, erste Person einladen"). Er kann außerdem niemanden zum Trainer oder Admin machen und keinem bestehenden Nutzer einen Kurs zuweisen (H24); jede Einrichtung läuft über Josip.
 3. Keine Demo-Inhalte. `demo-blau` hat 0 Kurse. Ein Interessent kann die Plattform nirgends als Lernender erleben.
 4. Kaufweg unvollständig: K1 (Kauf ohne Mitgliedschaft), H1 (Einschreibung wirkungslos), H5 (asynchrone Zahlarten), keine Rechnungsstellung an Endkunden über Stripe Invoices, keine Steuerlogik (Stripe Tax), kein Gutschein, kein Bundle.
 5. Breite statt Tiefe: LMS, Marketplace, Kunden-Area, Schichtplan, drei Sprachen und ein Betreiber-Portal sind gebaut, während der Kern (ein Kurs, ein Lernender, ein Zahlungseingang) noch nie unter Produktionsbedingungen durchlaufen wurde.
 6. Kurs-Generator nimmt nur PDF an. Die Zielgruppe (Coaches, Vertriebstrainer) hat ihre Inhalte typischerweise in PowerPoint und Word.
-7. Kein Vertriebsmaterial im Produkt: keine Preisseite, keine Demo-Buchung, kein Trial-Ablauf mit Erinnerung (`plan = 'trial'` existiert, ein Ablaufdatum nicht).
+7. Kein Vertriebsmaterial im Produkt: keine Preisseite, keine Demo-Buchung, kein Trial-Ablauf mit Erinnerung (`plan = 'trial'` existiert, ein Ablaufdatum nicht; der Status „Trial" schaltet die Akademie sogar ab, H21).
+8. Attrappen, die Vertrauen kosten: Benachrichtigungsschalter ohne Mailpfad, leere Glocke, Push ohne Ereignisse, „Suchen"-Knopf ohne Suche (M45, M49, M51). Was nicht funktioniert, darf die Oberfläche nicht versprechen.
 
 ---
 
@@ -272,62 +299,72 @@ Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agent
 3. **K2 beheben.** Migration mit Spaltenrechten auf `tenants` und Guard-Trigger für die Betreiber-Schlüssel. Danach im Portal einmal prüfen, dass der Betreiber weiterhin alles setzen kann.
 4. **K1 beheben.** Mitgliedschaft im Stripe-Webhook und bei der Selbstregistrierung anlegen. E2E-Fall dazu.
 5. **H6 und H7 beheben.** Cron ruft zusätzlich `/api/admin/webhooks/retry`; alle `dispatchWebhookEvent`- und Push-Aufrufe in `after()`.
-6. **Live-Datenbank aufräumen.** Die 100 `testN@example.com`-Konten und die vier weiteren Testkonten ohne Mitgliedschaft löschen (`auth.admin.deleteUser`, Kaskade räumt `profiles` mit). Vorher Liste exportieren.
-7. **Supabase-Dashboard.** Leaked-Password-Protection einschalten (seit 11.07. offen), Session-Timeouts setzen, Redirect-URLs für `*.calltalent.ai` und `salestalent.app` prüfen. Sammelmigration für die 17 `anon`-EXECUTE-Rechte (Ruflo Punkt 6.1).
-8. **KI-Modell und Kostensätze** (H10): `claude-sonnet-5`, `claude-haiku-4-5`, Preise aktualisieren, einen Generator-Lauf am echten PDF gegenprüfen. Dazu H18: Stale-Fenster auf 15 Minuten und Versuchszähler, damit kein Job endlos Kosten erzeugt.
-9. **Barrierefreiheit für den täglichen Betrieb** (H20): Abmelden-Knopf auf `onClick`, Token `muted-400` und `muted-300` anheben, Skip-Link und `<main>` in beiden Shells, `prefers-reduced-motion`. Ein bis zwei Tage, spürbar bei jedem Login.
+6. **H21 beheben.** `trial` in den vier Auflösungen wie `active` behandeln, `suspended` auf eine Sperrseite leiten. Eine Stunde Aufwand, verhindert, dass ein Klick im Portal einen Kunden offline nimmt.
+7. **Live-Datenbank aufräumen.** Die 100 `testN@example.com`-Konten und die vier weiteren Testkonten ohne Mitgliedschaft löschen (`auth.admin.deleteUser`, Kaskade räumt `profiles` mit). Vorher Liste exportieren.
+8. **Supabase-Dashboard.** Leaked-Password-Protection einschalten (seit 11.07. offen), Session-Timeouts setzen, Redirect-URLs für `*.calltalent.ai` und `salestalent.app` prüfen. Sammelmigration für die 17 `anon`-EXECUTE-Rechte (Ruflo Punkt 6.1).
+9. **KI-Modell und Kostensätze** (H10): `claude-sonnet-5`, `claude-haiku-4-5`, Preise aktualisieren, einen Generator-Lauf am echten PDF gegenprüfen. Dazu H18: Stale-Fenster auf 15 Minuten und Versuchszähler, damit kein Job endlos Kosten erzeugt.
+10. **Barrierefreiheit für den täglichen Betrieb** (H20): Abmelden-Knopf auf `onClick`, Token `muted-400` und `muted-300` anheben, Skip-Link und `<main>` in beiden Shells, `prefers-reduced-motion`. Ein bis zwei Tage, spürbar bei jedem Login.
 
 ### 5.2 In 30 Tagen
 
-10. **CI mit GitHub Actions.** Ein Workflow `ci.yml`: `npm ci`, `tsc --noEmit`, `eslint`, `vitest run` mit Platzhalter-Env; Branch-Schutz auf `main` (Pull Request und grüner Check Pflicht). Zweiter Workflow `deploy.yml`: bei Push auf `main` `opennextjs-cloudflare build && deploy` mit `CLOUDFLARE_API_TOKEN` als Repo-Secret. Damit ist `main` per Definition der deployte Stand. Messbar: jeder Commit auf `main` hat einen grünen Check, letzter Deploy-Commit = HEAD.
-11. **Monitoring.** Cloudflare Workers Logs mit Alarm auf 5xx-Rate, Sentry (kostenlos bis 5.000 Ereignisse/Monat) über `@sentry/nextjs` für Server Actions und Route-Handler, ein Uptime-Check auf `https://academy.calltalent.ai/login` und `/api/stripe/webhook` (HEAD). Messbar: ein absichtlich erzeugter Fehler landet innerhalb von 5 Minuten als Nachricht bei Josip.
-12. **Backups.** Entweder Supabase Pro (25 USD/Monat, tägliche Backups, 7 Tage) oder ein Cron-Job mit `pg_dump` in einen R2-Bucket mit `jurisdiction: eu`. Einmal Restore in eine Branch-DB üben. Messbar: ein datierter Dump liegt vor und wurde einmal eingespielt.
-13. **H1 umsetzen** (Einschreibungs-Gating plus Abo-Entzug). Das ist die Voraussetzung, um überhaupt kostenpflichtige Kurse zu verkaufen. Reporting und Dashboard auf dieselbe Definition (H15).
-14. **Stripe-Lebenszyklus schließen**: Rückerstattungen und Disputes (H11), Kundenportal mit Kündigungsknopf (H12), `payment_status` (H5), `livemode`-Prüfung und Produkte für den Live-Modus (M26), Fehler mit 500 statt 200 quittieren (M27), Widerrufsverzicht im Checkout (H14, vorher anwaltlich bestätigen lassen). Zusammen zwei bis drei Tage.
-15. **H2, H4, H8** und aus 3.3 die Punkte M1, M4, M5, M8, M15, M16, M20, M23, M29, M30, M38 (jeweils Stunden bis ein Tag).
-16. **Zeiterfassung vor dem ersten Lohnlauf** (H16, H17): `on delete restrict` plus Archivstatus, Zeiten-Ansicht mit Korrektur und CSV-Export, Auto-Close nach 14 Stunden. Ohne das darf kein Mandant den Schichtplan für echte Beschäftigte nutzen.
-17. **KI-Kostendeckel** (H19): Minutenkontingent für Transkription je Plan, Kontingent nur bei Erfolg buchen (M38), Betreiber-Alarm.
-18. **RLS-Negativtests** (M12) als Vitest-Suite gegen eine Supabase-Branch-Datenbank, in der CI laufend.
-19. **Der erste echte Kurs.** Josip baut auf `academy.calltalent.ai` einen vollständigen Calltalent-Kurs (fünf Lektionen mit Video, ein Quiz, ein Zertifikat) und lässt drei echte Personen ihn durchlaufen, inklusive eines Testkaufs im Stripe-Testmodus. Jeder Stolperstein wird ein Ticket. Messbar: drei ausgestellte Zertifikate in `certificates`, eine `orders`-Zeile mit `paid`.
-20. **Onboarding-Checkliste im Admin-Dashboard**: fünf Schritte mit Haken (Logo, Farben, erster Kurs, erste Einladung, Rechtsträger), sichtbar bis alle erledigt sind. Dazu „Kurs anlegen" mit automatisch angelegtem Modul und Sektion (M25).
-21. **Wissensarchiv ordnen.** `PHASENSTATUS.md` einfrieren (Archiv), eine neue `STATUS.md` mit zwei Seiten: Was läuft, was ist offen, wie deployt man, wo liegen welche Schlüssel (ohne Werte). `README.md` auf den Ist-Zustand bringen.
+11. **CI mit GitHub Actions.** Ein Workflow `ci.yml`: `npm ci`, `tsc --noEmit`, `eslint`, `vitest run` mit Platzhalter-Env; Branch-Schutz auf `main` (Pull Request und grüner Check Pflicht). Zweiter Workflow `deploy.yml`: bei Push auf `main` `opennextjs-cloudflare build && deploy` mit `CLOUDFLARE_API_TOKEN` als Repo-Secret. Damit ist `main` per Definition der deployte Stand. Messbar: jeder Commit auf `main` hat einen grünen Check, letzter Deploy-Commit = HEAD.
+12. **Monitoring.** Cloudflare Workers Logs mit Alarm auf 5xx-Rate, Sentry (kostenlos bis 5.000 Ereignisse/Monat) über `@sentry/nextjs` für Server Actions und Route-Handler, ein Uptime-Check auf `https://academy.calltalent.ai/login` und `/api/stripe/webhook` (HEAD). Messbar: ein absichtlich erzeugter Fehler landet innerhalb von 5 Minuten als Nachricht bei Josip.
+13. **Backups.** Entweder Supabase Pro (25 USD/Monat, tägliche Backups, 7 Tage) oder ein Cron-Job mit `pg_dump` in einen R2-Bucket mit `jurisdiction: eu`. Einmal Restore in eine Branch-DB üben. Messbar: ein datierter Dump liegt vor und wurde einmal eingespielt.
+14. **H1 umsetzen** (Einschreibungs-Gating plus Abo-Entzug). Das ist die Voraussetzung, um überhaupt kostenpflichtige Kurse zu verkaufen. Reporting und Dashboard auf dieselbe Definition (H15).
+15. **Stripe-Lebenszyklus schließen**: Rückerstattungen und Disputes (H11), Kundenportal mit Kündigungsknopf (H12), `payment_status` (H5), `livemode`-Prüfung und Produkte für den Live-Modus (M26), Fehler mit 500 statt 200 quittieren (M27), Widerrufsverzicht im Checkout (H14, vorher anwaltlich bestätigen lassen). Zusammen zwei bis drei Tage.
+16. **H2, H4, H8** und aus 3.3 die Punkte M1, M4, M5, M8, M15, M16, M20, M23, M29, M30, M38 (jeweils Stunden bis ein Tag).
+17. **Zeiterfassung vor dem ersten Lohnlauf** (H16, H17): `on delete restrict` plus Archivstatus, Zeiten-Ansicht mit Korrektur und CSV-Export, Auto-Close nach 14 Stunden. Ohne das darf kein Mandant den Schichtplan für echte Beschäftigte nutzen.
+18. **KI-Kostendeckel** (H19): Minutenkontingent für Transkription je Plan, Kontingent nur bei Erfolg buchen (M38), Betreiber-Alarm.
+19. **RLS-Negativtests** (M12) als Vitest-Suite gegen eine Supabase-Branch-Datenbank, in der CI laufend.
+20. **Der erste echte Kurs.** Josip baut auf `academy.calltalent.ai` einen vollständigen Calltalent-Kurs (fünf Lektionen mit Video, ein Quiz, ein Zertifikat) und lässt drei echte Personen ihn durchlaufen, inklusive eines Testkaufs im Stripe-Testmodus. Jeder Stolperstein wird ein Ticket. Messbar: drei ausgestellte Zertifikate in `certificates`, eine `orders`-Zeile mit `paid`.
+21. **Self-Service für den ersten Kunden** (H24, H23, H22): Rollenwahl bei Einladung und in der Teilnehmerliste, Kurs zuweisen und entziehen auf der Teilnehmer-Detailseite, Rechtsträger-Felder im Portal und im Admin, Löschantrag-Inbox mit Löschpfad. Messbar: Josip legt einen Pilotmandanten mit Branding, Impressum, einem Kurs, fünf Lernenden und Zuweisungen in unter 30 Minuten ohne SQL an.
+22. **Onboarding-Checkliste im Admin-Dashboard**: fünf Schritte mit Haken (Logo, Farben, erster Kurs, erste Einladung, Rechtsträger), sichtbar bis alle erledigt sind. Dazu „Kurs anlegen" mit automatisch angelegtem Modul und Sektion (M25), und die Attrappen aus M45 entfernen.
+23. **Wissensarchiv ordnen.** `PHASENSTATUS.md` einfrieren (Archiv), eine neue `STATUS.md` mit zwei Seiten: Was läuft, was ist offen, wie deployt man, wo liegen welche Schlüssel (ohne Werte). `README.md` auf den Ist-Zustand bringen.
 
 ### 5.3 In 90 Tagen
 
-22. **Drei Pilotkunden.** Ein Mandant pro Monat mit echtem Vertrag, echten Inhalten und echter Rechnung. Vorher Trial-Ablauf (`tenants.trial_ends_at`, Erinnerungsmail, Sperre) und eine Preisseite. Die Abrechnung der Mandantenpakete zunächst manuell über Stripe Invoicing, erst bei zehn Mandanten automatisieren.
-23. **Barrierefreiheit belegen.** axe-core in der Playwright-Suite für Login, Dashboard, Lernansicht, Kurs-Editor; die Befunde mit Josip als Betroffenem priorisieren. Das Barrierefreiheitsstärkungsgesetz gilt seit 28.06.2025 für B2C-Dienste; die Lernansicht auf `salestalent.app` fällt darunter, sobald Endkunden dort kaufen.
-24. **Performance messen statt annehmen.** Lighthouse auf Login, Kurskatalog und Lektionsseite; Mandanten-Auflösung cachen (M7); Lektionsseite schlank laden (M24). Ziel laut CLAUDE.md §3.3: mobil ≥ 90.
-25. **Kurs-Generator für DOCX und PPTX**, weil das die Inhalte der Zielgruppe sind. Ein Workers-tauglicher OOXML-Parser (`jszip` plus XML-Textextraktion) reicht für Text; Bilder später.
-26. **Player vervollständigen** (M21): Wiederaufnahme, Kapitel, Tempo. Das ist der Teil, den Lernende täglich sehen.
-27. **Mandanten-Selbstverwaltung im Portal**: Domain-Verknüpfung mit Cloudflare for SaaS per API statt Hand, Nutzungsübersicht (KI-Kosten je Mandant aus `ai_jobs`), Rechnungsliste.
+24. **Drei Pilotkunden.** Ein Mandant pro Monat mit echtem Vertrag, echten Inhalten und echter Rechnung. Vorher Trial-Ablauf (`tenants.trial_ends_at`, Erinnerungsmail, Sperre) und eine Preisseite. Die Abrechnung der Mandantenpakete zunächst manuell über Stripe Invoicing, erst bei zehn Mandanten automatisieren.
+25. **Barrierefreiheit belegen.** axe-core in der Playwright-Suite für Login, Dashboard, Lernansicht, Kurs-Editor; die Befunde mit Josip als Betroffenem priorisieren. Das Barrierefreiheitsstärkungsgesetz gilt seit 28.06.2025 für B2C-Dienste; die Lernansicht auf `salestalent.app` fällt darunter, sobald Endkunden dort kaufen.
+26. **Performance messen statt annehmen.** Lighthouse auf Login, Kurskatalog und Lektionsseite; Mandanten-Auflösung cachen (M7); Lektionsseite schlank laden (M24). Ziel laut CLAUDE.md §3.3: mobil ≥ 90.
+27. **Kurs-Generator für DOCX und PPTX**, weil das die Inhalte der Zielgruppe sind. Ein Workers-tauglicher OOXML-Parser (`jszip` plus XML-Textextraktion) reicht für Text; Bilder später.
+28. **Player vervollständigen** (M21): Wiederaufnahme, Kapitel, Tempo. Das ist der Teil, den Lernende täglich sehen.
+29. **Mandanten-Selbstverwaltung im Portal**: Domain-Verknüpfung mit Cloudflare for SaaS per API statt Hand, Nutzungsübersicht (KI-Kosten je Mandant aus `ai_jobs`), Rechnungsliste.
+30. **DSGVO-Paket zu Ende bauen** (H22, H23, M13, M47, M48): vollständige Exporte über alle Tabellen mit `tenant_id`, Audit-Log-Schreiber in allen Admin- und Portal-Aktionen, Aufbewahrungsfristen (`rate_limits` 30 Tage, `webhook_deliveries` 90 Tage, Zeiterfassung 2 Jahre gesperrt), MFA und Papierkorb im Portal, Datenschutzerklärung nachziehen. Messbar: ein Löschantrag wird automatisiert innerhalb der Frist erfüllt.
+31. **Benachrichtigungen, die Nutzung auslösen** (M46): Mails bei Kurs-Zuweisung, neuer Abgabe, Bewertung, Zertifikat, Kontingent 80 %, Planänderung; Bounce-Webhook; Reply-To je Mandant. Erst danach Glocke und Push aus derselben Ereignisquelle.
 
 ### 5.4 Einfrieren oder streichen
 
 1. **Marketplace einfrieren**, bis der erste Mandant eigene kostenpflichtige Kurse verkauft. 0 Listings, offene Steuerfrage (Merchant of Record, SPEC §9.4), Käufer-Selbstregistrierung ungeklärt. Der Code bleibt, der Schalter bleibt aus.
 2. **Schichtplan als getrenntes Produkt betrachten.** Er teilt mit dem LMS nur Auth und Mandanten. Entweder er bekommt eigene Vertriebsziele und eine eigene Roadmap, oder er wird nach Block S6 eingefroren. Beides ist vertretbar; parallel weiterzubauen, während der LMS-Kern ungenutzt ist, ist es nicht.
 3. **Dritte und vierte Sprache** nicht vor dem ersten Kunden erweitern. Die Parität de/en/bs ist vollständig; jede weitere Funktion kostet drei Übersetzungen.
-4. **Kein weiterer Funktionsbereich** (Kommentare, Gamification, Lernpfade, SSO), bevor Position 19 erreicht ist.
+4. **Kunden-Area, Web-Push und PWA-Ausbau einfrieren.** Kein Prüfbereich hat die Kunden-Area als nötig für den ersten Kunden identifiziert; Push hat 0 Abonnements und ist auf Workers nie verifiziert. Ereignisse zuerst per Mail.
+5. **Marketing-Skills-Branch nicht ins Produkt-Repo mergen.** 483 Dateien unter `.claude/tools` gehören in ein eigenes Repo, nicht in den Deploy-Pfad der Plattform.
+6. **Kein weiterer Funktionsbereich** (Kommentare, Gamification, Lernpfade, SSO), bevor Position 20 erreicht ist.
 
 ---
 
 ## 6. Entscheidungen, die nur Josip treffen kann
 
-1. Marketing-Skills-Branch mergen oder schließen (483 Dateien im Repo).
-2. Supabase Pro (25 USD/Monat) für Backups und Session-Timeouts, oder eigener `pg_dump`-Cron.
-3. Stripe: nur Kartenzahlung zulassen oder asynchrone Zahlarten korrekt behandeln (H5).
-4. Schichtplan: eigenes Produkt oder Einfrieren nach S6.
-5. Marketplace: Einfrieren bis zur steuerlichen Klärung des Merchant-of-Record-Modells.
-6. Vertreter in der Union nach Art. 27 DSGVO benennen (offen seit 24.08.).
-7. Anwaltliche Prüfung der AGB, Datenschutz und AVV vor dem ersten echten Kauf.
-8. Trainer-Rolle: SPEC §2 durchsetzen (H8) oder SPEC an das heutige, weitere Rechtebild anpassen.
-9. `login_copyright` für SalesTalent, Selbstregistrierung für Marketplace-Käufer (beides seit August offen).
+1. **Zielkunde der nächsten 30 Tage.** Entweder ein B2B-Mandant mit eigenen Mitarbeitenden (interne Akademie, CSV-Import, „alle Kurse für alle") oder ein Kursverkäufer mit Endkunden (Einschreibungs-Gating, Stripe, Widerruf, Rechnung). Die Antwort bestimmt, ob Position 14 (Einschreibungs-Gating) oder Position 21 (Self-Service) zuerst kommt.
+2. **Standardverhalten Kurszugriff.** „Alle veröffentlichten Kurse für alle Mitglieder" (heute) als Mandanten-Schalter behalten, oder Einschreibung als Standard; betrifft alle bestehenden Mandanten.
+3. **Laufende Kosten.** Supabase Pro (25 USD/Monat: Backups, Session-Timeouts, keine Pausierung) und Cloudflare Workers Paid (5 USD/Monat: Build-Größe, Logs) freigeben, oder Backups per eigenem Cron lösen.
+4. **Sprachen, die verkauft werden.** Nur Deutsch, Deutsch und Englisch, oder auch Bosnisch; bei Bosnisch sind eine inhaltliche Prüfung von `messages/bs.json` und die Lokalisierung von Admin, Editor und Zertifikat fällig.
+5. Marketing-Skills-Branch mergen oder schließen (483 Dateien im Repo).
+6. Supabase Pro (25 USD/Monat) für Backups und Session-Timeouts, oder eigener `pg_dump`-Cron.
+7. Stripe: nur Kartenzahlung zulassen oder asynchrone Zahlarten korrekt behandeln (H5).
+8. Schichtplan: eigenes Produkt oder Einfrieren nach S6.
+9. Marketplace: Einfrieren bis zur steuerlichen Klärung des Merchant-of-Record-Modells.
+10. Vertreter in der Union nach Art. 27 DSGVO benennen (offen seit 24.08.).
+11. Anwaltliche Prüfung der AGB, Datenschutz und AVV vor dem ersten echten Kauf.
+12. Trainer-Rolle: SPEC §2 durchsetzen (H8) oder SPEC an das heutige, weitere Rechtebild anpassen.
+13. `login_copyright` für SalesTalent, Selbstregistrierung für Marketplace-Käufer (beides seit August offen).
 
 ---
 
 ## 7. Vorgehen und Grenzen dieser Analyse
 
 1. **Ablauf.** Am 08.09.2026 ab 16:12 UTC: Repo geklont, Abhängigkeiten installiert, Baseline (tsc, ESLint, Vitest) gefahren, Live-Datenbank und Cloudflare per MCP abgefragt, die drei ungemergten Branches gelesen. Danach ein Agenten-Lauf mit 14 geplanten Fachbereichen, je einem lesenden Prüf-Agenten und einem Gegenprüfer, einem Vollständigkeits-Kritiker und einem Strategie-Panel.
-2. **Was tatsächlich lief.** Der Lauf wurde dreimal vom Nutzungslimit der Sitzung unterbrochen (Reset 20:50 UTC und 01:50 UTC). Durchgelaufen sind 9 Bereichs-Prüfer mit zusammen 175 Funden sowie eine abschließende Synthese. Die drei Bereiche Toolchain/Betrieb, Performance und Datenmodell habe ich ohne Agenten selbst geprüft; ihre Befunde stehen in den Abschnitten 2, 4.2 und 3.3 (M11). Die automatische Gegenprüfung ist ausgefallen. Ersatzweise habe ich alle kritischen und hohen Befunde aus den Bereichen RLS, Auth, API und Kurse selbst am Code nachvollzogen, ebenso H11, H12, H16, H18, H20, M26 und die Kontrastwerte. Befunde ohne diesen Vermerk stammen aus der Agenten-Prüfung mit Beleg (Datei und Zeile), sind aber nicht unabhängig bestätigt; Anhang A führt sie vollständig.
+2. **Was tatsächlich lief.** Der Lauf wurde dreimal vom Nutzungslimit der Sitzung unterbrochen (Reset 20:50 UTC und 01:50 UTC). Durchgelaufen sind 11 Bereichs-Prüfer mit zusammen 217 Funden sowie eine abschließende Synthese, deren Roadmap ich mit meiner eigenen abgeglichen und in die Abschnitte 5 und 6 eingearbeitet habe (übernommen: Portal-Status, Self-Service, DSGVO-Paket, Attrappen, Einfrier-Liste, Zielkunden-Entscheidung). Die drei Bereiche Toolchain/Betrieb, Performance und Datenmodell habe ich ohne Agenten selbst geprüft; ihre Befunde stehen in den Abschnitten 2, 4.2 und 3.3 (M11). Die automatische Gegenprüfung ist ausgefallen. Ersatzweise habe ich alle kritischen und hohen Befunde aus den Bereichen RLS, Auth, API und Kurse selbst am Code nachvollzogen, ebenso H11, H12, H16, H18, H20, H21, H22, M26, M49 und die Kontrastwerte. Befunde ohne diesen Vermerk stammen aus der Agenten-Prüfung mit Beleg (Datei und Zeile), sind aber nicht unabhängig bestätigt; Anhang A führt sie vollständig.
 3. **Nicht geprüft.** Playwright-Suite (keine `.env`, kein Dev-Server), Lighthouse und LCP, ein echter Stripe-Testkauf, Bunny-Upload und Transkription, Deploy-Ablauf, die Word-Dokumente (AVV, TOM), der Website-Branch im Repo `calltalent-website`, die Inhalte von `messages/bs.json` über Stichproben hinaus.
 4. **Live-Zugriff.** Nur lesend: Advisor, Migrationsliste, Zeilenzahlen, Mandantenliste, Muster der Auth-Konten. Es wurde nichts in Supabase, Cloudflare oder im Repo `main` verändert.
 5. **Vorarbeit.** Der Ruflo-Bericht vom 07.09. (Branch `claude/ruflo-swarm-hierarchical-0trzqy`, PHASENSTATUS-Abschnitt „Projektrevision 07.09.2026") war Ausgangspunkt; seine 18 offenen Code-Punkte und 15 Punkte für Josip gelten weiter und sind hier nicht wiederholt, außer wo sich Schwere oder Lösung geändert hat.
@@ -336,7 +373,7 @@ Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agent
 
 ## Anhang A: Alle Funde der Bereichs-Prüfer
 
-175 Funde aus 9 Bereichen, sortiert nach Schwere: kritisch 3, hoch 36, mittel 85, niedrig 51. Status: neu = in diesem Lauf erstmals belegt; bekannt = stand im Ruflo-Bericht vom 07.09.; Branch = auf einem ungemergten Branch behoben. Die Funde der Bereiche Quiz, Zahlungen, Schichtplan, KI und Barrierefreiheit sind nicht gegengeprüft, außer wo Abschnitt 3 ausdrücklich eine eigene Prüfung nennt.
+217 Funde aus 11 Bereichen, sortiert nach Schwere: kritisch 3, hoch 44, mittel 107, niedrig 63. Status: neu = in diesem Lauf erstmals belegt; bekannt = stand im Ruflo-Bericht vom 07.09.; Branch = auf einem ungemergten Branch behoben. Die Funde der Bereiche Quiz, Zahlungen, Schichtplan, KI, Barrierefreiheit, Produkt und Portal sind nicht gegengeprüft, außer wo Abschnitt 3 ausdrücklich eine eigene Prüfung nennt.
 
 | Bereich | Schwere | Art | Status | Fundstelle | Titel |
 |---|---|---|---|---|---|
@@ -356,6 +393,14 @@ Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agent
 | KI | hoch | risk | neu | `src/lib/video/transcript.ts:118` | Kein Kostendeckel für nicht-kontingentierte KI-Posten (Bunny-Transkription 0,10 $/Min, Haiku-Übersetzung, Zusammenfassung, Embeddings) |
 | Kurse | hoch | bug | neu | `src/app/(learn)/kurs/[slug]/l/[lessonId]/page.tsx:88` | Lektionsreihenfolge in der Lernansicht falsch bei mehreren Sektionen pro Modul (Positionen sektionsweit, Sortierung modulweit) |
 | Kurse | hoch | gap | neu | `supabase/migrations/0001_init.sql:465` | Kein Einschreibungs-Gating: jedes aktive Mitglied sieht und absolviert jeden veröffentlichten Kurs des Mandanten |
+| Portal | hoch | bug | neu | `src/lib/tenant/resolve.ts:137` | Portal-Status „Trial“ schaltet die Akademie ab; „Gesperrt“ zeigt Dev-Hinweis statt Sperrseite; API-Keys gesperrter Mandanten laufen weiter |
+| Portal | hoch | gap | neu | `src/app/profil/actions.ts:63` | Art. 17: Löschanträge werden nie bearbeitet: es existiert im gesamten Code kein Pfad, der ein Nutzerkonto löscht |
+| Portal | hoch | gap | neu | `supabase/migrations/0001_init.sql:19` | Keine Abrechnung der Mandanten: kein Trial-Ablauf, keine Rechnungsdaten, kein Abo je Mandant (149/249 €) |
+| Portal | hoch | gap | neu | `src/app/portal/mandanten/[id]/export/route.ts:102` | Beide DSGVO-Exporte unvollständig: Mandanten-Export ohne 22 tenant_id-Tabellen (u. a. alle calendar_*), Selbst-Export ohne Lesezeichen/Push/Löschanträge |
+| Portal | hoch | risk | neu | `src/app/(legal)/layout.tsx:38` | Neue Mandanten haben kein Impressum/Datenschutz (404): tenants.legal.entity ist weder im Portal noch im Admin pflegbar |
+| Produkt | hoch | gap | neu | `src/app/(admin)/admin/einstellungen/page.tsx:23` | Kein Self-Service für Branding, Tutor-Schalter und Domain im Mandanten-Admin: `/admin/design` aus SPEC §4.2 existiert nicht |
+| Produkt | hoch | gap | neu | `src/lib/users/import.ts:313` | Keine Rollenverwaltung in der Oberfläche: Einladung/Import erzeugen immer `member`, kein Weg zu admin/trainer |
+| Produkt | hoch | improvement | neu | `src/app/(admin)/admin/page.tsx:273` | Kein geführter Erststart: leere Mandanten ohne Onboarding-Checkliste, Demo-Kurs oder CTA: nach zwei Monaten 0 Kurse in der Live-DB |
 | Quiz | hoch | bug | neu | `supabase/migrations/20260907091500_quiz_attempt_limit_rpc.sql:65` | Ruflo-Branch: RPC submit_quiz_attempt sperrt Marketplace-Gäste vom Quiz aus (Regression) |
 | Quiz | hoch | bug | neu | `src/lib/reporting/queries.ts:299` | Reporting zählt nur Einschreibungen, Lernzugang ist aber nicht einschreibungsgebunden – Lernende fehlen im Bericht |
 | RLS | hoch | gap | neu | `supabase/migrations/0001_init.sql:465` | Einschreibungen steuern für reguläre Mitglieder keinen Zugriff: jedes Mitglied sieht alle veröffentlichten Kurse, Abo-Kündigung entzieht nichts |
@@ -418,6 +463,28 @@ Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agent
 | Kurse | mittel | improvement | neu | `src/lib/courses/actions.ts:799` | Pflicht-Hierarchie Kurs -> Modul -> Sektion -> Lektion verletzt die 3-Klick-Regel; keine sinnvollen Standardwerte |
 | Kurse | mittel | gap | neu | `src/components/admin/course-editor-steps.tsx:96` | Keine Vorschau im Kurs-Editor; Entwurfs-Lektionen sind für Staff nirgends als Lernender ansehbar (SPEC 4.2) |
 | Kurse | mittel | improvement | neu | `src/lib/courses/actions.ts:51` | Kein Kurs-Duplizieren, keine Kursvorlagen, kein Kurs-Export (nur Import) |
+| Portal | mittel | bug | neu | `src/lib/users/import.ts:105` | CSV-Import: Willkommensmails aller Zeilen gleichzeitig: scheitert am Resend-Limit, unsichtbar in der UI; DoD-Messung 100 < 30 s veraltet |
+| Portal | mittel | bug | neu | `src/lib/account/actions.ts:105` | Benachrichtigungs-Einstellungen sind Attrappen: notification_prefs wird von keinem Mailpfad gelesen, fünf der sechs Toggles beschreiben Mails, die es nicht gibt |
+| Portal | mittel | gap | neu | `src/lib/submissions/actions.ts:214` | Fehlende Ereignis-Mails gegenüber SPEC „E-Mail-Benachrichtigungen“: keine Mail bei neuer Abgabe an Trainer, bei Kurs-Zuweisung, Löschantrag, Kontingent-Ende, Trial-Ablauf |
+| Portal | mittel | risk | neu | `src/lib/email/client.ts:73` | Kein Bounce-/Complaint-Handling: harte Bounces werden unbegrenzt weiter angeschrieben, Domain-Reputation von calltalent.ai für alle Mandanten gefährdet |
+| Portal | mittel | improvement | neu | `src/lib/email/client.ts:31` | Absender fest noreply@calltalent.ai, kein Reply-To: Antworten auf Kontaktanfragen und Systemmails laufen ins Leere; kein White-Label-Versand |
+| Portal | mittel | gap | neu | `src/app/(admin)/admin/teilnehmer/[id]/page.tsx:108` | Nutzerverwaltung unter SPEC §4.2: kein Rollenwechsel, keine Kurs-Zuweisung für bestehende Nutzer, kein Fortschritts-Popup, keine Gruppen in der Liste |
+| Portal | mittel | gap | neu | `supabase/migrations/0001_init.sql:384` | audit_log wird nirgends geschrieben: sicherheitsrelevante Aktionen hinterlassen keine Spur |
+| Portal | mittel | risk | neu | `src/app/(legal)/privacy/page.tsx:22` | Datenschutzerklärung deckt reale Verarbeitung nicht ab: Schichtplan/Zeiterfassung (Art. 9), Web-Push, Bunny-Transkription, KI-Planung/Generator-Uploads fehlen; kein Art.-27-Vertreter-Abschnitt |
+| Portal | mittel | bug | neu | `src/lib/account/actions.ts:98` | changeEmail() ohne zod/Rate-Limit und mit rohem Supabase-Fehlertext (Enumeration); updateProfile() ohne Längenlimits |
+| Portal | mittel | risk | neu | `src/lib/platform/auth.ts:35` | Betreiber-Portal ohne MFA, ohne Admin-Verwaltung und ohne Papierkorb: ein kompromittiertes Platform-Admin-Konto löscht alle Mandanten endgültig |
+| Portal | mittel | gap | neu | `src/app/portal/mandanten/[id]/mandant-edit-form.tsx:130` | „Mandant in 5 Minuten“ ist nur die Datenbankzeile: Custom Domain/SSL, Supabase-Redirect-URLs und Rechtsträger bleiben Handarbeit; keine Onboarding-Checkliste |
+| Produkt | mittel | gap | neu | `supabase/migrations/0001_init.sql:93` | Drip-Content (zeitgesteuerte Freischaltung, SPEC §3 Should) ist nicht umgesetzt |
+| Produkt | mittel | gap | neu | `supabase/migrations/0001_init.sql:465` | Keine Kurs-Zuweisung je Nutzer: jedes Mitglied sieht alle veröffentlichten Kurse, Einschreibung nur beim Einladen/Kauf/API |
+| Produkt | mittel | gap | neu | `src/components/layout/Sidebar.tsx:308` | Semantische Suche ist für Lernende unerreichbar; der Sidebar-Button „Suchen …" klappt nur die Sidebar ein |
+| Produkt | mittel | gap | neu | `src/components/learn/app-shell.tsx:166` | Benachrichtigungszentrale ist eine Attrappe (immer leer), Web-Push feuert nur bei einem Ereignis, live 0 Abos |
+| Produkt | mittel | gap | neu | `src/lib/import/course-import.ts:29` | Migrations-Importer entspricht nicht CLAUDE.md §6.4 („CSV + Video-Reupload") und ist ohne Format-Doku/Beispieldatei für Kunden unbenutzbar |
+| Produkt | mittel | gap | neu | `src/components/admin/api-keys-panel.tsx:1` | Zapier/Make-Dokumentation (SPEC §3 Should) und jede API-/Webhook-Doku fehlen: live 0 API-Keys, 0 Webhooks |
+| Produkt | mittel | risk | bekannt | `PHASENSTATUS.md:760` | DoD-Kriterien aus SPEC §8 sind teils nie gemessen, teils veraltet belegt (Tutor 10+2, 3 PDFs < 10 Min, Domain < 5 Min, Lighthouse, Stripe-E2E) |
+| Produkt | mittel | improvement | neu | `src/lib/ai/config.ts:69` | Kein Trial-/Abrechnungsmodell je Mandant, keine Self-Service-Anlage; Enterprise unterscheidet sich technisch nur im KI-Kontingent |
+| Produkt | mittel | improvement | neu | `src/lib/courses/actions.ts:1` | Kurs duplizieren, Kursvorlagen und „Kurs in Kundenmandant kopieren" fehlen: kein Weg, Calltalent-Inhalte an Kunden zu verteilen |
+| Produkt | mittel | gap | bekannt | `src/lib/marketplace/fulfil.ts:99` | Marketplace-Selbstregistrierung fehlt: der einzige öffentliche Akquise-Kanal endet für Neukunden bei einer E-Mail an office@ |
+| Produkt | mittel | risk | neu | `playwright.config.ts:50` | E2E- und manuelle Testläufe schreiben in die Produktions-Datenbank; 104 synthetische Testkonten liegen live |
 | Quiz | mittel | bug | neu | `src/app/(admin)/admin/page.tsx:62` | Admin-Dashboard lädt progress/enrollments/memberships ohne Paginierung – KPIs ab 1000 Zeilen falsch |
 | Quiz | mittel | gap | neu | `src/app/(admin)/admin/page.tsx:187` | Dashboard-KPIs weichen von SPEC §4.2 ab: keine „aktive Lernende 30 T.“, Abschlussquote anders definiert als im Reporting |
 | Quiz | mittel | gap | neu | `src/app/(admin)/admin/page.tsx:156` | Admin-Dashboard ohne i18n – alle Texte hartkodiert Deutsch (Verstoß CLAUDE.md §3.5) |
@@ -491,6 +558,18 @@ Reihenfolge nach Wirkung je Aufwand für einen Einzelbetreiber, der mit KI-Agent
 | Kurse | niedrig | improvement | neu | `src/components/editor/block-form.tsx:283` | Text-Block: veraltetes execCommand-WYSIWYG ohne Listen, Überschriften, Links; Schema erlaubt mehr als der Editor erzeugen kann |
 | Kurse | niedrig | risk | neu | `src/app/api/bunny/webhook/route.ts:93` | Bunny-Webhook startet kostenpflichtige Transkription für jedes Video der Library mit fest 'de' als Sprache |
 | Kurse | niedrig | improvement | neu | `src/lib/bookmarks/actions.ts:19` | Keine Lernnotizen je Lektion; Lesezeichen sind nur ein Toggle ohne Text oder Zeitmarke |
+| Portal | niedrig | gap | neu | `src/lib/import/actions.ts:43` | Migrations-Importer nur für hausinternes JSON: kein CSV, kein Fremdformat, keine Nutzer im selben Lauf |
+| Portal | niedrig | gap | neu | `src/app/portal/mandanten/[id]/mandant-detail-tabs.tsx:12` | Kontingente nur planweit: keine Überschreibung je Mandant, kein Zusatzpaket (29 €/1.000), Portal zeigt Verbrauch ohne Limit, unbekannte ai_jobs-Arten roh |
+| Portal | niedrig | improvement | Branch | `src/lib/contact/actions.ts:32` | Kontaktformular auf main nur mit IP-Rate-Limit: Honeypot/Form-Token/Turnstile/Spam-Muster liegen fertig auf Branch 2 |
+| Portal | niedrig | improvement | Branch | `src/lib/users/actions.ts:22` | Einzel-Einladung und erneuter Einladungslink ohne Rate-Limit (Mailversand an fremde Adressen): auf Branch 1 behoben |
+| Portal | niedrig | improvement | neu | `src/lib/users/import.ts:152` | E-Mail-Sprache folgt der Mandanten-Standardsprache, nicht der gewählten Sprache des Empfängers |
+| Portal | niedrig | bug | neu | `src/lib/platform/actions.ts:633` | removeTenantDomain() ignoriert Datenbankfehler still: Domain bleibt scheinbar entfernt |
+| Produkt | niedrig | gap | neu | `README.md:5` | SPEC.md und README.md sind in mehreren Punkten überholt (Routen, entschiedene Fragen, Rechtsträger, Projektstatus) |
+| Produkt | niedrig | gap | neu | `src/components/layout/AdminSidebar.tsx:127` | Trainer sehen in der Admin-Navigation Sackgassen-Links (Teilnehmer, Einstellungen), die mit „Kein Zugriff" antworten |
+| Produkt | niedrig | improvement | neu | `src/lib/stripe/checkout.ts:137` | Keine Gutschein-/Rabattcodes im Stripe-Checkout (`allow_promotion_codes` fehlt), keine Bundles |
+| Produkt | niedrig | improvement | neu | `src/app/(learn)/kurs/[slug]/information/page.tsx:49` | Keine öffentliche Kurs-Landingpage auf der Mandanten-Domain: die Informationsseite erzwingt Login |
+| Produkt | niedrig | gap | neu | `src/app/manifest.ts:47` | PWA: Manifest-Sprache fest „de", Offline-Shell praktisch leer, Installierbarkeit/Push nie live bestätigt |
+| Produkt | niedrig | improvement | neu | `-:-` | Could-Features (Kommentare je Lektion, Lernpfade, Gamification, SSO) sämtlich nicht begonnen: Priorisierungsvorschlag |
 | Quiz | niedrig | bug | neu | `src/app/(admin)/admin/page.tsx:124` | Dashboard-Wochenbalken lassen jeden siebten Tag aus (Bucket-Spanne 6 Tage, Lücke von 24 h) |
 | Quiz | niedrig | bug | neu | `src/app/(admin)/admin/page.tsx:140` | „Letzte Aktivität“ nimmt drei zufällige Mitgliedschaften statt der neuesten |
 | Quiz | niedrig | improvement | neu | `src/app/(admin)/admin/abgaben/page.tsx:56` | Abgaben-Inbox, Teilnehmerliste und Reporting ohne Pagination; Inbox lädt vollen Text aller Abgaben |
