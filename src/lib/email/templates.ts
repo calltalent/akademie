@@ -555,3 +555,86 @@ export async function shiftChangeRequestSubmitted({
   `;
   return renderLayout({ tenantName, accentColor, heading: t("shiftChangeRequestSubmitted.heading"), bodyHtml, locale, t });
 }
+
+// =====================================================================
+// Affiliate-System Block B5 (11.09.2026) — Storno, Rückbuchung und
+// Wiedergutschrift. Bestehende Vorlagen oben UNVERÄNDERT.
+// =====================================================================
+
+/**
+ * Der Anlass der Nachricht (PLAN_Affiliate-System.md 5.8):
+ *
+ *   `refund`   — der Händler hat (teilweise) erstattet;
+ *   `dispute`  — der Käufer hat zurückgebucht (Chargeback);
+ *   `recredit` — der Streitfall wurde gewonnen, die Provision kommt zurück.
+ *
+ * Alle drei in EINER Vorlage, wie `shiftChangeRequestDecided()` Zustimmung und
+ * Ablehnung in einer führt: Aufbau, Betragszeile und Fuß sind identisch, nur
+ * der erklärende Satz unterscheidet sich. Drei Vorlagen wären drei Orte, an
+ * denen dasselbe Layout auseinanderlaufen kann.
+ */
+export type AffiliateReversalReason = "refund" | "dispute" | "recredit";
+
+/**
+ * Storno-/Wiedergutschrift-Benachrichtigung an den Partner.
+ *
+ * `amountLabel` kommt FERTIG FORMATIERT herein ("26,47 €") — wie `shiftLabel`
+ * in den Schichtplan-Vorlagen. Die Vorlage rechnet und formatiert nicht: der
+ * Betrag steht in Cent in `affiliate_commissions`, und die Währung gehört zur
+ * Zeile (5.11), nicht zur Sprache des Empfängers.
+ *
+ * Es steht bewusst KEIN Käufer- oder Bestelldetail in dieser Mail. Ein Partner
+ * sieht nie Käuferdaten — das ist in der Datenbank strukturell gesichert
+ * (3.11, letzter Absatz) und darf hier nicht durch die Hintertür wieder
+ * hereinkommen. `referenceLabel` ist deshalb für eine unverfängliche Angabe
+ * gedacht (Produktname oder Kampagne), nicht für Namen oder Adressen.
+ */
+export async function affiliateReversal({
+  tenantName,
+  recipientName,
+  reason,
+  amountLabel,
+  referenceLabel,
+  accentColor,
+  locale,
+  actionUrl,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  reason: AffiliateReversalReason;
+  amountLabel: string;
+  referenceLabel?: string;
+  accentColor?: string;
+  locale: Locale;
+  actionUrl?: string;
+}): Promise<string> {
+  const t = await getTranslations({ locale, namespace: "email" });
+  const isRecredit = reason === "recredit";
+  const bodyText = isRecredit
+    ? t("affiliateReversal.bodyRecredit", { tenantName: `<strong>${escapeHtml(tenantName)}</strong>` })
+    : reason === "dispute"
+      ? t("affiliateReversal.bodyDispute", { tenantName: `<strong>${escapeHtml(tenantName)}</strong>` })
+      : t("affiliateReversal.bodyRefund", { tenantName: `<strong>${escapeHtml(tenantName)}</strong>` });
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName, t)}</p>
+    <p style="margin:0 0 16px 0;">${bodyText}</p>
+    ${detailBlock(t("affiliateReversal.amountLabel"), amountLabel)}
+    ${referenceLabel ? detailBlock(t("affiliateReversal.referenceLabel"), referenceLabel) : ""}
+    <p style="margin:16px 0 24px 0;font-size:13px;color:#6b7280;">${
+      isRecredit ? t("affiliateReversal.noticeRecredit") : t("affiliateReversal.noticeReversal")
+    }</p>
+    ${actionUrl ? actionButton(actionUrl, t("affiliateReversal.actionButton"), accentColor) : ""}
+  `;
+
+  return renderLayout({
+    tenantName,
+    accentColor,
+    heading: isRecredit
+      ? t("affiliateReversal.headingRecredit")
+      : t("affiliateReversal.headingReversal"),
+    bodyHtml,
+    locale,
+    t,
+  });
+}

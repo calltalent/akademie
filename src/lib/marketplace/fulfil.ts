@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/email/client";
 import { orderPaid } from "@/lib/email/templates";
 import { resolveTenantEmailLocale } from "@/i18n/config";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
+import { recordAffiliateEvent } from "@/lib/affiliate/intake";
 import type { MarketplaceCheckoutMetadata } from "@/lib/stripe/schema";
 
 /**
@@ -119,12 +120,25 @@ export async function grantMarketplaceAccess(
  * Reihenfolge (Plan Abschnitt 5, Punkt "Bezahlter Kauf" > "`api/stripe/
  * webhook/route.ts` (geändert)"): orders-Upsert -> grantMarketplaceAccess()
  * -> Ledger-Eintrag -> enrollment.created-Dispatch (nur bei Neuanlage) ->
- * Bestätigungsmail (fail-soft).
+ * Bestätigungsmail (fail-soft) -> Affiliate-Aufnahme (NEU, B4).
+ *
+ * AFFILIATE (Block B4, PLAN_Affiliate-System.md 9.6): der vierte Parameter
+ * `event` ist neu und nicht optional. Er trägt `event.id` — die einzige
+ * Idempotenzquelle der Aufnahme (`unique (stripe_event_id)`, Plan 3.10) —
+ * sowie `event.type` und `event.livemode`; nichts davon steht auf der
+ * `Checkout.Session`. Bewusst NICHT optional: ein weggelassenes Argument
+ * hieße „Marketplace-Käufe still ohne Provision", also genau der lautlose
+ * Verlust, den die Outbox verhindern soll (G1). Der Plan nennt für B4 nur
+ * `handleCheckoutCompleted()` als Signaturänderung; diese hier ist die zweite
+ * und unvermeidlich, weil `handleCheckoutCompleted()` für Marketplace-Käufe
+ * vorzeitig abzweigt (`route.ts`) und die Aufnahme deshalb hier stattfinden
+ * muss — wer den Hook nur an den Direktkauf hängt, erwischt diese Käufe nie.
  */
 export async function handleMarketplacePurchase(
   admin: AdminClient,
   session: Stripe.Checkout.Session,
   metadata: MarketplaceCheckoutMetadata,
+  event: Stripe.Event,
 ): Promise<void> {
   const { tenant_id: tenantId, product_id: productId, user_id: userId, listing_id: listingId } = metadata;
 
@@ -213,6 +227,23 @@ export async function handleMarketplacePurchase(
   const grossCents = session.amount_total ?? 0;
   const { commissionCents, netCents } = computeCommission(grossCents, rateBp);
 
+  // BEKANNTE FOLGE DES AFFILIATE-MODULS (Plan 12.5, B4): bei einem
+  // Marketplace-Kauf MIT Affiliate-Zuordnung laufen ab jetzt ZWEI
+  // Provisionsrechnungen auf dasselbe Brutto — die Marktplatz-Provision hier
+  // und die Partner-Provision im Affiliate-Verarbeiter —, beide mit
+  // `Math.floor`. `net_cents` ist in dieser Tabelle als Verkäufer-Anteil
+  // definiert und bleibt es semantisch auch; es ist danach aber nicht mehr
+  // der Betrag, den der Verkäufer tatsächlich behält, weil die
+  // Affiliate-Provision ebenfalls aus dem Brutto kommt und diesen Anteil
+  // wirtschaftlich mindert. Der Plan ändert die Ledger-Semantik BEWUSST
+  // nicht: die Zeile ist ein Beleg über die Marktplatz-Provision, kein
+  // Auszahlungsbescheid. Wer die Zahl als „Auszahlung an den Verkäufer"
+  // auswertet (heute: `/portal/marketplace`), rechnet ab dann zu hoch. Die
+  // Reparatur wäre additiv — eine zusätzliche Spalte `affiliate_cents` —,
+  // keine Umarbeitung; sie ist hier ausdrücklich NICHT vorweggenommen, weil
+  // eine stillschweigende Umdeutung von `net_cents` schlimmer wäre als eine
+  // benannte Ungenauigkeit. Die Affiliate-Zeile selbst entsteht unten am Ende
+  // dieser Funktion.
   const { error: ledgerError } = await admin.from("marketplace_ledger").upsert(
     {
       tenant_id: tenantId,
@@ -245,6 +276,39 @@ export async function handleMarketplacePurchase(
   if (isNewOrder) {
     await sendMarketplacePurchaseMail(admin, tenantId, userId, courseId);
   }
+
+  // Affiliate B4 — Aufnahme in die Outbox (Plan 9.6). WIRFT bei jedem
+  // Datenbankfehler außer `23505` (G2): der Wurf erzeugt die 500-Antwort,
+  // auf die hin Stripe erneut zustellt. Idempotent über
+  // `unique (stripe_event_id)`, deshalb ohne `isNewOrder`-Bedingung — wirft
+  // ein früherer Schritt, wäre `isNewOrder` beim Retry `false` und die
+  // Aufnahme fiele dauerhaft aus (G3).
+  //
+  // ABWEICHUNG VOM PLAN, mit Absicht: 9.6 sagt „direkt neben dem
+  // `marketplace_ledger`-Upsert" und begründet das mit der Verfügbarkeit von
+  // `order.id`, `grossCents` und `currency`. Die stehen hier genauso zur
+  // Verfügung, der Aufruf sitzt aber ganz am ENDE der Funktion. Grund: die
+  // beiden Schritte zwischen Ledger und Ende sind an
+  // `enrollmentCreated`/`isNewOrder` gekoppelt und damit EINMALIG. Ein Wurf
+  // vor ihnen kostete sie dauerhaft — beim Stripe-Retry existieren
+  // Einschreibung und Bestellung bereits, beide Bedingungen sind `false`, der
+  // `enrollment.created`-Webhook des Mandanten und die Bestätigungsmail des
+  // Käufers unterblieben also für immer. Am Ende kostet derselbe Wurf nur
+  // einen Retry. Der Affiliate-Zeile fehlt dadurch nichts: sie braucht
+  // ausschließlich das Ereignis, den Mandanten und `order.id`.
+  //
+  // `tenantId` stammt aus der signaturgeprüften Session-Metadata, also aus
+  // derselben Quelle wie die `orders`-Zeile; der Betrag wird NICHT von hier
+  // durchgereicht, sondern in `intake.ts` aus dem Ereignis zerlegt, damit
+  // alle vier Einhängepunkte dieselbe Zerlegung benutzen.
+  //
+  // Praktisch entsteht hier nur dann eine Zuordnung, wenn ein Kunde über
+  // einen Mandanten-Link kam und anschließend ein Marketplace-Listing kaufte:
+  // der Promolink-Generator bietet Marketplace-Ziele gar nicht erst an, und
+  // `src/lib/marketplace/checkout.ts` bekommt bewusst KEINEN Metadata-Zusatz
+  // (Plan 4.7). Ohne Zuordnung trägt die Zeile `referral_token = null` und
+  // der Verarbeiter legt sie als `skipped/no_attribution` ab.
+  await recordAffiliateEvent(admin, event, { tenantId, orderId: order.id });
 }
 
 /**

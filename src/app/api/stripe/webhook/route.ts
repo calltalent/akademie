@@ -11,6 +11,7 @@ import { resolveTenantEmailLocale } from "@/i18n/config";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 import { genericErrorMessage } from "@/lib/errors/generic";
 import { handleMarketplacePurchase } from "@/lib/marketplace/fulfil";
+import { recordAffiliateEvent } from "@/lib/affiliate/intake";
 
 /**
  * Stripe-Webhook (Phase 2, Block 5). REIHENFOLGE STRENG WIE VORGEGEBEN:
@@ -27,6 +28,39 @@ import { handleMarketplacePurchase } from "@/lib/marketplace/fulfil";
  * (`orders.stripe_checkout_id`, `subscriptions.stripe_subscription_id`,
  * `enrollments(course_id, user_id)`) statt Fehler bei doppelter Zustellung
  * derselben Stripe-Zahlung.
+ *
+ * AFFILIATE (Block B4, PLAN_Affiliate-System.md 9.4 und 9.5): der Webhook tut
+ * fuer das Affiliate-Modul genau EINE Sache -- er schreibt ueber
+ * `recordAffiliateEvent()` eine Zeile in die Outbox `affiliate_events`. Die
+ * Provisionsrechnung laeuft danach im Cron-Verarbeiter
+ * (`src/lib/affiliate/process.ts`), damit ein Fehler in der Affiliate-Logik
+ * die Kauferfuellung strukturell nicht brechen kann (G1). Drei Regeln, die zu
+ * dieser Datei gehoeren:
+ *
+ *  1. Die Signaturpruefung bleibt die erste Handlung (CLAUDE.md §2.4). Die
+ *     beiden Aufnahmestellen liegen weit hinter ihr; `recordAffiliateEvent()`
+ *     wird nie aus einem ungeprueften Pfad gerufen (Plan 11.4).
+ *  2. Die Aufnahme steht NACH der Zugriffsgewaehr. Der Kaeufer hat seine
+ *     Mitgliedschaft und seine Einschreibung also bereits, bevor hier
+ *     irgendetwas schiefgehen kann.
+ *  3. `recordAffiliateEvent()` WIRFT bei jedem Datenbankfehler ausser `23505`
+ *     (G2). Der Wurf ist der Mechanismus, nicht ein Versehen: er erzeugt die
+ *     500-Antwort, auf die hin Stripe erneut zustellt. Ein
+ *     `try { … } catch { console.error() }` an dieser Stelle waere genau der
+ *     stille Verlust, den die Outbox verhindern soll.
+ *
+ * Ohne Affiliate-Zuordnung aendert sich am bestehenden Ablauf nichts: die
+ * Outbox-Zeile entsteht trotzdem (eine einzige INSERT-Anweisung), traegt
+ * `referral_token = null`, und der Verarbeiter legt sie als
+ * `skipped/no_attribution` ab -- es entsteht ausdruecklich KEINE
+ * Provisionszeile ueber 0 Cent (Plan 4.4 R9).
+ *
+ * BETRIEBSREIHENFOLGE (Plan Abschnitt 10): dieser Code setzt die angewendete
+ * Migration `…_affiliate_commissions.sql` voraus. Fehlt die Tabelle
+ * `affiliate_events`, wirft die Aufnahme -- wie bei jedem anderen
+ * Datenbankfehler -- und jeder Checkout-Webhook endet in 500 plus Stripe-Retry
+ * (der Zugriff des Kaeufers steht dann bereits). Erst anwenden, dann
+ * ausliefern.
  */
 export async function POST(request: Request) {
   const webhookSecret = getServerEnv().STRIPE_WEBHOOK_SECRET;
@@ -63,18 +97,46 @@ export async function POST(request: Request) {
   try {
     switch (event.type) {
       case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+        // Affiliate B4 (Plan 9.4): beide Behandler bekommen zusaetzlich das
+        // EREIGNIS. `recordAffiliateEvent()` braucht `event.id` (die einzige
+        // Idempotenzquelle der Aufnahme), `event.type` und `event.livemode`
+        // (Plan 4.5: Testbuchung) -- nichts davon steht auf dem Fachobjekt.
+        // Der Behandler selbst zerlegt das Ereignis nicht; das tut
+        // `src/lib/affiliate/intake.ts` fuer alle Einhaengepunkte gleich.
+        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session, event);
         break;
       case "invoice.paid":
-        await handleInvoicePaid(event.data.object as Stripe.Invoice);
+        await handleInvoicePaid(event.data.object as Stripe.Invoice, event);
         break;
       case "customer.subscription.updated":
       case "customer.subscription.deleted":
         await handleSubscriptionChanged(event.data.object as Stripe.Subscription);
         break;
+      // Affiliate B5 (Plan 9.3 und 10/B5): Storno, Rueckbuchung und
+      // gewonnener Streitfall. Die drei Zweige stehen NEBEN den bestehenden
+      // und aendern an ihnen nichts. Sie tun genau eine Sache -- die Aufnahme
+      // in die Outbox; gerechnet und gegengebucht wird im Cron-Verarbeiter
+      // (`src/lib/affiliate/reversal.ts`).
+      //
+      // ACHTUNG BETRIEB: die drei Ereignisarten muessen im Stripe-Dashboard am
+      // Endpunkt ABONNIERT sein (Plan 12.6). Fehlt das Abonnement, stellt
+      // Stripe sie gar nicht erst zu -- dieser Code laeuft dann nie, ohne dass
+      // irgendwo ein Fehler entsteht. Eine Erstattung bliebe still folgenlos,
+      // und die Provision dazu stuende weiter im Buch.
+      case "charge.refunded":
+      case "charge.dispute.created":
+      case "charge.dispute.closed":
+        await handleAffiliateChargeEvent(event);
+        break;
       default:
         // Unbehandelte Events bewusst ignorieren, kein Fehler - Stripe
         // erwartet nur 2xx fuer "angekommen", nicht fuer "relevant".
+        //
+        // Die drei Storno-Arten sind seit Block B5 oben verdrahtet. Wer hier
+        // eine WEITERE Art ergaenzt, traegt sie zusaetzlich in
+        // `AFFILIATE_EVENT_TYPES` (`src/lib/affiliate/intake.ts`) ein --
+        // andernfalls nimmt die Erlaubnisliste dort sie nicht auf, und die
+        // Aufnahme kehrt still zurueck.
         break;
     }
   } catch (e) {
@@ -86,7 +148,7 @@ export async function POST(request: Request) {
   return NextResponse.json({ received: true });
 }
 
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session, event: Stripe.Event) {
   const rawMetadata = session.metadata ?? {};
 
   // Marketplace M5 (Plan "ich-möchte-einen-eigenen-groovy-toast.md" Abschnitt
@@ -99,7 +161,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const marketplaceMeta = marketplaceCheckoutMetadataSchema.safeParse(rawMetadata);
   if (marketplaceMeta.success) {
     const admin = createAdminClient();
-    await handleMarketplacePurchase(admin, session, marketplaceMeta.data);
+    // Affiliate B4 (Plan 9.6): das Ereignis reist mit. Marketplace-Kaeufe
+    // zweigen hier vollstaendig ab und wuerden von einer Aufnahme, die nur am
+    // Direktkauf-Pfad haengt, nie erfasst.
+    await handleMarketplacePurchase(admin, session, marketplaceMeta.data, event);
     return;
   }
 
@@ -198,6 +263,29 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // unabhaengig vom Modus (Einmalkauf ODER Abo). Kuendigungen entfernen die
   // Einschreibung NICHT wieder (siehe handleSubscriptionChanged).
   await enrollFromProduct(admin, tenantId, userId, productId);
+
+  // Affiliate B4, Aufnahme in die Outbox (Plan 9.4). WIRFT bewusst -> 500 ->
+  // Stripe-Retry (G2). Die Stelle ist gewaehlt, nicht beliebig:
+  //
+  //  - NACH `grantPurchaseMembership()`/`enrollFromProduct()`, damit ein
+  //    Affiliate-Fehler den Kauf nie blockiert. Der Kaeufer hat seinen
+  //    Zugriff an diesem Punkt bereits.
+  //  - Die Idempotenz kommt aus `unique (stripe_event_id)` und AUSDRUECKLICH
+  //    NICHT aus `isNewOrder` (:132): wirft ein frueherer Schritt, existiert
+  //    die Bestellung beim Retry schon, `isNewOrder` waere `false` und die
+  //    Aufnahme fiele dauerhaft aus (G3). Deshalb steht hier keine Bedingung.
+  //  - `tenantId` und `order.id` stammen aus derselben geprueften Quelle wie
+  //    die soeben geschriebene `orders`-Zeile (`checkoutMetadataSchema`); der
+  //    Rest der Zeile (Betraege, Token, Zeitpunkt) wird in `intake.ts` aus
+  //    dem Ereignis zerlegt, damit alle vier Einhaengepunkte dieselbe
+  //    Zerlegung benutzen.
+  //
+  // Der bekannte offene Punkt daneben (`sendOrderPaidMail()` ist nicht per
+  // `isNewOrder` gegatet, PHASENSTATUS.md, offener Punkt 16) wird hier weder
+  // kopiert noch behoben (Plan 9.4). Er hat die angenehme Nebenwirkung, dass
+  // ein Wurf an dieser Stelle die Zahlungsmail nicht dauerhaft kostet: der
+  // Retry laeuft erneut bis hierher.
+  await recordAffiliateEvent(admin, event, { tenantId, orderId: order.id });
 
   await sendOrderPaidMail(admin, tenantId, userId, productId);
 }
@@ -383,9 +471,14 @@ function extractSubscriptionId(invoice: Stripe.Invoice): string | null {
   return null;
 }
 
-async function handleInvoicePaid(invoice: Stripe.Invoice) {
+async function handleInvoicePaid(invoice: Stripe.Invoice, event: Stripe.Event) {
   const subscriptionId = extractSubscriptionId(invoice);
-  if (!subscriptionId) return; // Rechnung ohne Abo-Bezug (z. B. Einmalkauf) - nichts zu tun.
+  // Rechnung ohne Abo-Bezug (z. B. Einmalkauf) - nichts zu tun. Auch fuer
+  // Affiliate nicht: wiederkehrende Provisionen entstehen ausschliesslich an
+  // einer Rechnung MIT Abo-Bezug (Plan 5.7/9.5), und der Verarbeiter legte
+  // eine solche Zeile ohnehin als `skipped/no_subscription` ab. Der Einmalkauf
+  // ist bereits ueber `checkout.session.completed` aufgenommen.
+  if (!subscriptionId) return;
 
   const admin = createAdminClient();
   let currentPeriodEnd: string | null = null;
@@ -410,6 +503,56 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
       error.message,
     );
   }
+
+  // Affiliate B4, Abo-Folgeraten (Plan 9.5) -- der EINZIGE Ort, an dem
+  // wiederkehrende Provisionen entstehen koennen. Steht am Ende, also nach
+  // dem bestehenden `subscriptions`-Update: der Wurf aus `recordAffiliateEvent()`
+  // (G2) fuehrt zu 500 und Stripe-Retry, und der Update oben ist idempotent,
+  // laeuft also gefahrlos erneut.
+  //
+  // `stripe_subscription_id` kommt aus `extractSubscriptionId()` und nicht aus
+  // der Zerlegung in `intake.ts`, damit die Abo-Kennung hier und in der
+  // `subscriptions`-Tabelle garantiert dieselbe ist (verschiedene
+  // Stripe-API-Versionen legen das Feld unterschiedlich ab, siehe dort).
+  // `orders.stripe_checkout_id` wird dafuer NICHT zweckentfremdet; den
+  // Mandanten loest der Verarbeiter ueber die Abo-Bindung auf (Plan 3.9).
+  await recordAffiliateEvent(admin, event, {
+    stripeInvoiceId: invoice.id ?? null,
+    stripeSubscriptionId: subscriptionId,
+  });
+}
+
+/**
+ * Affiliate B5 -- Aufnahme von `charge.refunded`, `charge.dispute.created` und
+ * `charge.dispute.closed` in die Outbox (Plan 9.3, 5.8).
+ *
+ * Alle drei Arten teilen sich diesen Behandler, weil der Webhook fuer alle
+ * drei exakt dasselbe tut: EINE Zeile in `affiliate_events` schreiben. Die
+ * Unterscheidung -- Vollstorno, Teilstorno, Betrugsflag, Wiedergutschrift --
+ * trifft der Verarbeiter aus der Nutzlast, die `src/lib/affiliate/intake.ts`
+ * beim Aufnehmen zerlegt (`amount_refunded`, `charge_amount`,
+ * `dispute_amount`, `dispute_status`).
+ *
+ * DREI EIGENSCHAFTEN, die zu dieser Stelle gehoeren:
+ *
+ *  1. KEIN `tenantId` im Kontext. Ein `Stripe.Charge` und ein
+ *     `Stripe.Dispute` tragen keine Session-Metadata; der Mandant ist zum
+ *     Aufnahmezeitpunkt schlicht nicht bekannt. Die Spalte ist dafuer nullbar,
+ *     und der Verarbeiter loest ihn ueber
+ *     `charge.payment_intent -> orders.stripe_payment_intent` bzw.
+ *     `charge.invoice -> affiliate_commissions.stripe_invoice_id` auf (3.10,
+ *     6.5 b). Hier zu raten waere schlechter als zu warten.
+ *  2. NICHTS AUSSER DER AUFNAHME. Es wird insbesondere nicht schon hier
+ *     `orders.refunded_cents` gesetzt: eine Erstattung ist erst dann
+ *     vollstaendig verarbeitet, wenn Gegenbuchung UND Bestellzustand stehen,
+ *     und das gehoert in EINEN wiederholbaren Vorgang (G1).
+ *  3. `recordAffiliateEvent()` WIRFT bei jedem Datenbankfehler ausser `23505`
+ *     (G2) -> 500 -> Stripe-Retry. Kein `try/catch` hier: ein verlorenes
+ *     Storno-Ereignis waere eine Provision, die niemand mehr zurueckholt.
+ */
+async function handleAffiliateChargeEvent(event: Stripe.Event) {
+  const admin = createAdminClient();
+  await recordAffiliateEvent(admin, event);
 }
 
 async function handleSubscriptionChanged(subscription: Stripe.Subscription) {

@@ -2280,6 +2280,18 @@
       "periodLabel": "Zeitraum",
       "referenceLabel": "Referenz",
       "actionButton": "Gutschrift herunterladen"
+    },
+    "affiliateReversal": {
+      "headingReversal": "Provision zurückgenommen",
+      "headingRecredit": "Provision wieder gutgeschrieben",
+      "bodyRefund": "eine von dir vermittelte Bestellung bei {tenantName} wurde ganz oder teilweise erstattet. Die Provision dazu nehmen wir im selben Verhältnis zurück.",
+      "bodyDispute": "zu einer von dir vermittelten Bestellung bei {tenantName} hat der Käufer das Geld zurückgebucht. Die Provision dazu nehmen wir deshalb zurück.",
+      "bodyRecredit": "die Rückbuchung zu einer von dir vermittelten Bestellung bei {tenantName} wurde gewonnen. Die zuvor zurückgenommene Provision schreiben wir dir wieder gut.",
+      "amountLabel": "Betrag",
+      "referenceLabel": "Vorgang",
+      "noticeReversal": "Der Betrag wird mit deinen künftigen Provisionen verrechnet. Eine bereits überwiesene Auszahlung fordern wir nicht zurück.",
+      "noticeRecredit": "Der Betrag steht wieder in deinem Guthaben und fließt in die nächste Auszahlung.",
+      "actionButton": "Kontoauszug ansehen"
     }
   },
   "maintenance": {

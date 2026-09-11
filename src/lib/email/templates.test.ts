@@ -3,6 +3,7 @@ import de from "../../../messages/de.json";
 import bs from "../../../messages/bs.json";
 import en from "../../../messages/en.json";
 import {
+  affiliateReversal,
   certificateIssued,
   confirmSignup,
   contactFormNotification,
@@ -424,5 +425,81 @@ describe("shiftChangeRequestSubmitted", () => {
     });
     expect(html).not.toContain("<img src=x onerror=alert(1)>");
     expect(html).toContain("&lt;img");
+  });
+});
+
+describe("affiliateReversal (Affiliate B5)", () => {
+  /**
+   * Diese Vorlage hat ZEHN Message-Keys in drei Sprachdateien. Ohne einen
+   * Test, der sie alle anfasst, ist ein Tippfehler oder ein in `bs.json`
+   * vergessener Schlüssel bis zur ersten echten Storno-Mail unsichtbar — der
+   * Mock oben wirft bei einem fehlenden Key, aber nur für Vorlagen, die auch
+   * gerendert werden. Deshalb wird hier jeder der drei Anlässe einmal in
+   * jeder Sprache gerendert.
+   */
+  const reasons = ["refund", "dispute", "recredit"] as const;
+
+  it("rendert alle drei Anlässe in allen drei Sprachen ohne fehlenden Message-Key", async () => {
+    for (const locale of ["de", "en", "bs"] as const) {
+      for (const reason of reasons) {
+        const html = await affiliateReversal({
+          tenantName: "Demo Akademie",
+          recipientName: "Erika Musterfrau",
+          reason,
+          amountLabel: "26,47 €",
+          referenceLabel: "Sommerkampagne",
+          locale,
+          actionUrl: "https://demo.example.invalid/partner/konto",
+        });
+        expect(html).toContain(`<html lang="${locale}">`);
+        expect(html).toContain("26,47 €");
+        expect(html).toContain("Sommerkampagne");
+      }
+    }
+  });
+
+  it("unterscheidet Wiedergutschrift und Rücknahme in Überschrift und Hinweis (de)", async () => {
+    const reversal = await affiliateReversal({
+      tenantName: "Demo Akademie",
+      reason: "refund",
+      amountLabel: "26,47 €",
+      locale: "de",
+    });
+    const recredit = await affiliateReversal({
+      tenantName: "Demo Akademie",
+      reason: "recredit",
+      amountLabel: "26,47 €",
+      locale: "de",
+    });
+
+    expect(reversal).toContain("Provision zurückgenommen");
+    expect(recredit).toContain("Provision wieder gutgeschrieben");
+    expect(reversal).not.toContain("Provision wieder gutgeschrieben");
+  });
+
+  it("lässt den Vorgangs-Block weg, wenn keine Referenz angegeben ist", async () => {
+    const html = await affiliateReversal({
+      tenantName: "Demo Akademie",
+      reason: "dispute",
+      amountLabel: "26,47 €",
+      locale: "de",
+    });
+    expect(html).not.toContain("Vorgang:");
+  });
+
+  it("escaped einen bösartigen Mandantennamen und eine bösartige Referenz", async () => {
+    // `referenceLabel` trägt Produktname oder Kampagne — beides vom Mandanten
+    // frei gewählt und damit nichts, dem eine HTML-Mail vertrauen darf.
+    const html = await affiliateReversal({
+      tenantName: "<script>alert(1)</script>",
+      reason: "refund",
+      amountLabel: "26,47 €",
+      referenceLabel: "<img src=x onerror=alert(2)>",
+      locale: "de",
+    });
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).not.toContain("<img src=x onerror=alert(2)>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("&lt;img src=x onerror=alert(2)&gt;");
   });
 });

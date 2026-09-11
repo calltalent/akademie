@@ -2280,6 +2280,18 @@
       "periodLabel": "Period",
       "referenceLabel": "Referenca",
       "actionButton": "Preuzmi knjižno odobrenje"
+    },
+    "affiliateReversal": {
+      "headingReversal": "Provizija povučena",
+      "headingRecredit": "Provizija ponovo odobrena",
+      "bodyRefund": "narudžba koju si posredovao kod {tenantName} je u cijelosti ili djelimično refundirana. Proviziju za nju povlačimo u istom omjeru.",
+      "bodyDispute": "kupac je povratio novac za narudžbu koju si posredovao kod {tenantName}. Zato povlačimo proviziju za nju.",
+      "bodyRecredit": "spor oko povrata novca za narudžbu koju si posredovao kod {tenantName} je dobijen. Prethodno povučenu proviziju ti ponovo odobravamo.",
+      "amountLabel": "Iznos",
+      "referenceLabel": "Transakcija",
+      "noticeReversal": "Iznos se prebija s tvojim budućim provizijama. Već doznačenu isplatu ne tražimo nazad.",
+      "noticeRecredit": "Iznos je ponovo u tvom saldu i ulazi u sljedeću isplatu.",
+      "actionButton": "Pogledaj izvod"
     }
   },
   "maintenance": {

@@ -2280,6 +2280,18 @@
       "periodLabel": "Period",
       "referenceLabel": "Reference",
       "actionButton": "Download credit note"
+    },
+    "affiliateReversal": {
+      "headingReversal": "Commission reversed",
+      "headingRecredit": "Commission credited back",
+      "bodyRefund": "an order you referred at {tenantName} has been refunded in full or in part. We are reversing the commission for it at the same ratio.",
+      "bodyDispute": "the buyer has charged back an order you referred at {tenantName}. We are therefore reversing the commission for it.",
+      "bodyRecredit": "the chargeback on an order you referred at {tenantName} was won. We are crediting the previously reversed commission back to you.",
+      "amountLabel": "Amount",
+      "referenceLabel": "Transaction",
+      "noticeReversal": "The amount is offset against your future commissions. We do not reclaim a payout that has already been transferred.",
+      "noticeRecredit": "The amount is back in your balance and goes into the next payout.",
+      "actionButton": "View account statement"
     }
   },
   "maintenance": {
