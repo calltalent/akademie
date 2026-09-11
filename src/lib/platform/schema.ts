@@ -194,6 +194,40 @@ export const tenantMarketplaceCommissionSchema = z.preprocess(
 );
 
 /**
+ * NEU (Affiliate B1, 10.09.2026, PLAN_Affiliate-System.md Abschnitt 9.8):
+ * Feature-Schema des Betreiber-Portals. Bis hierher hatte das Formular
+ * "Funktionen" (tenant-features-form.tsx) gar kein Schema — die fünf
+ * bestehenden Schalter werden in `updateTenantFeatures()` direkt als
+ * `formData.get("…") === "on"` gelesen, nur der Provisionssatz hat eines
+ * (`tenantMarketplaceCommissionSchema` oben). Das ist die einzige Stelle, an
+ * der der Plan (Zeile 2468: "`affiliateEnabled` im Feature-Schema") von einem
+ * Schema ausgeht, das es noch nicht gibt; es entsteht deshalb hier.
+ *
+ * Bewusst NUR mit dem neuen Feld statt gleich mit allen sechs Schaltern: eine
+ * Umstellung der fünf Bestandsschalter würde deren Polaritätsbehandlung im
+ * selben Schritt anfassen wie diese Freischaltung — ein stiller Umschlag dort
+ * wäre nicht auf den ersten Blick sichtbar. Die fünf können später einzeln
+ * nachziehen, das Schema ist dafür der vorgesehene Ort.
+ *
+ * Strenger als `=== "on"`: ein Wert, den ein Browser-Formular nie sendet
+ * (`affiliateEnabled=ja` aus einem gebastelten POST), wird zurückgewiesen
+ * statt stillschweigend als "aus" gelesen. Ein fehlendes Feld (`null` —
+ * Checkbox nicht angehakt) bleibt der reguläre Aus-Fall. Damit kann die
+ * Prüfung tatsächlich fehlschlagen, anders als bei einem
+ * `z.preprocess(v => v === "on", z.boolean())` (quiz/schema.ts:46), das jede
+ * Eingabe annimmt.
+ */
+const featureToggleSchema = z
+  .union([z.literal("on"), z.null(), z.undefined()], {
+    errorMap: () => ({ message: "Ungültiger Wert für einen Funktionsschalter." }),
+  })
+  .transform((v) => v === "on");
+
+export const tenantFeaturesSchema = z.object({
+  affiliateEnabled: featureToggleSchema,
+});
+
+/**
  * NEU (Marketplace M3): Pflicht-Begründung beim Ablehnen/Sperren eines
  * Listings im Betreiber-Portal (Plan Abschnitt 7: "Ablehnung mit
  * Pflicht-Begründung"). Auch für `suspendListing()` genutzt — bewusste

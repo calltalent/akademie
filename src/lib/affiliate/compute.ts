@@ -508,12 +508,18 @@ export function computeReversalDelta(input: AffiliateReversalInput): AffiliateRe
   // dem Ursprungsbetrag.
   const refunded = Math.min(Math.max(0, toInt(input.refunded_total_cents)), chargeTotal);
 
-  // BigInt, weil hier zwei CENT-Beträge multipliziert werden: bei einem
-  // fünfstelligen Eurobetrag auf beiden Seiten überschreitet das Produkt
-  // `Number.MAX_SAFE_INTEGER` und die Multiplikation würde ungenau. Bei
-  // `percentOf()` (Betrag mal höchstens 10 000) kann das nicht passieren.
-  // Beide Operanden sind hier nicht-negativ, die BigInt-Division schneidet
-  // deshalb nach unten ab und ist damit dasselbe `floor` wie überall sonst.
+  // BigInt, weil hier als einziger Stelle des Moduls zwei CENT-Beträge
+  // multipliziert werden und keiner der beiden Faktoren durch den Code
+  // begrenzt ist — `percentOf()` multipliziert mit höchstens 10 000, hier
+  // hängt die Obergrenze allein am Charge. Das Produkt übersteigt
+  // `Number.MAX_SAFE_INTEGER` (9 007 199 254 740 991) ab einem Charge von
+  // rund 1 000 000,00 EUR, und dann kippt das `floor` nachweislich: bei
+  // Charge 99 999 999, Vollerstattung und einer Zeile über 99 999 995 Cent
+  // liefert die Gleitkommarechnung 99 999 994 statt 99 999 995 — genau der
+  // Restcent, den das Zielwert-Verfahren nach G7 ausschließen soll. Der Fall
+  // steht als Test in `compute.test.ts`. Beide Operanden sind nicht-negativ,
+  // die BigInt-Division schneidet deshalb nach unten ab und ist damit
+  // dasselbe `floor` wie überall sonst.
   const target = Number(
     (BigInt(amount) * BigInt(refunded)) / BigInt(chargeTotal),
   );

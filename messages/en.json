@@ -1614,6 +1614,436 @@
         "jobNotFound": "Run not found.",
         "jobError": "Error: {error}"
       }
+    },
+    "affiliate": {
+      "eyebrow": "Sales · Partner programme",
+      "title": "Partner programme",
+      "description": "Partners, terms, commissions and payouts of the programme.",
+      "disabled": {
+        "heading": "Partner programme not enabled",
+        "body": "The partner programme is not enabled for this tenant. The platform operator enables it."
+      },
+      "nav": {
+        "overview": "Overview",
+        "partners": "Partners",
+        "conditions": "Commission terms",
+        "commissions": "Commissions",
+        "payouts": "Payouts",
+        "creatives": "Promotional material",
+        "settings": "Settings"
+      },
+      "overview": {
+        "title": "Overview",
+        "rangeLabel": "Period",
+        "range30": "30 days",
+        "range90": "90 days",
+        "range365": "12 months",
+        "clicks": "Clicks",
+        "sales": "Sales",
+        "availableCommission": "Available commission",
+        "reversalRate": "Reversal rate",
+        "unprocessedEvents": "{count} payment events have not been processed yet.",
+        "unprocessedEventsLink": "View events",
+        "flaggedCommissions": "{count} entries are flagged for review.",
+        "flaggedLink": "View entries",
+        "openApplications": "Open applications ({count})",
+        "openApplicationsEmpty": "No open applications.",
+        "topPartners": "Top partners",
+        "topPartnersEmpty": "No partner with revenue in this period yet.",
+        "recentCommissions": "Latest entries",
+        "recentCommissionsEmpty": "No entries in this period yet.",
+        "exportCsv": "Export CSV"
+      },
+      "partners": {
+        "title": "Partners",
+        "searchLabel": "Search partners",
+        "searchPlaceholder": "Name or email",
+        "tabs": {
+          "all": "All",
+          "pending": "Applications",
+          "active": "Active",
+          "suspended": "Suspended",
+          "rejected": "Rejected"
+        },
+        "columnName": "Name",
+        "columnCode": "Code",
+        "columnGroup": "Group",
+        "columnStatus": "Status",
+        "columnClicks": "Clicks (30 days)",
+        "columnSales": "Sales",
+        "columnAvailable": "Available",
+        "empty": "No partners in this view.",
+        "countSuffix": "{count} total",
+        "invite": {
+          "heading": "Invite a partner",
+          "description": "Creates an invitation link that is pre-approved. The partner sets up their account and code themselves.",
+          "emailLabel": "Email address",
+          "nameLabel": "Name",
+          "groupLabel": "Group",
+          "submit": "Create invitation link",
+          "pending": "Creating …",
+          "linkLabel": "Invitation link",
+          "copy": "Copy link",
+          "copied": "Link copied."
+        }
+      },
+      "partner": {
+        "backLink": "Back to the partner list",
+        "master": {
+          "heading": "Master data",
+          "nameLabel": "Name",
+          "companyLabel": "Company",
+          "emailLabel": "Email address",
+          "codeLabel": "Partner code",
+          "groupLabel": "Group",
+          "statusLabel": "Status",
+          "joinedLabel": "Member since",
+          "referredByLabel": "Referred by",
+          "applicationHeading": "Details from the application",
+          "applicationEmpty": "No details."
+        },
+        "condition": {
+          "heading": "Commission terms",
+          "effectiveRate": "Effective rate",
+          "origin": "Origin",
+          "originProgram": "Programme default",
+          "originGroup": "From group {name}",
+          "originPartner": "Rule for this partner",
+          "originProduct": "Rule for product {name}",
+          "editLink": "Edit commission terms"
+        },
+        "statement": {
+          "heading": "Account statement",
+          "empty": "No entries yet.",
+          "columnDate": "Date",
+          "columnProduct": "Product",
+          "columnBase": "Base",
+          "columnRate": "Rate",
+          "columnAmount": "Commission",
+          "columnStatus": "Status",
+          "more": "All entries of this partner"
+        },
+        "actions": {
+          "heading": "Actions",
+          "approve": "Approve",
+          "reject": "Reject",
+          "reasonLabel": "Reason",
+          "suspend": "Suspend",
+          "unsuspend": "Lift suspension",
+          "payoutHold": "Block payouts",
+          "payoutRelease": "Release payouts",
+          "manualEntry": "Manual entry",
+          "noteLabel": "Internal note",
+          "save": "Save",
+          "saved": "Saved.",
+          "pending": "Running …"
+        },
+        "banking": {
+          "heading": "Payment and tax details",
+          "complete": "Complete — a payout is possible.",
+          "incomplete": "Incomplete. Missing: {fields}",
+          "hint": "Bank details are not shown here. The partner maintains them themselves."
+        },
+        "audit": {
+          "heading": "Change log",
+          "empty": "No entries.",
+          "columnDate": "Time",
+          "columnActor": "User",
+          "columnAction": "Action"
+        }
+      },
+      "conditions": {
+        "title": "Commission terms",
+        "description": "The rule with the highest rank always applies. Rules of equal rank must not overlap in time.",
+        "defaultHeading": "Programme default",
+        "defaultRate": "Default rate",
+        "defaultBasis": "Commission base",
+        "listHeading": "Rules",
+        "columnRank": "Rank",
+        "columnScope": "Scope",
+        "columnProduct": "Product",
+        "columnKind": "Type",
+        "columnRate": "Rate",
+        "columnPeriod": "Period",
+        "empty": "No rules yet. The programme default applies.",
+        "scopeAll": "All partners",
+        "scopeGroup": "Group",
+        "scopePartner": "Partner",
+        "productAll": "All products",
+        "form": {
+          "heading": "Create a rule",
+          "scopeLabel": "Scope",
+          "partnerLabel": "Partner",
+          "groupLabel": "Group",
+          "productLabel": "Product",
+          "kindLabel": "Type",
+          "kindPercent": "Percentage",
+          "kindFixed": "Fixed amount",
+          "rateLabel": "Rate in percent",
+          "fixedLabel": "Amount in euros",
+          "validFromLabel": "Valid from",
+          "validToLabel": "Valid until (optional)",
+          "noteLabel": "Note",
+          "submit": "Save rule",
+          "pending": "Saving …",
+          "saved": "Rule saved.",
+          "delete": "Delete rule",
+          "overlapError": "A rule already exists for this scope within the selected period."
+        },
+        "calculator": {
+          "heading": "Calculator",
+          "partnerLabel": "Partner",
+          "productLabel": "Product",
+          "submit": "Calculate",
+          "result": "{rule} applies: {rate}. On {gross} gross that is {amount}.",
+          "ruleDefault": "The programme default",
+          "ruleNumbered": "Rule {rank}"
+        }
+      },
+      "commissions": {
+        "title": "Commissions",
+        "filter": {
+          "status": "Status",
+          "partner": "Partner",
+          "product": "Product",
+          "period": "Period",
+          "flagged": "Flagged only",
+          "test": "Test entries only",
+          "apply": "Apply filter",
+          "reset": "Reset filter",
+          "all": "All"
+        },
+        "columnDate": "Date",
+        "columnPartner": "Partner",
+        "columnProduct": "Product",
+        "columnCampaign": "Campaign",
+        "columnBase": "Base",
+        "columnRate": "Rate",
+        "columnAmount": "Amount",
+        "columnStatus": "Status",
+        "empty": "No entries for this filter.",
+        "detailsOpen": "Show calculation",
+        "detailsClose": "Hide calculation",
+        "reasonHeading": "Attribution",
+        "snapshotHeading": "Rule applied",
+        "reserveLabel": "of which reserve",
+        "reserveHint": "The reserve becomes available only after the reserve period has passed.",
+        "actions": {
+          "reverse": "Reverse",
+          "rebook": "Reassign",
+          "flag": "Flag",
+          "unflag": "Remove flag",
+          "reprocess": "Process again",
+          "pending": "Running …",
+          "done": "Done."
+        },
+        "manual": {
+          "heading": "Manual entry",
+          "partnerLabel": "Partner",
+          "amountLabel": "Amount in euros",
+          "reasonLabel": "Reason",
+          "submit": "Book",
+          "saved": "Entry created."
+        },
+        "exportCsv": "Export CSV"
+      },
+      "payouts": {
+        "title": "Payouts",
+        "tabs": {
+          "drafts": "Drafts",
+          "approved": "Released",
+          "exported": "Exported",
+          "paid": "Paid",
+          "history": "History"
+        },
+        "columnPartner": "Partner",
+        "columnPeriod": "Period",
+        "columnGross": "Gross",
+        "columnReversals": "Reversals",
+        "columnAmount": "Payout amount",
+        "columnTaxMode": "Tax treatment",
+        "columnMethod": "Payment method",
+        "columnCompleteness": "Completeness",
+        "columnReference": "Reference",
+        "columnDocument": "Document",
+        "empty": "No payouts in this view.",
+        "complete": "Complete",
+        "incomplete": "Incomplete. Missing: {fields}",
+        "releaseSelected": "Release selected",
+        "releaseConfirm": "Release {count} payouts totalling {amount}?",
+        "releaseConfirmYes": "Release",
+        "releaseConfirmNo": "Cancel",
+        "exportSepa": "Download SEPA XML",
+        "exportCsv": "Export CSV",
+        "markPaid": "Mark as paid",
+        "referenceLabel": "Payment reference",
+        "documentDownload": "Download credit note",
+        "blockedHeading": "Cannot be paid out",
+        "blockedReason": "{partner}: {reason}",
+        "taxMode": {
+          "regular": "Standard taxation",
+          "small_business": "Small business (section 19 UStG)",
+          "reverse_charge": "Reverse charge",
+          "non_eu": "Non-EU country"
+        },
+        "method": {
+          "sepa": "SEPA transfer",
+          "paypal": "PayPal",
+          "manual": "Manual"
+        }
+      },
+      "creatives": {
+        "title": "Promotional material",
+        "kind": {
+          "banner": "Banner",
+          "email": "Email template",
+          "text": "Text snippet",
+          "file": "File"
+        },
+        "empty": "No promotional material yet.",
+        "activeLabel": "Active",
+        "inactiveLabel": "Inactive",
+        "previewLabel": "Preview",
+        "form": {
+          "heading": "Add promotional material",
+          "kindLabel": "Type",
+          "titleLabel": "Title",
+          "fileLabel": "File",
+          "fileHint": "PNG, JPG, WEBP and PDF up to 5 MB are allowed.",
+          "bodyLabel": "Content",
+          "placeholderHint": "Placeholders: {linkToken} is replaced by the partner link, {nameToken} by the partner name.",
+          "submit": "Save",
+          "pending": "Saving …",
+          "saved": "Saved.",
+          "delete": "Delete"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "basics": {
+          "heading": "Basics and visibility",
+          "statusLabel": "Programme status",
+          "visibilityLabel": "Visibility",
+          "approvalLabel": "Applications",
+          "approvalManual": "Approve manually",
+          "approvalAuto": "Approve automatically"
+        },
+        "visibility": {
+          "private": "Private, not reachable",
+          "link": "Direct link only",
+          "public": "Publicly listed"
+        },
+        "commission": {
+          "heading": "Default terms and commission base",
+          "rateKindLabel": "Type",
+          "ratePercent": "Percentage",
+          "rateFixed": "Fixed amount",
+          "rateLabel": "Default rate in percent",
+          "fixedLabel": "Fixed amount in euros",
+          "basisLabel": "Commission base",
+          "basisNet": "Net, excluding tax",
+          "basisGross": "Gross",
+          "feeDeductionLabel": "Deduction for payment fees in percent",
+          "minLabel": "Minimum commission in euros",
+          "maxLabel": "Maximum commission in euros",
+          "currencyLabel": "Currency"
+        },
+        "attribution": {
+          "heading": "Attribution",
+          "modelLabel": "Model",
+          "modelLast": "Last click",
+          "modelFirst": "First click",
+          "cookieTtlLabel": "Attribution window in days",
+          "overwriteLabel": "Later click by another partner",
+          "overwriteAllow": "Allow overwriting",
+          "overwriteDeny": "Keep the first attribution",
+          "lifetimeLabel": "Permanent binding to the account",
+          "selfReferralLabel": "Self-referral",
+          "selfReferralBlock": "Do not pay",
+          "selfReferralFlag": "Pay, but flag",
+          "blocklistLabel": "Blocked referring sites",
+          "blocklistHint": "One domain per line."
+        },
+        "recurring": {
+          "heading": "Subscription behaviour",
+          "modeLabel": "Instalments paid",
+          "modeFirstOnly": "First instalment only",
+          "modeNPeriods": "The first instalments",
+          "modeAll": "All instalments",
+          "maxPeriodsLabel": "Number of instalments"
+        },
+        "money": {
+          "heading": "Money and periods",
+          "holdDaysLabel": "Holding period in days",
+          "reserveLabel": "Reserve in percent",
+          "reserveDaysLabel": "Reserve period in days",
+          "minPayoutLabel": "Minimum payout in euros",
+          "scheduleLabel": "Payout schedule",
+          "scheduleWeekly": "Weekly",
+          "scheduleSemiMonthly": "Twice a month",
+          "scheduleMonthly": "Monthly"
+        },
+        "tier2": {
+          "heading": "Second tier",
+          "enabledLabel": "Second tier active",
+          "basisLabel": "Calculation base",
+          "basisCommission": "Commission of the referred partner",
+          "basisRevenue": "Revenue of the referred partner",
+          "rateLabel": "Second tier rate in percent"
+        },
+        "texts": {
+          "heading": "Texts",
+          "descriptionLabel": "Programme description",
+          "termsLabel": "Partner terms",
+          "termsVersionLabel": "Version",
+          "termsVersionHint": "If the version is raised, every partner has to accept again.",
+          "applicationNoteLabel": "Note in the application form",
+          "applicationFieldsLabel": "Additional application fields"
+        },
+        "test": {
+          "heading": "Test mode",
+          "label": "Test mode active",
+          "hint": "Entries from test orders are created but never paid out."
+        },
+        "save": "Save settings",
+        "pending": "Saving …",
+        "saved": "Settings saved.",
+        "warnings": {
+          "holdDays": "The holding period is shorter than the statutory 14-day withdrawal period.",
+          "highRate": "The rate is above 50 percent.",
+          "combinedRate": "First and second tier together are above 60 percent.",
+          "basisChange": "The change applies to future entries only. Existing entries and running subscriptions stay as they are.",
+          "recurringAll": "Paying every instalment is an open-ended obligation."
+        }
+      },
+      "status": {
+        "program": {
+          "draft": "Draft",
+          "active": "Active",
+          "paused": "Paused"
+        },
+        "partner": {
+          "pending": "Application open",
+          "active": "Active",
+          "rejected": "Rejected",
+          "suspended": "Suspended"
+        },
+        "commission": {
+          "pending": "Holding period running",
+          "on_hold": "Under review",
+          "approved": "Available",
+          "paid": "Paid out",
+          "cancelled": "Cancelled"
+        },
+        "payout": {
+          "draft": "Draft",
+          "approved": "Released",
+          "exported": "Exported",
+          "paid": "Paid",
+          "failed": "Failed",
+          "cancelled": "Cancelled"
+        }
+      }
     }
   },
   "portal": {
@@ -1815,6 +2245,41 @@
       "shiftLabel": "Shift",
       "proposedLabel": "New time",
       "reasonLabel": "Reason"
+    },
+    "affiliateApplicationReceived": {
+      "subject": "New partner application",
+      "heading": "New partner application",
+      "body": "{name} has applied to become a partner of {tenantName}.",
+      "actionButton": "View application"
+    },
+    "affiliateApproved": {
+      "subject": "Your partner application has been approved",
+      "heading": "Welcome to the partner programme",
+      "body": "your application for the partner programme of {tenantName} has been approved. Your partner code is {code}.",
+      "actionButton": "Go to the partner area"
+    },
+    "affiliateRejected": {
+      "subject": "Your partner application",
+      "heading": "Application rejected",
+      "body": "we cannot accept your application for the partner programme of {tenantName}.",
+      "reasonLabel": "Reason"
+    },
+    "affiliateSale": {
+      "subject": "New commission credited",
+      "heading": "New commission",
+      "body": "{amount} has been credited to you for a referral.",
+      "productLabel": "Product",
+      "amountLabel": "Commission",
+      "statusLabel": "Status",
+      "actionButton": "View account statement"
+    },
+    "affiliatePayout": {
+      "subject": "Payout on its way",
+      "heading": "Payout",
+      "body": "we have transferred {amount} to you.",
+      "periodLabel": "Period",
+      "referenceLabel": "Reference",
+      "actionButton": "Download credit note"
     }
   },
   "maintenance": {
@@ -1918,6 +2383,259 @@
       }
     }
   },
+  "affiliate": {
+    "shell": {
+      "title": "Partner area",
+      "skipLink": "Skip to main content",
+      "nav": {
+        "dashboard": "Overview",
+        "links": "Links",
+        "statistics": "Statistics",
+        "statement": "Account statement",
+        "payouts": "Payouts",
+        "team": "Team",
+        "profile": "Master data",
+        "terms": "Terms"
+      },
+      "logout": "Sign out"
+    },
+    "dashboard": {
+      "title": "Overview",
+      "balanceHeading": "Balances",
+      "balanceOpen": "Open",
+      "balanceOpenHint": "Booked, the holding period is still running.",
+      "balanceReserve": "In reserve",
+      "balanceReserveHint": "Held back against possible later refunds.",
+      "balanceOnHold": "Under review",
+      "balanceOnHoldHint": "Being checked by a person.",
+      "balanceAvailable": "Available",
+      "balanceAvailableHint": "Will be transferred with the next payout.",
+      "balancePaid": "Paid out",
+      "balancePaidHint": "Already transferred.",
+      "freeFrom": "Released on {date}",
+      "nextPayout": "Next payout on {date}",
+      "minPayoutMissing": "{amount} short of the minimum payout.",
+      "payoutBlocked": "Payout not possible. Missing: {fields}",
+      "payoutBlockedLink": "Complete your master data",
+      "metricsHeading": "Key figures",
+      "clicks": "Clicks",
+      "uniqueClicks": "Unique clicks",
+      "leads": "Leads",
+      "sales": "Sales",
+      "conversion": "Conversion",
+      "epc": "Earnings per click",
+      "empty": "No data yet."
+    },
+    "links": {
+      "title": "Links",
+      "description": "Pick a product and a target page, add a campaign if you want, copy the link.",
+      "productLabel": "Product",
+      "productAny": "Home page",
+      "targetLabel": "Target page",
+      "campaignLabel": "Campaign (optional)",
+      "campaignHint": "Letters, digits, dot, hyphen and underscore are allowed.",
+      "resultLabel": "Your link",
+      "copy": "Copy link",
+      "copied": "Link copied.",
+      "codeHeading": "Your partner code",
+      "codeHint": "The code also works without a link, for example in a podcast or in print.",
+      "ttlHint": "An attribution lasts {days} days."
+    },
+    "statistics": {
+      "title": "Statistics",
+      "rangeLabel": "Period",
+      "groupLabel": "Breakdown",
+      "groupDay": "By day",
+      "groupProduct": "By product",
+      "groupCampaign": "By campaign",
+      "columnDay": "Day",
+      "columnProduct": "Product",
+      "columnCampaign": "Campaign",
+      "columnClicks": "Clicks",
+      "columnUniqueClicks": "Unique clicks",
+      "columnLeads": "Leads",
+      "columnSales": "Sales",
+      "columnConversion": "Conversion",
+      "columnEpc": "Earnings per click",
+      "columnCommission": "Commission",
+      "columnReversalRate": "Reversal rate",
+      "empty": "No data in the selected period.",
+      "chartLabel": "Clicks and sales per day: {summary}",
+      "exportCsv": "Export CSV"
+    },
+    "statement": {
+      "title": "Account statement",
+      "columnDate": "Date",
+      "columnKind": "Type",
+      "columnProduct": "Product",
+      "columnCampaign": "Campaign",
+      "columnAmount": "Amount",
+      "columnBalance": "Balance",
+      "columnStatus": "Status",
+      "empty": "No entries yet.",
+      "detailsOpen": "Show calculation",
+      "detailsClose": "Hide calculation",
+      "baseLabel": "Base",
+      "rateLabel": "Rate",
+      "ruleLabel": "Rule",
+      "reserveLabel": "Reserve",
+      "kindSale": "Sale",
+      "kindRecurring": "Subscription instalment",
+      "kindTier2": "Second tier",
+      "kindReversal": "Reversal",
+      "kindManual": "Manual entry",
+      "kindPayout": "Payout",
+      "privacyNote": "We do not show any details about the buyer."
+    },
+    "payouts": {
+      "title": "Payouts",
+      "columnDate": "Date",
+      "columnPeriod": "Period",
+      "columnAmount": "Amount",
+      "columnTaxMode": "Tax treatment",
+      "columnReference": "Reference",
+      "columnStatus": "Status",
+      "empty": "No payouts yet.",
+      "download": "Download credit note",
+      "downloadUnavailable": "The document has not been created yet."
+    },
+    "team": {
+      "title": "Team",
+      "description": "Partners you referred, and the second tier commission that came from them.",
+      "linkLabel": "Your referral link for partners",
+      "columnName": "Partner",
+      "columnJoined": "Member since",
+      "columnRevenue": "Revenue",
+      "columnCommission": "Your commission",
+      "empty": "No referred partners yet."
+    },
+    "profile": {
+      "title": "Master data",
+      "addressHeading": "Address",
+      "nameLabel": "Name",
+      "companyLabel": "Company",
+      "streetLabel": "Street and number",
+      "postalCodeLabel": "Postal code",
+      "cityLabel": "City",
+      "countryLabel": "Country",
+      "taxHeading": "Tax details",
+      "taxHint": "We need these details for the credit note covering your commission.",
+      "legalFormLabel": "Legal form",
+      "vatIdLabel": "VAT ID",
+      "vatStatusLabel": "Check status",
+      "vatStatusValid": "Checked and valid",
+      "vatStatusInvalid": "Not valid",
+      "vatStatusPending": "Check running",
+      "vatStatusUnchecked": "Not checked yet",
+      "smallBusinessLabel": "Small business under section 19 UStG",
+      "paymentHeading": "Payment details",
+      "paymentHint": "Without payment details we cannot transfer anything.",
+      "ibanLabel": "IBAN",
+      "accountHolderLabel": "Account holder",
+      "paypalLabel": "PayPal address",
+      "notificationsHeading": "Notifications",
+      "notifySale": "Email on every sale",
+      "notifyReversal": "Email on every reversal",
+      "notifyPayout": "Email on every payout",
+      "save": "Save",
+      "pending": "Saving …",
+      "saved": "Saved.",
+      "dataHeading": "Your data",
+      "dataExport": "Download your data as JSON",
+      "dataDelete": "Request deletion",
+      "dataDeleteHint": "Commission records are kept for legal reasons; your name is removed from them."
+    },
+    "terms": {
+      "title": "Partner terms",
+      "acceptedVersion": "Accepted: version {version} on {date}",
+      "updatedHeading": "New version",
+      "updatedBody": "The partner terms have changed. Please accept the new version to keep using the partner area.",
+      "accept": "Accept",
+      "pending": "Saving …",
+      "accepted": "Acceptance saved."
+    },
+    "program": {
+      "title": "Partner programme",
+      "commissionHeading": "Commission",
+      "commissionPercent": "{rate} per referred sale",
+      "commissionFixed": "{amount} per referred sale",
+      "exampleHeading": "Example",
+      "exampleText": "On a sale of {gross} you receive {amount}.",
+      "attributionHint": "A referral is attributed for {days} days.",
+      "rulesHeading": "Rules",
+      "notFound": "This partner programme is not public."
+    },
+    "apply": {
+      "heading": "Apply as a partner",
+      "description": "We review every application by hand and reply by email.",
+      "nameLabel": "Name",
+      "emailLabel": "Email address",
+      "companyLabel": "Company (optional)",
+      "websiteLabel": "Website or channel (optional)",
+      "messageLabel": "How do you plan to promote?",
+      "termsLabel": "I have read the partner terms and accept them.",
+      "termsLink": "View partner terms",
+      "submit": "Send application",
+      "pending": "Sending …",
+      "success": "Thank you. We have received your application and will reply by email.",
+      "error": "The application could not be sent. Please try again later.",
+      "invalid": "Please check the highlighted fields."
+    },
+    "status": {
+      "program": {
+        "draft": "Draft",
+        "active": "Active",
+        "paused": "Paused"
+      },
+      "partner": {
+        "pending": "Application open",
+        "active": "Active",
+        "rejected": "Rejected",
+        "suspended": "Suspended"
+      },
+      "commission": {
+        "pending": "Holding period running",
+        "on_hold": "Under review",
+        "approved": "Available",
+        "paid": "Paid out",
+        "cancelled": "Cancelled"
+      },
+      "payout": {
+        "draft": "Draft",
+        "approved": "Released",
+        "exported": "Exported",
+        "paid": "Paid",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      }
+    }
+  },
+  "consent": {
+    "title": "Cookie for partner referrals",
+    "body": "If you arrived here through a partner referral link, we can remember who referred you. That takes a single cookie. It is used only to match a later order to that partner — no advertising, no profiling, no sharing with ad networks.",
+    "legalNote": "The choice is yours. Without consent the site works exactly the same. You can change your choice at any time in your settings.",
+    "privacyLink": "More about this in the privacy policy",
+    "dialogLabel": "Choice about the cookie for partner referrals",
+    "deny": "Decline",
+    "accept": "Accept",
+    "savedGranted": "Consent saved.",
+    "savedDenied": "Refusal saved.",
+    "savedWithdrawn": "Withdrawal saved.",
+    "error": "Your choice could not be saved. Please try again.",
+    "grant": "Give consent",
+    "withdraw": "Withdraw consent",
+    "settings": {
+      "heading": "Cookie for partner referrals",
+      "description": "This single cookie matches an order to the partner who referred you. It is only set with your consent.",
+      "statusLabel": "Current state",
+      "statusUndecided": "Not decided yet",
+      "statusGranted": "Consent given",
+      "statusDenied": "Declined",
+      "statusWithdrawn": "Withdrawn",
+      "decidedAt": "Decided on {date}",
+      "outdated": "The privacy policy has changed since your decision. Please decide again."
+    }
+  },
   "legal": {
     "shell": {
       "metaTitle": "Legal",
@@ -1980,7 +2698,14 @@
       "transferHeading": "Transfers to third countries",
       "transferText": "{company} is based in the USA, and some providers also process data outside the EU. We base these transfers on the European Commission standard contractual clauses (Art. 46(2)(c) GDPR) together with additional measures such as encryption in transit and at rest. The database and the videos remain in the EU.",
       "cookiesHeading": "Cookies and sessions",
-      "cookiesText": "We only set strictly necessary cookies: the sign-in session cookie (httpOnly, Secure, SameSite) and your language choice. No tracking, no advertising cookies, no sharing with ad networks. Sessions expire automatically once the configured lifetime is reached.",
+      "cookiesText": "For sign-in and language we set strictly necessary cookies: the sign-in session cookie (httpOnly, Secure, SameSite) and your language choice. If this provider runs a partner programme, exactly one further cookie is added, which matches an order to the referring partner. That one cookie requires consent, is not set without your consent, and can be withdrawn at any time. We set no advertising cookies and share no data with ad networks. Sessions expire automatically once the configured lifetime is reached.",
+      "cookiesConsentText": "We record your decision about that cookie in a cookie of our own (httpOnly, Secure, SameSite, six months). It holds a random identifier with no personal reference, the version of this policy and the time of the decision — so that we do not ask again on every visit and can evidence the consent (Art. 7(1) GDPR). After six months we ask again.",
+      "affiliateHeading": "Partner programme and referral matching",
+      "affiliateText": "If you arrive through a partner referral link, we store the click with its time, target page, campaign name, browser type and a short, non-reversible value derived from your IP address. Only with your consent is a cookie added that keeps this match across later page views. If a purchase follows, we link the order to the referral in order to calculate the partner commission.",
+      "affiliateLegalBasis": "Legal bases: your consent for the cookie and for storing the click (Art. 6(1)(a) GDPR, section 25(1) TDDDG); performance of the contract with the partner for settling the commission (Art. 6(1)(b) GDPR); legal obligation for retaining the accounting records (Art. 6(1)(c) GDPR).",
+      "affiliateRecipients": "The partner never learns who bought. They see the date, product, amount, campaign and status of their own referrals — no name, no email address, no order number. No external affiliate network is involved; only the processors listed above are used.",
+      "affiliateRetention": "We delete clicks and referral records once the attribution window has passed, at the latest when your account is deleted. Commission entries and payout documents are accounting records and are kept for the statutory period; personal references are removed from them as far as the retention obligation allows.",
+      "affiliateWithdraw": "You can withdraw your consent at any time in your settings. The cookie is deleted immediately. Withdrawal takes effect for the future; referrals already settled are not affected.",
       "botHeading": "Spam and bot protection",
       "botText": "Publicly accessible forms — sign-in, registration, password reset and the contact form — are protected against automated bulk requests. For this we process the IP address of the request, the time of submission and the content of the form: we limit the number of requests per IP address, per sender address and per recipient mailbox, and we check automatically whether a message shows the hallmarks of machine-generated advertising. Messages classified as spam are neither delivered nor stored; only the fact that a request was rejected is logged, without the message content. The legal basis is our legitimate interest in preventing abuse (Art. 6(1)(f) GDPR).",
       "botTurnstile": "On the contact form we additionally use Cloudflare Turnstile. It evaluates technical characteristics of the request in the browser and only presents a challenge in case of doubt. The IP address and information about browser and device are transmitted to Cloudflare in the process. Turnstile sets no cookies, serves no advertising purpose and builds no user profiles. Cloudflare is our processor; for the transfer to the USA the section “Transfers to third countries” applies.",

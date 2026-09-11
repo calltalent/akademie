@@ -12,6 +12,7 @@ import {
   tenantLogoUrlSchema,
   tenantLoginContentSchema,
   tenantMarketplaceCommissionSchema,
+  tenantFeaturesSchema,
 } from "@/lib/platform/schema";
 import { getTranslations } from "next-intl/server";
 import { buildSetPasswordLink, findUserByEmail, type ImportTenant } from "@/lib/users/import";
@@ -525,6 +526,18 @@ export async function updateTenantLogoUrl(
  * (Opt-in, fehlend/undefined = AUS), einziger Freischalt-Weg für das Feature
  * (Mandant selbst hat keinen eigenen Schalter dafür, siehe
  * tenant/types.ts-Kommentar).
+ *
+ * ERWEITERT (Affiliate B1, 10.09.2026, PLAN_Affiliate-System.md 9.8): siebter
+ * Schalter `affiliate_enabled` (Partnerprogramm), gleiche Opt-in-Polarität
+ * (fehlend/undefined = AUS). Anders als die fünf Checkboxen davor läuft dieser
+ * Wert über `tenantFeaturesSchema` (platform/schema.ts) statt über ein direktes
+ * `=== "on"` — Begründung dort. Diese Funktion bleibt der EINZIGE Schreibweg:
+ * ein Mandanten-Admin kann `affiliate_enabled` auch per direktem
+ * PostgREST-PATCH auf `tenants.settings` nicht setzen, der Trigger
+ * `tenants_operator_settings_guard()` führt den Schlüssel in seiner
+ * Erlaubnisliste (Migration 20260910120200_affiliate_enabled_guard.sql). Die
+ * Freischaltung wird zusätzlich serverseitig gelesen
+ * (`requireAffiliateProgram()`, lib/affiliate/access.ts), nicht nur in der UI.
  */
 export async function updateTenantFeatures(
   tenantId: string,
@@ -541,6 +554,13 @@ export async function updateTenantFeatures(
       return { error: parsedCommission.error.issues[0]?.message ?? "Ungültige Eingabe." };
     }
 
+    const parsedFeatures = tenantFeaturesSchema.safeParse({
+      affiliateEnabled: formData.get("affiliateEnabled"),
+    });
+    if (!parsedFeatures.success) {
+      return { error: parsedFeatures.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+
     const admin = createAdminClient();
     const { data: current } = await admin.from("tenants").select("settings").eq("id", tenantId).maybeSingle();
 
@@ -551,6 +571,7 @@ export async function updateTenantFeatures(
       course_generator_enabled: formData.get("courseGeneratorEnabled") === "on",
       marketplace_enabled: formData.get("marketplaceEnabled") === "on",
       shift_calendar_enabled: formData.get("shiftCalendarEnabled") === "on",
+      affiliate_enabled: parsedFeatures.data.affiliateEnabled,
       // Leeres Formularfeld -> `parsedCommission.data` ist `undefined` ->
       // JSON.stringify (Supabase-Client-Serialisierung) lässt den Schlüssel
       // beim Schreiben weg, ein zuvor gesetzter Wert wird damit entfernt statt

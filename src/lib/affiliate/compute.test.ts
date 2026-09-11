@@ -838,9 +838,8 @@ describe("computeReversalDelta (5.8, G7)", () => {
     expect(schritt.target_cents).toBe(11_888);
   });
 
-  it("rechnet auch bei sechsstelligen Eurobeträgen genau (Ganzzahl, kein Gleitkomma)", () => {
-    // 500.000,00 EUR Charge, 300.000,00 EUR erstattet, 90.000,00 EUR Provision:
-    // Produkt der beiden Cent-Beträge liegt über Number.MAX_SAFE_INTEGER.
+  it("rechnet auch bei sechsstelligen Eurobeträgen genau", () => {
+    // 500.000,00 EUR Charge, 300.000,00 EUR erstattet, 90.000,00 EUR Provision.
     const schritt = computeReversalDelta({
       amount_cents: 9_000_000,
       refunded_total_cents: 30_000_000,
@@ -848,6 +847,28 @@ describe("computeReversalDelta (5.8, G7)", () => {
       already_reversed_cents: 0,
     });
     expect(schritt.target_cents).toBe(5_400_000);
+  });
+
+  it("kein Restcent auch dort, wo die Gleitkommarechnung einen liegen ließe", () => {
+    // Der Fall, wegen dem `computeReversalDelta()` mit BigInt rechnet: bei
+    // Charge 999.999,99 EUR übersteigt das Produkt der beiden Cent-Beträge
+    // `Number.MAX_SAFE_INTEGER`. `Math.floor((99999995 * 99999999) / 99999999)`
+    // ergibt in Gleitkomma 99999994 — bei VOLLER Erstattung bliebe ein Cent
+    // der Ursprungszeile unstorniert stehen, obwohl 5.8 „kein Rundungsrest"
+    // ausdrücklich zusichert. Der Test bricht, sobald jemand die
+    // BigInt-Zeile durch die naheliegende Number-Rechnung ersetzt.
+    const charge = 99_999_999;
+    const amount = 99_999_995;
+    expect(Math.floor((amount * charge) / charge)).toBe(99_999_994);
+
+    const schritt = computeReversalDelta({
+      amount_cents: amount,
+      refunded_total_cents: charge,
+      charge_total_cents: charge,
+      already_reversed_cents: 0,
+    });
+    expect(schritt.target_cents).toBe(amount);
+    expect(schritt.amount_cents).toBe(-amount);
   });
 });
 

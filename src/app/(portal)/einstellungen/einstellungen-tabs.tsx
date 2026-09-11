@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   updateProfile,
@@ -10,6 +11,8 @@ import {
   revokeSession,
   type SettingsState,
 } from "@/lib/account/actions";
+import { setTrackingConsent } from "@/lib/consent/actions";
+import type { ConsentDecision } from "@/lib/consent/schema";
 import { DeletionRequestForm } from "@/app/profil/deletion-request-form";
 import { PushToggle } from "@/components/pwa/push-toggle";
 import { LocaleSwitcher } from "@/components/settings/locale-switcher";
@@ -43,6 +46,21 @@ export type CertificateInfo = {
   issuedAt: string;
   serial: string;
   downloadUrl: string | null;
+};
+
+/**
+ * Affiliate-Modul, Block B2 (PLAN_Affiliate-System.md Abschnitt 10/B2,
+ * 10.09.2026): Zustand der Tracking-Einwilligung, aus dem `httpOnly`-Cookie
+ * `ct_consent` in page.tsx gelesen. `null` als Prop heißt: die Karte
+ * erscheint nicht (siehe Begründung dort).
+ */
+export type ConsentInfo = {
+  /** Letzte Entscheidung zur Kategorie „Partner-Empfehlung". */
+  decision: ConsentDecision;
+  /** Bereits formatiertes Datum der Entscheidung (Locale des Nutzers). */
+  decidedAt: string | null;
+  /** Bezieht sich die Entscheidung auf einen älteren Stand der Rechtstexte? */
+  outdated: boolean;
 };
 
 /**
@@ -92,6 +110,7 @@ export function EinstellungenTabs({
   initialTab,
   enabledLocales,
   currentLocale,
+  consent,
 }: {
   profile: SettingsProfile;
   email: string;
@@ -105,6 +124,8 @@ export function EinstellungenTabs({
   /** i18n Block B3: effektive Locale-Menge + aktuelle Wahl, aus page.tsx (Server Component). */
   enabledLocales: Locale[];
   currentLocale: Locale;
+  /** Affiliate Block B2: Tracking-Einwilligung; `null` = Karte ausblenden. */
+  consent: ConsentInfo | null;
 }) {
   const t = useTranslations("portal.settings");
   const tNotif = useTranslations("learn.shell");
@@ -153,6 +174,7 @@ export function EinstellungenTabs({
           pendingDeletionDate={pendingDeletionDate}
           enabledLocales={enabledLocales}
           currentLocale={currentLocale}
+          consent={consent}
         />
       )}
       {tab === "benachrichtigungen" && (
@@ -173,6 +195,7 @@ function AllgemeinTab({
   pendingDeletionDate,
   enabledLocales,
   currentLocale,
+  consent,
 }: {
   profile: SettingsProfile;
   email: string;
@@ -181,6 +204,7 @@ function AllgemeinTab({
   pendingDeletionDate: string | null;
   enabledLocales: Locale[];
   currentLocale: Locale;
+  consent: ConsentInfo | null;
 }) {
   const t = useTranslations("portal.settings");
   const tCert = useTranslations("certificates");
@@ -361,6 +385,12 @@ function AllgemeinTab({
         )}
       </div>
 
+      {/* Affiliate Block B2: Widerruf bzw. nachträgliche Erteilung der
+          Tracking-Einwilligung. Steht bewusst direkt vor Datenexport und
+          Kontolöschung — das sind die drei Karten, die dasselbe tun:
+          Betroffenenrechte ausüben. */}
+      {consent && <ConsentSection consent={consent} />}
+
       <div className="rounded-[14px] border border-border-100 bg-white p-[30px]">
         <h2 className="text-lg font-bold text-ink">{t("dataHeading")}</h2>
         <p className="mt-2 text-sm text-muted-500">
@@ -416,6 +446,134 @@ function Field({
         defaultValue={defaultValue ?? ""}
         className="w-full rounded-sm border border-border-300 bg-white px-[15px] py-[13px] text-base text-ink"
       />
+    </div>
+  );
+}
+
+/* --------------------------------------------------- Partner-Empfehlungen */
+
+/**
+ * Affiliate-Modul, Block B2 (PLAN_Affiliate-System.md Abschnitt 10/B2,
+ * 10.09.2026): Stand der Tracking-Einwilligung anzeigen und ändern.
+ *
+ * Genau EIN Knopf, genau EIN Aufruf derselben Server Action wie im Dialog —
+ * der Widerruf darf nicht mehr Schritte kosten als die Erteilung (Art. 7
+ * Abs. 3 DSGVO). Keine Rückfrage, kein Bestätigungsdialog: eine Rückfrage
+ * vor dem Widerruf wäre genau die Hürde, die die Vorschrift verbietet. Der
+ * Vorgang ist auch nicht verlustbehaftet — die Gegenrichtung steht als
+ * derselbe Knopf sofort wieder da.
+ *
+ * Fokusführung nach der Aktion (Plan 8.5): der Knopf wird nie `disabled`,
+ * behält damit den Tastaturfokus, und die Rückmeldung erscheint in einer
+ * `role="status"`-Region direkt darunter — dasselbe Muster wie im
+ * Sprachumschalter (components/settings/locale-switcher.tsx:44-60).
+ *
+ * `router.refresh()` nach dem Erfolg: Stand und Datum kommen als Prop vom
+ * Server aus dem `httpOnly`-Cookie, das diese Aktion gerade neu gesetzt hat.
+ * Ohne den Refresh stünde in der Karte weiter die alte Entscheidung mit dem
+ * alten Datum. Ein eigener lokaler Zustand wäre die zweite Wahrheit neben
+ * dem Cookie und würde genau dann falsch, wenn das Speichern scheitert.
+ */
+function ConsentSection({ consent }: { consent: ConsentInfo }) {
+  const t = useTranslations("consent");
+  const router = useRouter();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const busyRef = useRef(false);
+  const [pending, startTransition] = useTransition();
+  const [message, setMessage] = useState<{ text: string; kind: "success" | "error" } | null>(null);
+
+  const granted = consent.decision === "granted" && !consent.outdated;
+  // Erteilt -> Widerruf anbieten. Abgelehnt, widerrufen oder veraltet ->
+  // Erteilung anbieten. Es gibt keinen dritten Knopf und keine Auswahl:
+  // sichtbar ist immer nur die Gegenrichtung des aktuellen Zustands.
+  const next: ConsentDecision = granted ? "withdrawn" : "granted";
+
+  const statusText = consent.outdated
+    ? t("settings.statusUndecided")
+    : consent.decision === "granted"
+      ? t("settings.statusGranted")
+      : consent.decision === "denied"
+        ? t("settings.statusDenied")
+        : t("settings.statusWithdrawn");
+
+  function handleClick() {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setMessage(null);
+
+    startTransition(async () => {
+      const result = await setTrackingConsent(next);
+      busyRef.current = false;
+      // Fokus in BEIDEN Fällen auf dem Knopf halten — weder Erfolg noch
+      // Fehler dürfen einen Tastaturnutzer aus der Karte werfen.
+      buttonRef.current?.focus();
+
+      if (!result.ok) {
+        // Übersetzter Text statt `result.error`: die Meldungen der Server
+        // Action sind fest deutsch, diese Oberfläche läuft auch auf en/bs.
+        setMessage({ text: t("error"), kind: "error" });
+        return;
+      }
+
+      setMessage({
+        text: next === "granted" ? t("savedGranted") : t("savedWithdrawn"),
+        kind: "success",
+      });
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="rounded-[14px] border border-border-100 bg-white p-[30px]">
+      <h2 className="text-lg font-bold text-ink">{t("settings.heading")}</h2>
+      <p className="mt-2 text-sm text-muted-500">{t("settings.description")}</p>
+
+      {/* Stand als Text, nicht als Farbe oder Symbol (Plan 8.5). `dt`/`dd`
+          statt zweier Absätze, damit ein Screenreader Beschriftung und Wert
+          als zusammengehörig vorliest. */}
+      <dl className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <dt className="text-sm font-semibold text-navy">{t("settings.statusLabel")}:</dt>
+        <dd className="text-[15px] font-bold text-ink">{statusText}</dd>
+      </dl>
+
+      {consent.decidedAt && (
+        <p className="mt-1 text-sm text-muted-500">
+          {t("settings.decidedAt", { date: consent.decidedAt })}
+        </p>
+      )}
+
+      {consent.outdated && (
+        <p className="mt-2 text-sm font-semibold" style={{ color: "#7A3535" }}>
+          {t("settings.outdated")}
+        </p>
+      )}
+
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={handleClick}
+        aria-busy={pending}
+        className="mt-4 min-h-[44px] rounded-sm border border-border-300 bg-white px-[18px] py-3 text-[15px] font-semibold text-navy focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+      >
+        {granted ? t("withdraw") : t("grant")}
+      </button>
+
+      <p
+        role="status"
+        aria-live="polite"
+        className="mt-2 min-h-[1.25em] text-sm"
+        style={{ color: message?.kind === "error" ? "#B24343" : "#1F8A5B" }}
+      >
+        {message?.text}
+      </p>
+
+      <a
+        href="/privacy"
+        className="mt-1 inline-block rounded-sm py-1 text-sm font-semibold no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+        style={{ color: "var(--color-primary)" }}
+      >
+        {t("privacyLink")}
+      </a>
     </div>
   );
 }

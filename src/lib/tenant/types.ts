@@ -158,6 +158,37 @@ export type PublicTenant = {
      * Änderung sonst zurück.
      */
     shift_calendar_holiday_regions?: CalendarHolidayRegionCode[];
+    /**
+     * NEU (Affiliate B1, 10.09.2026, PLAN_Affiliate-System.md Abschnitt 9.8):
+     * schaltet das Partnerprogramm dieses Mandanten frei (Partner werben
+     * Kunden, Provision wird berechnet und ausgezahlt).
+     *
+     * POLARITÄT AUSDRÜCKLICH UMGEKEHRT gegenüber `payments_enabled`,
+     * `self_signup_enabled` und `certificates_enabled`: dort gilt
+     * fehlend/undefined = AN (nur explizites `false` schaltet ab), hier gilt
+     * fehlend/undefined = AUS. NUR ein ausdrückliches `true` schaltet frei —
+     * geprüft wird deshalb überall `=== true`, niemals `!== false`.
+     * Begründung: kein Bestandsmandant hat je einen Wert für dieses Feld
+     * gesetzt; mit einer "an außer explizit aus"-Polarität liefe bei JEDEM
+     * Mandanten sofort ein Partnerprogramm an, ohne dass der Betreiber das je
+     * aktiviert hätte — mit Provisionsversprechen an Dritte, Auszahlungspflicht
+     * und Klick-Tracking (Einwilligung nötig). Gleiche Opt-in-Richtung wie
+     * `marketplace_enabled`/`shift_calendar_enabled` oben.
+     *
+     * Schreibweg AUSSCHLIESSLICH das Betreiber-Portal (`updateTenantFeatures()`,
+     * `platform/actions.ts`), niemals der Mandant selbst. Durchgesetzt wird das
+     * nicht nur durch die fehlende UI, sondern in der Datenbank:
+     * `tenants_operator_settings_guard()` führt `affiliate_enabled` in seiner
+     * Erlaubnisliste der Betreiber-Schlüssel und setzt einen vom Mandanten
+     * mitgeschickten Wert auf den alten Stand zurück (Migration
+     * `20260910120200_affiliate_enabled_guard.sql`, Plan 3.0d).
+     *
+     * Serverseitiges Gate: `isAffiliateEnabled()`/`requireAffiliateProgram()`
+     * (`lib/affiliate/access.ts`) — bewusst nicht nur in der Oberfläche, damit
+     * dieses Modul die Lücke von `marketplace_enabled` nicht erbt (das wird
+     * heute nur in der UI geprüft, nicht in `createMarketplaceCheckout()`).
+     */
+    affiliate_enabled?: boolean;
   };
 };
 

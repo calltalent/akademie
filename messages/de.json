@@ -1614,6 +1614,436 @@
         "jobNotFound": "Auftrag nicht gefunden.",
         "jobError": "Fehler: {error}"
       }
+    },
+    "affiliate": {
+      "eyebrow": "Vertrieb · Partnerprogramm",
+      "title": "Partnerprogramm",
+      "description": "Partner, Konditionen, Provisionen und Auszahlungen des Programms.",
+      "disabled": {
+        "heading": "Partnerprogramm nicht freigeschaltet",
+        "body": "Für diesen Mandanten ist das Partnerprogramm nicht freigeschaltet. Der Plattform-Betreiber schaltet es frei."
+      },
+      "nav": {
+        "overview": "Übersicht",
+        "partners": "Partner",
+        "conditions": "Konditionen",
+        "commissions": "Provisionen",
+        "payouts": "Auszahlungen",
+        "creatives": "Werbemittel",
+        "settings": "Einstellungen"
+      },
+      "overview": {
+        "title": "Übersicht",
+        "rangeLabel": "Zeitraum",
+        "range30": "30 Tage",
+        "range90": "90 Tage",
+        "range365": "12 Monate",
+        "clicks": "Klicks",
+        "sales": "Verkäufe",
+        "availableCommission": "Verfügbare Provision",
+        "reversalRate": "Stornoquote",
+        "unprocessedEvents": "{count} Zahlungsereignisse sind noch nicht verarbeitet.",
+        "unprocessedEventsLink": "Ereignisse ansehen",
+        "flaggedCommissions": "{count} Buchungen sind zur Prüfung markiert.",
+        "flaggedLink": "Buchungen ansehen",
+        "openApplications": "Offene Bewerbungen ({count})",
+        "openApplicationsEmpty": "Keine offenen Bewerbungen.",
+        "topPartners": "Top-Partner",
+        "topPartnersEmpty": "Noch kein Partner mit Umsatz im Zeitraum.",
+        "recentCommissions": "Letzte Buchungen",
+        "recentCommissionsEmpty": "Noch keine Buchungen im Zeitraum.",
+        "exportCsv": "CSV exportieren"
+      },
+      "partners": {
+        "title": "Partner",
+        "searchLabel": "Partner suchen",
+        "searchPlaceholder": "Name oder E-Mail",
+        "tabs": {
+          "all": "Alle",
+          "pending": "Bewerbungen",
+          "active": "Aktiv",
+          "suspended": "Gesperrt",
+          "rejected": "Abgelehnt"
+        },
+        "columnName": "Name",
+        "columnCode": "Code",
+        "columnGroup": "Gruppe",
+        "columnStatus": "Status",
+        "columnClicks": "Klicks (30 Tage)",
+        "columnSales": "Verkäufe",
+        "columnAvailable": "Verfügbar",
+        "empty": "Keine Partner in dieser Ansicht.",
+        "countSuffix": "{count} gesamt",
+        "invite": {
+          "heading": "Partner einladen",
+          "description": "Erzeugt einen Einladungslink mit Vorab-Freigabe. Der Partner legt Konto und Code selbst an.",
+          "emailLabel": "E-Mail-Adresse",
+          "nameLabel": "Name",
+          "groupLabel": "Gruppe",
+          "submit": "Einladungslink erzeugen",
+          "pending": "Wird erzeugt …",
+          "linkLabel": "Einladungslink",
+          "copy": "Link kopieren",
+          "copied": "Link kopiert."
+        }
+      },
+      "partner": {
+        "backLink": "Zurück zur Partnerliste",
+        "master": {
+          "heading": "Stammdaten",
+          "nameLabel": "Name",
+          "companyLabel": "Firma",
+          "emailLabel": "E-Mail-Adresse",
+          "codeLabel": "Partner-Code",
+          "groupLabel": "Gruppe",
+          "statusLabel": "Status",
+          "joinedLabel": "Dabei seit",
+          "referredByLabel": "Geworben von",
+          "applicationHeading": "Angaben aus der Bewerbung",
+          "applicationEmpty": "Keine Angaben."
+        },
+        "condition": {
+          "heading": "Kondition",
+          "effectiveRate": "Wirksamer Satz",
+          "origin": "Herkunft",
+          "originProgram": "Programmstandard",
+          "originGroup": "Aus Gruppe {name}",
+          "originPartner": "Eigene Regel für diesen Partner",
+          "originProduct": "Regel für Produkt {name}",
+          "editLink": "Konditionen bearbeiten"
+        },
+        "statement": {
+          "heading": "Kontoauszug",
+          "empty": "Noch keine Buchungen.",
+          "columnDate": "Datum",
+          "columnProduct": "Produkt",
+          "columnBase": "Basis",
+          "columnRate": "Satz",
+          "columnAmount": "Provision",
+          "columnStatus": "Status",
+          "more": "Alle Buchungen dieses Partners"
+        },
+        "actions": {
+          "heading": "Aktionen",
+          "approve": "Freigeben",
+          "reject": "Ablehnen",
+          "reasonLabel": "Begründung",
+          "suspend": "Sperren",
+          "unsuspend": "Sperre aufheben",
+          "payoutHold": "Auszahlung sperren",
+          "payoutRelease": "Auszahlungssperre aufheben",
+          "manualEntry": "Handbuchung",
+          "noteLabel": "Interne Notiz",
+          "save": "Speichern",
+          "saved": "Gespeichert.",
+          "pending": "Wird ausgeführt …"
+        },
+        "banking": {
+          "heading": "Zahlungs- und Steuerdaten",
+          "complete": "Vollständig — eine Auszahlung ist möglich.",
+          "incomplete": "Unvollständig. Es fehlt: {fields}",
+          "hint": "Bankdaten werden hier nicht angezeigt. Der Partner pflegt sie selbst."
+        },
+        "audit": {
+          "heading": "Änderungsprotokoll",
+          "empty": "Keine Einträge.",
+          "columnDate": "Zeitpunkt",
+          "columnActor": "Bearbeiter",
+          "columnAction": "Vorgang"
+        }
+      },
+      "conditions": {
+        "title": "Konditionen",
+        "description": "Es gilt immer die Regel mit dem höchsten Rang. Gleichrangige Regeln dürfen sich zeitlich nicht überschneiden.",
+        "defaultHeading": "Programmstandard",
+        "defaultRate": "Standardsatz",
+        "defaultBasis": "Provisionsbasis",
+        "listHeading": "Regeln",
+        "columnRank": "Rang",
+        "columnScope": "Geltungsbereich",
+        "columnProduct": "Produkt",
+        "columnKind": "Art",
+        "columnRate": "Satz",
+        "columnPeriod": "Zeitraum",
+        "empty": "Noch keine Regeln. Es gilt der Programmstandard.",
+        "scopeAll": "Alle Partner",
+        "scopeGroup": "Gruppe",
+        "scopePartner": "Partner",
+        "productAll": "Alle Produkte",
+        "form": {
+          "heading": "Regel anlegen",
+          "scopeLabel": "Geltungsbereich",
+          "partnerLabel": "Partner",
+          "groupLabel": "Gruppe",
+          "productLabel": "Produkt",
+          "kindLabel": "Art",
+          "kindPercent": "Prozent",
+          "kindFixed": "Festbetrag",
+          "rateLabel": "Satz in Prozent",
+          "fixedLabel": "Betrag in Euro",
+          "validFromLabel": "Gilt ab",
+          "validToLabel": "Gilt bis (optional)",
+          "noteLabel": "Notiz",
+          "submit": "Regel speichern",
+          "pending": "Wird gespeichert …",
+          "saved": "Regel gespeichert.",
+          "delete": "Regel löschen",
+          "overlapError": "Für diesen Geltungsbereich gibt es im gewählten Zeitraum bereits eine Regel."
+        },
+        "calculator": {
+          "heading": "Rechner",
+          "partnerLabel": "Partner",
+          "productLabel": "Produkt",
+          "submit": "Berechnen",
+          "result": "Es gilt {rule}: {rate}. Das sind bei {gross} brutto {amount}.",
+          "ruleDefault": "der Programmstandard",
+          "ruleNumbered": "Regel {rank}"
+        }
+      },
+      "commissions": {
+        "title": "Provisionen",
+        "filter": {
+          "status": "Status",
+          "partner": "Partner",
+          "product": "Produkt",
+          "period": "Zeitraum",
+          "flagged": "Nur markierte",
+          "test": "Nur Testbuchungen",
+          "apply": "Filter anwenden",
+          "reset": "Filter zurücksetzen",
+          "all": "Alle"
+        },
+        "columnDate": "Datum",
+        "columnPartner": "Partner",
+        "columnProduct": "Produkt",
+        "columnCampaign": "Kampagne",
+        "columnBase": "Basis",
+        "columnRate": "Satz",
+        "columnAmount": "Betrag",
+        "columnStatus": "Status",
+        "empty": "Keine Buchungen für diesen Filter.",
+        "detailsOpen": "Berechnung anzeigen",
+        "detailsClose": "Berechnung ausblenden",
+        "reasonHeading": "Zuordnung",
+        "snapshotHeading": "Angewandte Regel",
+        "reserveLabel": "davon Reserve",
+        "reserveHint": "Die Reserve wird erst nach Ablauf der Reservefrist verfügbar.",
+        "actions": {
+          "reverse": "Stornieren",
+          "rebook": "Umbuchen",
+          "flag": "Markieren",
+          "unflag": "Markierung entfernen",
+          "reprocess": "Erneut verarbeiten",
+          "pending": "Wird ausgeführt …",
+          "done": "Ausgeführt."
+        },
+        "manual": {
+          "heading": "Handbuchung",
+          "partnerLabel": "Partner",
+          "amountLabel": "Betrag in Euro",
+          "reasonLabel": "Grund",
+          "submit": "Buchen",
+          "saved": "Buchung angelegt."
+        },
+        "exportCsv": "CSV exportieren"
+      },
+      "payouts": {
+        "title": "Auszahlungen",
+        "tabs": {
+          "drafts": "Entwürfe",
+          "approved": "Freigegeben",
+          "exported": "Exportiert",
+          "paid": "Bezahlt",
+          "history": "Historie"
+        },
+        "columnPartner": "Partner",
+        "columnPeriod": "Zeitraum",
+        "columnGross": "Brutto",
+        "columnReversals": "Gegenbuchungen",
+        "columnAmount": "Auszahlbetrag",
+        "columnTaxMode": "Steuermodus",
+        "columnMethod": "Zahlweg",
+        "columnCompleteness": "Vollständigkeit",
+        "columnReference": "Referenz",
+        "columnDocument": "Beleg",
+        "empty": "Keine Auszahlungen in dieser Ansicht.",
+        "complete": "Vollständig",
+        "incomplete": "Unvollständig. Es fehlt: {fields}",
+        "releaseSelected": "Ausgewählte freigeben",
+        "releaseConfirm": "{count} Auszahlungen über insgesamt {amount} freigeben?",
+        "releaseConfirmYes": "Freigeben",
+        "releaseConfirmNo": "Abbrechen",
+        "exportSepa": "SEPA-XML herunterladen",
+        "exportCsv": "CSV exportieren",
+        "markPaid": "Als gezahlt markieren",
+        "referenceLabel": "Zahlungsreferenz",
+        "documentDownload": "Gutschrift herunterladen",
+        "blockedHeading": "Nicht auszahlbar",
+        "blockedReason": "{partner}: {reason}",
+        "taxMode": {
+          "regular": "Regelbesteuerung",
+          "small_business": "Kleinunternehmer nach § 19 UStG",
+          "reverse_charge": "Reverse Charge",
+          "non_eu": "Drittland"
+        },
+        "method": {
+          "sepa": "SEPA-Überweisung",
+          "paypal": "PayPal",
+          "manual": "Manuell"
+        }
+      },
+      "creatives": {
+        "title": "Werbemittel",
+        "kind": {
+          "banner": "Banner",
+          "email": "E-Mail-Vorlage",
+          "text": "Textbaustein",
+          "file": "Datei"
+        },
+        "empty": "Noch keine Werbemittel.",
+        "activeLabel": "Aktiv",
+        "inactiveLabel": "Inaktiv",
+        "previewLabel": "Vorschau",
+        "form": {
+          "heading": "Werbemittel anlegen",
+          "kindLabel": "Art",
+          "titleLabel": "Titel",
+          "fileLabel": "Datei",
+          "fileHint": "Erlaubt sind PNG, JPG, WEBP und PDF bis 5 MB.",
+          "bodyLabel": "Inhalt",
+          "placeholderHint": "Platzhalter: {linkToken} wird durch den Partnerlink ersetzt, {nameToken} durch den Partnernamen.",
+          "submit": "Speichern",
+          "pending": "Wird gespeichert …",
+          "saved": "Gespeichert.",
+          "delete": "Löschen"
+        }
+      },
+      "settings": {
+        "title": "Einstellungen",
+        "basics": {
+          "heading": "Grunddaten und Sichtbarkeit",
+          "statusLabel": "Programmstatus",
+          "visibilityLabel": "Sichtbarkeit",
+          "approvalLabel": "Bewerbungen",
+          "approvalManual": "Von Hand freigeben",
+          "approvalAuto": "Automatisch freigeben"
+        },
+        "visibility": {
+          "private": "Privat, nicht erreichbar",
+          "link": "Nur über Direktlink",
+          "public": "Öffentlich gelistet"
+        },
+        "commission": {
+          "heading": "Standardkondition und Provisionsbasis",
+          "rateKindLabel": "Art",
+          "ratePercent": "Prozent",
+          "rateFixed": "Festbetrag",
+          "rateLabel": "Standardsatz in Prozent",
+          "fixedLabel": "Festbetrag in Euro",
+          "basisLabel": "Provisionsbasis",
+          "basisNet": "Netto, ohne Steuer",
+          "basisGross": "Brutto",
+          "feeDeductionLabel": "Abzug für Zahlungsgebühren in Prozent",
+          "minLabel": "Mindestprovision in Euro",
+          "maxLabel": "Höchstprovision in Euro",
+          "currencyLabel": "Währung"
+        },
+        "attribution": {
+          "heading": "Attribution",
+          "modelLabel": "Modell",
+          "modelLast": "Letzter Klick",
+          "modelFirst": "Erster Klick",
+          "cookieTtlLabel": "Zuordnungsdauer in Tagen",
+          "overwriteLabel": "Späterer Klick eines anderen Partners",
+          "overwriteAllow": "Überschreiben erlauben",
+          "overwriteDeny": "Erste Zuordnung behalten",
+          "lifetimeLabel": "Dauerhafte Bindung an das Konto",
+          "selfReferralLabel": "Selbst-Empfehlung",
+          "selfReferralBlock": "Nicht vergüten",
+          "selfReferralFlag": "Vergüten, aber markieren",
+          "blocklistLabel": "Gesperrte Herkunftsseiten",
+          "blocklistHint": "Eine Domain je Zeile."
+        },
+        "recurring": {
+          "heading": "Abo-Verhalten",
+          "modeLabel": "Vergütete Raten",
+          "modeFirstOnly": "Nur die erste Rate",
+          "modeNPeriods": "Die ersten Raten",
+          "modeAll": "Alle Raten",
+          "maxPeriodsLabel": "Anzahl Raten"
+        },
+        "money": {
+          "heading": "Geld und Fristen",
+          "holdDaysLabel": "Sperrfrist in Tagen",
+          "reserveLabel": "Reserve in Prozent",
+          "reserveDaysLabel": "Reservefrist in Tagen",
+          "minPayoutLabel": "Mindestauszahlung in Euro",
+          "scheduleLabel": "Auszahlungsrhythmus",
+          "scheduleWeekly": "Wöchentlich",
+          "scheduleSemiMonthly": "Zweimal im Monat",
+          "scheduleMonthly": "Monatlich"
+        },
+        "tier2": {
+          "heading": "Zweite Stufe",
+          "enabledLabel": "Zweite Stufe aktiv",
+          "basisLabel": "Bemessung",
+          "basisCommission": "Provision des geworbenen Partners",
+          "basisRevenue": "Umsatz des geworbenen Partners",
+          "rateLabel": "Satz der zweiten Stufe in Prozent"
+        },
+        "texts": {
+          "heading": "Texte",
+          "descriptionLabel": "Beschreibung des Programms",
+          "termsLabel": "Partnerbedingungen",
+          "termsVersionLabel": "Fassung",
+          "termsVersionHint": "Wird die Fassung erhöht, müssen alle Partner erneut zustimmen.",
+          "applicationNoteLabel": "Hinweis im Bewerbungsformular",
+          "applicationFieldsLabel": "Zusätzliche Felder der Bewerbung"
+        },
+        "test": {
+          "heading": "Testmodus",
+          "label": "Testmodus aktiv",
+          "hint": "Buchungen aus Testbestellungen werden angelegt, aber nie ausgezahlt."
+        },
+        "save": "Einstellungen speichern",
+        "pending": "Wird gespeichert …",
+        "saved": "Einstellungen gespeichert.",
+        "warnings": {
+          "holdDays": "Die Sperrfrist ist kürzer als die gesetzliche Widerrufsfrist von 14 Tagen.",
+          "highRate": "Der Satz liegt über 50 Prozent.",
+          "combinedRate": "Erste und zweite Stufe liegen zusammen über 60 Prozent.",
+          "basisChange": "Die Änderung gilt nur für künftige Buchungen. Bestehende Buchungen und laufende Abos bleiben unverändert.",
+          "recurringAll": "Alle Raten zu vergüten ist eine unbefristete Verbindlichkeit."
+        }
+      },
+      "status": {
+        "program": {
+          "draft": "Entwurf",
+          "active": "Aktiv",
+          "paused": "Pausiert"
+        },
+        "partner": {
+          "pending": "Bewerbung offen",
+          "active": "Aktiv",
+          "rejected": "Abgelehnt",
+          "suspended": "Gesperrt"
+        },
+        "commission": {
+          "pending": "Sperrfrist läuft",
+          "on_hold": "In Prüfung",
+          "approved": "Verfügbar",
+          "paid": "Ausgezahlt",
+          "cancelled": "Storniert"
+        },
+        "payout": {
+          "draft": "Entwurf",
+          "approved": "Freigegeben",
+          "exported": "Exportiert",
+          "paid": "Bezahlt",
+          "failed": "Fehlgeschlagen",
+          "cancelled": "Storniert"
+        }
+      }
     }
   },
   "portal": {
@@ -1815,6 +2245,41 @@
       "shiftLabel": "Schicht",
       "proposedLabel": "Neue Zeit",
       "reasonLabel": "Begründung"
+    },
+    "affiliateApplicationReceived": {
+      "subject": "Neue Partner-Bewerbung",
+      "heading": "Neue Partner-Bewerbung",
+      "body": "{name} hat sich als Partner für {tenantName} beworben.",
+      "actionButton": "Bewerbung ansehen"
+    },
+    "affiliateApproved": {
+      "subject": "Deine Partner-Bewerbung ist freigegeben",
+      "heading": "Willkommen im Partnerprogramm",
+      "body": "deine Bewerbung für das Partnerprogramm von {tenantName} ist freigegeben. Dein Partner-Code lautet {code}.",
+      "actionButton": "Zum Partnerbereich"
+    },
+    "affiliateRejected": {
+      "subject": "Deine Partner-Bewerbung",
+      "heading": "Bewerbung abgelehnt",
+      "body": "wir können deine Bewerbung für das Partnerprogramm von {tenantName} nicht annehmen.",
+      "reasonLabel": "Begründung"
+    },
+    "affiliateSale": {
+      "subject": "Neue Provision gutgeschrieben",
+      "heading": "Neue Provision",
+      "body": "für eine Vermittlung wurden dir {amount} gutgeschrieben.",
+      "productLabel": "Produkt",
+      "amountLabel": "Provision",
+      "statusLabel": "Status",
+      "actionButton": "Kontoauszug ansehen"
+    },
+    "affiliatePayout": {
+      "subject": "Auszahlung unterwegs",
+      "heading": "Auszahlung",
+      "body": "wir haben {amount} an dich überwiesen.",
+      "periodLabel": "Zeitraum",
+      "referenceLabel": "Referenz",
+      "actionButton": "Gutschrift herunterladen"
     }
   },
   "maintenance": {
@@ -1918,6 +2383,259 @@
       }
     }
   },
+  "affiliate": {
+    "shell": {
+      "title": "Partnerbereich",
+      "skipLink": "Zum Hauptinhalt",
+      "nav": {
+        "dashboard": "Übersicht",
+        "links": "Links",
+        "statistics": "Statistik",
+        "statement": "Kontoauszug",
+        "payouts": "Auszahlungen",
+        "team": "Team",
+        "profile": "Stammdaten",
+        "terms": "Bedingungen"
+      },
+      "logout": "Abmelden"
+    },
+    "dashboard": {
+      "title": "Übersicht",
+      "balanceHeading": "Salden",
+      "balanceOpen": "Offen",
+      "balanceOpenHint": "Gebucht, die Sperrfrist läuft noch.",
+      "balanceReserve": "In Reserve",
+      "balanceReserveHint": "Einbehalt für mögliche spätere Rückerstattungen.",
+      "balanceOnHold": "In Prüfung",
+      "balanceOnHoldHint": "Wird von Hand geprüft.",
+      "balanceAvailable": "Verfügbar",
+      "balanceAvailableHint": "Wird mit der nächsten Auszahlung überwiesen.",
+      "balancePaid": "Ausgezahlt",
+      "balancePaidHint": "Bereits überwiesen.",
+      "freeFrom": "Frei ab {date}",
+      "nextPayout": "Nächste Auszahlung am {date}",
+      "minPayoutMissing": "Bis zum Mindestbetrag fehlen noch {amount}.",
+      "payoutBlocked": "Auszahlung nicht möglich. Es fehlt: {fields}",
+      "payoutBlockedLink": "Stammdaten vervollständigen",
+      "metricsHeading": "Kennzahlen",
+      "clicks": "Klicks",
+      "uniqueClicks": "Eindeutige Klicks",
+      "leads": "Leads",
+      "sales": "Verkäufe",
+      "conversion": "Conversion",
+      "epc": "Verdienst je Klick",
+      "empty": "Noch keine Daten."
+    },
+    "links": {
+      "title": "Links",
+      "description": "Produkt und Zielseite wählen, bei Bedarf eine Kampagne ergänzen, Link kopieren.",
+      "productLabel": "Produkt",
+      "productAny": "Startseite",
+      "targetLabel": "Zielseite",
+      "campaignLabel": "Kampagne (optional)",
+      "campaignHint": "Erlaubt sind Buchstaben, Ziffern, Punkt, Bindestrich und Unterstrich.",
+      "resultLabel": "Dein Link",
+      "copy": "Link kopieren",
+      "copied": "Link kopiert.",
+      "codeHeading": "Dein Partner-Code",
+      "codeHint": "Der Code funktioniert auch ohne Link, etwa im Podcast oder auf Papier.",
+      "ttlHint": "Eine Zuordnung hält {days} Tage."
+    },
+    "statistics": {
+      "title": "Statistik",
+      "rangeLabel": "Zeitraum",
+      "groupLabel": "Aufschlüsselung",
+      "groupDay": "Nach Tag",
+      "groupProduct": "Nach Produkt",
+      "groupCampaign": "Nach Kampagne",
+      "columnDay": "Tag",
+      "columnProduct": "Produkt",
+      "columnCampaign": "Kampagne",
+      "columnClicks": "Klicks",
+      "columnUniqueClicks": "Eindeutige Klicks",
+      "columnLeads": "Leads",
+      "columnSales": "Verkäufe",
+      "columnConversion": "Conversion",
+      "columnEpc": "Verdienst je Klick",
+      "columnCommission": "Provision",
+      "columnReversalRate": "Stornoquote",
+      "empty": "Keine Daten im gewählten Zeitraum.",
+      "chartLabel": "Klicks und Verkäufe je Tag: {summary}",
+      "exportCsv": "CSV exportieren"
+    },
+    "statement": {
+      "title": "Kontoauszug",
+      "columnDate": "Datum",
+      "columnKind": "Vorgang",
+      "columnProduct": "Produkt",
+      "columnCampaign": "Kampagne",
+      "columnAmount": "Betrag",
+      "columnBalance": "Saldo",
+      "columnStatus": "Status",
+      "empty": "Noch keine Buchungen.",
+      "detailsOpen": "Berechnung anzeigen",
+      "detailsClose": "Berechnung ausblenden",
+      "baseLabel": "Basis",
+      "rateLabel": "Satz",
+      "ruleLabel": "Regel",
+      "reserveLabel": "Reserve",
+      "kindSale": "Verkauf",
+      "kindRecurring": "Abo-Rate",
+      "kindTier2": "Zweite Stufe",
+      "kindReversal": "Storno",
+      "kindManual": "Handbuchung",
+      "kindPayout": "Auszahlung",
+      "privacyNote": "Angaben zum Käufer zeigen wir nicht an."
+    },
+    "payouts": {
+      "title": "Auszahlungen",
+      "columnDate": "Datum",
+      "columnPeriod": "Zeitraum",
+      "columnAmount": "Betrag",
+      "columnTaxMode": "Steuermodus",
+      "columnReference": "Referenz",
+      "columnStatus": "Status",
+      "empty": "Noch keine Auszahlungen.",
+      "download": "Gutschrift herunterladen",
+      "downloadUnavailable": "Der Beleg ist noch nicht erstellt."
+    },
+    "team": {
+      "title": "Team",
+      "description": "Partner, die du geworben hast, und die daraus entstandene Provision der zweiten Stufe.",
+      "linkLabel": "Dein Werbe-Link für Partner",
+      "columnName": "Partner",
+      "columnJoined": "Dabei seit",
+      "columnRevenue": "Umsatz",
+      "columnCommission": "Deine Provision",
+      "empty": "Noch keine geworbenen Partner."
+    },
+    "profile": {
+      "title": "Stammdaten",
+      "addressHeading": "Anschrift",
+      "nameLabel": "Name",
+      "companyLabel": "Firma",
+      "streetLabel": "Straße und Hausnummer",
+      "postalCodeLabel": "Postleitzahl",
+      "cityLabel": "Ort",
+      "countryLabel": "Land",
+      "taxHeading": "Steuerdaten",
+      "taxHint": "Diese Angaben brauchen wir für die Gutschrift über deine Provision.",
+      "legalFormLabel": "Rechtsform",
+      "vatIdLabel": "USt-IdNr.",
+      "vatStatusLabel": "Prüfstatus",
+      "vatStatusValid": "Geprüft und gültig",
+      "vatStatusInvalid": "Nicht gültig",
+      "vatStatusPending": "Prüfung läuft",
+      "vatStatusUnchecked": "Noch nicht geprüft",
+      "smallBusinessLabel": "Kleinunternehmer nach § 19 UStG",
+      "paymentHeading": "Zahlungsverbindung",
+      "paymentHint": "Ohne Zahlungsverbindung können wir nichts überweisen.",
+      "ibanLabel": "IBAN",
+      "accountHolderLabel": "Kontoinhaber",
+      "paypalLabel": "PayPal-Adresse",
+      "notificationsHeading": "Benachrichtigungen",
+      "notifySale": "E-Mail bei jedem Verkauf",
+      "notifyReversal": "E-Mail bei jedem Storno",
+      "notifyPayout": "E-Mail bei jeder Auszahlung",
+      "save": "Speichern",
+      "pending": "Wird gespeichert …",
+      "saved": "Gespeichert.",
+      "dataHeading": "Deine Daten",
+      "dataExport": "Daten als JSON herunterladen",
+      "dataDelete": "Löschung beantragen",
+      "dataDeleteHint": "Provisionsbelege bleiben aus gesetzlichen Gründen erhalten; dein Name wird darin entfernt."
+    },
+    "terms": {
+      "title": "Partnerbedingungen",
+      "acceptedVersion": "Zugestimmt: Fassung {version} am {date}",
+      "updatedHeading": "Neue Fassung",
+      "updatedBody": "Die Partnerbedingungen haben sich geändert. Bitte stimme der neuen Fassung zu, um den Partnerbereich weiter zu nutzen.",
+      "accept": "Zustimmen",
+      "pending": "Wird gespeichert …",
+      "accepted": "Zustimmung gespeichert."
+    },
+    "program": {
+      "title": "Partnerprogramm",
+      "commissionHeading": "Provision",
+      "commissionPercent": "{rate} je vermitteltem Verkauf",
+      "commissionFixed": "{amount} je vermitteltem Verkauf",
+      "exampleHeading": "Beispiel",
+      "exampleText": "Bei einem Verkauf über {gross} erhältst du {amount}.",
+      "attributionHint": "Eine Empfehlung wird {days} Tage lang zugeordnet.",
+      "rulesHeading": "Regeln",
+      "notFound": "Dieses Partnerprogramm ist nicht öffentlich."
+    },
+    "apply": {
+      "heading": "Als Partner bewerben",
+      "description": "Wir prüfen jede Bewerbung von Hand und melden uns per E-Mail.",
+      "nameLabel": "Name",
+      "emailLabel": "E-Mail-Adresse",
+      "companyLabel": "Firma (optional)",
+      "websiteLabel": "Webseite oder Kanal (optional)",
+      "messageLabel": "Wie willst du werben?",
+      "termsLabel": "Ich habe die Partnerbedingungen gelesen und stimme ihnen zu.",
+      "termsLink": "Partnerbedingungen ansehen",
+      "submit": "Bewerbung senden",
+      "pending": "Wird gesendet …",
+      "success": "Danke. Wir haben deine Bewerbung erhalten und melden uns per E-Mail.",
+      "error": "Die Bewerbung konnte nicht gesendet werden. Bitte versuche es später erneut.",
+      "invalid": "Bitte prüfe die markierten Felder."
+    },
+    "status": {
+      "program": {
+        "draft": "Entwurf",
+        "active": "Aktiv",
+        "paused": "Pausiert"
+      },
+      "partner": {
+        "pending": "Bewerbung offen",
+        "active": "Aktiv",
+        "rejected": "Abgelehnt",
+        "suspended": "Gesperrt"
+      },
+      "commission": {
+        "pending": "Sperrfrist läuft",
+        "on_hold": "In Prüfung",
+        "approved": "Verfügbar",
+        "paid": "Ausgezahlt",
+        "cancelled": "Storniert"
+      },
+      "payout": {
+        "draft": "Entwurf",
+        "approved": "Freigegeben",
+        "exported": "Exportiert",
+        "paid": "Bezahlt",
+        "failed": "Fehlgeschlagen",
+        "cancelled": "Storniert"
+      }
+    }
+  },
+  "consent": {
+    "title": "Cookie für Partner-Empfehlungen",
+    "body": "Wenn du über den Empfehlungslink eines Partners hierher gekommen bist, können wir uns merken, wer dich empfohlen hat. Dafür brauchen wir ein einziges Cookie. Es dient nur dazu, eine spätere Bestellung diesem Partner zuzuordnen — keine Werbung, keine Profilbildung, keine Weitergabe an Werbenetzwerke.",
+    "legalNote": "Die Entscheidung ist freiwillig. Ohne Zustimmung funktioniert die Seite unverändert. Du kannst die Entscheidung jederzeit in den Einstellungen ändern.",
+    "privacyLink": "Mehr dazu in der Datenschutzerklärung",
+    "dialogLabel": "Entscheidung über das Cookie für Partner-Empfehlungen",
+    "deny": "Ablehnen",
+    "accept": "Annehmen",
+    "savedGranted": "Zustimmung gespeichert.",
+    "savedDenied": "Ablehnung gespeichert.",
+    "savedWithdrawn": "Widerruf gespeichert.",
+    "error": "Die Entscheidung konnte nicht gespeichert werden. Bitte versuche es erneut.",
+    "grant": "Zustimmen",
+    "withdraw": "Widerrufen",
+    "settings": {
+      "heading": "Cookie für Partner-Empfehlungen",
+      "description": "Dieses eine Cookie ordnet eine Bestellung dem Partner zu, der dich empfohlen hat. Es wird nur mit deiner Zustimmung gesetzt.",
+      "statusLabel": "Stand",
+      "statusUndecided": "Noch nicht entschieden",
+      "statusGranted": "Zugestimmt",
+      "statusDenied": "Abgelehnt",
+      "statusWithdrawn": "Widerrufen",
+      "decidedAt": "Entschieden am {date}",
+      "outdated": "Die Datenschutzerklärung hat sich seit deiner Entscheidung geändert. Bitte entscheide erneut."
+    }
+  },
   "legal": {
     "shell": {
       "metaTitle": "Rechtliches",
@@ -1980,7 +2698,14 @@
       "transferHeading": "Übermittlung in Drittländer",
       "transferText": "{company} hat ihren Sitz in den USA, einzelne Dienstleister verarbeiten Daten ebenfalls außerhalb der EU. Diese Übermittlungen stützen wir auf die Standardvertragsklauseln der EU-Kommission (Art. 46 Abs. 2 lit. c DSGVO) und ergänzende Maßnahmen wie Verschlüsselung bei Übertragung und Speicherung. Datenbank und Videos liegen weiterhin in der EU.",
       "cookiesHeading": "Cookies und Sitzung",
-      "cookiesText": "Wir setzen ausschließlich technisch notwendige Cookies: das Sitzungs-Cookie der Anmeldung (httpOnly, Secure, SameSite) und die gewählte Sprache. Kein Tracking, keine Werbe-Cookies, keine Weitergabe an Werbenetzwerke. Sitzungen laufen nach Ablauf der konfigurierten Gültigkeit automatisch ab.",
+      "cookiesText": "Für Anmeldung und Sprache setzen wir technisch notwendige Cookies: das Sitzungs-Cookie der Anmeldung (httpOnly, Secure, SameSite) und die gewählte Sprache. Betreibt dieser Anbieter ein Partnerprogramm, kommt genau ein weiteres Cookie hinzu, das eine Bestellung dem empfehlenden Partner zuordnet. Dieses eine Cookie ist einwilligungspflichtig, wird ohne deine Zustimmung nicht gesetzt und ist jederzeit widerrufbar. Werbe-Cookies setzen wir nicht, und wir geben keine Daten an Werbenetzwerke weiter. Sitzungen laufen nach Ablauf der konfigurierten Gültigkeit automatisch ab.",
+      "cookiesConsentText": "Deine Entscheidung über dieses Cookie halten wir selbst in einem Cookie fest (httpOnly, Secure, SameSite, sechs Monate). Darin stehen eine zufällige Kennung ohne Personenbezug, der Stand dieser Erklärung und der Zeitpunkt der Entscheidung — damit wir dich nicht bei jedem Aufruf erneut fragen und die Einwilligung nachweisen können (Art. 7 Abs. 1 DSGVO). Nach sechs Monaten fragen wir erneut.",
+      "affiliateHeading": "Partnerprogramm und Zuordnung von Empfehlungen",
+      "affiliateText": "Kommst du über den Empfehlungslink eines Partners, speichern wir den Klick mit Zeitpunkt, Zielseite, Kampagnenname, Browsertyp und einem nicht rückrechenbaren Kurzwert deiner IP-Adresse. Nur mit deiner Zustimmung kommt ein Cookie hinzu, das diese Zuordnung über spätere Seitenaufrufe hinweg hält. Kommt ein Kauf zustande, verknüpfen wir die Bestellung mit der Empfehlung, um die Provision des Partners zu berechnen.",
+      "affiliateLegalBasis": "Rechtsgrundlagen: für das Cookie und die Speicherung des Klicks deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1 TDDDG); für die Abrechnung der Provision die Erfüllung des Vertrags mit dem Partner (Art. 6 Abs. 1 lit. b DSGVO); für die Aufbewahrung der Buchungsbelege die rechtliche Verpflichtung (Art. 6 Abs. 1 lit. c DSGVO).",
+      "affiliateRecipients": "Der Partner erfährt nie, wer gekauft hat. Er sieht Datum, Produkt, Betrag, Kampagne und Status seiner eigenen Vermittlungen — keinen Namen, keine E-Mail-Adresse, keine Bestellnummer. Ein externes Partnernetzwerk ist nicht beteiligt; es kommen nur die oben genannten Auftragsverarbeiter zum Einsatz.",
+      "affiliateRetention": "Klicks und Zuordnungen löschen wir nach Ablauf der Zuordnungsfrist, spätestens bei der Löschung deines Kontos. Provisionsbuchungen und Auszahlungsbelege sind Buchungsunterlagen und bleiben für die gesetzliche Dauer erhalten; der Personenbezug wird darin entfernt, soweit die Aufbewahrungspflicht das zulässt.",
+      "affiliateWithdraw": "Du kannst die Einwilligung jederzeit in den Einstellungen widerrufen. Das Cookie wird dann sofort gelöscht. Der Widerruf wirkt für die Zukunft; bereits abgerechnete Empfehlungen bleiben davon unberührt.",
       "botHeading": "Spam- und Bot-Schutz",
       "botText": "Öffentlich erreichbare Formulare — Anmeldung, Registrierung, Passwort-Reset und das Kontaktformular — sind gegen automatisierte Massenanfragen geschützt. Dafür verarbeiten wir die IP-Adresse der Anfrage, den Zeitpunkt des Absendens und den Inhalt des Formulars: Wir begrenzen die Zahl der Anfragen je IP-Adresse, je Absenderadresse und je Empfänger-Postfach und prüfen automatisiert, ob eine Nachricht Merkmale maschinell erzeugter Werbung trägt. Als Spam eingestufte Nachrichten werden nicht zugestellt und nicht gespeichert; protokolliert wird nur der Umstand der Abweisung ohne den Nachrichteninhalt. Rechtsgrundlage ist unser berechtigtes Interesse an der Abwehr von Missbrauch (Art. 6 Abs. 1 lit. f DSGVO).",
       "botTurnstile": "Im Kontaktformular setzen wir zusätzlich Cloudflare Turnstile ein. Das Verfahren wertet im Browser technische Merkmale der Anfrage aus und stellt nur im Zweifelsfall eine Aufgabe. Dabei werden die IP-Adresse sowie Angaben zu Browser und Gerät an Cloudflare übermittelt. Turnstile setzt keine Cookies, dient nicht der Werbung und erstellt keine Nutzerprofile. Cloudflare ist unser Auftragsverarbeiter; für die Übermittlung in die USA gilt der Abschnitt „Übermittlung in Drittländer“.",

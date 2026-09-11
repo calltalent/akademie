@@ -34,6 +34,18 @@ const initialState: PlatformActionState = { error: null };
  * freischalten" (`shift_calendar_enabled`), gleiche "aus, außer explizit
  * true"-Polarität, einziger Freischalt-Weg für das Feature (der Mandant hat
  * dafür keinen eigenen Schalter, siehe CLAUDE.md-Feature-Beschreibung).
+ *
+ * ERWEITERT (Affiliate B1, 10.09.2026, PLAN_Affiliate-System.md 9.8): sechster
+ * Schalter "Partnerprogramm freischalten" (`affiliate_enabled`), gleiche
+ * "aus, außer explizit true"-Polarität. Der Hilfetext nennt ausdrücklich die
+ * Folgen einer Freischaltung (Provisionszusage gegenüber Dritten,
+ * Klick-Tracking mit Einwilligung) — dieser Schalter kostet den Mandanten
+ * Geld und löst eine Datenverarbeitung aus, das gehört vor den Klick und
+ * nicht in eine Dokumentation, die hier niemand liest.
+ *
+ * Texte hier hartkodiert auf Deutsch wie im gesamten Betreiber-Portal: dieser
+ * Bereich ist nicht über next-intl übersetzt (kein `useTranslations` unter
+ * `src/app/portal/`), er richtet sich ausschließlich an den Betreiber.
  */
 export function TenantFeaturesForm({
   tenantId,
@@ -44,6 +56,7 @@ export function TenantFeaturesForm({
   marketplaceCommissionPercent,
   defaultCommissionPercent,
   shiftCalendarEnabled,
+  affiliateEnabled,
 }: {
   tenantId: string;
   paymentsEnabled: boolean;
@@ -53,6 +66,7 @@ export function TenantFeaturesForm({
   marketplaceCommissionPercent: string;
   defaultCommissionPercent: string;
   shiftCalendarEnabled: boolean;
+  affiliateEnabled: boolean;
 }) {
   const boundUpdate = updateTenantFeatures.bind(null, tenantId);
   const [state, formAction, pending] = useActionState(boundUpdate, initialState);
@@ -123,6 +137,12 @@ export function TenantFeaturesForm({
           label="Schichtplan freischalten"
           desc="Kalender für Schichtplanung und Zeiterfassung — Arbeiterverwaltung im Admin-Bereich, Wochenansicht + Ein-/Ausstempeln im Lernbereich."
           defaultChecked={shiftCalendarEnabled}
+        />
+        <FeatureCheckbox
+          name="affiliateEnabled"
+          label="Partnerprogramm freischalten"
+          desc="Mandant darf Partner werben lassen und ihnen Provision auf vermittelte Käufe zusagen. Schaltet Partnerverwaltung, Provisionsabrechnung und Klick-Tracking frei — Letzteres setzt eine Einwilligung des Besuchers voraus."
+          defaultChecked={affiliateEnabled}
         />
       </div>
 

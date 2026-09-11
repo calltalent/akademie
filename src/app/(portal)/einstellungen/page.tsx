@@ -3,12 +3,15 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTenant } from "@/lib/tenant/context";
 import { publicEnv } from "@/lib/env";
+import { readTrackingConsent } from "@/lib/consent/read";
+import { LEGAL_LAST_UPDATED } from "@/lib/legal/updated";
 import { AppShell } from "@/components/learn/app-shell";
 import { DEFAULT_LOCALE, isSupportedLocale, resolveEnabledLocales, type Locale } from "@/i18n/config";
 import {
   EinstellungenTabs,
   type SessionInfo,
   type CertificateInfo,
+  type ConsentInfo,
 } from "./einstellungen-tabs";
 
 type Tab = "allgemein" | "benachrichtigungen" | "geraete";
@@ -170,6 +173,38 @@ export default async function EinstellungenPage({
     }),
   );
 
+  /**
+   * Affiliate-Modul, Block B2 (PLAN_Affiliate-System.md Abschnitt 10/B2,
+   * 10.09.2026): Widerruf der Tracking-Einwilligung. Art. 7 Abs. 3 DSGVO
+   * verlangt, dass der Widerruf so einfach ist wie die Erteilung — der
+   * Einwilligungsdialog liegt über jeder öffentlichen Seite, die
+   * Gegenrichtung braucht deshalb eine feste, auffindbare Stelle.
+   *
+   * Das Cookie ist `httpOnly` (CLAUDE.md §2.13), der Zustand muss also hier
+   * auf dem Server gelesen und als Prop weitergereicht werden; der Browser
+   * kann ihn nicht selbst sehen.
+   *
+   * `null` bedeutet: Karte gar nicht anzeigen. Sie erscheint genau dann, wenn
+   * es eine Entscheidung gibt, die man ändern könnte. Wer nie gefragt wurde
+   * (Mandant ohne Partnerprogramm), bekommt auch keinen Abschnitt über ein
+   * Cookie, das es dort nicht gibt.
+   */
+  const consentState = await readTrackingConsent();
+  const consentDecision = consentState.decisions.affiliate ?? null;
+  const consent: ConsentInfo | null =
+    consentDecision === null
+      ? null
+      : {
+          decision: consentDecision,
+          decidedAt: consentState.decidedAt ? formatDate(format, consentState.decidedAt) : null,
+          // Bezieht sich die Entscheidung noch auf den aktuellen Stand der
+          // Rechtstexte? Wenn nicht, fragt der Dialog ohnehin erneut; die
+          // Karte sagt es zusätzlich, damit der Hinweis auch findet, wer
+          // gerade von einer Rechtsseite kommt (dort erscheint der Dialog
+          // bewusst nicht).
+          outdated: consentState.policyVersion !== LEGAL_LAST_UPDATED,
+        };
+
   const { data: pendingDeletion } = await supabase
     .from("deletion_requests")
     .select("requested_at")
@@ -202,6 +237,7 @@ export default async function EinstellungenPage({
         sessions={sessions}
         certificates={certificates}
         pendingDeletionDate={pendingDeletion ? formatDate(format, pendingDeletion.requested_at) : null}
+        consent={consent}
         vapidPublicKey={publicEnv.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
         initialTab={initialTab}
         enabledLocales={enabledLocales}

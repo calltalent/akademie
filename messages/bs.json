@@ -1614,6 +1614,436 @@
         "jobNotFound": "Nalog nije pronađen.",
         "jobError": "Greška: {error}"
       }
+    },
+    "affiliate": {
+      "eyebrow": "Prodaja · Partnerski program",
+      "title": "Partnerski program",
+      "description": "Partneri, uslovi, provizije i isplate programa.",
+      "disabled": {
+        "heading": "Partnerski program nije aktiviran",
+        "body": "Za ovog klijenta partnerski program nije aktiviran. Aktivira ga operater platforme."
+      },
+      "nav": {
+        "overview": "Pregled",
+        "partners": "Partneri",
+        "conditions": "Uslovi provizije",
+        "commissions": "Provizije",
+        "payouts": "Isplate",
+        "creatives": "Promotivni materijal",
+        "settings": "Podešavanja"
+      },
+      "overview": {
+        "title": "Pregled",
+        "rangeLabel": "Period",
+        "range30": "30 dana",
+        "range90": "90 dana",
+        "range365": "12 mjeseci",
+        "clicks": "Klikovi",
+        "sales": "Prodaje",
+        "availableCommission": "Dostupna provizija",
+        "reversalRate": "Stopa storna",
+        "unprocessedEvents": "{count} platnih događaja još nije obrađeno.",
+        "unprocessedEventsLink": "Pogledaj događaje",
+        "flaggedCommissions": "{count} knjiženja je označeno za provjeru.",
+        "flaggedLink": "Pogledaj knjiženja",
+        "openApplications": "Otvorene prijave ({count})",
+        "openApplicationsEmpty": "Nema otvorenih prijava.",
+        "topPartners": "Najbolji partneri",
+        "topPartnersEmpty": "Još nema partnera s prometom u ovom periodu.",
+        "recentCommissions": "Posljednja knjiženja",
+        "recentCommissionsEmpty": "Još nema knjiženja u ovom periodu.",
+        "exportCsv": "Izvezi CSV"
+      },
+      "partners": {
+        "title": "Partneri",
+        "searchLabel": "Pretraži partnere",
+        "searchPlaceholder": "Ime ili e-mail",
+        "tabs": {
+          "all": "Svi",
+          "pending": "Prijave",
+          "active": "Aktivni",
+          "suspended": "Blokirani",
+          "rejected": "Odbijeni"
+        },
+        "columnName": "Ime",
+        "columnCode": "Kod",
+        "columnGroup": "Grupa",
+        "columnStatus": "Status",
+        "columnClicks": "Klikovi (30 dana)",
+        "columnSales": "Prodaje",
+        "columnAvailable": "Dostupno",
+        "empty": "Nema partnera u ovom prikazu.",
+        "countSuffix": "{count} ukupno",
+        "invite": {
+          "heading": "Pozovi partnera",
+          "description": "Kreira link za poziv s unaprijed datim odobrenjem. Partner sam kreira nalog i kod.",
+          "emailLabel": "E-mail adresa",
+          "nameLabel": "Ime",
+          "groupLabel": "Grupa",
+          "submit": "Kreiraj link za poziv",
+          "pending": "Kreira se …",
+          "linkLabel": "Link za poziv",
+          "copy": "Kopiraj link",
+          "copied": "Link kopiran."
+        }
+      },
+      "partner": {
+        "backLink": "Nazad na listu partnera",
+        "master": {
+          "heading": "Osnovni podaci",
+          "nameLabel": "Ime",
+          "companyLabel": "Firma",
+          "emailLabel": "E-mail adresa",
+          "codeLabel": "Partnerski kod",
+          "groupLabel": "Grupa",
+          "statusLabel": "Status",
+          "joinedLabel": "Član od",
+          "referredByLabel": "Preporučio",
+          "applicationHeading": "Podaci iz prijave",
+          "applicationEmpty": "Nema podataka."
+        },
+        "condition": {
+          "heading": "Uslovi provizije",
+          "effectiveRate": "Važeća stopa",
+          "origin": "Porijeklo",
+          "originProgram": "Standard programa",
+          "originGroup": "Iz grupe {name}",
+          "originPartner": "Vlastito pravilo za ovog partnera",
+          "originProduct": "Pravilo za proizvod {name}",
+          "editLink": "Uredi uslove provizije"
+        },
+        "statement": {
+          "heading": "Izvod",
+          "empty": "Još nema knjiženja.",
+          "columnDate": "Datum",
+          "columnProduct": "Proizvod",
+          "columnBase": "Osnovica",
+          "columnRate": "Stopa",
+          "columnAmount": "Provizija",
+          "columnStatus": "Status",
+          "more": "Sva knjiženja ovog partnera"
+        },
+        "actions": {
+          "heading": "Radnje",
+          "approve": "Odobri",
+          "reject": "Odbij",
+          "reasonLabel": "Obrazloženje",
+          "suspend": "Blokiraj",
+          "unsuspend": "Ukini blokadu",
+          "payoutHold": "Blokiraj isplatu",
+          "payoutRelease": "Ukini blokadu isplate",
+          "manualEntry": "Ručno knjiženje",
+          "noteLabel": "Interna napomena",
+          "save": "Sačuvaj",
+          "saved": "Sačuvano.",
+          "pending": "Izvršava se …"
+        },
+        "banking": {
+          "heading": "Podaci za plaćanje i poreski podaci",
+          "complete": "Potpuno — isplata je moguća.",
+          "incomplete": "Nepotpuno. Nedostaje: {fields}",
+          "hint": "Bankovni podaci se ovdje ne prikazuju. Partner ih sam održava."
+        },
+        "audit": {
+          "heading": "Evidencija izmjena",
+          "empty": "Nema unosa.",
+          "columnDate": "Vrijeme",
+          "columnActor": "Korisnik",
+          "columnAction": "Radnja"
+        }
+      },
+      "conditions": {
+        "title": "Uslovi provizije",
+        "description": "Uvijek važi pravilo s najvišim rangom. Pravila istog ranga se vremenski ne smiju preklapati.",
+        "defaultHeading": "Standard programa",
+        "defaultRate": "Standardna stopa",
+        "defaultBasis": "Osnovica provizije",
+        "listHeading": "Pravila",
+        "columnRank": "Rang",
+        "columnScope": "Opseg",
+        "columnProduct": "Proizvod",
+        "columnKind": "Vrsta",
+        "columnRate": "Stopa",
+        "columnPeriod": "Period",
+        "empty": "Još nema pravila. Važi standard programa.",
+        "scopeAll": "Svi partneri",
+        "scopeGroup": "Grupa",
+        "scopePartner": "Partner",
+        "productAll": "Svi proizvodi",
+        "form": {
+          "heading": "Kreiraj pravilo",
+          "scopeLabel": "Opseg",
+          "partnerLabel": "Partner",
+          "groupLabel": "Grupa",
+          "productLabel": "Proizvod",
+          "kindLabel": "Vrsta",
+          "kindPercent": "Procenat",
+          "kindFixed": "Fiksni iznos",
+          "rateLabel": "Stopa u procentima",
+          "fixedLabel": "Iznos u eurima",
+          "validFromLabel": "Važi od",
+          "validToLabel": "Važi do (opcionalno)",
+          "noteLabel": "Napomena",
+          "submit": "Sačuvaj pravilo",
+          "pending": "Čuva se …",
+          "saved": "Pravilo sačuvano.",
+          "delete": "Obriši pravilo",
+          "overlapError": "Za ovaj opseg već postoji pravilo u odabranom periodu."
+        },
+        "calculator": {
+          "heading": "Kalkulator",
+          "partnerLabel": "Partner",
+          "productLabel": "Proizvod",
+          "submit": "Izračunaj",
+          "result": "Važi {rule}: {rate}. Kod {gross} bruto to je {amount}.",
+          "ruleDefault": "standard programa",
+          "ruleNumbered": "pravilo {rank}"
+        }
+      },
+      "commissions": {
+        "title": "Provizije",
+        "filter": {
+          "status": "Status",
+          "partner": "Partner",
+          "product": "Proizvod",
+          "period": "Period",
+          "flagged": "Samo označena",
+          "test": "Samo testna knjiženja",
+          "apply": "Primijeni filter",
+          "reset": "Resetuj filter",
+          "all": "Sve"
+        },
+        "columnDate": "Datum",
+        "columnPartner": "Partner",
+        "columnProduct": "Proizvod",
+        "columnCampaign": "Kampanja",
+        "columnBase": "Osnovica",
+        "columnRate": "Stopa",
+        "columnAmount": "Iznos",
+        "columnStatus": "Status",
+        "empty": "Nema knjiženja za ovaj filter.",
+        "detailsOpen": "Prikaži obračun",
+        "detailsClose": "Sakrij obračun",
+        "reasonHeading": "Povezivanje",
+        "snapshotHeading": "Primijenjeno pravilo",
+        "reserveLabel": "od toga rezerva",
+        "reserveHint": "Rezerva postaje dostupna tek nakon isteka roka rezerve.",
+        "actions": {
+          "reverse": "Storniraj",
+          "rebook": "Preknjiži",
+          "flag": "Označi",
+          "unflag": "Ukloni oznaku",
+          "reprocess": "Obradi ponovo",
+          "pending": "Izvršava se …",
+          "done": "Izvršeno."
+        },
+        "manual": {
+          "heading": "Ručno knjiženje",
+          "partnerLabel": "Partner",
+          "amountLabel": "Iznos u eurima",
+          "reasonLabel": "Razlog",
+          "submit": "Proknjiži",
+          "saved": "Knjiženje kreirano."
+        },
+        "exportCsv": "Izvezi CSV"
+      },
+      "payouts": {
+        "title": "Isplate",
+        "tabs": {
+          "drafts": "Nacrti",
+          "approved": "Odobreno",
+          "exported": "Izvezeno",
+          "paid": "Plaćeno",
+          "history": "Historija"
+        },
+        "columnPartner": "Partner",
+        "columnPeriod": "Period",
+        "columnGross": "Bruto",
+        "columnReversals": "Protuknjiženja",
+        "columnAmount": "Iznos isplate",
+        "columnTaxMode": "Poreski tretman",
+        "columnMethod": "Način plaćanja",
+        "columnCompleteness": "Potpunost",
+        "columnReference": "Referenca",
+        "columnDocument": "Dokument",
+        "empty": "Nema isplata u ovom prikazu.",
+        "complete": "Potpuno",
+        "incomplete": "Nepotpuno. Nedostaje: {fields}",
+        "releaseSelected": "Odobri odabrano",
+        "releaseConfirm": "Odobriti {count} isplata u ukupnom iznosu od {amount}?",
+        "releaseConfirmYes": "Odobri",
+        "releaseConfirmNo": "Otkaži",
+        "exportSepa": "Preuzmi SEPA XML",
+        "exportCsv": "Izvezi CSV",
+        "markPaid": "Označi kao plaćeno",
+        "referenceLabel": "Referenca plaćanja",
+        "documentDownload": "Preuzmi knjižno odobrenje",
+        "blockedHeading": "Nije moguće isplatiti",
+        "blockedReason": "{partner}: {reason}",
+        "taxMode": {
+          "regular": "Redovno oporezivanje",
+          "small_business": "Mali preduzetnik (§ 19 UStG)",
+          "reverse_charge": "Reverse charge",
+          "non_eu": "Treća zemlja"
+        },
+        "method": {
+          "sepa": "SEPA doznaka",
+          "paypal": "PayPal",
+          "manual": "Ručno"
+        }
+      },
+      "creatives": {
+        "title": "Promotivni materijal",
+        "kind": {
+          "banner": "Baner",
+          "email": "E-mail predložak",
+          "text": "Tekstualni isječak",
+          "file": "Datoteka"
+        },
+        "empty": "Još nema promotivnog materijala.",
+        "activeLabel": "Aktivno",
+        "inactiveLabel": "Neaktivno",
+        "previewLabel": "Pregled",
+        "form": {
+          "heading": "Dodaj promotivni materijal",
+          "kindLabel": "Vrsta",
+          "titleLabel": "Naslov",
+          "fileLabel": "Datoteka",
+          "fileHint": "Dozvoljeni su PNG, JPG, WEBP i PDF do 5 MB.",
+          "bodyLabel": "Sadržaj",
+          "placeholderHint": "Rezervisana mjesta: {linkToken} se zamjenjuje partnerskim linkom, {nameToken} imenom partnera.",
+          "submit": "Sačuvaj",
+          "pending": "Čuva se …",
+          "saved": "Sačuvano.",
+          "delete": "Obriši"
+        }
+      },
+      "settings": {
+        "title": "Podešavanja",
+        "basics": {
+          "heading": "Osnovni podaci i vidljivost",
+          "statusLabel": "Status programa",
+          "visibilityLabel": "Vidljivost",
+          "approvalLabel": "Prijave",
+          "approvalManual": "Odobravaj ručno",
+          "approvalAuto": "Odobravaj automatski"
+        },
+        "visibility": {
+          "private": "Privatno, nedostupno",
+          "link": "Samo preko direktnog linka",
+          "public": "Javno izlistano"
+        },
+        "commission": {
+          "heading": "Standardni uslovi i osnovica provizije",
+          "rateKindLabel": "Vrsta",
+          "ratePercent": "Procenat",
+          "rateFixed": "Fiksni iznos",
+          "rateLabel": "Standardna stopa u procentima",
+          "fixedLabel": "Fiksni iznos u eurima",
+          "basisLabel": "Osnovica provizije",
+          "basisNet": "Neto, bez poreza",
+          "basisGross": "Bruto",
+          "feeDeductionLabel": "Odbitak za naknade plaćanja u procentima",
+          "minLabel": "Najmanja provizija u eurima",
+          "maxLabel": "Najveća provizija u eurima",
+          "currencyLabel": "Valuta"
+        },
+        "attribution": {
+          "heading": "Povezivanje preporuka",
+          "modelLabel": "Model",
+          "modelLast": "Posljednji klik",
+          "modelFirst": "Prvi klik",
+          "cookieTtlLabel": "Trajanje povezivanja u danima",
+          "overwriteLabel": "Kasniji klik drugog partnera",
+          "overwriteAllow": "Dozvoli prepisivanje",
+          "overwriteDeny": "Zadrži prvo povezivanje",
+          "lifetimeLabel": "Trajno vezivanje za nalog",
+          "selfReferralLabel": "Preporuka samom sebi",
+          "selfReferralBlock": "Ne plaćaj",
+          "selfReferralFlag": "Plaćaj, ali označi",
+          "blocklistLabel": "Blokirane stranice porijekla",
+          "blocklistHint": "Jedna domena po redu."
+        },
+        "recurring": {
+          "heading": "Ponašanje kod pretplata",
+          "modeLabel": "Rate koje se plaćaju",
+          "modeFirstOnly": "Samo prva rata",
+          "modeNPeriods": "Prvih nekoliko rata",
+          "modeAll": "Sve rate",
+          "maxPeriodsLabel": "Broj rata"
+        },
+        "money": {
+          "heading": "Novac i rokovi",
+          "holdDaysLabel": "Period čekanja u danima",
+          "reserveLabel": "Rezerva u procentima",
+          "reserveDaysLabel": "Rok rezerve u danima",
+          "minPayoutLabel": "Najmanja isplata u eurima",
+          "scheduleLabel": "Ritam isplate",
+          "scheduleWeekly": "Sedmično",
+          "scheduleSemiMonthly": "Dva puta mjesečno",
+          "scheduleMonthly": "Mjesečno"
+        },
+        "tier2": {
+          "heading": "Drugi nivo",
+          "enabledLabel": "Drugi nivo aktivan",
+          "basisLabel": "Osnovica obračuna",
+          "basisCommission": "Provizija preporučenog partnera",
+          "basisRevenue": "Promet preporučenog partnera",
+          "rateLabel": "Stopa drugog nivoa u procentima"
+        },
+        "texts": {
+          "heading": "Tekstovi",
+          "descriptionLabel": "Opis programa",
+          "termsLabel": "Partnerski uslovi",
+          "termsVersionLabel": "Verzija",
+          "termsVersionHint": "Ako se verzija poveća, svi partneri moraju ponovo prihvatiti uslove.",
+          "applicationNoteLabel": "Napomena u obrascu za prijavu",
+          "applicationFieldsLabel": "Dodatna polja prijave"
+        },
+        "test": {
+          "heading": "Testni režim",
+          "label": "Testni režim aktivan",
+          "hint": "Knjiženja iz testnih narudžbi se kreiraju, ali se nikada ne isplaćuju."
+        },
+        "save": "Sačuvaj podešavanja",
+        "pending": "Čuva se …",
+        "saved": "Podešavanja sačuvana.",
+        "warnings": {
+          "holdDays": "Period čekanja je kraći od zakonskog roka za odustajanje od 14 dana.",
+          "highRate": "Stopa je iznad 50 procenata.",
+          "combinedRate": "Prvi i drugi nivo zajedno su iznad 60 procenata.",
+          "basisChange": "Izmjena važi samo za buduća knjiženja. Postojeća knjiženja i aktivne pretplate ostaju nepromijenjeni.",
+          "recurringAll": "Plaćanje svih rata je obaveza bez vremenskog ograničenja."
+        }
+      },
+      "status": {
+        "program": {
+          "draft": "Nacrt",
+          "active": "Aktivan",
+          "paused": "Pauziran"
+        },
+        "partner": {
+          "pending": "Prijava otvorena",
+          "active": "Aktivan",
+          "rejected": "Odbijen",
+          "suspended": "Blokiran"
+        },
+        "commission": {
+          "pending": "Traje period čekanja",
+          "on_hold": "U provjeri",
+          "approved": "Dostupno",
+          "paid": "Isplaćeno",
+          "cancelled": "Stornirano"
+        },
+        "payout": {
+          "draft": "Nacrt",
+          "approved": "Odobreno",
+          "exported": "Izvezeno",
+          "paid": "Plaćeno",
+          "failed": "Neuspješno",
+          "cancelled": "Stornirano"
+        }
+      }
     }
   },
   "portal": {
@@ -1815,6 +2245,41 @@
       "shiftLabel": "Smjena",
       "proposedLabel": "Novo vrijeme",
       "reasonLabel": "Obrazloženje"
+    },
+    "affiliateApplicationReceived": {
+      "subject": "Nova partnerska prijava",
+      "heading": "Nova partnerska prijava",
+      "body": "{name} se prijavio kao partner za {tenantName}.",
+      "actionButton": "Pogledaj prijavu"
+    },
+    "affiliateApproved": {
+      "subject": "Tvoja partnerska prijava je odobrena",
+      "heading": "Dobro došao u partnerski program",
+      "body": "tvoja prijava za partnerski program klijenta {tenantName} je odobrena. Tvoj partnerski kod je {code}.",
+      "actionButton": "U partnerski prostor"
+    },
+    "affiliateRejected": {
+      "subject": "Tvoja partnerska prijava",
+      "heading": "Prijava odbijena",
+      "body": "ne možemo prihvatiti tvoju prijavu za partnerski program klijenta {tenantName}.",
+      "reasonLabel": "Obrazloženje"
+    },
+    "affiliateSale": {
+      "subject": "Nova provizija je odobrena",
+      "heading": "Nova provizija",
+      "body": "za jedno posredovanje odobreno ti je {amount}.",
+      "productLabel": "Proizvod",
+      "amountLabel": "Provizija",
+      "statusLabel": "Status",
+      "actionButton": "Pogledaj izvod"
+    },
+    "affiliatePayout": {
+      "subject": "Isplata je na putu",
+      "heading": "Isplata",
+      "body": "doznačili smo ti {amount}.",
+      "periodLabel": "Period",
+      "referenceLabel": "Referenca",
+      "actionButton": "Preuzmi knjižno odobrenje"
     }
   },
   "maintenance": {
@@ -1918,6 +2383,259 @@
       }
     }
   },
+  "affiliate": {
+    "shell": {
+      "title": "Partnerski prostor",
+      "skipLink": "Pređi na glavni sadržaj",
+      "nav": {
+        "dashboard": "Pregled",
+        "links": "Linkovi",
+        "statistics": "Statistika",
+        "statement": "Izvod",
+        "payouts": "Isplate",
+        "team": "Tim",
+        "profile": "Osnovni podaci",
+        "terms": "Uslovi"
+      },
+      "logout": "Odjavi se"
+    },
+    "dashboard": {
+      "title": "Pregled",
+      "balanceHeading": "Stanja",
+      "balanceOpen": "Otvoreno",
+      "balanceOpenHint": "Proknjiženo, period čekanja još traje.",
+      "balanceReserve": "U rezervi",
+      "balanceReserveHint": "Zadržano zbog mogućih kasnijih povrata.",
+      "balanceOnHold": "U provjeri",
+      "balanceOnHoldHint": "Provjerava osoba.",
+      "balanceAvailable": "Dostupno",
+      "balanceAvailableHint": "Bit će doznačeno sa sljedećom isplatom.",
+      "balancePaid": "Isplaćeno",
+      "balancePaidHint": "Već doznačeno.",
+      "freeFrom": "Oslobađa se {date}",
+      "nextPayout": "Sljedeća isplata {date}",
+      "minPayoutMissing": "Do najmanjeg iznosa nedostaje još {amount}.",
+      "payoutBlocked": "Isplata nije moguća. Nedostaje: {fields}",
+      "payoutBlockedLink": "Dopuni osnovne podatke",
+      "metricsHeading": "Pokazatelji",
+      "clicks": "Klikovi",
+      "uniqueClicks": "Jedinstveni klikovi",
+      "leads": "Kontakti",
+      "sales": "Prodaje",
+      "conversion": "Konverzija",
+      "epc": "Zarada po kliku",
+      "empty": "Još nema podataka."
+    },
+    "links": {
+      "title": "Linkovi",
+      "description": "Odaberi proizvod i ciljnu stranicu, po potrebi dodaj kampanju i kopiraj link.",
+      "productLabel": "Proizvod",
+      "productAny": "Početna stranica",
+      "targetLabel": "Ciljna stranica",
+      "campaignLabel": "Kampanja (opcionalno)",
+      "campaignHint": "Dozvoljeni su slova, cifre, tačka, crtica i donja crta.",
+      "resultLabel": "Tvoj link",
+      "copy": "Kopiraj link",
+      "copied": "Link kopiran.",
+      "codeHeading": "Tvoj partnerski kod",
+      "codeHint": "Kod radi i bez linka, na primjer u podcastu ili na papiru.",
+      "ttlHint": "Povezivanje traje {days} dana."
+    },
+    "statistics": {
+      "title": "Statistika",
+      "rangeLabel": "Period",
+      "groupLabel": "Raščlanjenje",
+      "groupDay": "Po danu",
+      "groupProduct": "Po proizvodu",
+      "groupCampaign": "Po kampanji",
+      "columnDay": "Dan",
+      "columnProduct": "Proizvod",
+      "columnCampaign": "Kampanja",
+      "columnClicks": "Klikovi",
+      "columnUniqueClicks": "Jedinstveni klikovi",
+      "columnLeads": "Kontakti",
+      "columnSales": "Prodaje",
+      "columnConversion": "Konverzija",
+      "columnEpc": "Zarada po kliku",
+      "columnCommission": "Provizija",
+      "columnReversalRate": "Stopa storna",
+      "empty": "Nema podataka u odabranom periodu.",
+      "chartLabel": "Klikovi i prodaje po danu: {summary}",
+      "exportCsv": "Izvezi CSV"
+    },
+    "statement": {
+      "title": "Izvod",
+      "columnDate": "Datum",
+      "columnKind": "Vrsta",
+      "columnProduct": "Proizvod",
+      "columnCampaign": "Kampanja",
+      "columnAmount": "Iznos",
+      "columnBalance": "Saldo",
+      "columnStatus": "Status",
+      "empty": "Još nema knjiženja.",
+      "detailsOpen": "Prikaži obračun",
+      "detailsClose": "Sakrij obračun",
+      "baseLabel": "Osnovica",
+      "rateLabel": "Stopa",
+      "ruleLabel": "Pravilo",
+      "reserveLabel": "Rezerva",
+      "kindSale": "Prodaja",
+      "kindRecurring": "Rata pretplate",
+      "kindTier2": "Drugi nivo",
+      "kindReversal": "Storno",
+      "kindManual": "Ručno knjiženje",
+      "kindPayout": "Isplata",
+      "privacyNote": "Podatke o kupcu ne prikazujemo."
+    },
+    "payouts": {
+      "title": "Isplate",
+      "columnDate": "Datum",
+      "columnPeriod": "Period",
+      "columnAmount": "Iznos",
+      "columnTaxMode": "Poreski tretman",
+      "columnReference": "Referenca",
+      "columnStatus": "Status",
+      "empty": "Još nema isplata.",
+      "download": "Preuzmi knjižno odobrenje",
+      "downloadUnavailable": "Dokument još nije kreiran."
+    },
+    "team": {
+      "title": "Tim",
+      "description": "Partneri koje si preporučio i provizija drugog nivoa koja je iz toga nastala.",
+      "linkLabel": "Tvoj link za preporuku partnera",
+      "columnName": "Partner",
+      "columnJoined": "Član od",
+      "columnRevenue": "Promet",
+      "columnCommission": "Tvoja provizija",
+      "empty": "Još nema preporučenih partnera."
+    },
+    "profile": {
+      "title": "Osnovni podaci",
+      "addressHeading": "Adresa",
+      "nameLabel": "Ime",
+      "companyLabel": "Firma",
+      "streetLabel": "Ulica i broj",
+      "postalCodeLabel": "Poštanski broj",
+      "cityLabel": "Mjesto",
+      "countryLabel": "Država",
+      "taxHeading": "Poreski podaci",
+      "taxHint": "Ovi podaci su nam potrebni za knjižno odobrenje za tvoju proviziju.",
+      "legalFormLabel": "Pravni oblik",
+      "vatIdLabel": "PDV broj",
+      "vatStatusLabel": "Status provjere",
+      "vatStatusValid": "Provjeren i važeći",
+      "vatStatusInvalid": "Nije važeći",
+      "vatStatusPending": "Provjera u toku",
+      "vatStatusUnchecked": "Još nije provjeren",
+      "smallBusinessLabel": "Mali preduzetnik prema § 19 UStG",
+      "paymentHeading": "Podaci za plaćanje",
+      "paymentHint": "Bez podataka za plaćanje ne možemo ništa doznačiti.",
+      "ibanLabel": "IBAN",
+      "accountHolderLabel": "Vlasnik računa",
+      "paypalLabel": "PayPal adresa",
+      "notificationsHeading": "Obavještenja",
+      "notifySale": "E-mail kod svake prodaje",
+      "notifyReversal": "E-mail kod svakog storna",
+      "notifyPayout": "E-mail kod svake isplate",
+      "save": "Sačuvaj",
+      "pending": "Čuva se …",
+      "saved": "Sačuvano.",
+      "dataHeading": "Tvoji podaci",
+      "dataExport": "Preuzmi podatke kao JSON",
+      "dataDelete": "Zatraži brisanje",
+      "dataDeleteHint": "Dokumenti o proviziji ostaju sačuvani iz zakonskih razloga; tvoje ime se iz njih uklanja."
+    },
+    "terms": {
+      "title": "Partnerski uslovi",
+      "acceptedVersion": "Prihvaćeno: verzija {version} dana {date}",
+      "updatedHeading": "Nova verzija",
+      "updatedBody": "Partnerski uslovi su se promijenili. Molimo prihvati novu verziju da bi dalje koristio partnerski prostor.",
+      "accept": "Prihvati",
+      "pending": "Čuva se …",
+      "accepted": "Prihvatanje sačuvano."
+    },
+    "program": {
+      "title": "Partnerski program",
+      "commissionHeading": "Provizija",
+      "commissionPercent": "{rate} po posredovanoj prodaji",
+      "commissionFixed": "{amount} po posredovanoj prodaji",
+      "exampleHeading": "Primjer",
+      "exampleText": "Kod prodaje od {gross} dobijaš {amount}.",
+      "attributionHint": "Preporuka se povezuje {days} dana.",
+      "rulesHeading": "Pravila",
+      "notFound": "Ovaj partnerski program nije javan."
+    },
+    "apply": {
+      "heading": "Prijavi se kao partner",
+      "description": "Svaku prijavu provjeravamo ručno i javljamo se e-mailom.",
+      "nameLabel": "Ime",
+      "emailLabel": "E-mail adresa",
+      "companyLabel": "Firma (opcionalno)",
+      "websiteLabel": "Web stranica ili kanal (opcionalno)",
+      "messageLabel": "Kako planiraš oglašavati?",
+      "termsLabel": "Pročitao sam partnerske uslove i prihvatam ih.",
+      "termsLink": "Pogledaj partnerske uslove",
+      "submit": "Pošalji prijavu",
+      "pending": "Šalje se …",
+      "success": "Hvala. Primili smo tvoju prijavu i javit ćemo se e-mailom.",
+      "error": "Prijavu nije bilo moguće poslati. Molimo pokušaj kasnije ponovo.",
+      "invalid": "Molimo provjeri označena polja."
+    },
+    "status": {
+      "program": {
+        "draft": "Nacrt",
+        "active": "Aktivan",
+        "paused": "Pauziran"
+      },
+      "partner": {
+        "pending": "Prijava otvorena",
+        "active": "Aktivan",
+        "rejected": "Odbijen",
+        "suspended": "Blokiran"
+      },
+      "commission": {
+        "pending": "Traje period čekanja",
+        "on_hold": "U provjeri",
+        "approved": "Dostupno",
+        "paid": "Isplaćeno",
+        "cancelled": "Stornirano"
+      },
+      "payout": {
+        "draft": "Nacrt",
+        "approved": "Odobreno",
+        "exported": "Izvezeno",
+        "paid": "Plaćeno",
+        "failed": "Neuspješno",
+        "cancelled": "Stornirano"
+      }
+    }
+  },
+  "consent": {
+    "title": "Kolačić za partnerske preporuke",
+    "body": "Ako si došao preko partnerskog linka za preporuku, možemo zapamtiti ko te je preporučio. Za to nam treba jedan jedini kolačić. Služi samo tome da kasniju narudžbu povežemo s tim partnerom — bez reklama, bez profilisanja, bez prosljeđivanja reklamnim mrežama.",
+    "legalNote": "Odluka je dobrovoljna. Bez saglasnosti stranica radi jednako. Odluku možeš promijeniti u svakom trenutku u podešavanjima.",
+    "privacyLink": "Više o tome u izjavi o privatnosti",
+    "dialogLabel": "Odluka o kolačiću za partnerske preporuke",
+    "deny": "Odbij",
+    "accept": "Prihvati",
+    "savedGranted": "Saglasnost je sačuvana.",
+    "savedDenied": "Odbijanje je sačuvano.",
+    "savedWithdrawn": "Povlačenje je sačuvano.",
+    "error": "Odluku nije bilo moguće sačuvati. Molimo pokušaj ponovo.",
+    "grant": "Daj saglasnost",
+    "withdraw": "Povuci saglasnost",
+    "settings": {
+      "heading": "Kolačić za partnerske preporuke",
+      "description": "Taj jedan kolačić povezuje narudžbu s partnerom koji te je preporučio. Postavlja se samo uz tvoju saglasnost.",
+      "statusLabel": "Stanje",
+      "statusUndecided": "Još nije odlučeno",
+      "statusGranted": "Saglasnost data",
+      "statusDenied": "Odbijeno",
+      "statusWithdrawn": "Povučeno",
+      "decidedAt": "Odlučeno {date}",
+      "outdated": "Izjava o privatnosti se promijenila od tvoje odluke. Molimo odluči ponovo."
+    }
+  },
   "legal": {
     "shell": {
       "metaTitle": "Pravne informacije",
@@ -1980,7 +2698,14 @@
       "transferHeading": "Prenos u treće zemlje",
       "transferText": "{company} ima sjedište u SAD-u, a pojedini pružaoci usluga obrađuju podatke također izvan EU. Te prenose zasnivamo na standardnim ugovornim klauzulama Evropske komisije (čl. 46. st. 2. tač. c GDPR) uz dodatne mjere poput enkripcije pri prenosu i pohrani. Baza podataka i videi ostaju u EU.",
       "cookiesHeading": "Kolačići i sesija",
-      "cookiesText": "Koristimo isključivo tehnički neophodne kolačiće: kolačić prijavne sesije (httpOnly, Secure, SameSite) i odabrani jezik. Bez praćenja, bez reklamnih kolačića, bez prosljeđivanja reklamnim mrežama. Sesije automatski ističu nakon isteka podešenog trajanja.",
+      "cookiesText": "Za prijavu i jezik koristimo tehnički neophodne kolačiće: kolačić prijavne sesije (httpOnly, Secure, SameSite) i odabrani jezik. Ako ovaj pružalac vodi partnerski program, dolazi tačno još jedan kolačić koji narudžbu povezuje s partnerom koji je dao preporuku. Taj jedan kolačić zahtijeva saglasnost, bez tvoje saglasnosti se ne postavlja i može se povući u svakom trenutku. Reklamne kolačiće ne koristimo i ne prosljeđujemo podatke reklamnim mrežama. Sesije automatski ističu nakon isteka podešenog trajanja.",
+      "cookiesConsentText": "Tvoju odluku o tom kolačiću bilježimo u vlastitom kolačiću (httpOnly, Secure, SameSite, šest mjeseci). U njemu su nasumična oznaka bez veze s tvojom ličnošću, verzija ove izjave i vrijeme odluke — kako te ne bismo pitali pri svakoj posjeti i kako bismo mogli dokazati saglasnost (čl. 7. st. 1. GDPR). Nakon šest mjeseci pitamo ponovo.",
+      "affiliateHeading": "Partnerski program i povezivanje preporuka",
+      "affiliateText": "Ako dođeš preko partnerskog linka za preporuku, bilježimo klik s vremenom, ciljnom stranicom, nazivom kampanje, vrstom pregledača i kratkom vrijednošću tvoje IP adrese koja se ne može vratiti unazad. Samo uz tvoju saglasnost dolazi kolačić koji tu vezu zadržava kroz kasnije posjete stranicama. Ako dođe do kupovine, narudžbu povezujemo s preporukom kako bismo obračunali proviziju partnera.",
+      "affiliateLegalBasis": "Pravni osnovi: za kolačić i pohranu klika tvoja saglasnost (čl. 6. st. 1. tač. a GDPR, § 25. st. 1. TDDDG); za obračun provizije ispunjenje ugovora s partnerom (čl. 6. st. 1. tač. b GDPR); za čuvanje knjigovodstvenih dokumenata zakonska obaveza (čl. 6. st. 1. tač. c GDPR).",
+      "affiliateRecipients": "Partner nikada ne saznaje ko je kupio. Vidi datum, proizvod, iznos, kampanju i status vlastitih preporuka — bez imena, bez e-mail adrese, bez broja narudžbe. Vanjska partnerska mreža nije uključena; koriste se samo gore navedeni obrađivači.",
+      "affiliateRetention": "Klikove i zapise o povezivanju brišemo nakon isteka roka za povezivanje, najkasnije pri brisanju tvog naloga. Knjiženja provizija i dokumenti o isplati su knjigovodstvena dokumentacija i ostaju sačuvani zakonski propisano vrijeme; lični podaci se iz njih uklanjaju koliko obaveza čuvanja to dopušta.",
+      "affiliateWithdraw": "Saglasnost možeš povući u svakom trenutku u podešavanjima. Kolačić se tada odmah briše. Povlačenje djeluje za ubuduće; već obračunate preporuke ostaju nepromijenjene.",
       "botHeading": "Zaštita od neželjenih poruka i botova",
       "botText": "Javno dostupni obrasci — prijava, registracija, resetiranje lozinke i kontakt-obrazac — zaštićeni su od automatiziranih masovnih zahtjeva. U tu svrhu obrađujemo IP adresu zahtjeva, vrijeme slanja i sadržaj obrasca: ograničavamo broj zahtjeva po IP adresi, po adresi pošiljatelja i po sandučetu primatelja te automatski provjeravamo nosi li poruka obilježja mašinski generirane reklame. Poruke ocijenjene kao neželjene ne dostavljaju se i ne pohranjuju; bilježi se samo činjenica odbijanja, bez sadržaja poruke. Pravni osnov je naš legitimni interes za sprječavanje zloupotrebe (čl. 6. st. 1. tač. f GDPR-a).",
       "botTurnstile": "U kontakt-obrascu dodatno koristimo Cloudflare Turnstile. Postupak u pregledniku procjenjuje tehnička obilježja zahtjeva i samo u slučaju sumnje postavlja zadatak. Pritom se IP adresa te podaci o pregledniku i uređaju prenose Cloudflareu. Turnstile ne postavlja kolačiće, ne služi oglašavanju i ne stvara korisničke profile. Cloudflare je naš izvršitelj obrade; za prijenos u SAD vrijedi odjeljak „Prijenos u treće zemlje“.",

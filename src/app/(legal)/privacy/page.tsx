@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getTenant } from "@/lib/tenant/context";
+import type { PublicTenant } from "@/lib/tenant/types";
 import { formatAddress, resolveLegalEntity } from "@/lib/legal/company";
 import { LEGAL_LAST_UPDATED } from "@/lib/legal/updated";
 import { LegalHeader, LegalSection } from "@/components/legal/legal-section";
@@ -28,6 +29,22 @@ import { isTurnstileConfigured } from "@/lib/security/turnstile";
  * gar nicht stattfindet, wäre genauso falsch wie eine, die eine
  * stattfindende verschweigt. Damit gibt es auch keine Reihenfolge-Falle
  * beim Scharfschalten: Schlüssel setzen genügt, der Text folgt von selbst.
+ *
+ * Abschnitt "Partner-Empfehlungen" NEU (10.09.2026, Affiliate-Modul Block B2,
+ * PLAN_Affiliate-System.md Abschnitt 10/B2): Zweck, Rechtsgrundlage,
+ * Speicherdauer, Empfänger und Widerruf für das Attributions-Cookie `ct_aff`
+ * und das Einwilligungs-Cookie `ct_consent`. Er folgt derselben Regel wie der
+ * Turnstile-Absatz darüber und wird NUR gerendert, wenn das Partnerprogramm
+ * für diesen Mandanten freigeschaltet ist — sonst behauptete die Erklärung
+ * eine Verarbeitung, die auf dieser Akademie gar nicht stattfindet.
+ *
+ * Gleichzeitig wurde `legal.privacy.cookiesText` entschärft: der Satz "Wir
+ * setzen ausschließlich technisch notwendige Cookies … Kein Tracking" galt
+ * für jeden Mandanten und wäre mit dem ersten freigeschalteten
+ * Partnerprogramm falsch geworden. Die neue Fassung nennt die technisch
+ * notwendigen Cookies weiterhin abschließend und sagt für alles andere zu,
+ * dass es nur nach ausdrücklicher Einwilligung gesetzt und in dieser
+ * Erklärung beschrieben wird — das stimmt mit und ohne Partnerprogramm.
  */
 const PROCESSOR_KEYS = [
   "hosting",
@@ -38,6 +55,22 @@ const PROCESSOR_KEYS = [
   "embeddings",
   "cdn",
 ] as const;
+
+/**
+ * Ist das Partnerprogramm für diesen Mandanten freigeschaltet? Wortgleiche
+ * Hilfsfunktion wie in src/app/layout.tsx — mit derselben Begründung: das
+ * Feld `affiliate_enabled` lebt heute nur in `tenants.settings` (jsonb,
+ * Migration 20260910120000, Abschnitt (d)), typisiert wird es erst von Block
+ * B1 in `PublicTenant["settings"]`. Beide Stellen werden dann zu einer
+ * zusammengezogen; solange sind es bewusst zwei kurze, identische Funktionen
+ * statt eines geteilten Bausteins in einer Datei, die diesem Block nicht
+ * gehört.
+ */
+function isAffiliateModuleEnabled(tenant: PublicTenant | null): boolean {
+  if (!tenant) return false;
+  const settings: Record<string, unknown> = tenant.settings;
+  return settings.affiliate_enabled === true;
+}
 
 export default async function PrivacyPage() {
   const [tenant, t, locale] = await Promise.all([
@@ -52,6 +85,7 @@ export default async function PrivacyPage() {
     new Date(LEGAL_LAST_UPDATED),
   );
   const turnstileActive = isTurnstileConfigured();
+  const affiliateActive = isAffiliateModuleEnabled(tenant);
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
@@ -101,7 +135,22 @@ export default async function PrivacyPage() {
 
       <LegalSection heading={t("cookiesHeading")}>
         <p>{t("cookiesText")}</p>
+        {/* Das Einwilligungs-Cookie `ct_consent` entsteht erst, wenn der
+            Einwilligungsdialog überhaupt erscheint — also nur bei
+            freigeschaltetem Partnerprogramm. Deshalb steht es hier hinter
+            demselben Schalter wie der Abschnitt unten. */}
+        {affiliateActive && <p>{t("cookiesConsentText")}</p>}
       </LegalSection>
+
+      {affiliateActive && (
+        <LegalSection heading={t("affiliateHeading")}>
+          <p>{t("affiliateText")}</p>
+          <p>{t("affiliateLegalBasis")}</p>
+          <p>{t("affiliateRecipients")}</p>
+          <p>{t("affiliateRetention")}</p>
+          <p>{t("affiliateWithdraw")}</p>
+        </LegalSection>
+      )}
 
       <LegalSection heading={t("botHeading")}>
         <p>{t("botText")}</p>
