@@ -4,7 +4,7 @@ import { Montserrat } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { getTenant } from "@/lib/tenant/context";
-import type { PublicTenant } from "@/lib/tenant/types";
+import { isAffiliateEnabled } from "@/lib/tenant/types";
 import { needsConsentDecision, readTrackingConsent } from "@/lib/consent/read";
 import { ThemeStyle } from "@/components/branding/theme-style";
 import { ConsentBanner } from "@/components/consent/consent-banner";
@@ -48,21 +48,12 @@ export async function generateMetadata(): Promise<Metadata> {
  * Plans, dass B1 bis B5 ohne den Feature-Schalter vollständig inert bleiben
  * (Plan 10.1), und es fragt nach einer Einwilligung, die niemand braucht.
  *
- * Der Wert wird über einen Index-Zugriff gelesen statt über ein typisiertes
- * Feld: `affiliate_enabled` lebt in `tenants.settings` (jsonb, Erlaubnisliste
- * in Migration 20260910120000, Abschnitt (d)), das passende Feld in
- * `PublicTenant["settings"]` legt aber Block B1 an — der zu dieser Datei
- * gehört, nicht zu B2. Sobald B1 das Feld typisiert, kann diese Hilfsfunktion
- * durch `tenant.settings.affiliate_enabled === true` ersetzt und mit der
- * gleichlautenden Funktion in src/app/(legal)/privacy/page.tsx zu einer
- * gemeinsamen Stelle zusammengezogen werden.
+ * Die Prüfung selbst steht seit dem 11.09.2026 als `isAffiliateEnabled()` in
+ * src/lib/tenant/types.ts. Sie lag vorher wortgleich hier und in
+ * src/app/(legal)/privacy/page.tsx; `lib/affiliate/access.ts` kam als
+ * gemeinsame Heimat nicht in Frage, weil diese Datei `server-only` ist und
+ * ihre Importkette sonst an jeder ausgelieferten Seite hinge.
  */
-function isAffiliateModuleEnabled(tenant: PublicTenant | null): boolean {
-  if (!tenant) return false;
-  const settings: Record<string, unknown> = tenant.settings;
-  return settings.affiliate_enabled === true;
-}
-
 /**
  * Auf diesen Seiten erscheint der Dialog nicht. Er verlinkt selbst auf
  * /privacy; ein modaler Dialog über der Datenschutzerklärung verhindert genau
@@ -112,7 +103,7 @@ export default async function RootLayout({
    */
   const showConsentBanner =
     tenant !== null &&
-    isAffiliateModuleEnabled(tenant) &&
+    isAffiliateEnabled(tenant) &&
     needsConsentDecision(consent) &&
     !CONSENT_EXEMPT_PATHS.includes(headerList.get("x-portal-pathname") ?? "");
 

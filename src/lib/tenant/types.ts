@@ -208,3 +208,22 @@ export const DEFAULT_BRANDING: PublicTenant["branding"] = {
   font: "Montserrat",
   radius: "14px",
 };
+
+/**
+ * Feature-Schalter des Affiliate-Moduls, als reine Prüfung ohne jede
+ * Server-Abhängigkeit (11.09.2026).
+ *
+ * Sie steht bewusst HIER und nicht in `lib/affiliate/access.ts`: jene Datei
+ * beginnt mit `import "server-only"` und zieht Supabase-Client, Mandanten-
+ * Kontext und Auth nach. Das Root-Layout und die Datenschutzseite brauchen
+ * aber nur diese eine Ja/Nein-Frage — ein Import von `access.ts` hängte die
+ * ganze Kette an jede ausgelieferte Seite. Vor dieser Zusammenlegung stand
+ * die Funktion wortgleich in `app/layout.tsx` und `app/(legal)/privacy/page.tsx`.
+ *
+ * Polarität: fehlender Wert bedeutet AUS (siehe Kommentar an
+ * `settings.affiliate_enabled` oben), deshalb `=== true` und nie `!== false`.
+ */
+export function isAffiliateEnabled(tenant: PublicTenant | null | undefined): boolean {
+  if (!tenant) return false;
+  return tenant.settings.affiliate_enabled === true;
+}

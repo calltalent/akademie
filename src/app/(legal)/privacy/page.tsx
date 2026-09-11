@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getTenant } from "@/lib/tenant/context";
-import type { PublicTenant } from "@/lib/tenant/types";
+import { isAffiliateEnabled } from "@/lib/tenant/types";
 import { formatAddress, resolveLegalEntity } from "@/lib/legal/company";
 import { LEGAL_LAST_UPDATED } from "@/lib/legal/updated";
 import { LegalHeader, LegalSection } from "@/components/legal/legal-section";
@@ -56,22 +56,6 @@ const PROCESSOR_KEYS = [
   "cdn",
 ] as const;
 
-/**
- * Ist das Partnerprogramm für diesen Mandanten freigeschaltet? Wortgleiche
- * Hilfsfunktion wie in src/app/layout.tsx — mit derselben Begründung: das
- * Feld `affiliate_enabled` lebt heute nur in `tenants.settings` (jsonb,
- * Migration 20260910120000, Abschnitt (d)), typisiert wird es erst von Block
- * B1 in `PublicTenant["settings"]`. Beide Stellen werden dann zu einer
- * zusammengezogen; solange sind es bewusst zwei kurze, identische Funktionen
- * statt eines geteilten Bausteins in einer Datei, die diesem Block nicht
- * gehört.
- */
-function isAffiliateModuleEnabled(tenant: PublicTenant | null): boolean {
-  if (!tenant) return false;
-  const settings: Record<string, unknown> = tenant.settings;
-  return settings.affiliate_enabled === true;
-}
-
 export default async function PrivacyPage() {
   const [tenant, t, locale] = await Promise.all([
     getTenant(),
@@ -85,7 +69,7 @@ export default async function PrivacyPage() {
     new Date(LEGAL_LAST_UPDATED),
   );
   const turnstileActive = isTurnstileConfigured();
-  const affiliateActive = isAffiliateModuleEnabled(tenant);
+  const affiliateActive = isAffiliateEnabled(tenant);
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
