@@ -4572,3 +4572,137 @@ zu klären. Entschieden hat erst die lokale Gegenprobe gegen
 ungültig" von „Berechtigung fehlt", bevor eine Freigabe verbraucht wird. Bei
 einem Secret, das dreimal hintereinander abgelehnt wird, gehört dieser Test an
 den Anfang, nicht ans Ende.
+
+## Affiliate-System: Plan und Fundament (10./11.09.2026)
+
+Josips Auftrag per Swarm-Kommando: „plane und entwickle ein affiliate system
+mit welchem die mandanten ihre kurse affiliate partnern anbieten und verwalten
+können ... ähnlich wie digistore24".
+
+### Entwurf
+
+Fünf Recherche-Agenten (Digistore24-Featureinventar, Zahlungsfluss,
+Datenbank- und RLS-Konventionen, Oberflächen und i18n, Tracking-Infrastruktur),
+danach drei unabhängige Architekturentwürfe mit verschiedenen Schwerpunkten,
+drei Juroren (buchhalterische Korrektheit, Sicherheit und Mandantentrennung,
+Umsetzbarkeit) und eine Synthese. Einer der drei Entwürfe brach am
+Ausgabelimit ab; die Jury hat deshalb zwei statt drei bewertet.
+
+Ergebnis: `PLAN_Affiliate-System.md`, 3164 Zeilen. Siebzehn Tabellen,
+Attributionsregeln R0 bis R9 als Entscheidungstabelle, Provisionsrechnung in
+Ganzzahlarithmetik mit vier durchgerechneten Beispielen, Zustandsdiagramm
+einer Provisionszeile, Auszahlungsablauf samt Steuermodus, zehn
+Umsetzungsblöcke B1 bis B10 mit Dateiliste und Abnahmekriterium je Block.
+
+Drei Grenzen stehen im Plan, die keine Softwareentscheidung sind. Erstens ist
+die Plattform heute Merchant of Record: es gibt genau einen globalen
+`STRIPE_SECRET_KEY` (`src/lib/stripe/client.ts:27`), kein Stripe Connect. Eine
+Provision, die „der Mandant zahlt", ist betriebswirtschaftlich eine
+Verbindlichkeit des Betreibers. Zweitens ist `automatic_tax` in keinem der
+beiden Checkout-Pfade gesetzt, `amount_tax` ist damit immer 0 und eine Zusage
+„20 % vom Nettoumsatz" wäre ab dem ersten Tag um 19 % falsch. Drittens gab es
+im Repo keinerlei Einwilligungs-Infrastruktur, während `messages/de.json`
+wörtlich „Kein Tracking, keine Werbe-Cookies" behauptete.
+
+### B1 Fundament und B2 Einwilligung (gebaut)
+
+`supabase/migrations/20260910120000_affiliate_core.sql` mit sechs Tabellen
+(Programm, Gruppe, Partner, Kondition, Abrechnungsprofil, Prüfpfad), drei
+Hilfsfunktionen und vier Bestandsänderungen: `unique (id, tenant_id)` auf
+`products` und `orders` (fehlte, ohne das ist kein zusammengesetzter
+Fremdschlüssel anlegbar), `orders.refunded_cents`, erweiterter Status-CHECK um
+`partially_refunded` und ein Unique-Index auf `orders.stripe_payment_intent` —
+die einzige Brücke von `charge.refunded` zur Bestellung.
+
+`20260910120100_tracking_consents.sql` und `src/lib/consent/*` mit
+Einwilligungsdialog: `role="dialog"`, Fokusfalle, Escape gilt als Ablehnung,
+„Ablehnen" und „Annehmen" teilen exakt dieselbe Gestaltung, Ablehnen liegt
+zuerst in der Tab-Reihenfolge und bekommt den Anfangsfokus. Schriftgrößen 16
+bis 17 px.
+
+`20260910120200_affiliate_enabled_guard.sql` nimmt `affiliate_enabled` in die
+Erlaubnisliste von `tenants_operator_settings_guard()` auf. Ohne das schaltet
+sich ein Mandanten-Admin das Modul per PostgREST-PATCH auf `tenants.settings`
+selbst frei. Die Polarität ist umgekehrt zu den Bestandsschaltern: fehlender
+Wert bedeutet AUS, geprüft wird `=== true`, nie `!== false` — sonst liefe bei
+jedem Bestandsmandanten sofort ein Partnerprogramm mit Provisionszusage und
+Klick-Tracking an.
+
+`src/lib/affiliate/compute.ts` mit sieben reinen Funktionen und 70 Tests.
+Beim Nachrechnen der Planbeispiele fielen fünf Fehler im Plan auf, alle in
+Zwischenwerten der Prosa, keiner in einem Ergebnis: `44910 * 19/119` ist
+7170,504 und nicht 7171,26; drei `floor()`-Zwischenwerte in Beispiel C waren
+falsch abgeschrieben; und die fehlerhafte Deckel-Logik ergäbe nicht 60 %,
+sondern 66,8 % Storno. Der Pflichttest zu zwei aufeinanderfolgenden
+Teilerstattungen hält 7941 gegen 5294 fest.
+
+`messages/{de,en,bs}.json`: 587 Schlüssel, davon das Gerüst für die noch
+ungebauten Oberflächen. Der Satz „Kein Tracking, keine Werbe-Cookies" ist
+ersetzt.
+
+### Gegenlesen der Migrationen: drei Runden
+
+Die Migrationen können in dieser Umgebung nicht probeweise gefahren werden —
+kein lokales Postgres, kein Docker. Das Gegenlesen ist deshalb die einzige
+Prüfung vor dem Anwenden, und es hat sich gelohnt.
+
+Runde 1 fand 15 Befunde, drei davon kritisch, Urteil „nicht freigabefähig".
+Der schwerste: der Zweig `or partner_id is null` in
+`affiliate_conditions_select` war an keinen Mandanten gebunden — jeder
+eingeloggte Nutzer der Plattform hätte die Provisionsstruktur samt
+Freitextnotizen aller Mandanten gelesen. Dieselbe Bauart wie der bekannte
+`courses_member_select`-Fund. Dazu zwei zusammengesetzte Fremdschlüssel mit
+`on delete set null` ohne Spaltenliste: Postgres nullt dabei auch `tenant_id`,
+die `not null` ist, womit Gruppenlöschung, Partnerlöschung und sogar die
+Mandantenlöschung mit 23502 abgebrochen wären. Dieser Fehler stand so schon im
+Plan. Und der Unveränderlichkeits-Guard für `affiliate_billing_profiles` war
+nur an `before update` gebunden: ein Partner hätte beim Anlegen seines Profils
+`vat_check_result = 'valid'` selbst gesetzt und damit Reverse Charge und
+Auszahlungsfreigabe erzeugt.
+
+Das gemeinsame Muster der vier schwersten Befunde: jeder Guard hing an
+`before update`, der INSERT-Pfad war nirgends mitgedacht.
+
+Runde 2 las die Korrektur mit zwei unabhängigen Prüfern gegen, einer davon
+ohne Kenntnis der Befundliste. Beide fanden dasselbe: die Korrektur zu Befund 5
+hatte selbst ein Loch gerissen, indem sie `service_role` in die
+DELETE-Erlaubnisliste der beiden Unveränderlichkeits-Guards aufnahm. Der ganze
+Serverbetrieb läuft unter dieser Rolle; jede Route mit `createAdminClient()`
+hätte danach Prüfpfad und Einwilligungsnachweis spurlos räumen können. Die
+Prämisse trug nicht: eine ON-DELETE-Kaskade führt Postgres unter dem Eigentümer
+der referenzierenden Tabelle aus, live also unter `postgres` — und `postgres`
+stand ohnehin in der Liste.
+
+Runde 3 (Korrektur und Abnahme) läuft zum Zeitpunkt dieses Eintrags.
+
+### Status
+
+Die Migrationen sind geschrieben und NICHT angewendet (CLAUDE.md §4.6). B1 und
+B2 sind ohne den Feature-Schalter vollständig inert: keine Route, kein
+Menüpunkt, keine Buchung. Sichtbar wird das Modul erst ab B6.
+
+Verifikation auf dem Stand nach B1/B2: `tsc --noEmit` 0 Fehler, `eslint` 0
+Fehler, `vitest run` 867 von 867 grün (Baseline vorher 785).
+
+### Offen
+
+1. B3 bis B9 bauen (Klick und Attribution, Buchung, Storno, Oberflächen,
+   Partnerbereich, Auszahlung, Benachrichtigungen und DSGVO).
+2. Migrationen anwenden — braucht Josips Freigabe, danach beide
+   Advisor-Läufe und Umbenennung der Dateien auf die tatsächlich vergebene
+   Live-Version (H26-Drift).
+3. Zwei kaufmännische Entscheidungen für Josip, beide im Plan Abschnitt 12:
+   wer die Provision zahlt und wie sie dem Mandanten belastet wird (12.1),
+   und ob `automatic_tax` aktiviert wird oder die Partnerbedingungen ehrlich
+   „Bruttopreis" sagen (12.2). Bis dahin ist `basis_kind` auf `gross`
+   vorbelegt, das ist der nicht eingreifende Weg.
+4. Rechtliche Prüfung des Einwilligungsdialogs und steuerliche Prüfung der
+   Gutschriftvorlage vor dem ersten Beleg (Plan 12.3 und 12.4).
+5. `charge.refunded`, `charge.dispute.created` und `charge.dispute.closed`
+   müssen im Stripe-Dashboard am Webhook-Endpunkt abonniert werden, sonst
+   passiert nach dem Deploy still gar nichts.
+6. Falle für den nächsten Prüflauf: ändert sich nur `messages/de.json` und
+   keine `.ts`-Datei, meldet ein inkrementelles `npx tsc --noEmit`
+   Phantomfehler auf fehlende Message-Schlüssel (`tsconfig.tsbuildinfo` hält
+   die alte Form des JSON-Moduls fest). Vor jedem Verifikationslauf
+   `rm -f tsconfig.tsbuildinfo` voranstellen; die Datei ist git-ignoriert.
