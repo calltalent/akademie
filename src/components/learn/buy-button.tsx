@@ -26,7 +26,25 @@ import { createCheckoutSession } from "@/lib/stripe/checkout";
  * unveraendert: loest weiterhin nur createCheckoutSession() aus und leitet
  * zu Stripe Checkout weiter, kein eigenes Bestell-/Zahlungsformular.
  */
-export function BuyButton({ productSlug }: { productSlug: string }) {
+export function BuyButton({
+  productSlug,
+  affiliateToken,
+}: {
+  productSlug: string;
+  /**
+   * NEU (Affiliate-System, Block B3, Plan 4.3): der `?aff=`-Token, den die
+   * Kaufseite aus ihren `searchParams` durchreicht. OPTIONAL, damit kein
+   * bestehender Aufruf bricht — ohne Partnerlink bleibt der Aufruf unten
+   * einstellig und das Verhalten exakt wie bisher.
+   *
+   * Der Wert ist kein Geheimnis dieser Komponente: er stand eben noch in der
+   * Adresszeile des Besuchers. Er wird hier auch nicht geprüft — das gehört
+   * auf den Server (die Server Action schickt ihn durch zod und benutzt ihn
+   * nur als Filterwert einer mandantengebundenen Abfrage). Eine Prüfung im
+   * Browser wäre Zierde: sie ließe sich in derselben Sekunde umgehen.
+   */
+  affiliateToken?: string;
+}) {
   const t = useTranslations("payments");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +52,7 @@ export function BuyButton({ productSlug }: { productSlug: string }) {
   function handleClick() {
     setError(null);
     startTransition(async () => {
-      const result = await createCheckoutSession(productSlug);
+      const result = await createCheckoutSession(productSlug, affiliateToken);
       if (result?.error) {
         setError(result.error);
       }

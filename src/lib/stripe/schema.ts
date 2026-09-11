@@ -140,3 +140,48 @@ export const marketplaceCheckoutMetadataSchema = checkoutMetadataSchema.extend({
   source: z.literal("marketplace"),
 });
 export type MarketplaceCheckoutMetadata = z.infer<typeof marketplaceCheckoutMetadataSchema>;
+
+/**
+ * Affiliate-System, Block B3 (Plan 9.2) — die Zuordnung in der
+ * Session-Metadata.
+ *
+ * EIGENSTÄNDIG und ausdrücklich NICHT per `.extend()` an
+ * `checkoutMetadataSchema` gehängt. Der Grund steht im Webhook
+ * (`src/app/api/stripe/webhook/route.ts::handleCheckoutCompleted()`, der
+ * Kommentar über `marketplaceCheckoutMetadataSchema.safeParse()`): dort wird
+ * ZUERST das Marketplace-Schema probiert, WEIL es eine echte Obermenge des
+ * Basis-Schemas ist. Diese Beziehung ist die Weiche zwischen Marketplace-Kauf
+ * (Ledger, Fremd-Mandant) und Direktkauf. Wer Affiliate-Felder ins
+ * Basis-Schema hineinerweitert, verschiebt beide Seiten der Weiche zugleich
+ * und riskiert, dass eine Marketplace-Zahlung im Direktkauf-Pfad landet —
+ * kein Ledger-Eintrag, falsche Erfüllung.
+ *
+ * Ein drittes, unabhängiges Schema hat diese Wirkung nicht: es steht in
+ * keiner `.extend()`-Beziehung zu den beiden anderen, nimmt an der
+ * Reihenfolge im Webhook nicht teil und kann sie damit nicht kippen. Beide
+ * bestehenden Schemata sind gewöhnliche `z.object` OHNE `.strict()` —
+ * `affiliate_ref_token` wird dort stillschweigend gestrippt, nicht
+ * abgelehnt; der Direktkauf-Pfad läuft mit diesem zusätzlichen Schlüssel
+ * unverändert, und das Marketplace-Schema scheitert an ihm weiterhin
+ * (`listing_id`/`source` fehlen), so wie es soll.
+ *
+ * Gelesen wird es deshalb auf `session.metadata` ROH — nie auf
+ * `parsedMeta.data`, das den Zusatzschlüssel bereits verloren hat.
+ *
+ * Das Muster ist dasselbe wie `AFFILIATE_REFERRAL_TOKEN_PATTERN`
+ * (`src/lib/affiliate/schema.ts`) und das CHECK der Spalte
+ * `affiliate_referrals.token` (Migration 20260911120000): 32 Zufallsbytes als
+ * 64 Hex-Zeichen. Hier bewusst als Literal wiederholt statt importiert:
+ * `stripe/schema.ts` wird von der Kaufseite und damit aus einem Pfad geladen,
+ * der auch ohne Affiliate-Modul trägt, und eine Abhängigkeit vom
+ * Affiliate-Modul nur für eine Regex wäre eine Kopplung ohne Gegenwert. Wer
+ * das Muster ändert, muss beide Stellen und das CHECK ändern — genau wie
+ * heute schon Schema und Migration.
+ */
+export const affiliateMetadataSchema = z.object({
+  affiliate_ref_token: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/, "Ungültiges Empfehlungs-Token.")
+    .optional(),
+});
+export type AffiliateMetadata = z.infer<typeof affiliateMetadataSchema>;

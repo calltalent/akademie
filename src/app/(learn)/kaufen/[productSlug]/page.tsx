@@ -7,6 +7,8 @@ import { getTenant } from "@/lib/tenant/context";
 import { getPublicProduct, getPublicProductFeatures } from "@/lib/stripe/storefront";
 import type { ProductKind } from "@/lib/stripe/schema";
 import { BuyButton } from "@/components/learn/buy-button";
+import { bindReferral } from "@/lib/affiliate/bind";
+import { parseReferralToken, readAffiliateCookieToken } from "@/lib/affiliate/checkout-meta";
 
 const ACCENT = "#5663AE";
 const NAVY = "#3E3F66";
@@ -61,10 +63,28 @@ const NAVY = "#3E3F66";
  */
 export default async function KaufenPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ productSlug: string }>;
+  /**
+   * NEU (Affiliate-System, Block B3, Plan 4.3): `?aff=<token>` ist der
+   * Träger, der ohne Einwilligung — also ohne Cookie — überhaupt noch
+   * funktioniert; der Klick-Endpunkt hängt ihn an das Ziel an.
+   *
+   * `searchParams` ist in Next 16 ein Promise (gleiches Muster wie
+   * `(learn)/suche/page.tsx:22-26`), und ein Wert daraus ist `string |
+   * string[]`: bei `?aff=a&aff=b` liefert Next ein Array. Der Typ sagt das
+   * hier ausdrücklich, statt ein `string` zu behaupten, das zur Laufzeit
+   * keines ist — `parseReferralToken()` lehnt den Doppelfall danach ab.
+   *
+   * BEWUSST KEINE Layout-Lösung (Plan 4.3): Layouts bekommen in Next.js kein
+   * `searchParams`, eine Komponente, die den Parameter global anhängt, ist
+   * nicht baubar.
+   */
+  searchParams?: Promise<{ aff?: string | string[] }>;
 }) {
   const { productSlug } = await params;
+  const affiliateToken = parseReferralToken((await searchParams)?.aff);
   const t = await getTranslations("learn.buy");
   const tShared = await getTranslations("learn.shared");
   const tPayments = await getTranslations("payments");
@@ -130,6 +150,30 @@ export default async function KaufenPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // NEU (Affiliate-System, Block B3, Plan 4.3): die dritte der drei Stellen,
+  // an denen die Klickspur an das Konto gebunden wird (die anderen beiden
+  // sind Login und Registrierung, `lib/auth/actions.ts`). Genau hier ist sie
+  // am wertvollsten: wer auf dem Handy klickt und am Rechner kauft, hat
+  // weder Cookie noch `?aff=` mehr — nach dieser Bindung hängt die Zuordnung
+  // am Konto (Regel R7) und überlebt den Gerätewechsel.
+  //
+  // Reihenfolge der Träger: die URL schlägt das Cookie. Der Parameter ist der
+  // frischere Klick (er steht in genau dieser Anfrage), das Cookie kann von
+  // einem älteren stammen.
+  //
+  // Idempotent und still: `bindReferral()` tut nichts bei fehlendem,
+  // abgelaufenem oder fremdem Token und meldet dem Besucher nie etwas
+  // (Plan 4.3). Der `.catch()` ist die zweite Linie — die Funktion wirft
+  // ausdrücklich nie, aber eine Kaufseite darf auch dann rendern, wenn sich
+  // das eines Tages ändert. Eine verlorene Provision ist ärgerlich, eine
+  // kaputte Kaufseite ist ein Ausfall.
+  if (user) {
+    const bindToken = affiliateToken ?? (await readAffiliateCookieToken());
+    if (bindToken) {
+      await bindReferral(bindToken).catch(() => null);
+    }
+  }
 
   const durationLabel = (() => {
     if (!features || features.totalMinutes <= 0) return null;
@@ -312,7 +356,13 @@ export default async function KaufenPage({
 
           {user ? (
             <div className="mt-5">
-              <BuyButton productSlug={product.slug} />
+              {/*
+                `affiliateToken` ist der geprüfte `?aff=`-Wert (Plan 4.3). Er
+                geht als zweiter, optionaler Parameter an die Server Action —
+                das Cookie liest diese serverseitig ohnehin selbst, die URL
+                dagegen kennt nur diese Seite.
+              */}
+              <BuyButton productSlug={product.slug} affiliateToken={affiliateToken ?? undefined} />
             </div>
           ) : (
             <div className="mt-5 flex flex-col gap-3 rounded-xl border p-4" style={{ borderColor: "#E0E2EF" }}>

@@ -19,8 +19,51 @@ import { resolveTenantEmailLocale, type Locale } from "@/i18n/config";
 import { translateAuthError } from "@/lib/auth/errors";
 import { sendEmail } from "@/lib/email/client";
 import { passwordReset, magicLinkEmail, confirmSignup } from "@/lib/email/templates";
+import { bindReferral } from "@/lib/affiliate/bind";
+import { readAffiliateCookieToken } from "@/lib/affiliate/checkout-meta";
 
 export type AuthActionState = { error: string | null; success?: boolean; redirectTo?: string };
+
+/**
+ * NEU (Affiliate-System, Block B3, Plan 4.3): hängt die Klickspur aus dem
+ * `ct_aff`-Cookie an das gerade angemeldete Konto. Zwei der drei vom Plan
+ * vorgeschriebenen Aufrufstellen liegen in dieser Datei (die dritte ist das
+ * Rendern von `/kaufen/[productSlug]`).
+ *
+ * DIES IST DIE EINE STELLE DES MODULS, AN DER FAIL-SOFT RICHTIG IST — und
+ * zwar doppelt abgesichert, mit Absicht:
+ *
+ *   1. `bindReferral()` gibt jeden Fehlerweg als Ergebniswert zurück und
+ *      wirft ausdrücklich nie.
+ *   2. Hier steht trotzdem ein `catch`, das alles verschluckt.
+ *
+ * Die zweite Linie ist keine Zierde: `bindReferral()` ist heute wurffrei,
+ * aber sie ruft `getTenant()`, `getAuthUser()` und Supabase — jede spätere
+ * Änderung an einer dieser Stellen könnte einen Wurf einführen, und der
+ * würde hier mitten in der Anmeldung landen. Die Abwägung ist eindeutig und
+ * einseitig: eine verlorene Provisionszuordnung ist ärgerlich und lässt sich
+ * über die Umbuchung (Plan 4.6) von Hand heilen; eine Anmeldung, die wegen
+ * des Partnerprogramms scheitert, sperrt den Nutzer aus seiner Akademie aus.
+ * Kein Provisionsbetrag rechtfertigt einen Anmelde-Ausfall.
+ *
+ * Deshalb hier auch kein `console.error` mit Details und keine veränderte
+ * Rückmeldung an den Nutzer: der Besucher darf an der Anmeldung nicht
+ * merken, ob eine Zuordnung bestand (Plan 11.15) — und der Aufrufer bekommt
+ * unverändert sein `AuthActionState`.
+ *
+ * Reihenfolge an der Aufrufstelle: IMMER nach dem erfolgreichen Anmelden.
+ * Vorher gibt es keine Sitzung, `bindReferral()` fände keinen Nutzer und
+ * täte stillschweigend nichts.
+ */
+async function bindAffiliateReferralQuietly(): Promise<void> {
+  try {
+    const token = await readAffiliateCookieToken();
+    if (!token) return;
+    await bindReferral(token);
+  } catch {
+    // Absichtlich vollständig verschluckt — siehe Kopfkommentar.
+  }
+}
 
 /**
  * Legt bei Erstanmeldung die profiles-Zeile an, falls sie fehlt.
@@ -109,6 +152,19 @@ export async function signInWithPassword(
     undefined,
     resolveTenantEmailLocale(tenant?.settings.default_locale),
   );
+
+  // NEU (Affiliate-System, Block B3, Plan 4.3): erste der beiden
+  // Aufrufstellen in dieser Datei. Steht NACH `signInWithPassword()` und nach
+  // `ensureProfile()` — die Sitzung muss existieren (sonst kein Nutzer), und
+  // `affiliate_referrals.user_id` zeigt per Fremdschlüssel auf
+  // `public.profiles`, die Zeile muss es also geben. Zum Fehlerverhalten
+  // siehe `bindAffiliateReferralQuietly()`.
+  //
+  // Sollte die eben gesetzte Sitzungs-Cookie in DIESER Anfrage noch nicht
+  // lesbar sein (Plattform-/Framework-Eigenheit), bleibt der Aufruf folgenlos
+  // — die Bindung holt dann die dritte Aufrufstelle nach, das Rendern von
+  // `/kaufen/[productSlug]`. Genau dafür gibt es drei Stellen und nicht eine.
+  await bindAffiliateReferralQuietly();
 
   // Performance-Fix (19.07.2026, Josips Fund: Anmeldung immer noch langsam
   // trotz getAuthUser()-Fix): redirect("/") lief für Mandanten-Logins immer
@@ -236,6 +292,23 @@ export async function signUpWithPassword(
       error: "Konto wurde angelegt, die Bestätigungsmail konnte aber nicht verschickt werden. Bitte kontaktiere den Support.",
     };
   }
+
+  // NEU (Affiliate-System, Block B3, Plan 4.3): zweite Aufrufstelle, „nach
+  // der Registrierung".
+  //
+  // EHRLICHE EINORDNUNG, damit niemand sie später für wirksam hält: in DIESEM
+  // Projekt legt die Registrierung noch keine Sitzung an. `generateLink({type:
+  // "signup"})` erzeugt das Konto, die Bestätigung per E-Mail steht aus (siehe
+  // Kommentar oben) — `bindReferral()` findet hier also in aller Regel keinen
+  // angemeldeten Nutzer und tut nichts. Die tatsächliche Bindung passiert beim
+  // ersten Login, der Aufrufstelle darüber.
+  //
+  // Der Aufruf bleibt trotzdem stehen, aus zwei Gründen: der Plan schreibt
+  // diese Stelle vor, und sobald die Registrierung je eine Sitzung anlegt
+  // (Double-Opt-in abgeschaltet, Einladungsannahme, Auto-Login), greift sie
+  // ohne weiteres Zutun. Sie kostet ohne `ct_aff`-Cookie keine einzige
+  // Abfrage.
+  await bindAffiliateReferralQuietly();
 
   return {
     error: null,

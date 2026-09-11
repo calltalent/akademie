@@ -8,6 +8,7 @@ import { createStripeClient } from "@/lib/stripe/client";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 import { productSlugSchema } from "@/lib/stripe/schema";
 import { buildTenantUrl } from "@/lib/tenant/url";
+import { affiliateCheckoutMetadata } from "@/lib/affiliate/checkout-meta";
 
 export type CheckoutActionState = { error: string | null };
 
@@ -79,7 +80,26 @@ async function loadProductForCheckout(
  * trotzdem selbst nach (Defense-in-Depth, falls sie je direkt ohne die
  * Seiten-Gate aufgerufen wird).
  */
-export async function createCheckoutSession(productSlug: string): Promise<CheckoutActionState> {
+export async function createCheckoutSession(
+  productSlug: string,
+  /**
+   * NEU (Affiliate-System, Block B3, Plan 4.3/9.1): der `?aff=`-Token der
+   * Kaufseite. OPTIONAL und als ZWEITER Parameter angehängt, damit kein
+   * bestehender Aufruf bricht — `BuyButton` ruft weiterhin einstellig auf,
+   * wenn keine Zuordnung vorliegt.
+   *
+   * Ungeprüft aus Client-Hand: eine Server Action ist ein öffentlicher
+   * Endpunkt, jeder kann hier beliebiges hineinreichen. Der Wert wird
+   * deshalb NICHT hier ausgewertet, sondern in `affiliateCheckoutMetadata()`
+   * zuerst durch zod geschickt (`affiliateReferralTokenSchema`) und danach
+   * ausschließlich als Filterwert einer mandantengebundenen Abfrage benutzt.
+   * Ein erfundenes oder fremdes Token findet nichts und ändert nichts — es
+   * kann insbesondere keine fremde Bestellung umhängen, weil die Zuordnung
+   * immer an der Referral-Zeile DIESES Mandanten hängt (CLAUDE.md §2.15).
+   * Typ `unknown` statt `string`, weil die Angabe genau das ist.
+   */
+  affiliateToken?: unknown,
+): Promise<CheckoutActionState> {
   const slugCheck = productSlugSchema.safeParse(productSlug);
   if (!slugCheck.success) {
     return { error: "Ungültiges Produkt." };
@@ -116,6 +136,23 @@ export async function createCheckoutSession(productSlug: string): Promise<Checko
     return { error: "Produkt nicht gefunden oder nicht verfügbar." };
   }
 
+  // NEU (Affiliate-System, Block B3, Plan 9.1): die Zuordnung wird EINMAL
+  // hier ausgewertet, nicht im Webhook (Plan 4.4) — nur hier ist der Käufer
+  // angemeldet, das Cookie lesbar und `?aff=` vorhanden. Der Aufruf sitzt
+  // bewusst NACH dem `payments_enabled`-Gate und NACH dem Produktladen: er
+  // soll nur für einen Kauf laufen, der tatsächlich zustande kommt.
+  //
+  // `affiliateCheckoutMetadata()` wirft nie und liefert `{}`, wenn das Modul
+  // aus ist, kein Programm existiert oder keine Zuordnung greift — der
+  // bestehende Pfad bleibt damit unverändert, einschließlich der Reihenfolge
+  // und des Fehlerverhaltens darunter.
+  const affiliateMetadata = await affiliateCheckoutMetadata(
+    tenant,
+    user,
+    product.id,
+    affiliateToken,
+  );
+
   let redirectUrl: string;
   try {
     const stripe = createStripeClient();
@@ -126,6 +163,16 @@ export async function createCheckoutSession(productSlug: string): Promise<Checko
         tenant_id: tenant.id,
         product_id: product.id,
         user_id: user.id,
+        // Additiv: höchstens EIN zusätzlicher Schlüssel
+        // (`affiliate_ref_token`, 64 Hex-Zeichen). Stripe erlaubt 50
+        // Schlüssel je Metadata-Objekt und 500 Zeichen je Wert — hier also 4
+        // von 50 und 64 von 500; die Grenze wird zusätzlich in
+        // `affiliateCheckoutMetadata()` geprüft, weil ein überschrittenes
+        // Limit den ganzen `sessions.create()`-Aufruf scheitern ließe.
+        // Die drei bestehenden Schlüssel bleiben unberührt, und der Webhook
+        // liest sie weiterhin über `checkoutMetadataSchema` (ein `z.object`
+        // ohne `.strict()`, das den Zusatzschlüssel stillschweigend strippt).
+        ...affiliateMetadata,
       },
       customer_email: user.email ?? undefined,
       // Design-Block (18.07.2026, Claude-Design-Import KursKauf.dc.html): der
