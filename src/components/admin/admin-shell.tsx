@@ -30,6 +30,7 @@ export async function AdminShell({
   pendingSubmissions = 0,
   marketplaceEnabled = false,
   shiftCalendarEnabled = false,
+  affiliateEnabled = false,
   restrictedToShiftCalendar = false,
 }: {
   children: ReactNode;
@@ -43,6 +44,10 @@ export async function AdminShell({
   marketplaceEnabled?: boolean;
   /** Schichtplan S1 (07.08.2026) — siehe AdminSidebar.tsx. */
   shiftCalendarEnabled?: boolean;
+  /** Affiliate B6 (11.09.2026) — siehe AdminSidebar.tsx. Die Prop geht
+   * ZWEIMAL weiter (Mobile-Nav und Desktop-Sidebar); fehlte eine der beiden
+   * Stellen, zeigte die Navigation je nach Fensterbreite etwas anderes an. */
+  affiliateEnabled?: boolean;
   /** Schichtplan S3 (09.08.2026), Projektleiter-Zugang — siehe AdminSidebar.tsx. */
   restrictedToShiftCalendar?: boolean;
 }) {
@@ -57,6 +62,7 @@ export async function AdminShell({
         pendingSubmissions={pendingSubmissions}
         marketplaceEnabled={marketplaceEnabled}
         shiftCalendarEnabled={shiftCalendarEnabled}
+        affiliateEnabled={affiliateEnabled}
         restrictedToShiftCalendar={restrictedToShiftCalendar}
       />
       <div className="flex min-h-screen" style={{ background: "#F4F5FA" }}>
@@ -68,6 +74,7 @@ export async function AdminShell({
           pendingSubmissions={pendingSubmissions}
           marketplaceEnabled={marketplaceEnabled}
           shiftCalendarEnabled={shiftCalendarEnabled}
+          affiliateEnabled={affiliateEnabled}
           restrictedToShiftCalendar={restrictedToShiftCalendar}
         />
 

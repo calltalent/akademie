@@ -1652,7 +1652,22 @@
         "topPartnersEmpty": "Noch kein Partner mit Umsatz im Zeitraum.",
         "recentCommissions": "Letzte Buchungen",
         "recentCommissionsEmpty": "Noch keine Buchungen im Zeitraum.",
-        "exportCsv": "CSV exportieren"
+        "exportCsv": "CSV exportieren",
+        "metricsHeading": "Kennzahlen im Zeitraum",
+        "metricUnavailable": "Nicht ermittelbar — die Daten konnten nicht vollständig geladen werden.",
+        "reversalRateUnknown": "Im Zeitraum wurde keine Provision gebucht — es gibt keine Quote.",
+        "rangeFrom": "Von",
+        "rangeTo": "Bis",
+        "applyRange": "Zeitraum anwenden",
+        "rangeValue": "Ausgewertet vom {from} bis {to}",
+        "warningsHeading": "Warnungen",
+        "unprocessedErrored": "{count, plural, one {# Ereignis ist mit Fehler liegen geblieben} other {# Ereignisse sind mit Fehler liegen geblieben}}",
+        "unprocessedOldest": "Ältestes offenes Ereignis vom {date}.",
+        "unprocessedHint": "Der Nachhol-Lauf verarbeitet offene Ereignisse automatisch. Bleibt die Zahl über Stunden stehen, bitte den Betreiber verständigen.",
+        "openApplicationsLink": "Bewerbungen ansehen",
+        "allCommissionsLink": "Alle Buchungen ansehen",
+        "exportHint": "Der Export enthält alle Partner mit Klicks, Verkäufen und Salden je Währung.",
+        "partnerUnknown": "Unbekannter Partner"
       },
       "partners": {
         "title": "Partner",
@@ -1684,7 +1699,34 @@
           "pending": "Wird erzeugt …",
           "linkLabel": "Einladungslink",
           "copy": "Link kopieren",
-          "copied": "Link kopiert."
+          "copied": "Link kopiert.",
+          "modeLabel": "Art der Aufnahme",
+          "modeInvite": "Einladen und sofort freigeben",
+          "modeCreate": "Als Bewerbung anlegen",
+          "companyLabel": "Firma (optional)",
+          "codeLabel": "Partner-Code",
+          "codeHint": "3 bis 32 Zeichen, nur Kleinbuchstaben, Ziffern und Bindestriche. Der Code steht später im Empfehlungslink.",
+          "savedInvite": "Partner angelegt und freigegeben.",
+          "savedCreate": "Bewerbung angelegt. Sie muss noch freigegeben werden.",
+          "submitCreate": "Bewerbung anlegen"
+        },
+        "tabsLabel": "Partner nach Status filtern",
+        "incompleteWarning": "Die Liste konnte nicht vollständig geladen werden. Einzelne Zahlen können zu niedrig sein.",
+        "noGroup": "Keine Gruppe",
+        "payoutHoldChip": "Auszahlung gesperrt",
+        "groups": {
+          "heading": "Gruppen",
+          "description": "Eine Gruppe trägt selbst keinen Satz. Der Satz entsteht über eine Kondition, die für diese Gruppe gilt.",
+          "empty": "Noch keine Gruppen.",
+          "nameLabel": "Name der Gruppe",
+          "create": "Gruppe anlegen",
+          "created": "Gruppe angelegt.",
+          "rename": "Umbenennen",
+          "saved": "Gespeichert.",
+          "delete": "Gruppe löschen",
+          "deleteConfirm": "Gruppe „{name}“ wirklich löschen? Partner verlieren die Zuordnung, Konditionen für diese Gruppe entfallen.",
+          "deleteConfirmYes": "Endgültig löschen",
+          "deleteConfirmNo": "Abbrechen"
         }
       },
       "partner": {
@@ -1700,7 +1742,8 @@
           "joinedLabel": "Dabei seit",
           "referredByLabel": "Geworben von",
           "applicationHeading": "Angaben aus der Bewerbung",
-          "applicationEmpty": "Keine Angaben."
+          "applicationEmpty": "Keine Angaben.",
+          "linkLabel": "Empfehlungslink"
         },
         "condition": {
           "heading": "Kondition",
@@ -1736,20 +1779,46 @@
           "noteLabel": "Interne Notiz",
           "save": "Speichern",
           "saved": "Gespeichert.",
-          "pending": "Wird ausgeführt …"
+          "pending": "Wird ausgeführt …",
+          "reasonOptional": "(optional)"
         },
         "banking": {
           "heading": "Zahlungs- und Steuerdaten",
           "complete": "Vollständig — eine Auszahlung ist möglich.",
           "incomplete": "Unvollständig. Es fehlt: {fields}",
-          "hint": "Bankdaten werden hier nicht angezeigt. Der Partner pflegt sie selbst."
+          "hint": "Bankdaten werden hier nicht angezeigt. Der Partner pflegt sie selbst.",
+          "fieldAddress": "Anschrift",
+          "fieldTax": "Steuerstatus",
+          "fieldPayout": "Zahlungsverbindung",
+          "payoutHold": "Die Auszahlung an diesen Partner ist gesperrt."
         },
         "audit": {
           "heading": "Änderungsprotokoll",
           "empty": "Keine Einträge.",
           "columnDate": "Zeitpunkt",
           "columnActor": "Bearbeiter",
-          "columnAction": "Vorgang"
+          "columnAction": "Vorgang",
+          "actor": {
+            "manager": "Team",
+            "partner": "Partner",
+            "system": "System"
+          }
+        },
+        "admin": {
+          "heading": "Zuordnung und Sperren",
+          "noReferrer": "Kein Werber",
+          "payoutHoldReasonLabel": "Grund der Auszahlungssperre",
+          "payoutHoldReasonHint": "Pflicht, sobald die Auszahlung gesperrt ist. Der Partner sieht diesen Text nicht.",
+          "noteHint": "Nur für das Team sichtbar. Der Partner sieht diese Notiz nie."
+        },
+        "balances": {
+          "heading": "Salden",
+          "empty": "Noch keine Buchungen in einer Währung.",
+          "open": "Offen",
+          "reserved": "In Reserve",
+          "inReview": "In Prüfung",
+          "available": "Verfügbar",
+          "paid": "Ausgezahlt"
         }
       },
       "conditions": {
@@ -1788,7 +1857,18 @@
           "pending": "Wird gespeichert …",
           "saved": "Regel gespeichert.",
           "delete": "Regel löschen",
-          "overlapError": "Für diesen Geltungsbereich gibt es im gewählten Zeitraum bereits eine Regel."
+          "overlapError": "Für diesen Geltungsbereich gibt es im gewählten Zeitraum bereits eine Regel.",
+          "edit": "Bearbeiten",
+          "close": "Schließen",
+          "selectPlaceholder": "Bitte wählen",
+          "rateBpLabel": "Satz in Basispunkten",
+          "rateBpHint": "100 Basispunkte sind 1 Prozent. Eingegeben sind {percent} Prozent.",
+          "fixedCentsLabel": "Fester Betrag in Cent",
+          "fixedCentsHint": "100 Cent sind 1 Euro. Gespeichert sind {euro} Euro.",
+          "validFromLocked": "Der Beginn einer bestehenden Regel lässt sich nicht verschieben. Für einen anderen Beginn eine neue Regel anlegen.",
+          "deleteConfirm": "Regel wirklich löschen? Bereits gebuchte Provisionen bleiben unverändert — sie tragen ihren Rechenweg in der eigenen Zeile.",
+          "deleteConfirmYes": "Endgültig löschen",
+          "deleteConfirmNo": "Abbrechen"
         },
         "calculator": {
           "heading": "Rechner",
@@ -1797,8 +1877,18 @@
           "submit": "Berechnen",
           "result": "Es gilt {rule}: {rate}. Das sind bei {gross} brutto {amount}.",
           "ruleDefault": "der Programmstandard",
-          "ruleNumbered": "Regel {rank}"
-        }
+          "ruleNumbered": "Regel {rank}",
+          "noProduct": "Ohne Produkt",
+          "noResult": "Für diese Auswahl lässt sich keine Vorschau berechnen.",
+          "base": "Bemessungsgrundlage",
+          "payoutPart": "Davon sofort",
+          "reservePart": "Davon Reserve",
+          "taxHint": "Ohne Steueranteil gerechnet. Bei Nettobasis liegt der gebuchte Betrag später darunter.",
+          "cappedHint": "Die Höchstprovision hat gegriffen. Eine so gebuchte Zeile wird zur Prüfung markiert."
+        },
+        "columnActions": "Aktionen",
+        "periodOpen": "Ab {from}, ohne Ende",
+        "periodClosed": "{from} bis {to}"
       },
       "commissions": {
         "title": "Provisionen",
@@ -1811,7 +1901,10 @@
           "test": "Nur Testbuchungen",
           "apply": "Filter anwenden",
           "reset": "Filter zurücksetzen",
-          "all": "Alle"
+          "all": "Alle",
+          "heading": "Filter",
+          "from": "Gebucht ab",
+          "to": "Gebucht bis"
         },
         "columnDate": "Datum",
         "columnPartner": "Partner",
@@ -1843,9 +1936,79 @@
           "amountLabel": "Betrag in Euro",
           "reasonLabel": "Grund",
           "submit": "Buchen",
-          "saved": "Buchung angelegt."
+          "saved": "Buchung angelegt.",
+          "description": "Erzeugt eine eigene Buchung. Ein negativer Betrag ist eine Korrektur zulasten des Partners.",
+          "amountHint": "Betrag in Euro, zum Beispiel 25,00 oder -25,00.",
+          "confirmLabel": "Betrag zur Bestätigung wiederholen",
+          "confirmHint": "Ab 500 Euro verlangt eine Handbuchung den Betrag ein zweites Mal. Beide Eingaben müssen auf den Cent übereinstimmen."
         },
-        "exportCsv": "CSV exportieren"
+        "exportCsv": "CSV exportieren",
+        "resultCount": "{count, plural, one {# Buchung} other {# Buchungen}}",
+        "limitHint": "Es werden höchstens 500 Zeilen angezeigt. Für mehr bitte den Zeitraum einschränken oder die CSV-Datei exportieren.",
+        "exportHint": "Der Export enthält genau die Zeilen, die der Filter oben zeigt.",
+        "noCampaign": "Ohne Kampagne",
+        "productUnknown": "Produkt nicht mehr vorhanden",
+        "flaggedChip": "Markiert",
+        "testChip": "Testbuchung",
+        "kindLabel": "Buchungsart",
+        "kind": {
+          "sale": "Verkauf",
+          "reserve": "Reserve",
+          "recurring": "Abo-Rate",
+          "recurring_reserve": "Reserve der Abo-Rate",
+          "tier2": "Zweite Stufe",
+          "reversal": "Storno",
+          "recredit": "Wiedergutschrift",
+          "manual": "Handbuchung"
+        },
+        "holdUntilLabel": "Frei ab",
+        "orderLabel": "Bestellung",
+        "invoiceLabel": "Rechnung",
+        "subscriptionLabel": "Abonnement",
+        "dedupLabel": "Idempotenzschlüssel",
+        "noteLabel": "Notiz zur Buchung",
+        "flagReasonLabel": "Grund der Markierung",
+        "reason": {
+          "referral": "Zuordnung über ein gespeichertes Klick-Token.",
+          "binding": "Zuordnung über die Bindung des Kontos beziehungsweise des Abonnements.",
+          "manual": "Von Hand gebucht."
+        },
+        "snapshotMissing": "Zu dieser Buchung ist kein eingefrorener Rechenweg gespeichert. Die heutigen Programmwerte gelten für sie nicht.",
+        "snapshot": {
+          "source": "Herkunft des Satzes",
+          "sourceCondition": "Kondition",
+          "sourceProgram": "Programmstandard",
+          "rate": "Satz",
+          "basis": "Bemessungsgrundlage",
+          "feeDeduction": "Abzug für Zahlungsgebühren",
+          "min": "Mindestprovision",
+          "max": "Höchstprovision",
+          "noLimit": "Keine Grenze",
+          "reserve": "Reserve",
+          "holdDays": "Sperrfrist in Tagen",
+          "reserveDays": "Reservefrist in Tagen",
+          "tier2": "Zweite Stufe",
+          "tier2Off": "Nicht aktiv"
+        },
+        "actionsHeading": "Aktionen zu dieser Buchung",
+        "decision": {
+          "label": "Entscheidung",
+          "approve": "Freigeben",
+          "cancel": "Stornieren",
+          "cancelReasonLabel": "Stornogrund",
+          "reasonLabel": "Begründung",
+          "submit": "Entscheidung speichern"
+        },
+        "cancelReason": {
+          "fraud_suspicion": "Betrugsverdacht",
+          "manual": "Entscheidung des Teams"
+        },
+        "reassign": {
+          "newPartnerLabel": "Neuer Partner",
+          "none": "Ohne Zuordnung",
+          "reasonLabel": "Begründung",
+          "hint": "Die Umbuchung betrifft alle Buchungen dieser Bestellung. Der Satz wird für den neuen Partner neu aufgelöst."
+        }
       },
       "payouts": {
         "title": "Auszahlungen",
@@ -1916,7 +2079,11 @@
           "pending": "Wird gespeichert …",
           "saved": "Gespeichert.",
           "delete": "Löschen"
-        }
+        },
+        "notAvailableHeading": "Werbemittel sind noch nicht eingerichtet",
+        "notAvailableBody": "Für Werbemittel fehlen noch Tabelle und Speicherort. Der Bereich bleibt leer, bis beides angelegt ist — ein Formular, das ins Leere lädt, wäre schlimmer als keines.",
+        "linkHint": "Der Empfehlungslink eines Partners entsteht allein aus seinem Code und steht schon heute auf seiner Partnerseite.",
+        "plannedHeading": "Vorgesehene Arten"
       },
       "settings": {
         "title": "Einstellungen",
@@ -1946,7 +2113,17 @@
           "feeDeductionLabel": "Abzug für Zahlungsgebühren in Prozent",
           "minLabel": "Mindestprovision in Euro",
           "maxLabel": "Höchstprovision in Euro",
-          "currencyLabel": "Währung"
+          "currencyLabel": "Währung",
+          "rateBpLabel": "Standardsatz in Basispunkten",
+          "rateBpHint": "100 Basispunkte sind 1 Prozent. Eingegeben sind {percent} Prozent.",
+          "fixedCentsLabel": "Fester Betrag in Cent",
+          "centsHint": "100 Cent sind 1 Euro. Gespeichert sind {euro} Euro.",
+          "minCentsLabel": "Mindestprovision in Cent",
+          "maxCentsLabel": "Höchstprovision in Cent",
+          "optionalCentsHint": "Leer lassen heißt: keine Grenze.",
+          "feeDeductionBpLabel": "Abzug für Zahlungsgebühren in Basispunkten",
+          "feeDeductionBpHint": "Wird vor der Provision von der Bemessungsgrundlage abgezogen. 250 sind 2,5 Prozent.",
+          "currencyHint": "Dreistelliges Kürzel, zum Beispiel eur. Salden werden nie über Währungen hinweg zusammengezählt."
         },
         "attribution": {
           "heading": "Attribution",
@@ -1981,7 +2158,11 @@
           "scheduleLabel": "Auszahlungsrhythmus",
           "scheduleWeekly": "Wöchentlich",
           "scheduleSemiMonthly": "Zweimal im Monat",
-          "scheduleMonthly": "Monatlich"
+          "scheduleMonthly": "Monatlich",
+          "reserveBpLabel": "Reserve in Basispunkten",
+          "reserveBpHint": "Anteil jeder Provision, der erst nach der Reservefrist verfügbar wird.",
+          "reserveDaysHint": "Darf nicht vor der Sperrfrist enden.",
+          "minPayoutCentsLabel": "Mindestauszahlung in Cent"
         },
         "tier2": {
           "heading": "Zweite Stufe",
@@ -1989,7 +2170,8 @@
           "basisLabel": "Bemessung",
           "basisCommission": "Provision des geworbenen Partners",
           "basisRevenue": "Umsatz des geworbenen Partners",
-          "rateLabel": "Satz der zweiten Stufe in Prozent"
+          "rateLabel": "Satz der zweiten Stufe in Prozent",
+          "rateBpLabel": "Satz der zweiten Stufe in Basispunkten"
         },
         "texts": {
           "heading": "Texte",
@@ -1998,7 +2180,9 @@
           "termsVersionLabel": "Fassung",
           "termsVersionHint": "Wird die Fassung erhöht, müssen alle Partner erneut zustimmen.",
           "applicationNoteLabel": "Hinweis im Bewerbungsformular",
-          "applicationFieldsLabel": "Zusätzliche Felder der Bewerbung"
+          "applicationFieldsLabel": "Zusätzliche Felder der Bewerbung",
+          "applicationFieldsEmpty": "Keine zusätzlichen Felder.",
+          "applicationFieldsReadonly": "Diese Felder lassen sich hier noch nicht bearbeiten. Sie gehören zum öffentlichen Bewerbungsformular."
         },
         "test": {
           "heading": "Testmodus",
@@ -2013,8 +2197,10 @@
           "highRate": "Der Satz liegt über 50 Prozent.",
           "combinedRate": "Erste und zweite Stufe liegen zusammen über 60 Prozent.",
           "basisChange": "Die Änderung gilt nur für künftige Buchungen. Bestehende Buchungen und laufende Abos bleiben unverändert.",
-          "recurringAll": "Alle Raten zu vergüten ist eine unbefristete Verbindlichkeit."
-        }
+          "recurringAll": "Alle Raten zu vergüten ist eine unbefristete Verbindlichkeit.",
+          "heading": "Bitte vor dem Speichern lesen"
+        },
+        "firstSaveHint": "Mit dem ersten Speichern wird das Programm angelegt. Bis dahin bleiben die übrigen Seiten leer."
       },
       "status": {
         "program": {
@@ -2043,6 +2229,19 @@
           "failed": "Fehlgeschlagen",
           "cancelled": "Storniert"
         }
+      },
+      "access": {
+        "heading": "Kein Zugriff",
+        "noTenant": "Zu dieser Adresse gehört keine Akademie.",
+        "notAuthenticated": "Bitte zuerst anmelden.",
+        "notManager": "Diese Seite ist Inhabern und Administratoren vorbehalten. Es geht um Geld und Personendaten."
+      },
+      "navLabel": "Bereiche des Partnerprogramms",
+      "skipToContent": "Zum Hauptinhalt springen",
+      "programMissing": "Für diese Akademie ist noch kein Partnerprogramm eingerichtet. Bitte zuerst die Einstellungen speichern.",
+      "csv": {
+        "currency": "Währung",
+        "uniqueClicks": "Eindeutige Klicks"
       }
     }
   },
@@ -2409,7 +2608,12 @@
         "profile": "Stammdaten",
         "terms": "Bedingungen"
       },
-      "logout": "Abmelden"
+      "logout": "Abmelden",
+      "navLabel": "Bereiche des Partnerbereichs",
+      "accessHeading": "Kein Zugriff",
+      "accessBody": "Dieser Bereich ist freigeschalteten Partnern vorbehalten.",
+      "accessNotAuthenticated": "Bitte melde dich an, um den Partnerbereich zu öffnen.",
+      "accessLogin": "Zur Anmeldung"
     },
     "dashboard": {
       "title": "Übersicht",
@@ -2436,7 +2640,16 @@
       "sales": "Verkäufe",
       "conversion": "Conversion",
       "epc": "Verdienst je Klick",
-      "empty": "Noch keine Daten."
+      "empty": "Noch keine Daten.",
+      "unavailable": "Nicht ermittelbar",
+      "balanceNegativeHint": "Negativer Betrag: er wird mit künftigen Provisionen verrechnet, nicht eingezogen.",
+      "payoutHold": "Für dein Konto ist die Auszahlung derzeit ausgesetzt. Bitte wende dich an die Akademie.",
+      "missingAddress": "Anschrift",
+      "missingTaxStatus": "Steuerstatus",
+      "missingPayoutMethod": "Zahlungsverbindung",
+      "minPayoutReached": "Der Mindestbetrag von {amount} ist erreicht.",
+      "rangeHint": "Zeitraum: die letzten {days} Tage",
+      "privacyNote": "Angaben zu Käuferinnen und Käufern zeigen wir nicht an."
     },
     "links": {
       "title": "Links",
@@ -2451,7 +2664,9 @@
       "copied": "Link kopiert.",
       "codeHeading": "Dein Partner-Code",
       "codeHint": "Der Code funktioniert auch ohne Link, etwa im Podcast oder auf Papier.",
-      "ttlHint": "Eine Zuordnung hält {days} Tage."
+      "ttlHint": "Eine Zuordnung hält {days} Tage.",
+      "targetCourse": "Kurs: {title}",
+      "targetProduct": "Produkt: {title}"
     },
     "statistics": {
       "title": "Statistik",
@@ -2473,7 +2688,15 @@
       "columnReversalRate": "Stornoquote",
       "empty": "Keine Daten im gewählten Zeitraum.",
       "chartLabel": "Klicks und Verkäufe je Tag: {summary}",
-      "exportCsv": "CSV exportieren"
+      "exportCsv": "CSV exportieren",
+      "rangeToLabel": "bis",
+      "apply": "Anzeigen",
+      "incomplete": "Die Zahlen konnten nicht vollständig geladen werden. Bitte später erneut versuchen.",
+      "campaignNone": "Ohne Kampagne",
+      "productNone": "Ohne Produkt",
+      "productNote": "Je Produkt zählen wir Verkäufe und Provision. Klicks werden nur je Tag und Kampagne gemessen.",
+      "totalRow": "Summe",
+      "chartLegend": "Breiter Balken: Klicks. Schmaler Balken: Verkäufe. Alle Werte stehen in der Tabelle darüber."
     },
     "statement": {
       "title": "Kontoauszug",
@@ -2497,7 +2720,19 @@
       "kindReversal": "Storno",
       "kindManual": "Handbuchung",
       "kindPayout": "Auszahlung",
-      "privacyNote": "Angaben zum Käufer zeigen wir nicht an."
+      "privacyNote": "Angaben zum Käufer zeigen wir nicht an.",
+      "incomplete": "Der Kontoauszug konnte nicht vollständig geladen werden. Bitte später erneut versuchen.",
+      "closingBalance": "Saldo: {amount}",
+      "columnDetails": "Berechnung",
+      "notCounted": "Zählt nicht",
+      "freeFrom": "Frei ab {date}",
+      "exportCsv": "CSV exportieren",
+      "basis": {
+        "net": "netto",
+        "gross": "brutto"
+      },
+      "kindReserve": "Einbehalt",
+      "kindRecredit": "Wiedergutschrift"
     },
     "payouts": {
       "title": "Auszahlungen",
@@ -2509,7 +2744,11 @@
       "columnStatus": "Status",
       "empty": "Noch keine Auszahlungen.",
       "download": "Gutschrift herunterladen",
-      "downloadUnavailable": "Der Beleg ist noch nicht erstellt."
+      "downloadUnavailable": "Der Beleg ist noch nicht erstellt.",
+      "notAvailableYet": "Es gab noch keine Auszahlung.",
+      "balanceHint": "Was bereits freigegeben ist, steht auf der Übersicht unter „Verfügbar“.",
+      "toOverview": "Zur Übersicht",
+      "toStatement": "Zum Kontoauszug"
     },
     "team": {
       "title": "Team",
@@ -2519,7 +2758,9 @@
       "columnJoined": "Dabei seit",
       "columnRevenue": "Umsatz",
       "columnCommission": "Deine Provision",
-      "empty": "Noch keine geworbenen Partner."
+      "empty": "Noch keine geworbenen Partner.",
+      "disabled": "Für dieses Partnerprogramm ist die zweite Stufe nicht aktiv.",
+      "linkHint": "Wer sich über diesen Link bewirbt, wird dir nach der Freigabe durch die Akademie als geworbener Partner zugeordnet."
     },
     "profile": {
       "title": "Stammdaten",
@@ -2555,7 +2796,19 @@
       "dataHeading": "Deine Daten",
       "dataExport": "Daten als JSON herunterladen",
       "dataDelete": "Löschung beantragen",
-      "dataDeleteHint": "Provisionsbelege bleiben aus gesetzlichen Gründen erhalten; dein Name wird darin entfernt."
+      "dataDeleteHint": "Provisionsbelege bleiben aus gesetzlichen Gründen erhalten; dein Name wird darin entfernt.",
+      "billingHeading": "Abrechnungsdaten",
+      "billingHint": "Anschrift, Steuerstatus und Zahlungsverbindung brauchen wir für die Gutschrift und die Überweisung.",
+      "legalNameLabel": "Rechtlicher Name",
+      "entityBusiness": "Unternehmen",
+      "entityPrivate": "Privatperson",
+      "taxNumberLabel": "Steuernummer",
+      "valueStored": "Hinterlegt — zum Ändern neu eingeben",
+      "payoutMethodLabel": "Auszahlungsart",
+      "payoutMethodSepa": "SEPA-Überweisung",
+      "payoutMethodPaypal": "PayPal",
+      "bicLabel": "BIC",
+      "dataViaProfile": "Datenexport und Löschantrag laufen über dein Profil unter „Konto“."
     },
     "terms": {
       "title": "Partnerbedingungen",
@@ -2564,7 +2817,11 @@
       "updatedBody": "Die Partnerbedingungen haben sich geändert. Bitte stimme der neuen Fassung zu, um den Partnerbereich weiter zu nutzen.",
       "accept": "Zustimmen",
       "pending": "Wird gespeichert …",
-      "accepted": "Zustimmung gespeichert."
+      "accepted": "Zustimmung gespeichert.",
+      "acceptLabel": "Ich stimme den Partnerbedingungen in der Fassung {version} zu.",
+      "currentVersion": "Aktuelle Fassung: {version}",
+      "notAcceptedYet": "Noch keine Zustimmung gespeichert.",
+      "noText": "Für dieses Partnerprogramm ist noch kein Regelwerk hinterlegt."
     },
     "program": {
       "title": "Partnerprogramm",
@@ -2575,7 +2832,55 @@
       "exampleText": "Bei einem Verkauf über {gross} erhältst du {amount}.",
       "attributionHint": "Eine Empfehlung wird {days} Tage lang zugeordnet.",
       "rulesHeading": "Regeln",
-      "notFound": "Dieses Partnerprogramm ist nicht öffentlich."
+      "notFound": "Dieses Partnerprogramm ist nicht öffentlich.",
+      "subtitle": "Empfiehl {tenant} weiter und verdiene an jedem vermittelten Verkauf.",
+      "basisHeading": "Bemessungsgrundlage",
+      "basisNet": "Gerechnet wird auf den Nettobetrag, also ohne Umsatzsteuer und Versand.",
+      "basisGross": "Gerechnet wird auf den Bruttobetrag, also auf den tatsächlich gezahlten Betrag.",
+      "basisFee": "Davor werden {rate} Zahlungsgebühr abgezogen.",
+      "commissionMinTerm": "Mindestprovision",
+      "commissionMin": "Je Verkauf mindestens {amount}.",
+      "commissionMaxTerm": "Höchstprovision",
+      "commissionMax": "Je Verkauf höchstens {amount}.",
+      "exampleTextNet": "Bei einem Nettobetrag von {net} erhältst du {amount}.",
+      "tier2Heading": "Zweite Stufe",
+      "tier2Commission": "Für Partner, die du wirbst, bekommst du zusätzlich {rate} ihrer Provision.",
+      "tier2Revenue": "Für Partner, die du wirbst, bekommst du zusätzlich {rate} ihres vermittelten Umsatzes.",
+      "attributionHeading": "Zuordnungsdauer",
+      "attributionModelTerm": "Mehrere Empfehlungen",
+      "attributionModelLast": "Kommt ein Käufer über mehrere Partnerlinks, zählt der letzte Klick vor dem Kauf.",
+      "attributionModelFirst": "Kommt ein Käufer über mehrere Partnerlinks, zählt der erste Klick.",
+      "attributionOverwriteTerm": "Späterer Klick",
+      "attributionOverwriteAllow": "Ein späterer Klick auf den Link eines anderen Partners überschreibt die Zuordnung.",
+      "attributionOverwriteDeny": "Eine einmal gesetzte Zuordnung wird von einem späteren Klick nicht mehr überschrieben.",
+      "attributionLifetimeTerm": "Spätere Käufe",
+      "attributionLifetime": "Nach dem ersten Kauf bleibt der Käufer dauerhaft dir zugeordnet, auch nach Ablauf der Frist.",
+      "attributionNoLifetime": "Die Zuordnung endet mit Ablauf der Frist und gilt nicht für spätere Käufe.",
+      "attributionSelfTerm": "Eigene Käufe",
+      "attributionSelf": "Käufe auf eigene Rechnung werden nicht vergütet.",
+      "attributionConsentTerm": "Einwilligung",
+      "attributionConsent": "Ohne Einwilligung des Besuchers wird kein Cookie gesetzt; die Zuordnung läuft dann allein über den Empfehlungsparameter im Link.",
+      "recurringHeading": "Abonnements",
+      "recurringFirstOnly": "Bei Abonnements wird nur die erste Zahlung vergütet.",
+      "recurringNPeriods": "Bei Abonnements werden die ersten {periods} Zahlungen vergütet.",
+      "recurringAll": "Bei Abonnements wird jede Zahlung vergütet, solange das Abonnement läuft.",
+      "payoutHeading": "Auszahlung",
+      "payoutScheduleTerm": "Rhythmus",
+      "payoutWeekly": "Ausgezahlt wird wöchentlich.",
+      "payoutSemiMonthly": "Ausgezahlt wird zweimal im Monat.",
+      "payoutMonthly": "Ausgezahlt wird einmal im Monat.",
+      "payoutHoldTerm": "Sperrfrist",
+      "payoutHold": "Eine Provision wird {days} Tage nach dem Verkauf zur Auszahlung frei.",
+      "payoutReserveTerm": "Reserve",
+      "payoutReserve": "{rate} jeder Provision bleiben {days} Tage als Reserve einbehalten und werden danach frei.",
+      "payoutMinimumTerm": "Mindestbetrag",
+      "payoutMinimum": "Ausgezahlt wird ab einem Guthaben von {amount}.",
+      "payoutReversalTerm": "Storno",
+      "payoutReversal": "Wird ein Kauf erstattet oder rückbelastet, wird die Provision zurückgebucht.",
+      "termsHeading": "Partnerbedingungen",
+      "termsVersion": "Fassung {version}",
+      "termsEmpty": "Die Partnerbedingungen werden dir vor der Freigabe zugeschickt.",
+      "termsShow": "Partnerbedingungen im Volltext anzeigen"
     },
     "apply": {
       "heading": "Als Partner bewerben",
@@ -2591,7 +2896,12 @@
       "pending": "Wird gesendet …",
       "success": "Danke. Wir haben deine Bewerbung erhalten und melden uns per E-Mail.",
       "error": "Die Bewerbung konnte nicht gesendet werden. Bitte versuche es später erneut.",
-      "invalid": "Bitte prüfe die markierten Felder."
+      "invalid": "Bitte prüfe die markierten Felder.",
+      "honeypotLabel": "Website (bitte leer lassen)",
+      "requiredHint": "Felder ohne den Zusatz „optional“ sind Pflichtfelder.",
+      "optional": "optional",
+      "codeLabel": "Wunsch-Code (optional)",
+      "codeHint": "Dieser Code steht später in deinem Empfehlungslink. Ist er schon vergeben, bekommst du einen ähnlichen — die Bewerbung scheitert daran nie."
     },
     "status": {
       "program": {
@@ -2620,6 +2930,11 @@
         "failed": "Fehlgeschlagen",
         "cancelled": "Storniert"
       }
+    },
+    "csv": {
+      "currencyColumn": "Währung",
+      "freeFromColumn": "Frei ab",
+      "reversalColumn": "Storniert"
     }
   },
   "consent": {

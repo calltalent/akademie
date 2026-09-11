@@ -18,6 +18,7 @@ import {
   GraduationCap,
   LogOut,
   CalendarClock,
+  Handshake,
   type LucideIcon,
 } from "lucide-react";
 
@@ -74,6 +75,7 @@ export type AdminSidebarItemId =
   | "marketplace"
   | "reporting"
   | "payments"
+  | "affiliate"
   | "members"
   | "import"
   | "schichtplanung"
@@ -100,6 +102,15 @@ type AdminNavItem = {
    * === true`) — gleiches Opt-in-Prinzip wie `marketplaceOnly`.
    */
   shiftCalendarOnly?: boolean;
+  /**
+   * NEU (Affiliate B6, 11.09.2026): nur sichtbar, wenn der Betreiber das
+   * Partnerprogramm freigeschaltet hat (`tenant.settings.affiliate_enabled
+   * === true`) — gleiches Opt-in-Prinzip wie `marketplaceOnly`. Der Schalter
+   * ist eine Berechtigung des MANDANTEN und wird zusätzlich serverseitig in
+   * jeder Seite, Server Action und Route geprüft (`requireAffiliate*()`,
+   * Plan 9.8): diese Zeile blendet nur den Menüpunkt aus, sie schützt nichts.
+   */
+  affiliateOnly?: boolean;
 };
 
 const GROUPS: { title: string; items: AdminNavItem[] }[] = [
@@ -119,6 +130,13 @@ const GROUPS: { title: string; items: AdminNavItem[] }[] = [
     items: [
       { id: "reporting", label: "Reporting", href: "/admin/reporting", icon: BarChart3 },
       { id: "payments", label: "Zahlungen", href: "/admin/zahlungen", icon: CreditCard },
+      {
+        id: "affiliate",
+        label: "Partnerprogramm",
+        href: "/admin/affiliate",
+        icon: Handshake,
+        affiliateOnly: true,
+      },
     ],
   },
   {
@@ -154,6 +172,7 @@ function activeFromPath(pathname: string): AdminSidebarItemId | undefined {
   if (pathname.startsWith("/admin/marketplace")) return "marketplace";
   if (pathname.startsWith("/admin/reporting")) return "reporting";
   if (pathname.startsWith("/admin/zahlungen")) return "payments";
+  if (pathname.startsWith("/admin/affiliate")) return "affiliate";
   if (pathname.startsWith("/admin/teilnehmer")) return "members";
   if (pathname.startsWith("/admin/import")) return "import";
   if (pathname.startsWith("/admin/schichtplanung")) return "schichtplanung";
@@ -171,6 +190,7 @@ export function AdminSidebar({
   logoUrl = null,
   marketplaceEnabled = false,
   shiftCalendarEnabled = false,
+  affiliateEnabled = false,
   restrictedToShiftCalendar = false,
 }: {
   active?: AdminSidebarItemId;
@@ -192,6 +212,10 @@ export function AdminSidebar({
    * "Schichtplanung"-Menüpunkts, siehe `shiftCalendarOnly` oben. Default
    * `false` (Opt-in), gleiches Prinzip wie `marketplaceEnabled`. */
   shiftCalendarEnabled?: boolean;
+  /** Affiliate B6 (11.09.2026) — steuert Sichtbarkeit des
+   * "Partnerprogramm"-Menüpunkts, siehe `affiliateOnly` oben. Default
+   * `false` (Opt-in), gleiches Prinzip wie `marketplaceEnabled`. */
+  affiliateEnabled?: boolean;
   /**
    * NEU (Schichtplan S3, 09.08.2026): Projektleiter-Zugang zu `/admin/*`
    * ist auf `/admin/schichtplanung` beschränkt (kein Schicht-/Zeitfenster-
@@ -309,6 +333,7 @@ export function AdminSidebar({
               (!i.platformOnly || isPlatformAdmin) &&
               (!i.marketplaceOnly || marketplaceEnabled) &&
               (!i.shiftCalendarOnly || shiftCalendarEnabled) &&
+              (!i.affiliateOnly || affiliateEnabled) &&
               (!restrictedToShiftCalendar || i.id === "schichtplanung"),
           );
           if (items.length === 0) return null;

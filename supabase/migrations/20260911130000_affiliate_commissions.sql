@@ -100,17 +100,30 @@
 --     ('affiliate_partner_has_commissions'). Eine vollstaendige Kaskade
 --     dagegen ist beim COMMIT in sich stimmig und geht durch.
 --     Was es NICHT bedeutet: eine Aufweichung. Wer in EINER Transaktion erst
---     die Provisionszeilen und dann den Partner loescht, kommt durch -- das
---     konnte `service_role` aber ohnehin, weil das Buch keine DELETE-Sperre
---     gegen `service_role` hat (Plan 3.11, bewusst kein DELETE-Trigger).
+--     die Provisionszeilen und dann den Partner loescht, kaeme durch --
+--     BERICHTIGT (K1): `service_role` kann die Provisionszeilen seit dem
+--     DELETE-Guard (Abschnitt 2.7) gar nicht mehr loeschen, dieser Weg steht
+--     also nur noch 'postgres' offen. Die aufschiebbare Pruefung bleibt
+--     trotzdem richtig: sie traegt die Mandantenkaskade, nicht diesen Fall.
 -- A2  `on delete set null` BEKOMMT EINE SPALTENLISTE. Der Plan (3.11)
 --     schreibt fuer product_id und referral_id `on delete set null` ohne
 --     Liste. Bei einem ZUSAMMENGESETZTEN Fremdschluessel nullt Postgres dann
 --     ALLE referenzierenden Spalten -- also auch `tenant_id`, die `not null`
---     ist. Das Loeschen eines Produkts bzw. der Loeschlauf auf
---     affiliate_referrals braeche mit 23502 ab. Hier steht deshalb
---     `on delete set null (product_id)` bzw. `(referral_id)`, wie in B3
---     (Abweichung A1 dort) bereits entschieden.
+--     ist. Das Loeschen einer Elternzeile braeche mit 23502 ab. Hier steht
+--     deshalb `on delete set null (referral_id)`, wie in B3 (Abweichung A1
+--     dort) bereits entschieden.
+--     BERICHTIGT (K13): der reale Anlass ist NICHT ein "Referral-Loeschlauf
+--     aus B3" -- den gibt es nicht. 20260911120000 legt genau eine loeschende
+--     Funktion an (affiliate_clicks_purge), und sie beruehrt ausschliesslich
+--     affiliate_clicks; die Partnerloeschung ist seit 20260911120000:1664-1669
+--     zusaetzlich gesperrt. affiliate_referrals-Zeilen verschwinden heute NUR
+--     ueber die Mandantenkaskade. Die Spaltenliste bleibt trotzdem richtig und
+--     noetig: sie traegt den Fall, dass B7 oder das DSGVO-Paket der Phase 4
+--     einen solchen Lauf nachreicht (der Verarbeiter ruft bereits ein noch
+--     nicht vorhandenes affiliate_referrals_purge(), process.ts:100). Fuer
+--     `product_id` ist der Anlass dagegen real und live bestaetigt
+--     (products_staff_delete) -- siehe aber K8: dieser Fremdschluessel ist
+--     nicht mehr `set null`.
 -- A3  SPALTENRECHT AUF affiliate_commissions. Der Plan (3.11) gibt
 --     `grant select on public.affiliate_commissions to authenticated` und
 --     verlaesst sich fuer die Kaeuferdatengrenze allein darauf, dass ein
@@ -126,7 +139,8 @@
 --     herausgegriffene Vorgaenge einer Person) und es ist genau das, was
 --     Plan 11.15 ausschliesst. Diese sechs Spalten stehen deshalb NICHT im
 --     Grant; dazu `flag_reason` und `note`, die Managertexte tragen koennen
---     (Vorbild: `payout_hold_reason` an affiliate_partners, B1). Siehe
+--     (Vorbild: `payout_hold_reason` an affiliate_partners, B1), und seit K12
+--     `condition_snapshot` als einzige formfreie Struktur der Tabelle. Siehe
 --     Abschnitt 2.5 fuer die vollstaendige Liste und die Folge fuer den
 --     Anwendungscode.
 -- A4  ZUSAETZLICHE CHECK-CONSTRAINTS gegenueber dem Plan, alle aus Saetzen des
@@ -194,6 +208,96 @@
 --     Stripe-Kennung, also ein mandantenuebergreifender Kundenbestand.
 --
 -- =================================================================
+-- KORREKTUREN NACH GEGENLESEN (11.09.2026, dreizehn Befunde)
+-- =================================================================
+-- Jeder Befund steht hier mit der Stelle, an der die Korrektur im Text
+-- kommentiert ist. Reihenfolge nach Schwere. K3, K4b und K10b liegen in der
+-- Schwesterdatei 20260911140000.
+--
+-- K1 (HOCH, blockierend) KEIN DELETE-SCHUTZ AUF DEM PROVISIONSBUCH.
+--     affiliate_commissions war die einzige Tabelle der Affiliate-Familie,
+--     die `service_role` mit einem falschen Filter leeren konnte -- die mit
+--     dem Geld darin. Korrektur: Abschnitt 2.7, DELETE-Guard nach der Bauart
+--     von affiliate_subscription_bindings_guard(); Begruendungstext im
+--     Abschnitt "WAS BEWUSST FEHLT" berichtigt.
+-- K2 (HOCH, blockierend) DER UEBERSTORNIERUNGS-DECKEL WAR KEINE EIGENSCHAFT
+--     DER DATENBANK. Er stand allein in book_affiliate_reversals()
+--     (20260911140000); book_affiliate_commissions() nahm 'reversal' und
+--     'recredit' mit beliebigem Betrag, ohne Deckel, ohne Pruefung der Art
+--     der Bezugszeile und ohne Sperre -- und genau dieser Weg ist der heutige
+--     Wiedergutschriftspfad (reversal.ts). Das ist woertlich das Argument aus
+--     A6: eine Regel, die nur in einem von drei Pfaden greift, ist keine
+--     Regel. Korrektur: der Deckel steht jetzt im BEFORE-INSERT-Zweig von
+--     affiliate_commissions_guard() (Abschnitt 2.3) und greift damit in allen
+--     drei Pfaden (B4-Buchung, B5-Storno, B6-Handbuchung). Dazu der fehlende
+--     Begruendungszwang fuer 'recredit' als CHECK (Abschnitt 2.1).
+-- K4a (MITTEL) DIE SPERRE TRUG NICHT GEGEN DEN WIEDERGUTSCHRIFTSPFAD. Die
+--     Elternsperre in book_affiliate_reversals() deckt nur zwei Laeufe
+--     DERSELBEN Funktion; die Wiedergutschrift laeuft ueber
+--     book_affiliate_commissions() und sperrte nichts, geht aber in denselben
+--     Netto-Stand ein. Korrektur: der Deckel aus K2 sperrt beide Bezugszeilen
+--     (`for no key update`) -- die Gegenbuchung UND die Ursprungszeile,
+--     gegen die book_affiliate_reversals() rechnet.
+-- K5 (MITTEL) DIE VERBRANNTE ABO-PERIODE. Anspruch (`periods_booked + 1`) und
+--     Buchung liegen in ZWEI Transaktionen; der Zaehler kennt per Guard nur
+--     eine Richtung. Scheitert die Buchung nach erfolgreichem Anspruch, ist
+--     die Periode verbraucht, ohne dass eine Zeile entstanden ist -- am Ende
+--     der Laufzeit fehlen dem Partner so viele Raten, wie es fehlgeschlagene
+--     Buchungen gab. Korrektur, HALB: book_affiliate_commissions() nimmt
+--     jetzt den optionalen Schluessel `claim_subscription_id` und zieht den
+--     Anspruch IN dieselbe Transaktion (Abschnitt 4). Die andere Haelfte --
+--     process.ts gibt den Schluessel mit und streicht claimSubscriptionPeriod()
+--     als eigenen Aufruf -- steht aus: sie zieht
+--     src/lib/affiliate/process.test.ts mit (mehrere Faelle pruefen den
+--     heutigen Zwei-Schritt-Weg), und diese Datei gehoert nicht zu diesem
+--     Arbeitsauftrag. FREIGABEBEDINGUNG, nicht
+--     Zeile SQL: solange der Schluessel nicht mitgegeben wird, bleibt der
+--     Fehler bestehen.
+-- K6 (MITTEL) DIE ATOMARITAETSZUSAGE DES KOPFES GALT FUER DIE ZWEITSTUFE
+--     STRUKTURELL NICHT. Kein Fehler im SQL, aber die Grundlage, auf der
+--     freigegeben wird, war falsch. Korrektur: FOLGEN (2) berichtigt, samt
+--     der Entscheidung ueber die Schluesselform, die VOR dem ersten Livelauf
+--     faellt.
+-- K7 (MITTEL) affiliate_events HATTE KEIN LOESCHKONZEPT -- bei einer Tabelle
+--     mit Inhaber-Geheimnis (referral_token), Stripe-Rohfeldern und
+--     nullable tenant_id, deren Zeilen die Mandantenloeschung ueberleben.
+--     Korrektur: Abschnitt 1.1, affiliate_events_purge(int, int) nach dem
+--     Muster von affiliate_clicks_purge(). Der AUFRUF gehoert in den
+--     Cron-Endpunkt (siehe dort) und ist wie bei B3/K4 eine
+--     Freigabebedingung, keine Zeile SQL.
+-- K8 (MITTEL) `product_id` VERLOR SEINEN BEZUG PER SET NULL, waehrend
+--     `order_id` mit ausfuehrlicher Begruendung `no action` traegt -- und der
+--     eingefrorene Rechenweg die Produktidentitaet nicht mitfuehrt. Nach dem
+--     Loeschen eines Produkts stand in der Geldzeile kein Hinweis mehr
+--     darauf, WOFUER die Provision entstand. Korrektur: derselbe
+--     Fremdschluessel-Typ wie bei order_id (Abschnitt 2.1). Preis und Folge
+--     stehen dort.
+-- K9 (MITTEL) DIE BRUECKEN-INDIZES PASSTEN NICHT ZUR EINZIGEN ABFRAGE OHNE
+--     tenant_id. Die Mandantenaufloesung sucht ueber stripe_invoice_id ohne
+--     jeden weiteren Filter (process.ts) -- ein Index mit fuehrendem
+--     tenant_id kann das nicht bedienen, und fuer stripe_charge_id gab es
+--     ueberhaupt keinen Index. Korrektur: zwei zusaetzliche partielle Indizes
+--     in Abschnitt 2.2.
+-- K10a (NIEDRIG) DER KONFLIKTZWEIG LAS DIE BESTEHENDE ZEILE ALLEIN UEBER DEN
+--     SCHLUESSEL, ohne zu pruefen, ob es dieselbe wirtschaftliche Tatsache
+--     ist. Ein kollidierender Schluessel wurde damit zur stillen
+--     Nichtbuchung, und Geschwisterzeilen haengten sich ueber `v_refs` an
+--     einen fremden Elternteil. Korrektur in Abschnitt 4.
+-- K11 (NIEDRIG) `note` WAR IM UPDATE-ZWEIG FREI -- auch fuer 'manual' und
+--     'reversal', wo der CHECK ihn verlangt, weil er DER BELEG ist, und auch
+--     fuer den G14-Vermerk, den der Guard selbst schreibt. Korrektur im
+--     UPDATE-Zweig (Abschnitt 2.3).
+-- K12 (NIEDRIG) `condition_snapshot` WAR DIE EINZIGE FORMFREIE STRUKTUR IM
+--     SPALTEN-GRANT. A3 geht acht Spalten einzeln durch und liess die offene
+--     stehen; ein Feature-Commit, der dort 'customer_name' ergaenzt, oeffnet
+--     ohne Migration genau das, was A3 ausschliesst. Korrektur: die Spalte
+--     steht nicht mehr im Grant (Abschnitt 2.5).
+-- K13 (NIEDRIG) VIER STELLEN STUETZTEN SICH AUF EINEN "REFERRAL-LOESCHLAUF
+--     AUS B3", DEN ES NICHT GIBT. Kein Fehler im SQL, aber eine falsche
+--     Tatsache in der Freigabegrundlage. Korrektur: A2 und die drei
+--     Guard-Kommentare berichtigt.
+
+-- =================================================================
 -- DIE AUSNAHME VON DER UNVERAENDERLICHKEIT, UND WARUM SIE SICHER IST
 -- =================================================================
 -- G4 sagt: eine Provisionszeile ist unveraenderlich, auch fuer `service_role`,
@@ -203,6 +307,10 @@
 -- Gruppe von Spalten bleibt aenderbar, weil sie den BELEG nicht beruehrt,
 -- sondern seinen LEBENSLAUF: status, cancel_reason, payout_id, paid_at,
 -- flagged, flag_reason, note, updated_at.
+-- EINGESCHRAENKT (K11): `note` gehoert nicht durchweg zum Lebenslauf. Fuer
+-- 'manual' und 'reversal' verlangt ihn der CHECK, dort ist er Teil des BELEGS
+-- und einmal gesetzt unveraenderlich; dasselbe gilt fuer den G14-Vermerk, den
+-- der Guard selbst schreibt. Aenderbar bleibt er nur fuer die uebrigen Arten.
 --
 -- Warum das sicher ist -- drei Eigenschaften, und jede einzelne wird vom Guard
 -- durchgesetzt, nicht nur behauptet:
@@ -236,16 +344,29 @@
 -- Rolle; fuer `service_role` (auth.uid() ist null) greift sie nicht, und das
 -- ist richtig: der Cron ist kein Mensch mit Interessenkonflikt.
 --
--- WAS BEWUSST FEHLT: kein `before delete`-Trigger und keine `rule`. Eine Rule
--- griffe beim Kaskadenloeschen eines Mandanten still und hinterliesse
--- Geldzeilen mit einer tenant_id auf einen geloeschten Mandanten; ein
--- werfender DELETE-Trigger blockierte die Mandantenloeschung ganz. Der Schutz
--- ist `revoke all` plus das Fehlen jeder DELETE-Policy -- ein Client kommt
--- nie durch, `service_role` und die Kaskade kommen durch (Plan 3.11
--- woertlich). Wer spaeter eine Datenkorrektur per Migration braucht, muss den
--- Guard bewusst abschalten (`alter table ... disable trigger
--- affiliate_commissions_guard_trg`) -- das ist keine Luecke, sondern die
--- verlangte Huerde.
+-- WAS BEWUSST FEHLT: keine `rule`. Eine Rule griffe beim Kaskadenloeschen
+-- eines Mandanten still und hinterliesse Geldzeilen mit einer tenant_id auf
+-- einen geloeschten Mandanten.
+--
+-- WAS NACHGETRAGEN IST (K1): einen `before delete`-Guard gibt es sehr wohl,
+-- siehe Abschnitt 2.7. Die frueheren zwei Saetze an dieser Stelle trugen
+-- nicht. Der erste argumentierte gegen eine `rule` -- eine Rule ist kein
+-- Trigger. Der zweite behauptete, ein werfender DELETE-Trigger blockierte die
+-- Mandantenloeschung ganz; genau dieses Problem loesen VIER
+-- Geschwistertabellen mit `pg_trigger_depth() > 1`, darunter
+-- affiliate_subscription_bindings in Abschnitt 3 DIESER Datei,
+-- affiliate_audit_log (20260910120000) sowie affiliate_clicks und
+-- affiliate_referrals (20260911120000). Ohne den Guard war das Provisionsbuch
+-- die EINZIGE Tabelle der Familie, die derselbe Serverbetrieb mit einem
+-- falschen Filter leeren konnte -- ausgerechnet die mit zehnjaehriger
+-- Aufbewahrungsfrist, und als einzige ohne Quelle, aus der sie neu berechnet
+-- werden koennte. G4 ("unveraenderlich, auch fuer service_role") war damit
+-- halb umgesetzt: umschreiben ging nicht, wegwerfen schon.
+-- Wer eine Datenkorrektur per Migration braucht, faehrt als `postgres` und
+-- kommt sowohl am DELETE-Guard als auch -- nach bewusstem `alter table ...
+-- disable trigger affiliate_commissions_guard_trg` -- am Schreib-Guard
+-- vorbei. Die verlangte Huerde bleibt also erhalten, ohne dass der
+-- Serverbetrieb sie ebenfalls haette.
 --
 -- =================================================================
 -- ZUM MITLESEN (Plan G17, woertlich)
@@ -268,10 +389,11 @@
 --       Abfrage mit Session-Client MUSS ihre Spalten benennen. Nicht
 --       enthalten und daher fuer `authenticated` ueberhaupt nicht lesbar:
 --       order_id, stripe_invoice_id, stripe_subscription_id, stripe_charge_id,
---       dedup_key, note, flag_reason. Die Admin-Oberflaeche (B6) und der
---       Partnerbereich (B7) laden diese Spalten ueber eine Server-Route mit
---       vorgelagerter Rollenpruefung und createAdminClient() -- und liefern je
---       Rolle unterschiedlich viel aus. Dieselbe Falle wie bei
+--       dedup_key, note, flag_reason -- und seit K12 condition_snapshot.
+--       Die Admin-Oberflaeche (B6) und der Partnerbereich (B7) laden diese
+--       Spalten ueber eine Server-Route mit vorgelagerter Rollenpruefung und
+--       createAdminClient() -- und liefern je Rolle unterschiedlich viel aus.
+--       Dieselbe Falle wie bei
 --       affiliate_partners/-billing_profiles/-conditions (B1) und
 --       affiliate_clicks/-referrals (B3).
 --   (2) Gebucht wird AUSSCHLIESSLICH ueber book_affiliate_commissions(jsonb)
@@ -279,7 +401,22 @@
 --       der Rechte, sondern der Atomaritaet: eine Bestellung erzeugt bis zu
 --       drei Zeilen (sale, reserve, tier2), und eine halb gebuchte Bestellung
 --       ist ein Geldfehler, den niemand mehr sieht. Die RPC schreibt alle
---       Zeilen in EINER Transaktion oder keine.
+--       Zeilen EINES AUFRUFS in EINER Transaktion oder keine.
+--       BERICHTIGT (K6): "alle Zeilen EINES AUFRUFS" -- nicht "alle Zeilen
+--       einer Bestellung". Die ZWEITSTUFE ist heute ein zweiter Aufruf mit
+--       eigenem lock_key (process.ts: `tier2:<parent_id>`), weil ihr
+--       dedup_key an der erst beim Insert erzeugten uuid der sale-Zeile
+--       haengt und sie deshalb strukturell nicht in denselben Stapel passt --
+--       der ref/parent_ref-Mechanismus aus Abschnitt 4 wird fuer sie also
+--       NICHT benutzt. Die tragende Gruppe (sale + reserve bzw. recurring +
+--       recurring_reserve) bleibt atomar. Folge, die vor dem ERSTEN Livelauf
+--       zu entscheiden ist: soll der Schluessel der Zweitstufe von der uuid
+--       geloest werden ('tier2:order:<order_id>' bzw.
+--       'tier2:invoice:<stripe_invoice_id>'), damit die Zeile in denselben
+--       Stapel passt? Danach ist er nicht mehr aenderbar, weil dedup_key die
+--       einzige Idempotenzachse ist. Solange er bleibt, gilt als Betriebs-
+--       bedingung: ein Ereignis darf erst NACH der tier2-Buchung auf 'done'
+--       gehen (PHASENSTATUS.md, Risiken).
 --   (3) Der Freigabelauf ist approve_due_affiliate_commissions(int)
 --       (Abschnitt 5) und gehoert als Schritt 2 in den Verarbeiter
 --       (Plan 6.5). Er gibt die freigegebenen Zeilen zurueck, damit der
@@ -298,6 +435,21 @@
 --   (6) Der Abo-Zaehler wird NIE gelesen-und-dann-geschrieben. Das bedingte
 --       Statement aus Plan 3.9 ist die einzige erlaubte Form; der Guard
 --       erzwingt zusaetzlich, dass periods_booked nur steigen kann.
+--       K5: weil er nur steigen kann, gehoert der Anspruch in DIESELBE
+--       Transaktion wie die Buchung -- sonst verbrennt jede fehlgeschlagene
+--       Buchung eine Periode. book_affiliate_commissions() nimmt dafuer den
+--       optionalen Schluessel `claim_subscription_id` (Abschnitt 4).
+--       AUSSTEHEND: der Verarbeiter muss ihn mitgeben und
+--       claimSubscriptionPeriod() als eigenen Aufruf streichen.
+--   (7) K7: `affiliate_events_purge(int, int)` (Abschnitt 1.1) braucht einen
+--       Aufrufer, sonst ist die Frist wieder nur ein Kommentar -- derselbe
+--       Fund wie K4 in B3. Die Stelle ist runDataRetention() in
+--       src/lib/affiliate/process.ts, neben affiliate_clicks_purge, mit
+--       `p_retention_days: 90` und `p_limit: AFFILIATE_PURGE_LIMIT`. Der
+--       Rueckgabewert gehoert in `cleanup` des Lauf-Ergebnisses; das zieht
+--       die Erwartung in src/lib/affiliate/process.test.ts mit
+--       (`expect(result.cleanup).toEqual(...)`). FREIGABEBEDINGUNG, keine
+--       Zeile SQL.
 --
 -- =================================================================
 -- DIESE MIGRATION IST NICHT ANGEWENDET
@@ -313,8 +465,11 @@
 -- ERWARTUNG FUER DIESEN LAUF, damit niemand sie fuer eine Regression haelt:
 --   * KEIN neuer Treffer der Klassen
 --     `anon_security_definer_function_executable` und
---     `authenticated_security_definer_function_executable`: diese Datei legt
---     KEINE einzige SECURITY-DEFINER-Funktion an.
+--     `authenticated_security_definer_function_executable`. Seit K7 legt
+--     diese Datei GENAU EINE `security definer`-Funktion an
+--     (affiliate_events_purge, Abschnitt 1.1) -- beide Lints pruefen
+--     ausschliesslich `anon` und `authenticated`, und beiden ist das
+--     EXECUTE-Recht darauf ausdruecklich entzogen (Abschnitt 6).
 --   * KEIN neuer `rls_enabled_no_policy`: affiliate_commissions und
 --     affiliate_subscription_bindings bekommen eine echte SELECT-Policy,
 --     affiliate_events die ausdrueckliche Deny-Policy.
@@ -488,6 +643,80 @@ create policy affiliate_events_deny_all on public.affiliate_events
   for all to anon, authenticated using (false) with check (false);
 
 
+-- --- 1.1 Aufbewahrung (K7) ---------------------------------------------
+-- Die Outbox hatte kein Loeschkonzept -- die Datei sagte das selbst ("eine
+-- Tabelle, die kein Loeschkonzept hat") und zog daraus keine Folge. Dauerhaft
+-- gespeichert werden hier: `referral_token` (Inhaber-Geheimnis, Plan 11.13),
+-- `payload` mit Stripe-Rohfeldern, drei Stripe-Kennungen als Kaeuferbezug und
+-- `last_error` als Freitext. Und weil `tenant_id` fuer charge.refunded und die
+-- drei Dispute-Ereignisse AUSDRUECKLICH nullable ist, haengen genau diese
+-- Zeilen an keinem Mandanten: sie ueberleben `delete from tenants`
+-- vollstaendig und werden von einem Datenexport je Mandant (Phase 4) nicht
+-- gefunden. Art. 5 Abs. 1 lit. e DSGVO ist keine Empfehlung.
+--
+-- Gleiche Bauart wie affiliate_clicks_purge() (20260911120000): gedeckelter
+-- Stapel, `for update skip locked`, Unter- und Obergrenze fuer beide
+-- Parameter. `security definer` hier NICHT wegen eines Loesch-Guards -- den
+-- hat diese Tabelle nicht --, sondern wegen der zweiten Anweisung: der
+-- UPDATE-Zweig von affiliate_events_guard() nagelt `payload` fest, und eine
+-- Redaktion aus `service_role` heraus liefe still ins Leere. Als Eigentuemer
+-- 'postgres' faellt der Rumpf in die Erlaubnisliste des Guards.
+--
+-- 'error'-Zeilen bleiben SICHTBAR liegen -- das ist der Zweck der Outbox --,
+-- verlieren nach derselben Frist aber Geheimnis und Rohfelder.
+create or replace function public.affiliate_events_purge(
+  p_retention_days int default 90,
+  p_limit          int default 5000
+)
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_deleted int;
+begin
+  -- Untergrenze wie bei affiliate_clicks_purge(): ohne sie waere
+  -- `p_retention_days => 0` ein Ein-Parameter-Weg, die gesamte Aufnahme zu
+  -- loeschen. Obergrenze, damit ein Vertipper die Frist nicht stillschweigend
+  -- ausfallen laesst.
+  if p_retention_days is null or p_retention_days < 30 or p_retention_days > 3650 then
+    raise exception 'affiliate_events_purge_invalid_retention';
+  end if;
+  if p_limit is null or p_limit < 1 or p_limit > 50000 then
+    raise exception 'affiliate_events_purge_invalid_limit';
+  end if;
+
+  -- Nur ABGESCHLOSSENE Zeilen. Eine wartende ('pending') Zeile ist Arbeit,
+  -- eine fehlerhafte ('error') ist ein Befund -- beide bleiben stehen.
+  with doomed as (
+    select e.id
+      from public.affiliate_events e
+     where e.status in ('done','skipped')
+       and e.processed_at is not null
+       and e.processed_at < now() - make_interval(days => p_retention_days)
+     order by e.processed_at
+     limit p_limit
+     for update skip locked
+  )
+  delete from public.affiliate_events t
+  using doomed d
+  where t.id = d.id;
+  get diagnostics v_deleted = row_count;
+
+  update public.affiliate_events e
+     set referral_token = null,
+         payload        = '{}'::jsonb
+   where e.status = 'error'
+     and e.created_at < now() - make_interval(days => p_retention_days)
+     and (e.referral_token is not null or e.payload <> '{}'::jsonb);
+
+  return v_deleted;
+end;
+$$;
+
+
 -- =================================================================
 -- 2. affiliate_commissions (Plan 3.11) -- das Provisionsbuch
 -- =================================================================
@@ -569,7 +798,11 @@ create table public.affiliate_commissions (
 
   check (kind <> 'manual'   or note is not null),
   check (kind <> 'reversal' or (reverses_id is not null and amount_cents < 0 and note is not null)),
-  check (kind <> 'recredit' or (reverses_id is not null and amount_cents > 0)),
+  -- K2: `note` jetzt auch fuer 'recredit' Pflicht -- parallel zu 'reversal'
+  -- und 'manual'. Eine Wiedergutschrift ist eine POSITIVE Geldzeile ohne
+  -- Verkauf dahinter; ohne Begruendung ist sie im Streitfall nicht
+  -- erklaerbar. Der heutige Pfad (reversal.ts) setzt sie bereits.
+  check (kind <> 'recredit' or (reverses_id is not null and amount_cents > 0 and note is not null)),
   check (kind not in ('tier2','reserve','recurring_reserve') or parent_id is not null),
   -- A4: ein negativer Betrag ist eine Gegenbuchung oder eine Handkorrektur.
   -- Eine 'sale'-Zeile mit negativem Betrag waere ein Rechenfehler, der sich
@@ -610,12 +843,28 @@ create table public.affiliate_commissions (
   constraint affiliate_commissions_reverses_fk
     foreign key (reverses_id, tenant_id) references public.affiliate_commissions (id, tenant_id)
     on delete no action deferrable initially deferred,
-  -- A2: MIT Spaltenliste. Ohne sie nullt Postgres beim zusammengesetzten
-  -- SET NULL auch `tenant_id` (not null) und das Loeschen eines Produkts bzw.
-  -- der Referral-Loeschlauf braeche mit 23502 ab.
+  -- K8: `product_id` traegt jetzt DIESELBE Entscheidung wie `order_id` --
+  -- vorher `on delete set null (product_id)`. Der Grund ist derselbe und war
+  -- fuer das Produkt nur nie ausgesprochen: `condition_snapshot` friert
+  -- Saetze, Fristen und Deckel ein, aber KEINE Produktidentitaet, und
+  -- `orders.product_id` ist per `on delete set null` ebenfalls genullt. Nach
+  -- dem Loeschen eines Produkts stuende in der Geldzeile kein Hinweis mehr
+  -- darauf, WOFUER die Provision entstand -- gegen den eigenen Anspruch an
+  -- die Belegspalten (2.1: zehn Jahre nachrechenbar).
+  -- PREIS, ausgesprochen: sobald eine Provisionszeile auf ein Produkt zeigt,
+  -- scheitert dessen Loeschung am COMMIT mit 23503 (products_staff_delete
+  -- erreicht damit nichts mehr). Das ist gewollt und dieselbe Huerde wie bei
+  -- affiliate_partners in B1: die Zeile bleibt stehen und wird im
+  -- Loeschfall anonymisiert (Plan 7.8), nicht kaskadierend weggeraeumt. Die
+  -- Oberflaeche muss "archivieren" anbieten, wo sie heute "loeschen" anbietet.
   constraint affiliate_commissions_product_fk
     foreign key (product_id, tenant_id) references public.products (id, tenant_id)
-    on delete set null (product_id),
+    on delete no action deferrable initially deferred,
+  -- A2: MIT Spaltenliste. Ohne sie nullt Postgres beim zusammengesetzten
+  -- SET NULL auch `tenant_id` (not null), und das Loeschen der Elternzeile
+  -- braeche mit 23502 ab. Zum Anlass siehe A2 im Kopf (K13): einen
+  -- Referral-Loeschlauf gibt es heute nicht, die Spaltenliste traegt den Fall,
+  -- dass B7 oder Phase 4 ihn nachreicht.
   constraint affiliate_commissions_referral_fk
     foreign key (referral_id, tenant_id) references public.affiliate_referrals (id, tenant_id)
     on delete set null (referral_id)
@@ -640,12 +889,31 @@ create index affiliate_commissions_referral_idx on public.affiliate_commissions 
 -- A5: fehlt im Plan, traegt aber den Fremdschluessel auf affiliate_programs
 -- (Advisor `unindexed_foreign_keys`).
 create index affiliate_commissions_program_idx  on public.affiliate_commissions (program_id, tenant_id);
--- Die beiden Bruecken des Verarbeiters: von einer Rechnung bzw. einem Abo
--- zurueck ins Buch.
+-- Die Bruecken des Verarbeiters zurueck ins Buch. K9: es sind VIER Abfragen,
+-- nicht zwei -- und sie brauchen verschiedene Indizes, weil zwei von ihnen
+-- die tenant_id gar nicht haben.
+-- (a) MIT tenant_id: der Storno-Pfad liest die stornierbaren Zeilen eines
+--     Vorgangs (reversal.ts).
 create index affiliate_commissions_sub_idx on public.affiliate_commissions
   (tenant_id, stripe_subscription_id) where stripe_subscription_id is not null;
 create index affiliate_commissions_invoice_idx on public.affiliate_commissions
   (tenant_id, stripe_invoice_id) where stripe_invoice_id is not null;
+-- (b) OHNE tenant_id: die MANDANTENAUFLOESUNG. Fuer charge.refunded und die
+--     drei Dispute-Ereignisse ist affiliate_events.tenant_id null (siehe
+--     Abschnitt 1), der Verarbeiter sucht den Mandanten also gerade erst --
+--     `select tenant_id ... where stripe_invoice_id = ...` ohne jeden
+--     weiteren Filter. Ein Index mit fuehrendem tenant_id kann das nicht
+--     bedienen (es gibt kein Index-Suffix), die Abfrage liefe als
+--     Sequential Scan ueber das Provisionsbuch ALLER Mandanten -- in einer
+--     Tabelle, die nie geloescht wird und monoton waechst, unter dem
+--     CPU-Deckel eines Cloudflare-Workers. Der Performance-Advisor meldet das
+--     nicht: der Index existiert ja, er passt nur nicht.
+create index affiliate_commissions_invoice_lookup_idx on public.affiliate_commissions
+  (stripe_invoice_id) where stripe_invoice_id is not null;
+-- Der Charge ist die zweite Bruecke von einer Erstattung ins Buch und hatte
+-- auf dieser Tabelle ueberhaupt keinen Index (nur affiliate_events hat einen).
+create index affiliate_commissions_charge_idx on public.affiliate_commissions
+  (stripe_charge_id) where stripe_charge_id is not null;
 -- Traegt zugleich den Fremdschluessel auf tenants (Kaskade).
 create index affiliate_commissions_tenant_created_idx
   on public.affiliate_commissions (tenant_id, created_at desc);
@@ -668,6 +936,10 @@ declare
   v_books_closed_until date;
   v_target_booked_at   date;
   v_self_partner_id    uuid;
+  -- K2: die Bezugszeile einer Gegenbuchung bzw. Wiedergutschrift und der
+  -- bereits gegengebuchte NETTO-Stand zu ihr.
+  v_ref                public.affiliate_commissions%rowtype;
+  v_already            int;
 begin
   -- ---------------- INSERT --------------------------------------------------
   -- GANZ VORN, weil OLD beim INSERT nicht zugewiesen ist und jeder `old.`-
@@ -722,14 +994,144 @@ begin
       new.booked_at := v_target_booked_at;
     end if;
 
+    -- K2/K4a: DER UEBERSTORNIERUNGS-DECKEL, an der Stelle, an der ALLE drei
+    -- Schreibwege vorbeikommen -- mit derselben Begruendung wie A6. Er stand
+    -- vorher allein in book_affiliate_reversals() (20260911140000);
+    -- book_affiliate_commissions() nahm 'reversal' und 'recredit' mit
+    -- beliebigem Betrag entgegen, pruefte weder die Summe gegen die
+    -- Ursprungszeile noch die Art der Bezugszeile und sperrte nichts -- und
+    -- genau dieser Weg ist der heutige Wiedergutschriftspfad (reversal.ts).
+    -- Eine Regel, die in der Datenbank steht, aber nur in einem von drei
+    -- Pfaden greift, ist keine Regel.
+    --
+    -- `new.reverses_id is not null` ist Vorbedingung, keine Pruefung: fehlt
+    -- der Verweis, meldet ihn der CHECK der Tabelle (23514) praeziser.
+    if new.kind in ('reversal','recredit') and new.reverses_id is not null then
+      -- `for no key update` sperrt die Bezugszeile. Damit serialisieren
+      -- Gegenbuchung und Wiedergutschrift auch dann, wenn sie unter
+      -- verschiedenen `lock_key` und aus verschiedenen Funktionen laufen
+      -- (K4a) -- book_affiliate_reversals() sperrt genau diese Zeile.
+      select * into v_ref
+        from public.affiliate_commissions r0
+       where r0.id = new.reverses_id and r0.tenant_id = new.tenant_id
+       for no key update;
+      if not found then
+        -- Der zusammengesetzte Fremdschluessel faenge das ebenfalls, aber
+        -- erst am COMMIT (A1) und ohne Kennung fuer `last_error`.
+        raise exception 'affiliate_commission_reverses_tenant_mismatch';
+      end if;
+
+      if new.kind = 'reversal' then
+        -- Erlaubnisliste der stornierbaren Arten (Plan 5.8), wortgleich zu
+        -- book_affiliate_reversals(). Ohne sie waere eine Gegenbuchung auf
+        -- eine Gegenbuchung schreibbar -- eine Wiedergutschrift, die nicht
+        -- so heisst und in keinem Deckel steht.
+        if v_ref.kind not in ('sale','reserve','recurring','recurring_reserve','tier2') then
+          raise exception 'affiliate_commission_reversal_parent_kind_invalid';
+        end if;
+
+        -- Der NETTO-Stand, Zeichen fuer Zeichen dieselbe Rechnung wie in
+        -- book_affiliate_reversals(): die Gegenbuchungen zu dieser Zeile
+        -- minus die Wiedergutschriften zu eben diesen Gegenbuchungen. Wer
+        -- hier nur die Gegenbuchungen zaehlte, sperrte nach einem gewonnenen
+        -- Streitfall die spaetere echte Erstattung AUS (100 zurueckgenommen,
+        -- 100 wiedergutgeschrieben, netto 0 -- eine Vollerstattung muss
+        -- danach wieder bis 100 gehen duerfen). Das ist die Gegenprobe zu
+        -- dieser Korrektur: sie darf niemanden aussperren, der heute
+        -- rechtmaessig bucht.
+        -- `status <> 'cancelled'` in BEIDEN Zweigen (K3): eine stornierte
+        -- Zeile zaehlt in keinem Saldo (6.1) -- auch nicht in dem, gegen den
+        -- hier gerechnet wird.
+        -- BEWUSST NICHT auf 0 angehoben: ein negativer Netto-Stand (mehr
+        -- Wiedergutschrift als Gegenbuchung, nur ueber eine Handbuchung
+        -- erreichbar) darf den Deckel nicht kuenstlich senken.
+        select coalesce(sum(-x.amount_cents), 0)::int into v_already
+          from (
+            select r.amount_cents
+              from public.affiliate_commissions r
+             where r.tenant_id   = new.tenant_id
+               and r.kind        = 'reversal'
+               and r.status     <> 'cancelled'
+               and r.reverses_id = v_ref.id
+            union all
+            select c.amount_cents
+              from public.affiliate_commissions c
+              join public.affiliate_commissions r2
+                on r2.id = c.reverses_id and r2.tenant_id = c.tenant_id
+             where c.tenant_id    = new.tenant_id
+               and c.kind         = 'recredit'
+               and c.status      <> 'cancelled'
+               and r2.kind        = 'reversal'
+               and r2.status     <> 'cancelled'
+               and r2.reverses_id = v_ref.id
+          ) x;
+
+        -- `new.amount_cents` ist negativ (CHECK der Tabelle), `-new.amount_cents`
+        -- also der zurueckgenommene Betrag. Mehr als die Ursprungszeile
+        -- hergibt, geht nicht -- egal was der Aufrufer gerechnet hat.
+        if v_already + (-new.amount_cents) > v_ref.amount_cents then
+          raise exception 'affiliate_commission_over_reversal';
+        end if;
+      else
+        -- 'recredit'. Ohne diese Pruefung duerfte eine Wiedergutschrift auf
+        -- JEDE Zeile zeigen, auch auf eine 'sale'-Zeile: eine positive
+        -- Provision aus dem Nichts, nur mit gesetztem reverses_id.
+        if v_ref.kind <> 'reversal' then
+          raise exception 'affiliate_commission_recredit_parent_not_reversal';
+        end if;
+        -- Eine stornierte Gegenbuchung zaehlt in keinem Saldo (6.1); sie
+        -- wiedergutzuschreiben hiesse, Geld ohne Gegenstueck zu buchen. Der
+        -- heutige Pfad kann das nicht ausloesen -- reversal.ts uebergeht
+        -- stornierte Gegenbuchungen --, B6 koennte es.
+        if v_ref.status = 'cancelled' then
+          raise exception 'affiliate_commission_recredit_parent_cancelled';
+        end if;
+        -- K4a: zusaetzlich die URSPRUNGSZEILE sperren. Gegen sie rechnet
+        -- book_affiliate_reversals() (dort `for no key update` auf denselben
+        -- Satz Zeilen); ohne diese Zeile rechnet ein gleichzeitiger
+        -- Storno-Lauf an der noch nicht sichtbaren Wiedergutschrift vorbei
+        -- und laesst Provision beim Partner stehen, die zurueckgenommen
+        -- gehoerte. Reihenfolge Gegenbuchung -> Ursprungszeile; der
+        -- Storno-Lauf nimmt nur die Ursprungszeile, ein Zyklus entsteht also
+        -- nicht.
+        perform 1 from public.affiliate_commissions s0
+         where s0.id = v_ref.reverses_id and s0.tenant_id = new.tenant_id
+         for no key update;
+
+        select coalesce(sum(x.amount_cents), 0)::int into v_already
+          from public.affiliate_commissions x
+         where x.tenant_id   = new.tenant_id
+           and x.kind        = 'recredit'
+           and x.status     <> 'cancelled'
+           and x.reverses_id = v_ref.id;
+
+        -- `-v_ref.amount_cents` ist der Betrag der Gegenbuchung, positiv
+        -- gelesen: mehr, als sie hergegeben hat, kann nicht zurueckkommen.
+        if v_already + new.amount_cents > -v_ref.amount_cents then
+          raise exception 'affiliate_commission_over_recredit';
+        end if;
+      end if;
+    end if;
+
     return new;
   end if;
 
   -- ---------------- UPDATE --------------------------------------------------
   -- KASKADEN-AUSWEG, eng gefasst und VOR jeder anderen Pruefung. Zwei fremde
   -- Loeschungen schlagen als UPDATE hier auf:
-  --   * `products`-Loeschung            -> product_id  per SET NULL auf null;
-  --   * der Referral-Loeschlauf (B3)    -> referral_id per SET NULL auf null.
+  --   * der Referral-Loeschlauf         -> referral_id per SET NULL auf null.
+  -- K13: einen solchen Lauf gibt es HEUTE NICHT -- B3 hat ihn bewusst nicht
+  -- gebaut ("eine Referral-Zeile ist der Beleg, warum eine Provision
+  -- entstanden ist"), und die Partnerloeschung ist seit
+  -- 20260911120000:1664-1669 gesperrt; affiliate_referrals-Zeilen
+  -- verschwinden nur ueber die Mandantenkaskade. Der Zweig steht als
+  -- Tiefenverteidigung fuer den Fall, dass B7 oder das DSGVO-Paket der
+  -- Phase 4 ihn nachreicht (der Verarbeiter ruft bereits ein noch nicht
+  -- vorhandenes affiliate_referrals_purge()). K8: die `products`-Loeschung
+  -- steht hier nicht mehr -- product_id ist seit K8 `no action`, es gibt
+  -- also kein SET NULL mehr, das durchgelassen werden muesste. Die
+  -- Bedingungen auf product_id bleiben trotzdem stehen: sie schaden nicht
+  -- und fangen einen kuenftigen Wechsel zurueck.
   -- Ohne diesen Zweig wuerde die Festnagelung darunter den Wert stillschweigend
   -- auf `old` zuruecksetzen -- das UPDATE liefe durch, die Referenz bliebe
   -- stehen, und die Tabelle zeigte auf eine geloeschte Zeile. Bei SET NULL
@@ -855,10 +1257,35 @@ begin
     new.paid_at := old.paid_at;
   end if;
 
+  -- K11: `note` ist fuer 'manual' und 'reversal' KEIN Lebenslauf, sondern der
+  -- BELEG -- der CHECK der Tabelle verlangt ihn dort, und bei einer
+  -- Handbuchung ist er die einzige Begruendung, die es ueberhaupt gibt. Der
+  -- Guard verhinderte bisher nur das Nullen (das faengt der CHECK mit 23514),
+  -- nicht das ERSETZEN: Betrag, Satz und Basis waren festgenagelt, die
+  -- Begruendung -- also das einzige, worum im Streitfall gestritten wird --
+  -- nicht. Einmal gesetzt, bleibt sie; ein zusaetzlicher Vermerk gehoert in
+  -- eine neue Zeile oder in affiliate_audit_log, nicht in eine Umschrift.
+  --
+  -- WARUM HIER UND NICHT WEITER OBEN: die G15-Pruefung vergleicht `new.note`
+  -- mit `old.note`. Stuende die Festnagelung vor ihr, liefe der Versuch eines
+  -- Partners, seine eigene Notiz zu aendern, STILL ins Leere statt laut
+  -- abzubrechen. Erst festnageln, nachdem G15 gesprochen hat.
+  if old.kind in ('manual','reversal') and old.note is not null then
+    new.note := old.note;
+  end if;
+  -- Auch der G14-Vermerk aus dem INSERT-Zweig ist Beleg: er erklaert, warum
+  -- `booked_at` nicht dem Ereignisdatum entspricht. Die Datenbank schriebe
+  -- ihn sonst selbst und liesse zugleich zu, dass er verschwindet.
+  if old.note is not null and old.note like '%Nachbuchung: Abrechnungszeitraum%' then
+    new.note := old.note;
+  end if;
+
   -- Aenderbar bleiben damit genau: status (entlang der Kanten oben),
   -- cancel_reason (einmalig), payout_id (nur auf 'approved'), paid_at (von der
-  -- Datenbank gesetzt), flagged, flag_reason, note und updated_at (vom
-  -- Touch-Trigger). Begruendung im Kopf dieser Datei.
+  -- Datenbank gesetzt), flagged, flag_reason, updated_at (vom Touch-Trigger)
+  -- und `note` -- letzteres nur noch fuer die uebrigen Buchungsarten und nur,
+  -- solange kein G14-Vermerk darin steht (K11). Begruendung im Kopf dieser
+  -- Datei.
   return new;
 end;
 $$;
@@ -888,17 +1315,28 @@ revoke all on public.affiliate_commissions from anon, authenticated;
 --   order_id, stripe_invoice_id, stripe_subscription_id, stripe_charge_id,
 --   dedup_key  -- Kaeuferbezug (Plan 11.15);
 --   note, flag_reason -- Managertexte ("Verdacht auf Eigenbestellungen"),
---   Vorbild payout_hold_reason an affiliate_partners (B1).
+--   Vorbild payout_hold_reason an affiliate_partners (B1);
+--   condition_snapshot -- formfreies jsonb, siehe K12 unten.
 -- WICHTIG: Spaltenrechte sind NICHT rollenabhaengig. Diese Liste ist damit die
 -- SCHNITTMENGE aus dem, was Partner UND Manager ueber PostgREST sehen duerfen.
 -- Der Manager bekommt die fehlenden Spalten ueber eine Server-Route mit
 -- requireAdminTenant() und createAdminClient(); der Partner bekommt `note`
 -- ueber die Partner-Route, die sie fuer seine eigenen Zeilen ausliefert.
 -- Folge fuer den Anwendungscode: `select('*')` bricht hier mit 42501 ab.
+-- K12: `condition_snapshot` steht NICHT mehr im Grant. Sie war die einzige
+-- formfreie Struktur der Tabelle -- `jsonb` ohne CHECK, ungeprueft aus der
+-- Nutzlast uebernommen -- und damit die eine Tuer, die A3 offen gelassen
+-- hatte, nachdem es acht Spalten einzeln geprueft hat. Heute steht dort nur
+-- der Rechenweg (AffiliateConditionSnapshot: Saetze, Fristen, Deckel), aber
+-- das ist eine Zusage des Anwendungscodes und keine der Datenbank: wer in B6
+-- oder B7 fuer eine Oberflaeche 'customer_name' oder 'invoice_number'
+-- ergaenzt, oeffnet mit einem Feature-Commit ohne Migration genau das, was A3
+-- verhindern soll. Der Partnerbereich (B7) liefert den Schnappschuss ueber
+-- dieselbe Server-Route aus, die fuer `note` ohnehin gebaut werden muss.
 grant select (id, tenant_id, program_id, partner_id, kind,
               product_id, campaign, referral_id, parent_id, reverses_id,
               base_cents, basis_kind, rate_kind, rate_bp, fixed_cents,
-              amount_cents, currency, condition_id, condition_snapshot,
+              amount_cents, currency, condition_id,
               status, cancel_reason, hold_until, booked_at,
               payout_id, paid_at, flagged, is_test, created_at, updated_at)
   on public.affiliate_commissions to authenticated;
@@ -922,6 +1360,48 @@ create policy affiliate_commissions_select on public.affiliate_commissions for s
 -- ist das `revoke all` oben plus das Fehlen jeder Schreib-Policy.
 create policy affiliate_commissions_deny_write on public.affiliate_commissions
   for all to anon, authenticated using (false) with check (false);
+
+
+-- --- 2.7 Der Loesch-Guard (K1, G4) -------------------------------------
+-- G4 sagt "unveraenderlich, auch fuer service_role". Ohne diesen Trigger galt
+-- das nur halb: umschreiben ging nicht, wegwerfen schon. Ein
+-- `admin.from('affiliate_commissions').delete().eq('tenant_id', t)` oder ein
+-- `.lt('created_at', x)` mit einem Filter zu wenig loeschte das Provisionsbuch
+-- eines Mandanten oder eines Zeitraums restlos -- und nichts hielt das an:
+-- RLS gilt fuer `service_role` wegen `rolbypassrls` nicht, eine DELETE-Policy
+-- gibt es nicht (sie wuerde auch nichts nuetzen), und das DELETE-Recht kommt
+-- aus `alter default privileges`. Was verschwaende, waeren die Belege, aus
+-- denen Gutschriften mit zehnjaehriger Aufbewahrungsfrist entstanden sind --
+-- und anders als bei affiliate_clicks gibt es keine Quelle, aus der sie neu
+-- berechnet werden koennten.
+--
+-- Gleiche Bauart wie affiliate_subscription_bindings_guard() weiter unten und
+-- affiliate_audit_log_guard() (20260910120000): Erlaubnisliste plus die
+-- HERKUNFT der Anweisung. `pg_trigger_depth() > 1` ist die Mandantenkaskade
+-- (tenants -> affiliate_commissions, `on delete cascade` in 2.1) -- sie bleibt
+-- offen, dieser Guard blockiert sie NICHT. 'service_role' steht bewusst NICHT
+-- in der Liste: der normale Serverbetrieb loescht keinen Beleg.
+-- OHNE `security definer`, gleiche Begruendung wie beim Schreib-Guard: unter
+-- `security definer` waere `current_user` immer der Eigentuemer und die
+-- Erlaubnisliste damit wirkungslos.
+create or replace function public.affiliate_commissions_delete_guard()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if current_user in ('postgres', 'supabase_admin')
+     or pg_trigger_depth() > 1 then
+    return old;
+  end if;
+  raise exception 'affiliate_commission_immutable';
+end;
+$$;
+
+drop trigger if exists affiliate_commissions_delete_guard_trg on public.affiliate_commissions;
+create trigger affiliate_commissions_delete_guard_trg
+  before delete on public.affiliate_commissions
+  for each row execute function public.affiliate_commissions_delete_guard();
 
 
 -- =================================================================
@@ -977,8 +1457,12 @@ create table public.affiliate_subscription_bindings (
   constraint affiliate_subscription_bindings_origin_fk
     foreign key (origin_commission_id, tenant_id) references public.affiliate_commissions (id, tenant_id)
     on delete no action deferrable initially deferred,
-  -- A2: mit Spaltenliste. Der Referral-Loeschlauf aus B3 raeumt abgelaufene
-  -- Zuordnungen weg; die Bindung ueberlebt das, sie verliert nur den Verweis.
+  -- A2: mit Spaltenliste. Raeumte ein Loeschlauf abgelaufene Zuordnungen weg,
+  -- ueberlebte die Bindung das und verloere nur den Verweis. K13: einen
+  -- solchen Lauf gibt es heute nicht -- B3 hat ihn bewusst nicht gebaut, und
+  -- affiliate_referrals-Zeilen verschwinden nur ueber die Mandantenkaskade.
+  -- Die Spaltenliste bleibt trotzdem: ohne sie nullte Postgres `tenant_id`
+  -- mit (23502), und B7 oder Phase 4 koennen den Lauf nachreichen.
   constraint affiliate_subscription_bindings_referral_fk
     foreign key (referral_id, tenant_id) references public.affiliate_referrals (id, tenant_id)
     on delete set null (referral_id)
@@ -1036,9 +1520,11 @@ begin
     return new;
   end if;
 
-  -- KASKADEN-AUSWEG: der Referral-Loeschlauf nullt `referral_id`. Ohne diesen
-  -- Zweig setzte die Festnagelung darunter den Wert stillschweigend zurueck,
-  -- und die Bindung zeigte auf eine geloeschte Zuordnung.
+  -- KASKADEN-AUSWEG: ein Referral-Loeschlauf nullte `referral_id`. Ohne
+  -- diesen Zweig setzte die Festnagelung darunter den Wert stillschweigend
+  -- zurueck, und die Bindung zeigte auf eine geloeschte Zuordnung. K13: der
+  -- Lauf existiert heute nicht, der Zweig ist Tiefenverteidigung fuer den
+  -- Fall, dass B7 oder Phase 4 ihn nachreicht.
   if pg_trigger_depth() > 1
      and old.referral_id is not null and new.referral_id is null
      and to_jsonb(new) - 'referral_id' = to_jsonb(old) - 'referral_id' then
@@ -1153,6 +1639,9 @@ create policy affiliate_subscription_bindings_deny_write
 --     "tenant_id":  "<uuid>",
 --     "program_id": "<uuid>",
 --     "lock_key":   "order:<uuid>" | "invoice:<id>" | "charge:<id>" | ...,
+--     "claim_subscription_id": "sub_123",   -- optional, K5: der Abo-Anspruch
+--                                           -- in DERSELBEN Transaktion
+--                                           -- (Abschnitt 4, unten begruendet)
 --     "rows": [
 --       { "ref": "sale", "kind": "sale", "partner_id": "<uuid>",
 --         "order_id": "<uuid>", "product_id": "<uuid>", "campaign": "sommer",
@@ -1239,6 +1728,43 @@ begin
     hashtext('affiliate_commissions'),
     hashtext(v_tenant_id::text || '|' || v_lock_key)
   );
+
+  -- K5: DER ABO-ANSPRUCH, OPTIONAL UND IN DERSELBEN TRANSAKTION.
+  -- "Folgen fuer den Anwendungscode" (6) schreibt das bedingte Zaehler-Update
+  -- als einzige erlaubte Form vor, und der Guard aus Abschnitt 3 macht den
+  -- Zaehler unumkehrbar. Solange der Anspruch eine EIGENE Anweisung VOR der
+  -- Buchung ist, sind das zwei Transaktionen -- und scheitert die zweite
+  -- (Verbindungsabbruch, Timeout, CHECK-Verstoss), ist die Periode
+  -- verbraucht, ohne dass eine Zeile entstanden ist. Die Vorpruefung auf den
+  -- dedup_key im Verarbeiter schuetzt nur gegen den Retry nach ERFOLGREICHER
+  -- Buchung; nach einer fehlgeschlagenen findet sie nichts und claimt erneut.
+  -- Am Ende einer Laufzeit ueber zwoelf Raten fehlen dem Partner genau so
+  -- viele Raten, wie es fehlgeschlagene Buchungen gab -- ohne Fehler, ohne
+  -- Eintrag in last_error, gemeldet als `skipped: recurring_exhausted`.
+  -- Hier drin rollt der Zaehler mit zurueck, wenn irgendein Insert des
+  -- Stapels scheitert; der Retry claimt sauber neu. Dasselbe Argument, mit
+  -- dem diese Datei den Stapel sale+reserve zusammenhaelt.
+  -- Das bedingte Update bleibt die einzige Form: Postgres wertet das
+  -- Praedikat nach dem Sperren der Zeile erneut aus, zwei gleichzeitige
+  -- Laeufe koennen denselben Deckel also nicht zweimal unterschreiten.
+  -- OFFEN (Freigabebedingung): der Verarbeiter gibt den Schluessel noch nicht
+  -- mit und claimt weiterhin selbst (process.ts, claimSubscriptionPeriod()).
+  -- Solange das so ist, ist dieser Zweig unbenutzt und der Fehler oben
+  -- besteht fort. Die Umstellung zieht src/lib/affiliate/process.test.ts mit.
+  if nullif(p_payload->>'claim_subscription_id', '') is not null then
+    update public.affiliate_subscription_bindings b
+       set periods_booked = b.periods_booked + 1
+     where b.stripe_subscription_id = p_payload->>'claim_subscription_id'
+       and b.tenant_id = v_tenant_id
+       and b.ended_at is null
+       and (b.recurring_mode = 'all' or b.periods_booked < b.max_periods);
+    if not found then
+      -- Deckel erreicht, Abo beendet, oder die Bindung gehoert einem anderen
+      -- Mandanten. Fuer den Aufrufer ist das kein Fehler, sondern eine
+      -- Auskunft: diese Rate wird nie gebucht.
+      raise exception 'affiliate_book_subscription_exhausted';
+    end if;
+  end if;
 
   for v_row in select value from jsonb_array_elements(v_rows)
   loop
@@ -1373,14 +1899,27 @@ begin
       -- Die Zeile gab es schon (Wiederholungsaufruf). Ihre id wird
       -- weiterverwendet, damit Geschwisterzeilen auf das ORIGINAL zeigen und
       -- nicht ins Leere.
+      -- K10a: NICHT allein ueber den Schluessel. Der Schluessel sagt nicht,
+      -- dass es dieselbe wirtschaftliche Tatsache ist -- `dedup_key` ist
+      -- `text` mit einem Laengen-CHECK und sonst nichts, und die Datenbank
+      -- kann einen Buchungs- nicht von einem Stornoschluessel unterscheiden.
+      -- Vergibt eine kuenftige Schreibstelle (B6-Handbuchung, ein Importer)
+      -- einen kollidierenden Schluessel, war das vorher eine stille
+      -- Nichtbuchung MIT falschem Elternteil: die Funktion meldete
+      -- `inserted: false` und haengte die Geschwisterzeilen des Stapels ueber
+      -- `v_refs` an eine fremde Zeile. Jetzt bricht sie ab.
       select c.id into v_id
         from public.affiliate_commissions c
-       where c.tenant_id = v_tenant_id and c.dedup_key = v_dedup_key;
+       where c.tenant_id  = v_tenant_id
+         and c.dedup_key  = v_dedup_key
+         and c.kind       = v_row->>'kind'
+         and c.partner_id = v_partner_id;
       if v_id is null then
-        -- Kann nur eintreten, wenn ein anderer Constraint den Konflikt
-        -- ausgeloest hat. Lieber lautstark abbrechen als eine Zeile still
-        -- verschlucken.
-        raise exception 'affiliate_book_conflict_unresolved';
+        -- Entweder hat ein anderer Constraint den Konflikt ausgeloest, oder
+        -- der Schluessel gehoert einer anderen Buchung. Beides ist ein
+        -- Fehler, kein Wiederholungsaufruf -- lieber lautstark abbrechen als
+        -- eine Zeile still verschlucken.
+        raise exception 'affiliate_book_dedup_key_mismatch';
       end if;
       v_was_new  := false;
       v_existing := v_existing + 1;
@@ -1506,6 +2045,11 @@ revoke execute on function public.affiliate_commissions_guard()           from p
 revoke execute on function public.affiliate_commissions_guard()           from anon;
 grant  execute on function public.affiliate_commissions_guard()           to authenticated, service_role;
 
+-- K1: derselbe Satz fuer den Loesch-Guard.
+revoke execute on function public.affiliate_commissions_delete_guard()    from public;
+revoke execute on function public.affiliate_commissions_delete_guard()    from anon;
+grant  execute on function public.affiliate_commissions_delete_guard()    to authenticated, service_role;
+
 revoke execute on function public.affiliate_subscription_bindings_guard() from public;
 revoke execute on function public.affiliate_subscription_bindings_guard() from anon;
 grant  execute on function public.affiliate_subscription_bindings_guard() to authenticated, service_role;
@@ -1523,3 +2067,13 @@ revoke execute on function public.approve_due_affiliate_commissions(int) from pu
 revoke execute on function public.approve_due_affiliate_commissions(int) from anon;
 revoke execute on function public.approve_due_affiliate_commissions(int) from authenticated;
 grant  execute on function public.approve_due_affiliate_commissions(int) to service_role;
+
+-- K7: der Loeschlauf der Outbox. Als einzige `security definer`-Funktion
+-- dieser Datei bekommt sie denselben dreifachen Entzug wie
+-- affiliate_clicks_purge() in B3 -- und genau deshalb taucht sie in den Lints
+-- `anon_security_definer_function_executable` und
+-- `authenticated_security_definer_function_executable` nicht auf.
+revoke execute on function public.affiliate_events_purge(int, int) from public;
+revoke execute on function public.affiliate_events_purge(int, int) from anon;
+revoke execute on function public.affiliate_events_purge(int, int) from authenticated;
+grant  execute on function public.affiliate_events_purge(int, int) to service_role;

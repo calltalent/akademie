@@ -442,6 +442,14 @@ async function loadRecreditRows(admin: Admin, tenantIdValue: string, reversalIds
  * Bestellung buchte dann nichts mehr. Dieselbe Rechnung steht in
  * `book_affiliate_reversals()`; dort ist sie verbindlich, hier entscheidet sie
  * nur, ob der Aufruf lohnt.
+ *
+ * K3 (Gegenlesen 11.09.2026): STORNIERTE Zeilen zählen in KEINEM Saldo (6.1)
+ * — auch nicht in diesem. Vorher zählten sie mit, und zwar auf beiden Seiten:
+ * eine stornierte Gegenbuchung ließ die spätere echte Erstattung als
+ * `no_delta` durchfallen, eine stornierte Wiedergutschrift senkte den Stand
+ * fälschlich. Die verbindliche Rechnung in `book_affiliate_reversals()` filtert
+ * seit derselben Korrektur ebenso; weichen die beiden voneinander ab, enthält
+ * der Stapel Zeilen, die die RPC dann überspringt.
  */
 function netReversedByParent(
   reversals: readonly ReversalRow[],
@@ -452,11 +460,16 @@ function netReversedByParent(
 
   for (const row of reversals) {
     if (row.reverses_id === null) continue;
+    if (row.status === "cancelled") continue;
     byReversalId.set(row.id, row);
     net.set(row.reverses_id, (net.get(row.reverses_id) ?? 0) - row.amount_cents);
   }
   for (const row of recredits) {
     if (row.reverses_id === null) continue;
+    if (row.status === "cancelled") continue;
+    // Eine Wiedergutschrift zu einer stornierten Gegenbuchung findet ihren
+    // Elternteil hier nicht mehr — genau wie in der RPC, wo der `join` an
+    // `r2.status <> 'cancelled'` scheitert. Das Paar fällt komplett heraus.
     const reversal = byReversalId.get(row.reverses_id);
     if (reversal === undefined || reversal.reverses_id === null) continue;
     net.set(reversal.reverses_id, (net.get(reversal.reverses_id) ?? 0) - row.amount_cents);
@@ -783,7 +796,15 @@ export async function recreditForWonDispute(
     parsed.tenant_id,
     parents.map((row) => row.id),
   );
-  const fromDispute = reversals.filter((row) => dedupSourceId(row.dedup_key) === parsed.dispute_id);
+  // `status !== "cancelled"`: eine stornierte Gegenbuchung zählt in keinem
+  // Saldo (6.1), sie wiedergutzuschreiben hieße Geld ohne Gegenstück zu
+  // buchen. Seit K2 weist der Unveränderlichkeits-Guard genau das ab
+  // (`affiliate_commission_recredit_parent_cancelled`) — ohne diesen Filter
+  // risse eine einzige von Hand stornierte Gegenbuchung den ganzen Stapel
+  // dieses Streitfalls mit.
+  const fromDispute = reversals.filter(
+    (row) => row.status !== "cancelled" && dedupSourceId(row.dedup_key) === parsed.dispute_id,
+  );
   if (fromDispute.length === 0) return { ...emptyResult(), matched: true };
 
   // Bereits vorhandene Wiedergutschriften: sie werden nicht ein zweites Mal

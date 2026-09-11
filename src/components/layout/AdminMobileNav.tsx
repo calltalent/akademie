@@ -27,6 +27,7 @@ export function AdminMobileNav({
   logoUrl = null,
   marketplaceEnabled = false,
   shiftCalendarEnabled = false,
+  affiliateEnabled = false,
   restrictedToShiftCalendar = false,
 }: {
   isPlatformAdmin?: boolean;
@@ -39,6 +40,10 @@ export function AdminMobileNav({
   marketplaceEnabled?: boolean;
   /** Schichtplan S1 (07.08.2026) — siehe AdminSidebar.tsx. */
   shiftCalendarEnabled?: boolean;
+  /** Affiliate B6 (11.09.2026) — siehe AdminSidebar.tsx. Muss hier
+   * mitgeführt werden, weil diese Kopfzeile dieselbe Sidebar-Komponente als
+   * Panel rendert; fehlte die Prop, verschwände der Menüpunkt unter 1024 px. */
+  affiliateEnabled?: boolean;
   /** Schichtplan S3 (09.08.2026) — siehe AdminSidebar.tsx. */
   restrictedToShiftCalendar?: boolean;
 }) {
@@ -100,6 +105,7 @@ export function AdminMobileNav({
             pendingSubmissions={pendingSubmissions}
             marketplaceEnabled={marketplaceEnabled}
             shiftCalendarEnabled={shiftCalendarEnabled}
+            affiliateEnabled={affiliateEnabled}
             restrictedToShiftCalendar={restrictedToShiftCalendar}
           />
         </div>

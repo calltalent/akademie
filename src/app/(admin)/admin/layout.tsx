@@ -3,6 +3,7 @@ import { checkStaffAccess } from "@/lib/auth/staff";
 import { checkPlatformAccess } from "@/lib/platform/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { isAffiliateEnabled } from "@/lib/tenant/types";
 
 /**
  * Design-Block (12.07.2026, Claude-Design-Export Teil 2, siehe
@@ -54,6 +55,12 @@ export default async function AdminLayout({
       pendingSubmissions={pendingSubmissions ?? 0}
       marketplaceEnabled={access.tenant.settings.marketplace_enabled === true}
       shiftCalendarEnabled={access.tenant.settings.shift_calendar_enabled === true}
+      /* Affiliate B6 (11.09.2026): reine Sichtbarkeit des Menüpunkts. Die
+         Berechtigung selbst prüft jede Affiliate-Seite, Server Action und
+         Route noch einmal serverseitig (Plan 9.8) — `marketplace_enabled`
+         wird heute NUR in der UI geprüft, und genau diese Lücke darf das
+         Partnerprogramm nicht erben. */
+      affiliateEnabled={isAffiliateEnabled(access.tenant)}
     >
       {children}
     </AdminShell>

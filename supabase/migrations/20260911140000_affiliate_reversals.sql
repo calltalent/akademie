@@ -48,9 +48,21 @@
 --     Sperre und aus frischem Stand. Das ist der einzige Ort, an dem sie
 --     verlaesslich ist.
 --   * Der Zielwert wird zusaetzlich auf `parent.amount_cents` GEDECKELT.
---     Damit ist die Ueberstornierung nicht nur eine Rechenregel, sondern eine
---     Eigenschaft der Datenbank: mehr als die Ursprungszeile kann auch ein
---     fehlerhafter Aufrufer nicht zuruecknehmen.
+--     BERICHTIGT (K2, Gegenlesen 11.09.2026): dieser Deckel allein machte die
+--     Ueberstornierung NICHT zu einer Eigenschaft der Datenbank, wie hier
+--     frueher stand. Er lag in EINER von zwei Funktionen;
+--     book_affiliate_commissions() nahm dieselben zwei Buchungsarten
+--     ('reversal', 'recredit') mit beliebigem Betrag entgegen, ohne Deckel,
+--     ohne Pruefung der Art der Bezugszeile und ohne Sperre -- und genau
+--     dieser Weg ist der heutige Wiedergutschriftspfad. Seit K2 steht der
+--     Deckel zusaetzlich im BEFORE-INSERT-Zweig von
+--     affiliate_commissions_guard() (20260911130000, Abschnitt 2.3) und
+--     greift damit in allen drei Schreibpfaden: B4-Buchung, B5-Storno,
+--     B6-Handbuchung. ERST DAMIT ist der Satz wahr: mehr als die
+--     Ursprungszeile kann auch ein fehlerhafter Aufrufer nicht zuruecknehmen.
+--     Der Deckel hier bleibt trotzdem stehen -- er rechnet den Zielwert
+--     herunter, statt abzubrechen, und das ist fuer den Stripe-Pfad das
+--     richtige Verhalten.
 --   * Der STATUS-EIMER (G6) kommt vom Aufrufer, weil er eine fachliche Regel
 --     ist ("pending erbt hold_until, approved/paid wird sofort approved") und
 --     an genau einer Stelle stehen soll -- dort, wo sie ohne Datenbank
@@ -63,12 +75,58 @@
 -- WAS HIER NICHT STEHT
 -- Die WIEDERGUTSCHRIFT (`kind='recredit'`, gewonnener Dispute) braucht keine
 -- eigene Funktion: ihr Betrag ist die exakte Gegenzahl einer BEKANNTEN
--- Gegenbuchung, es gibt nichts zu summieren und nichts zu deckeln. Sie laeuft
--- deshalb ueber `book_affiliate_commissions()` mit `reverses_id` auf die
--- Gegenbuchung und `dedup_key = 'recredit:<reversal_id>:<dispute_id>'`.
--- Eine zweite Funktion mit demselben Rumpf waere eine zweite Stelle, an der
--- sich Spaltenlisten auseinanderentwickeln koennen.
+-- Gegenbuchung. Sie laeuft deshalb ueber `book_affiliate_commissions()` mit
+-- `reverses_id` auf die Gegenbuchung und
+-- `dedup_key = 'recredit:<reversal_id>:<dispute_id>'`. Eine zweite Funktion
+-- mit demselben Rumpf waere eine zweite Stelle, an der sich Spaltenlisten
+-- auseinanderentwickeln koennen.
+-- BERICHTIGT (K2): "es gibt nichts zu summieren und nichts zu deckeln" war
+-- falsch. Zwei Wiedergutschriften auf dieselbe Gegenbuchung tragen
+-- verschiedene Schluessel ('recredit:<reversal_id>:<dispute_id>'), der
+-- `unique (tenant_id, dedup_key)` greift also nicht, und die Datenbank liess
+-- +100,00 EUR auf eine Gegenbuchung ueber -50,00 EUR zu -- in einem
+-- freigabefaehigen Status. Gedeckelt wird jetzt im Guard: Summe der nicht
+-- stornierten Wiedergutschriften plus die neue darf den Betrag der
+-- Gegenbuchung nicht ueberschreiten, und die Bezugszeile MUSS eine
+-- Gegenbuchung sein.
 
+
+-- =================================================================
+-- KORREKTUREN NACH GEGENLESEN (11.09.2026)
+-- =================================================================
+-- Die Befunde zu dieser Datei; die uebrigen elf stehen im Kopf von
+-- 20260911130000.
+--
+-- K2 (HOCH, blockierend) DER UEBERSTORNIERUNGS-DECKEL WAR KEINE EIGENSCHAFT
+--     DER DATENBANK -- obwohl diese Datei das woertlich behauptet hat. Die
+--     Korrektur liegt im Guard der Schwesterdatei; der Satz oben ist
+--     berichtigt.
+-- K3 (MITTEL) DER NETTO-STAND `v_already` ZAEHLTE STORNIERTE ZEILEN MIT.
+--     Beide Zweige der UNION filterten nur auf `kind`, nicht auf `status` --
+--     im Widerspruch zu der Regel, die dieselbe Funktion zwanzig Zeilen
+--     darueber auf den ELTERNTEIL anwendet ("eine stornierte Zeile zaehlt in
+--     keinem Saldo", 6.1). Folge: eine stornierte Gegenbuchung liess die
+--     spaetere ECHTE Erstattung als 'no_delta' durchfallen -- gemeldet als
+--     `skipped`, ohne Fehler, ohne zweiten Versuch, und die Provision blieb
+--     beim Partner, obwohl der Kaeufer sein Geld zurueck hat. Spiegelbildlich
+--     senkte eine stornierte Wiedergutschrift den Stand faelschlich und
+--     provozierte eine Ueberstornierung bis an den Deckel. Korrektur im
+--     Netto-Stand unten; der TypeScript-Spiegel netReversedByParent()
+--     (reversal.ts) ist mitgezogen.
+-- K4b (MITTEL) DIE SPERRE FIEL IN DER SCHLEIFE, in der vom Aufrufer
+--     gelieferten Zeilenreihenfolge. Zwei Laeufe mit ueberlappender
+--     Elternmenge und verschiedenem `lock_key` (eine Erstattung und ein
+--     Dispute auf denselben Charge) konnten sie in verschiedener Reihenfolge
+--     nehmen und sich verklemmen (40P01) -- das Ereignis landete in 'error'.
+--     Dass reversal.ts die Elternzeilen nach id sortiert, ist eine Zusage des
+--     Aufrufers, keine Eigenschaft der Funktion, und B6 wird sie nicht
+--     kennen. Korrektur: feste Sperrreihenfolge VOR der Schleife.
+--     K4a -- die Sperre trug nicht gegen den Wiedergutschriftspfad -- ist im
+--     Guard der Schwesterdatei behoben.
+-- K10b (NIEDRIG) DER KONFLIKTZWEIG LAS DIE BESTEHENDE ZEILE ALLEIN UEBER DEN
+--     SCHLUESSEL und meldete im schlechten Fall den Betrag einer ganz anderen
+--     Zeile zurueck -- der so in die Partnerbenachrichtigung ginge. Korrektur
+--     unten.
 
 -- =================================================================
 -- 1. RPC book_affiliate_reversals(jsonb) -- Plan 5.8, G6, G7
@@ -156,6 +214,30 @@ begin
     hashtext('affiliate_commissions'),
     hashtext(v_tenant_id::text || '|' || v_lock_key)
   );
+
+  -- K4b: ALLE Elternzeilen des Stapels in EINER Anweisung und in FESTER
+  -- Reihenfolge sperren. Die Einzelsperre in der Schleife unten faellt sonst
+  -- in der vom Aufrufer gelieferten Zeilenreihenfolge: zwei Laeufe mit
+  -- ueberlappender Elternmenge und verschiedenem `lock_key` -- eine
+  -- Erstattung und ein Dispute auf denselben Charge -- koennen sie dann in
+  -- verschiedener Reihenfolge nehmen und sich verklemmen (40P01), und das
+  -- Geldereignis landet in 'error'. `order by c.id` mit `for no key update`
+  -- legt LockRows im Plan ueber Sort, die Sperren fallen also in
+  -- id-Reihenfolge. Die Einzelsperre bleibt stehen (sie holt zugleich die
+  -- Zeile), ist danach aber ein No-op.
+  -- Eine unbrauchbare `reverses_id` bricht hier mit 22P02 statt weiter unten
+  -- mit `affiliate_reversal_row_incomplete` -- derselbe Abbruch, nur frueher:
+  -- der Stapel wird ohnehin als Ganzes zurueckgerollt.
+  perform c.id
+     from public.affiliate_commissions c
+    where c.tenant_id = v_tenant_id
+      and c.id in (
+        select (e.value->>'reverses_id')::uuid
+          from jsonb_array_elements(v_rows) e
+         where nullif(e.value->>'reverses_id', '') is not null
+      )
+    order by c.id
+      for no key update;
 
   for v_row in select value from jsonb_array_elements(v_rows)
   loop
@@ -245,12 +327,22 @@ begin
       -- derselben Bestellung buchte dann nichts mehr.
       -- `sum(-amount_cents)` ueber beide Arten: reversal ist negativ (wird
       -- positiv), recredit ist positiv (wird negativ).
+      -- K3: `status <> 'cancelled'` in BEIDEN Zweigen. Die Regel steht zwanzig
+      -- Zeilen weiter oben fuer den ELTERNTEIL und galt fuer die
+      -- Gegenbuchungen selbst nicht: eine stornierte Gegenbuchung zaehlte
+      -- mit, und die spaetere ECHTE Erstattung derselben Bestellung fiel als
+      -- 'no_delta' durch -- ohne Fehler, ohne zweiten Versuch. Was nie
+      -- werthaltig war, zaehlt in KEINEM Saldo (6.1) -- auch nicht in dem,
+      -- gegen den hier gerechnet wird. Der Guard rechnet seit K2 dieselbe
+      -- Summe mit denselben Filtern; weichen die beiden auseinander, sperrt
+      -- der eine aus, was der andere bucht.
       select coalesce(sum(-x.amount_cents), 0)::int into v_already
         from (
           select r.amount_cents
             from public.affiliate_commissions r
            where r.tenant_id = v_tenant_id
              and r.kind = 'reversal'
+             and r.status <> 'cancelled'
              and r.reverses_id = v_parent.id
           union all
           select c.amount_cents
@@ -259,7 +351,9 @@ begin
               on r2.id = c.reverses_id and r2.tenant_id = c.tenant_id
            where c.tenant_id = v_tenant_id
              and c.kind = 'recredit'
+             and c.status <> 'cancelled'
              and r2.kind = 'reversal'
+             and r2.status <> 'cancelled'
              and r2.reverses_id = v_parent.id
         ) x;
       v_already := greatest(v_already, 0);
@@ -331,10 +425,21 @@ begin
         -- Reprocess). Die bestehende Zeile wird gelesen und ihr Betrag
         -- zurueckgemeldet -- der Aufrufer soll denselben Bericht bekommen wie
         -- beim ersten Mal.
+        -- K10b: NICHT allein ueber den Schluessel. `dedup_key` ist `text` und
+        -- sagt nicht, dass die gefundene Zeile dieselbe Tatsache ist -- ein
+        -- kollidierender Schluessel aus einer kuenftigen Schreibstelle
+        -- lieferte sonst den Betrag einer FREMDEN Zeile zurueck, und der ginge
+        -- so in die Partnerbenachrichtigung.
         select c.id, c.amount_cents into v_id, v_delta
           from public.affiliate_commissions c
-         where c.tenant_id = v_tenant_id and c.dedup_key = v_dedup_key;
+         where c.tenant_id   = v_tenant_id
+           and c.dedup_key   = v_dedup_key
+           and c.kind        = 'reversal'
+           and c.reverses_id = v_parent.id;
         if v_id is null then
+          -- Entweder hat ein anderer Constraint den Konflikt ausgeloest, oder
+          -- der Schluessel gehoert einer anderen Buchung. Beides ist ein
+          -- Fehler, kein Wiederholungsaufruf.
           raise exception 'affiliate_reversal_conflict_unresolved';
         end if;
         v_delta := -v_delta;

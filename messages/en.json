@@ -1652,7 +1652,22 @@
         "topPartnersEmpty": "No partner with revenue in this period yet.",
         "recentCommissions": "Latest entries",
         "recentCommissionsEmpty": "No entries in this period yet.",
-        "exportCsv": "Export CSV"
+        "exportCsv": "Export CSV",
+        "metricsHeading": "Key figures for the period",
+        "metricUnavailable": "Cannot be determined — the data could not be loaded in full.",
+        "reversalRateUnknown": "No commission was booked in this period — there is no rate.",
+        "rangeFrom": "From",
+        "rangeTo": "To",
+        "applyRange": "Apply period",
+        "rangeValue": "Evaluated from {from} to {to}",
+        "warningsHeading": "Warnings",
+        "unprocessedErrored": "{count, plural, one {# event was left with an error} other {# events were left with an error}}",
+        "unprocessedOldest": "Oldest open event from {date}.",
+        "unprocessedHint": "The catch-up run processes open events automatically. If the number stays put for hours, please notify the operator.",
+        "openApplicationsLink": "View applications",
+        "allCommissionsLink": "View all entries",
+        "exportHint": "The export contains all partners with clicks, sales and balances per currency.",
+        "partnerUnknown": "Unknown partner"
       },
       "partners": {
         "title": "Partners",
@@ -1684,7 +1699,34 @@
           "pending": "Creating …",
           "linkLabel": "Invitation link",
           "copy": "Copy link",
-          "copied": "Link copied."
+          "copied": "Link copied.",
+          "modeLabel": "Type of admission",
+          "modeInvite": "Invite and approve immediately",
+          "modeCreate": "Create as an application",
+          "companyLabel": "Company (optional)",
+          "codeLabel": "Partner code",
+          "codeHint": "3 to 32 characters, lower-case letters, digits and hyphens only. The code later appears in the referral link.",
+          "savedInvite": "Partner created and approved.",
+          "savedCreate": "Application created. It still needs to be approved.",
+          "submitCreate": "Create application"
+        },
+        "tabsLabel": "Filter partners by status",
+        "incompleteWarning": "The list could not be loaded in full. Individual figures may be too low.",
+        "noGroup": "No group",
+        "payoutHoldChip": "Payout blocked",
+        "groups": {
+          "heading": "Groups",
+          "description": "A group carries no rate of its own. The rate comes from a condition that applies to this group.",
+          "empty": "No groups yet.",
+          "nameLabel": "Group name",
+          "create": "Create group",
+          "created": "Group created.",
+          "rename": "Rename",
+          "saved": "Saved.",
+          "delete": "Delete group",
+          "deleteConfirm": "Really delete the group “{name}”? Partners lose their assignment and conditions for this group cease to apply.",
+          "deleteConfirmYes": "Delete permanently",
+          "deleteConfirmNo": "Cancel"
         }
       },
       "partner": {
@@ -1700,7 +1742,8 @@
           "joinedLabel": "Member since",
           "referredByLabel": "Referred by",
           "applicationHeading": "Details from the application",
-          "applicationEmpty": "No details."
+          "applicationEmpty": "No details.",
+          "linkLabel": "Referral link"
         },
         "condition": {
           "heading": "Commission terms",
@@ -1736,20 +1779,46 @@
           "noteLabel": "Internal note",
           "save": "Save",
           "saved": "Saved.",
-          "pending": "Running …"
+          "pending": "Running …",
+          "reasonOptional": "(optional)"
         },
         "banking": {
           "heading": "Payment and tax details",
           "complete": "Complete — a payout is possible.",
           "incomplete": "Incomplete. Missing: {fields}",
-          "hint": "Bank details are not shown here. The partner maintains them themselves."
+          "hint": "Bank details are not shown here. The partner maintains them themselves.",
+          "fieldAddress": "Address",
+          "fieldTax": "Tax status",
+          "fieldPayout": "Payment details",
+          "payoutHold": "Payouts to this partner are blocked."
         },
         "audit": {
           "heading": "Change log",
           "empty": "No entries.",
           "columnDate": "Time",
           "columnActor": "User",
-          "columnAction": "Action"
+          "columnAction": "Action",
+          "actor": {
+            "manager": "Team",
+            "partner": "Partner",
+            "system": "System"
+          }
+        },
+        "admin": {
+          "heading": "Assignment and blocks",
+          "noReferrer": "No referrer",
+          "payoutHoldReasonLabel": "Reason for the payout block",
+          "payoutHoldReasonHint": "Required as soon as the payout is blocked. The partner does not see this text.",
+          "noteHint": "Visible to the team only. The partner never sees this note."
+        },
+        "balances": {
+          "heading": "Balances",
+          "empty": "No entries in any currency yet.",
+          "open": "Open",
+          "reserved": "In reserve",
+          "inReview": "Under review",
+          "available": "Available",
+          "paid": "Paid out"
         }
       },
       "conditions": {
@@ -1788,7 +1857,18 @@
           "pending": "Saving …",
           "saved": "Rule saved.",
           "delete": "Delete rule",
-          "overlapError": "A rule already exists for this scope within the selected period."
+          "overlapError": "A rule already exists for this scope within the selected period.",
+          "edit": "Edit",
+          "close": "Close",
+          "selectPlaceholder": "Please select",
+          "rateBpLabel": "Rate in basis points",
+          "rateBpHint": "100 basis points are 1 per cent. You entered {percent} per cent.",
+          "fixedCentsLabel": "Fixed amount in cents",
+          "fixedCentsHint": "100 cents are 1 euro. {euro} euros are stored.",
+          "validFromLocked": "The start of an existing rule cannot be moved. Create a new rule for a different start.",
+          "deleteConfirm": "Really delete this rule? Commissions already booked stay unchanged — each carries its own calculation in its own row.",
+          "deleteConfirmYes": "Delete permanently",
+          "deleteConfirmNo": "Cancel"
         },
         "calculator": {
           "heading": "Calculator",
@@ -1797,8 +1877,18 @@
           "submit": "Calculate",
           "result": "{rule} applies: {rate}. On {gross} gross that is {amount}.",
           "ruleDefault": "The programme default",
-          "ruleNumbered": "Rule {rank}"
-        }
+          "ruleNumbered": "Rule {rank}",
+          "noProduct": "Without a product",
+          "noResult": "No preview can be calculated for this selection.",
+          "base": "Calculation base",
+          "payoutPart": "Of which immediately",
+          "reservePart": "Of which reserve",
+          "taxHint": "Calculated without the tax share. On a net base the booked amount is later lower than this.",
+          "cappedHint": "The maximum commission has taken effect. A row booked this way is flagged for review."
+        },
+        "columnActions": "Actions",
+        "periodOpen": "From {from}, open-ended",
+        "periodClosed": "{from} to {to}"
       },
       "commissions": {
         "title": "Commissions",
@@ -1811,7 +1901,10 @@
           "test": "Test entries only",
           "apply": "Apply filter",
           "reset": "Reset filter",
-          "all": "All"
+          "all": "All",
+          "heading": "Filters",
+          "from": "Booked from",
+          "to": "Booked until"
         },
         "columnDate": "Date",
         "columnPartner": "Partner",
@@ -1843,9 +1936,79 @@
           "amountLabel": "Amount in euros",
           "reasonLabel": "Reason",
           "submit": "Book",
-          "saved": "Entry created."
+          "saved": "Entry created.",
+          "description": "Creates an entry of its own. A negative amount is a correction at the partner's expense.",
+          "amountHint": "Amount in euros, for example 25.00 or -25.00.",
+          "confirmLabel": "Repeat the amount to confirm",
+          "confirmHint": "From 500 euros upwards a manual entry asks for the amount a second time. Both entries must match to the cent."
         },
-        "exportCsv": "Export CSV"
+        "exportCsv": "Export CSV",
+        "resultCount": "{count, plural, one {# entry} other {# entries}}",
+        "limitHint": "At most 500 rows are shown. For more, narrow the period or export the CSV file.",
+        "exportHint": "The export contains exactly the rows shown by the filter above.",
+        "noCampaign": "Without a campaign",
+        "productUnknown": "Product no longer exists",
+        "flaggedChip": "Flagged",
+        "testChip": "Test entry",
+        "kindLabel": "Entry type",
+        "kind": {
+          "sale": "Sale",
+          "reserve": "Reserve",
+          "recurring": "Subscription instalment",
+          "recurring_reserve": "Reserve on the subscription instalment",
+          "tier2": "Second tier",
+          "reversal": "Reversal",
+          "recredit": "Re-credit",
+          "manual": "Manual entry"
+        },
+        "holdUntilLabel": "Released on",
+        "orderLabel": "Order",
+        "invoiceLabel": "Invoice",
+        "subscriptionLabel": "Subscription",
+        "dedupLabel": "Idempotency key",
+        "noteLabel": "Note on the entry",
+        "flagReasonLabel": "Reason for the flag",
+        "reason": {
+          "referral": "Attributed via a stored click token.",
+          "binding": "Attributed via the binding of the account or the subscription.",
+          "manual": "Booked by hand."
+        },
+        "snapshotMissing": "No frozen calculation is stored for this entry. Today's programme values do not apply to it.",
+        "snapshot": {
+          "source": "Origin of the rate",
+          "sourceCondition": "Condition",
+          "sourceProgram": "Programme default",
+          "rate": "Rate",
+          "basis": "Calculation base",
+          "feeDeduction": "Deduction for payment fees",
+          "min": "Minimum commission",
+          "max": "Maximum commission",
+          "noLimit": "No limit",
+          "reserve": "Reserve",
+          "holdDays": "Holding period in days",
+          "reserveDays": "Reserve period in days",
+          "tier2": "Second tier",
+          "tier2Off": "Not active"
+        },
+        "actionsHeading": "Actions for this entry",
+        "decision": {
+          "label": "Decision",
+          "approve": "Approve",
+          "cancel": "Cancel",
+          "cancelReasonLabel": "Reason for cancellation",
+          "reasonLabel": "Justification",
+          "submit": "Save decision"
+        },
+        "cancelReason": {
+          "fraud_suspicion": "Suspected fraud",
+          "manual": "Decision by the team"
+        },
+        "reassign": {
+          "newPartnerLabel": "New partner",
+          "none": "Without attribution",
+          "reasonLabel": "Justification",
+          "hint": "The reassignment affects every entry of this order. The rate is resolved anew for the new partner."
+        }
       },
       "payouts": {
         "title": "Payouts",
@@ -1916,7 +2079,11 @@
           "pending": "Saving …",
           "saved": "Saved.",
           "delete": "Delete"
-        }
+        },
+        "notAvailableHeading": "Creatives are not set up yet",
+        "notAvailableBody": "Creatives still lack a table and a storage location. This section stays empty until both exist — a form that uploads into nothing would be worse than none.",
+        "linkHint": "A partner's referral link is built from their code alone and is already on their partner page today.",
+        "plannedHeading": "Planned types"
       },
       "settings": {
         "title": "Settings",
@@ -1946,7 +2113,17 @@
           "feeDeductionLabel": "Deduction for payment fees in percent",
           "minLabel": "Minimum commission in euros",
           "maxLabel": "Maximum commission in euros",
-          "currencyLabel": "Currency"
+          "currencyLabel": "Currency",
+          "rateBpLabel": "Default rate in basis points",
+          "rateBpHint": "100 basis points are 1 per cent. You entered {percent} per cent.",
+          "fixedCentsLabel": "Fixed amount in cents",
+          "centsHint": "100 cents are 1 euro. {euro} euros are stored.",
+          "minCentsLabel": "Minimum commission in cents",
+          "maxCentsLabel": "Maximum commission in cents",
+          "optionalCentsHint": "Leaving this empty means: no limit.",
+          "feeDeductionBpLabel": "Deduction for payment fees in basis points",
+          "feeDeductionBpHint": "Deducted from the calculation base before the commission. 250 is 2.5 per cent.",
+          "currencyHint": "Three-letter code, for example eur. Balances are never added up across currencies."
         },
         "attribution": {
           "heading": "Attribution",
@@ -1981,7 +2158,11 @@
           "scheduleLabel": "Payout schedule",
           "scheduleWeekly": "Weekly",
           "scheduleSemiMonthly": "Twice a month",
-          "scheduleMonthly": "Monthly"
+          "scheduleMonthly": "Monthly",
+          "reserveBpLabel": "Reserve in basis points",
+          "reserveBpHint": "The share of every commission that only becomes available after the reserve period.",
+          "reserveDaysHint": "Must not end before the holding period.",
+          "minPayoutCentsLabel": "Minimum payout in cents"
         },
         "tier2": {
           "heading": "Second tier",
@@ -1989,7 +2170,8 @@
           "basisLabel": "Calculation base",
           "basisCommission": "Commission of the referred partner",
           "basisRevenue": "Revenue of the referred partner",
-          "rateLabel": "Second tier rate in percent"
+          "rateLabel": "Second tier rate in percent",
+          "rateBpLabel": "Second-tier rate in basis points"
         },
         "texts": {
           "heading": "Texts",
@@ -1998,7 +2180,9 @@
           "termsVersionLabel": "Version",
           "termsVersionHint": "If the version is raised, every partner has to accept again.",
           "applicationNoteLabel": "Note in the application form",
-          "applicationFieldsLabel": "Additional application fields"
+          "applicationFieldsLabel": "Additional application fields",
+          "applicationFieldsEmpty": "No additional fields.",
+          "applicationFieldsReadonly": "These fields cannot be edited here yet. They belong to the public application form."
         },
         "test": {
           "heading": "Test mode",
@@ -2013,8 +2197,10 @@
           "highRate": "The rate is above 50 percent.",
           "combinedRate": "First and second tier together are above 60 percent.",
           "basisChange": "The change applies to future entries only. Existing entries and running subscriptions stay as they are.",
-          "recurringAll": "Paying every instalment is an open-ended obligation."
-        }
+          "recurringAll": "Paying every instalment is an open-ended obligation.",
+          "heading": "Please read before saving"
+        },
+        "firstSaveHint": "The first save creates the programme. Until then the other pages stay empty."
       },
       "status": {
         "program": {
@@ -2043,6 +2229,19 @@
           "failed": "Failed",
           "cancelled": "Cancelled"
         }
+      },
+      "access": {
+        "heading": "No access",
+        "noTenant": "No academy belongs to this address.",
+        "notAuthenticated": "Please sign in first.",
+        "notManager": "This page is reserved for owners and administrators. It deals with money and personal data."
+      },
+      "navLabel": "Sections of the partner programme",
+      "skipToContent": "Skip to main content",
+      "programMissing": "No partner programme has been set up for this academy yet. Please save the settings first.",
+      "csv": {
+        "currency": "Currency",
+        "uniqueClicks": "Unique clicks"
       }
     }
   },
@@ -2409,7 +2608,12 @@
         "profile": "Master data",
         "terms": "Terms"
       },
-      "logout": "Sign out"
+      "logout": "Sign out",
+      "navLabel": "Sections of the partner area",
+      "accessHeading": "No access",
+      "accessBody": "This area is reserved for approved partners.",
+      "accessNotAuthenticated": "Please sign in to open the partner area.",
+      "accessLogin": "Go to sign-in"
     },
     "dashboard": {
       "title": "Overview",
@@ -2436,7 +2640,16 @@
       "sales": "Sales",
       "conversion": "Conversion",
       "epc": "Earnings per click",
-      "empty": "No data yet."
+      "empty": "No data yet.",
+      "unavailable": "Cannot be determined",
+      "balanceNegativeHint": "Negative amount: it is offset against future commissions, not collected from you.",
+      "payoutHold": "Payouts to your account are currently suspended. Please contact the academy.",
+      "missingAddress": "Address",
+      "missingTaxStatus": "Tax status",
+      "missingPayoutMethod": "Payment details",
+      "minPayoutReached": "The minimum amount of {amount} has been reached.",
+      "rangeHint": "Period: the last {days} days",
+      "privacyNote": "We do not show any details about buyers."
     },
     "links": {
       "title": "Links",
@@ -2451,7 +2664,9 @@
       "copied": "Link copied.",
       "codeHeading": "Your partner code",
       "codeHint": "The code also works without a link, for example in a podcast or in print.",
-      "ttlHint": "An attribution lasts {days} days."
+      "ttlHint": "An attribution lasts {days} days.",
+      "targetCourse": "Course: {title}",
+      "targetProduct": "Product: {title}"
     },
     "statistics": {
       "title": "Statistics",
@@ -2473,7 +2688,15 @@
       "columnReversalRate": "Reversal rate",
       "empty": "No data in the selected period.",
       "chartLabel": "Clicks and sales per day: {summary}",
-      "exportCsv": "Export CSV"
+      "exportCsv": "Export CSV",
+      "rangeToLabel": "to",
+      "apply": "Show",
+      "incomplete": "The figures could not be loaded in full. Please try again later.",
+      "campaignNone": "Without a campaign",
+      "productNone": "Without a product",
+      "productNote": "Per product we count sales and commission. Clicks are measured per day and campaign only.",
+      "totalRow": "Total",
+      "chartLegend": "Wide bar: clicks. Narrow bar: sales. Every value is in the table above."
     },
     "statement": {
       "title": "Account statement",
@@ -2497,7 +2720,19 @@
       "kindReversal": "Reversal",
       "kindManual": "Manual entry",
       "kindPayout": "Payout",
-      "privacyNote": "We do not show any details about the buyer."
+      "privacyNote": "We do not show any details about the buyer.",
+      "incomplete": "The account statement could not be loaded in full. Please try again later.",
+      "closingBalance": "Balance: {amount}",
+      "columnDetails": "Calculation",
+      "notCounted": "Not counted",
+      "freeFrom": "Released on {date}",
+      "exportCsv": "Export CSV",
+      "basis": {
+        "net": "net",
+        "gross": "gross"
+      },
+      "kindReserve": "Held back",
+      "kindRecredit": "Re-credit"
     },
     "payouts": {
       "title": "Payouts",
@@ -2509,7 +2744,11 @@
       "columnStatus": "Status",
       "empty": "No payouts yet.",
       "download": "Download credit note",
-      "downloadUnavailable": "The document has not been created yet."
+      "downloadUnavailable": "The document has not been created yet.",
+      "notAvailableYet": "There has not been a payout yet.",
+      "balanceHint": "Whatever has already been released is shown on the overview under “Available”.",
+      "toOverview": "Go to overview",
+      "toStatement": "Go to account statement"
     },
     "team": {
       "title": "Team",
@@ -2519,7 +2758,9 @@
       "columnJoined": "Member since",
       "columnRevenue": "Revenue",
       "columnCommission": "Your commission",
-      "empty": "No referred partners yet."
+      "empty": "No referred partners yet.",
+      "disabled": "The second tier is not active for this partner programme.",
+      "linkHint": "Anyone applying through this link is assigned to you as a referred partner once the academy approves them."
     },
     "profile": {
       "title": "Master data",
@@ -2555,7 +2796,19 @@
       "dataHeading": "Your data",
       "dataExport": "Download your data as JSON",
       "dataDelete": "Request deletion",
-      "dataDeleteHint": "Commission records are kept for legal reasons; your name is removed from them."
+      "dataDeleteHint": "Commission records are kept for legal reasons; your name is removed from them.",
+      "billingHeading": "Billing details",
+      "billingHint": "We need your address, tax status and payment details for the credit note and the transfer.",
+      "legalNameLabel": "Legal name",
+      "entityBusiness": "Business",
+      "entityPrivate": "Private individual",
+      "taxNumberLabel": "Tax number",
+      "valueStored": "Stored — enter again to change",
+      "payoutMethodLabel": "Payout method",
+      "payoutMethodSepa": "SEPA transfer",
+      "payoutMethodPaypal": "PayPal",
+      "bicLabel": "BIC",
+      "dataViaProfile": "Data export and deletion requests run through your profile under “Account”."
     },
     "terms": {
       "title": "Partner terms",
@@ -2564,7 +2817,11 @@
       "updatedBody": "The partner terms have changed. Please accept the new version to keep using the partner area.",
       "accept": "Accept",
       "pending": "Saving …",
-      "accepted": "Acceptance saved."
+      "accepted": "Acceptance saved.",
+      "acceptLabel": "I agree to the partner terms in version {version}.",
+      "currentVersion": "Current version: {version}",
+      "notAcceptedYet": "No consent stored yet.",
+      "noText": "No set of terms has been stored for this partner programme yet."
     },
     "program": {
       "title": "Partner programme",
@@ -2575,7 +2832,55 @@
       "exampleText": "On a sale of {gross} you receive {amount}.",
       "attributionHint": "A referral is attributed for {days} days.",
       "rulesHeading": "Rules",
-      "notFound": "This partner programme is not public."
+      "notFound": "This partner programme is not public.",
+      "subtitle": "Recommend {tenant} and earn on every referred sale.",
+      "basisHeading": "Calculation base",
+      "basisNet": "The calculation uses the net amount, that is without VAT and shipping.",
+      "basisGross": "The calculation uses the gross amount, that is the amount actually paid.",
+      "basisFee": "Before that, {rate} is deducted for payment fees.",
+      "commissionMinTerm": "Minimum commission",
+      "commissionMin": "At least {amount} per sale.",
+      "commissionMaxTerm": "Maximum commission",
+      "commissionMax": "At most {amount} per sale.",
+      "exampleTextNet": "On a net amount of {net} you receive {amount}.",
+      "tier2Heading": "Second tier",
+      "tier2Commission": "For partners you refer you additionally receive {rate} of their commission.",
+      "tier2Revenue": "For partners you refer you additionally receive {rate} of the revenue they bring in.",
+      "attributionHeading": "Attribution period",
+      "attributionModelTerm": "Several referrals",
+      "attributionModelLast": "If a buyer arrives through several partner links, the last click before the purchase counts.",
+      "attributionModelFirst": "If a buyer arrives through several partner links, the first click counts.",
+      "attributionOverwriteTerm": "Later click",
+      "attributionOverwriteAllow": "A later click on another partner's link overwrites the attribution.",
+      "attributionOverwriteDeny": "Once set, an attribution is no longer overwritten by a later click.",
+      "attributionLifetimeTerm": "Later purchases",
+      "attributionLifetime": "After the first purchase the buyer stays attributed to you permanently, even once the period has expired.",
+      "attributionNoLifetime": "The attribution ends when the period expires and does not cover later purchases.",
+      "attributionSelfTerm": "Your own purchases",
+      "attributionSelf": "Purchases on your own account are not remunerated.",
+      "attributionConsentTerm": "Consent",
+      "attributionConsent": "Without the visitor's consent no cookie is set; the attribution then runs through the referral parameter in the link alone.",
+      "recurringHeading": "Subscriptions",
+      "recurringFirstOnly": "For subscriptions only the first payment is remunerated.",
+      "recurringNPeriods": "For subscriptions the first {periods} payments are remunerated.",
+      "recurringAll": "For subscriptions every payment is remunerated for as long as the subscription runs.",
+      "payoutHeading": "Payout",
+      "payoutScheduleTerm": "Frequency",
+      "payoutWeekly": "Payouts are made weekly.",
+      "payoutSemiMonthly": "Payouts are made twice a month.",
+      "payoutMonthly": "Payouts are made once a month.",
+      "payoutHoldTerm": "Holding period",
+      "payoutHold": "A commission is released for payout {days} days after the sale.",
+      "payoutReserveTerm": "Reserve",
+      "payoutReserve": "{rate} of every commission is held back as a reserve for {days} days and is released afterwards.",
+      "payoutMinimumTerm": "Minimum amount",
+      "payoutMinimum": "Payouts start from a balance of {amount}.",
+      "payoutReversalTerm": "Reversal",
+      "payoutReversal": "If a purchase is refunded or charged back, the commission is reversed.",
+      "termsHeading": "Partner terms",
+      "termsVersion": "Version {version}",
+      "termsEmpty": "The partner terms are sent to you before approval.",
+      "termsShow": "Show the full text of the partner terms"
     },
     "apply": {
       "heading": "Apply as a partner",
@@ -2591,7 +2896,12 @@
       "pending": "Sending …",
       "success": "Thank you. We have received your application and will reply by email.",
       "error": "The application could not be sent. Please try again later.",
-      "invalid": "Please check the highlighted fields."
+      "invalid": "Please check the highlighted fields.",
+      "honeypotLabel": "Website (please leave empty)",
+      "requiredHint": "Fields without the note “optional” are required.",
+      "optional": "optional",
+      "codeLabel": "Preferred code (optional)",
+      "codeHint": "This code later appears in your referral link. If it is already taken you get a similar one — the application never fails because of it."
     },
     "status": {
       "program": {
@@ -2620,6 +2930,11 @@
         "failed": "Failed",
         "cancelled": "Cancelled"
       }
+    },
+    "csv": {
+      "currencyColumn": "Currency",
+      "freeFromColumn": "Released on",
+      "reversalColumn": "Reversed"
     }
   },
   "consent": {
