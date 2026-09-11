@@ -55,10 +55,32 @@
 -- LOESUNG
 -- Vier neue Tabellen, vier Guard-Trigger, drei Funktionen (Tagesgrenze,
 -- Klick-Aufnahme, Loeschlauf) -- Tabelle, RLS und Policies jeweils im selben
--- Schritt (CLAUDE.md §2.1). Alle Betraege `int` in Cent, alle Saetze
+-- Schritt (CLAUDE.md §2.1). Dazu, seit dem Gegenlesen, Abschnitt 8: der
+-- DELETE-Guard von affiliate_partners aus B1 lernt die vier neuen Tabellen
+-- kennen (K1). Alle Betraege `int` in Cent, alle Saetze
 -- Basispunkte (Plan G12); in dieser Datei kommen Betraege nur als Aggregate
--- vor. Keine Zeile dieser Datei wird von Anwendungscode gelesen, solange B3
--- nicht gebaut ist -- die Migration ist wie B1 inert.
+-- vor.
+--
+-- DIESE MIGRATION IST NICHT INERT (berichtigt nach dem Gegenlesen, Befund 5).
+-- Hier stand, keine Zeile dieser Datei werde von Anwendungscode gelesen,
+-- solange B3 nicht gebaut sei. Das war die Entscheidungsgrundlage fuer die
+-- Freigabe, und sie war falsch: B3 IST gebaut. Mit dem Anwenden dieser Datei
+-- wird ein oeffentlich erreichbarer, unauthentifizierter GET-Endpunkt scharf,
+-- der unter `service_role` in vier Tabellen schreibt, an denen Geld haengt.
+-- Scharf werden genau diese Dateien:
+--   * src/app/api/aff/k/route.ts        -- der oeffentliche Klick-Endpunkt;
+--   * src/lib/affiliate/track.ts        -- ruft affiliate_record_click() mit
+--     der Signatur aus Abschnitt 5.2 und schreibt affiliate_referrals;
+--   * src/lib/affiliate/bind.ts         -- schreibt affiliate_referrals.user_id
+--     und affiliate_customer_bindings;
+--   * src/lib/affiliate/checkout-meta.ts -- liest alle drei plus
+--     affiliate_clicks.
+-- Folge fuer die Freigabe: wer nach dem Anwenden einen Fehler bemerkt, kann
+-- nicht abwarten, bis B3 kommt -- B3 laeuft dann bereits. Das Anwenden gehoert
+-- deshalb mit der Abnahme von B3 zusammen, nicht davor und nicht als
+-- Vorratsbeschluss. Signatur, Rueckgabefelder (click_id/counted/deduped/
+-- capped) und alle CHECK-Muster sind gegen bot.ts, click-target.ts, hash.ts
+-- und schema.ts geprueft und passen -- falsch war allein dieser Kopftext.
 --
 -- VORBILDER
 --   - Aufbau, Kommentardichte, zusammengesetzte Fremdschluessel, "genau eine
@@ -150,6 +172,60 @@
 --     der Schnappschuss-Gedanke (Plan 3.7) verhindern soll.
 --
 -- =================================================================
+-- KORREKTUREN NACH GEGENLESEN (11.09.2026, sieben Befunde)
+-- =================================================================
+-- Jeder Befund steht hier mit der Stelle, an der die Korrektur im Text
+-- kommentiert ist. Reihenfolge nach Schwere.
+--
+-- K1 (HOCH, blockierend) LOESCHWEG UEBER affiliate_partners.
+--     Was war falsch: alle vier Tabellen dieser Datei haengen per `on delete
+--     cascade` an affiliate_partners. Diese Datei verweigert dem hoeher
+--     privilegierten `service_role` das Loeschen von Klick- und
+--     Referralzeilen in zwei Kommentarbloecken ausdruecklich (Abschnitt 1
+--     und 2) -- gleichzeitig traegt affiliate_partners ein DELETE-Recht fuer
+--     `authenticated` samt Policy `affiliate_partners_manager_delete`
+--     (20260910120000), und ihr Guard kennt nur affiliate_billing_profiles
+--     und -- als Vorgriff -- affiliate_commissions. Zwei gewoehnliche
+--     PostgREST-Requests (PATCH {"status":"rejected"}, dann DELETE) auf eine
+--     nie verknuepfte Partnerzeile raeumten damit Klicks, Zuordnungen,
+--     Lifetime-Bindungen und Tageszahlen dieses Partners restlos weg -- und
+--     zwar von einer Rolle aus, die WENIGER darf als die, der es hier
+--     verboten ist. Derselbe Baufehler wie Z4 in der zweiten B1-Runde: der
+--     Schutz setzt an der falschen Stelle an.
+--     Korrektur: Abschnitt 8 dieser Datei zieht den Bestand in den vier neuen
+--     Tabellen in affiliate_partners_delete_guard() nach. Warum dort und
+--     nicht per `on delete restrict` am Fremdschluessel: `restrict` feuert
+--     sofort und wuerde die Mandantenloeschung blockieren, weil sie die
+--     Partnerzeile ueber dieselbe Anweisung raeumt wie die Kindzeilen. Der
+--     Guard hat den Kaskadenausweg bereits.
+-- K2 (MITTEL) affiliate_customer_bindings.bound_at war beim INSERT erzwungen
+--     und beim UPDATE voellig frei -- die INSERT/UPDATE-Asymmetrie der
+--     Durchsicht unten, nur in der Gegenrichtung. An genau diesem Zeitstempel
+--     haengt "die erste Bindung gewinnt". Korrektur im UPDATE-Zweig von
+--     affiliate_customer_bindings_guard() (Abschnitt 3).
+-- K3 (MITTEL) affiliate_daily_stats war die einzige der vier Tabellen ohne
+--     DELETE-Zweig und ohne Schutz der drei Klickzaehler -- obwohl sie die
+--     einzigen Zahlen traegt, die den 90-Tage-Loeschlauf ueberdauern, und
+--     obwohl die Tagesobergrenze aus Abschnitt 5.2 aus ihr gelesen wird.
+--     Korrektur: Trigger jetzt auch `or delete`, DELETE-Zweig mit
+--     Erlaubnisliste, Klickzaehler monoton (Abschnitt 4).
+-- K4 (MITTEL) Die 90-Tage-Frist hatte keinen Vollzug: affiliate_clicks_purge()
+--     hat im Repo keinen Aufrufer und `pg_cron` ist nicht installiert.
+--     Korrektur: FOLGEN (3) benennt Datei, Stelle, Muster und Takt des
+--     Aufrufs. Die Route selbst gehoert nicht zu dieser Migration -- das ist
+--     eine FREIGABEBEDINGUNG, keine Zeile SQL.
+-- K5 (MITTEL) Der Kopf behauptete, die Datei sei inert. B3 ist gebaut.
+--     Korrektur im Abschnitt LOESUNG oben und in FOLGEN (1) und (5).
+-- K6 (NIEDRIG) affiliate_referrals.bound_at war beim INSERT hart geprueft und
+--     beim UPDATE ungeprueft, solange die Zeile noch ungebunden war -- der
+--     Aufrufer setzte den Zeitstempel der Neubindung selbst. Korrektur im
+--     UPDATE-Zweig von affiliate_referrals_guard() (Abschnitt 2).
+-- K7 (NIEDRIG) Auf affiliate_daily_stats fehlte ein Index mit fuehrendem
+--     `(tenant_id, day)` fuer die mandantenweite Tagesabfrage; im
+--     Primaerschluessel steht `day` an dritter Stelle. Korrektur in
+--     Abschnitt 4.
+--
+-- =================================================================
 -- DURCHSICHT "INSERT-PFAD" (Pflicht seit dem Gegenlesen von B1)
 -- =================================================================
 -- Die Frage ist fuer JEDE schuetzenswerte Spalte einzeln gestellt: ist sie
@@ -204,7 +280,12 @@
 --   affiliate_customer_bindings faellt mit dem Konto (`on delete cascade` auf
 --                               profiles) -- der einzige Personenbezug IST die
 --                               Konto-ID.
---   affiliate_daily_stats       aggregiert, kein Personenbezug, keine Frist.
+--   affiliate_daily_stats       aggregiert, kein Personenbezug, keine Frist --
+--                               und seit K3 auch kein Loeschweg mehr ausser
+--                               der Kaskade: die drei Klickzaehler sind die
+--                               einzigen Zahlen des Moduls, die der
+--                               90-Tage-Loeschlauf ueberleben, und eine
+--                               Neuberechnung koennte sie nicht herstellen.
 --
 -- =================================================================
 -- PARTITIONIERUNG: BEWUSST NICHT (mit dem Grund, den der Plan nicht nennt)
@@ -239,6 +320,12 @@
 --       Client-Spalten affiliate_referrals: id, tenant_id, program_id,
 --       partner_id, click_id, campaign, user_id, bound_at, status, expires_at,
 --       created_at -- OHNE `token`.
+--       PRAEZISIERUNG (Befund 5): der heutige B3-Code arbeitet ausschliesslich
+--       ueber createAdminClient() (`service_role`), und dort greifen weder RLS
+--       noch Spaltenrechte. Diese Falle schnappt also erst zu, sobald eine
+--       Oberflaeche mit Session-Client dazukommt -- die Partner- und
+--       Admin-Ansichten aus B5/B6. Sie steht hier trotzdem, weil sie dann
+--       zuschnappt, ohne dass jemand diese Datei noch einmal liest.
 --   (2) Klickzeile und Tageszaehler schreibt ausschliesslich
 --       `affiliate_record_click(...)` (Abschnitt 5). src/lib/affiliate/track.ts
 --       ruft die Funktion auf, statt die Regel ein zweites Mal in TypeScript zu
@@ -247,15 +334,55 @@
 --       und `deduped = false` lohnt eine Referral-Zeile.
 --   (3) Der Loeschlauf `affiliate_clicks_purge()` gehoert in den bestehenden
 --       Cron-Endpunkt (Plan 9.7). Er laeuft stapelweise und gibt die Zahl der
---       geloeschten Zeilen zurueck -- der Aufrufer wiederholt, solange das
---       Ergebnis dem Stapellimit entspricht.
+--       geloeschten Zeilen zurueck.
+--       OFFEN UND VERBINDLICH (Befund 4): dieser Aufruf existiert im Repo
+--       heute NICHT -- `affiliate_clicks_purge` kommt ausserhalb dieser
+--       Migration in keiner Datei vor, und `pg_cron` ist nicht installiert.
+--       Die 90-Tage-Frist haette nach dem Anwenden also keinen Vollzug, und
+--       damit faellt die DSGVO-Begruendung fuer ip_hash/ua_family/dedup_key
+--       (Art. 5 Abs. 1 lit. e) ebenso in sich zusammen wie die Entscheidung
+--       GEGEN Partitionierung, die ausdruecklich darauf beruht, dass der
+--       Loeschlauf die Tabelle bei 90 Tagen haelt. Wo der Aufruf hingehoert,
+--       genau:
+--         Datei   src/app/api/admin/ki/process/route.ts (POST, nach der
+--                 `timingSafeSecretEqual`-Pruefung, im `try`-Block).
+--         Stelle  NEBEN das bestehende `Promise.all([...])` der drei
+--                 KI-Warteschlangen, NICHT hinein: die drei sind
+--                 Job-Warteschlangen mit je EINEM Schritt pro Tick und teilen
+--                 sich nur den Tick (Kommentar ebd.), der Loeschlauf ist
+--                 dagegen ein Aufraeumlauf ohne Job-Zeile. Ein Fehler des
+--                 Loeschlaufs darf die drei Warteschlangen nicht mitreissen,
+--                 also eigener try/catch und ein eigenes Feld in der
+--                 JSON-Antwort (`affiliateClicksPurge`).
+--         Muster  wie die drei anderen: eine Funktion in src/lib/affiliate/
+--                 (z. B. purge.ts) kapselt den RPC, die Route ruft nur auf.
+--                 `admin.rpc('affiliate_clicks_purge', { p_retention_days: 90,
+--                 p_limit: 20000 })`, bei `error` nur `error.code` loggen
+--                 (CLAUDE.md §2.11), NIE die Rohmeldung.
+--         Takt    der Cron-Tick steht auf 2 Minuten (wrangler.jsonc). EIN
+--                 Stapel je Tick genuegt (20 000 Zeilen alle 2 Minuten sind
+--                 14,4 Mio. am Tag); eine Wiederholschleife im selben Request
+--                 ist nicht noetig und wuerde das Zeitbudget des Workers
+--                 riskieren.
+--       ZUR ABBRUCHBEDINGUNG, falls doch jemand schleift: "wiederholen,
+--       solange das Ergebnis dem Stapellimit entspricht" ist nicht vollstaendig
+--       -- wegen `for update skip locked` (Abschnitt 5.3) kann ein Stapel
+--       WENIGER Zeilen liefern, obwohl noch faellige da sind. Der Rest bleibt
+--       dann bis zum naechsten Lauf liegen; bei diesem Takt ist das
+--       unschaedlich, aber es ist keine Garantie, sondern eine Naeherung.
+--       Diese Route gehoert NICHT zu dieser Migration (B4-Agent).
 --   (4) Die Tagesgrenze der Statistik ist `affiliate_stats_day(now())`
 --       (Europe/Berlin). Jeder weitere Schreiber auf affiliate_daily_stats --
 --       insbesondere der Aggregationslauf aus B4 -- benutzt dieselbe Funktion,
 --       sonst zerfaellt der Tag in zwei Definitionen.
---   (5) types.ts braucht die Zeilen-Typen und die beiden Spaltenlisten aus (1);
---       sie fehlen dort heute. Das ist eine Aenderung an
---       src/lib/affiliate/types.ts, nicht an dieser Migration.
+--   (5) UEBERHOLT (Befund 5): hier stand, src/lib/affiliate/types.ts brauche
+--       die Zeilen-Typen und die beiden Spaltenlisten aus (1), sie fehlten
+--       dort heute. B3 hat die Frage anders entschieden: track.ts fuehrt die
+--       Zeilentypen und Spaltenlisten bewusst lokal (track.ts:174-215), weil
+--       types.ts aus B1 stammt und die vier Tabellen dieser Datei dort nicht
+--       kennt. Wer sie spaeter nach types.ts zieht, zieht BEIDE Spaltenlisten
+--       mit -- getrennte Listen an zwei Orten waeren die Falle aus (1) ein
+--       zweites Mal.
 --
 -- =================================================================
 -- DIESE MIGRATION IST NICHT ANGEWENDET
@@ -280,8 +407,9 @@
 --     platform_settings): jede der vier Tabellen bekommt eine echte
 --     SELECT-Policy und zusaetzlich die Deny-Policy als Absichtserklaerung.
 --   * Der Performance-Advisor kann `unused_index` fuer die neuen Indizes
---     melden, solange kein Anwendungscode sie benutzt. Das ist bei einer
---     inerten Migration erwartbar und kein Grund, einen FK-Index zu streichen.
+--     melden, solange der Klick-Endpunkt noch keinen Verkehr gesehen hat. Das
+--     ist direkt nach dem Anwenden erwartbar und kein Grund, einen FK-Index zu
+--     streichen -- er traegt die Kaskade, nicht eine Abfrage.
 --
 -- WIEDERHOLBARKEIT: wie in 20260910120000 bewusst NICHT nachgeruestet. `create
 -- table if not exists` wuerde eine bestehende, inhaltlich abweichende Tabelle
@@ -687,8 +815,33 @@ begin
   -- Die Kontobindung ist einmalig (Plan 4.3: "referral.user_id <> auth.uid()
   -- -> NICHTS tun"). Einmal gebunden, bleibt gebunden -- sonst uebernaehme ein
   -- zweiter Nutzer auf demselben Geraet die Zuordnung des ersten.
-  if old.user_id is not null and new.user_id is distinct from old.user_id then
+  --
+  -- KORREKTUR NACH GEGENLESEN (K6): hier stand nur der erste Zweig, und der
+  -- greift ausschliesslich, wenn BEREITS gebunden war. Die NEUbindung -- der
+  -- haeufigste Fall ueberhaupt -- uebernahm `bound_at` damit ungeprueft vom
+  -- Aufrufer; src/lib/affiliate/bind.ts:190 schickt ihn aus der Worker-Uhr
+  -- mit. Ein Uhrfehler oder eine spaetere Route konnte den Zeitstempel damit
+  -- vor `created_at` legen, ohne dass ein CHECK anschlaegt: die
+  -- Lead-Auswertung (eine Zeile mit gesetztem user_id und ohne Bestellung IST
+  -- der Lead) und jede Rechnung "Zeit vom Klick bis zur Registrierung"
+  -- bekaemen negative Zeitspannen. Gleiche Klasse wie beim INSERT-Zweig oben,
+  -- der `bound_at` gar nicht erst zulaesst -- nur in der Gegenrichtung.
+  -- Die drei Faelle sind hier ABSCHLIESSEND behandelt, damit kein vierter
+  -- unbemerkt durchfaellt; vorher blieb `bound_at` auch dann frei, wenn
+  -- `user_id` unveraendert blieb.
+  if old.user_id is not null then
+    -- Schon gebunden: Konto und Zeitstempel gehoeren der Zeile. Das deckt auch
+    -- den Versuch, `user_id` auf null zu setzen -- der einzige Weg, der das
+    -- darf, ist der Kaskaden-Ausweg weiter oben, und der ist hier laengst
+    -- vorbei.
     new.user_id  := old.user_id;
+    new.bound_at := old.bound_at;
+  elsif new.user_id is not null then
+    -- Neubindung: sie entsteht JETZT, nicht wann der Aufrufer sagt.
+    new.bound_at := now();
+  else
+    -- Weder vorher noch jetzt gebunden (z. B. das `status = 'superseded'` aus
+    -- track.ts): `bound_at` bleibt, was es war -- null.
     new.bound_at := old.bound_at;
   end if;
 
@@ -789,6 +942,31 @@ begin
   new.program_id := old.program_id;
   new.user_id    := old.user_id;
 
+  -- KORREKTUR NACH GEGENLESEN (K2): `bound_at` war beim INSERT erzwungen
+  -- (oben, now()) und beim UPDATE voellig frei. Das ist dieselbe
+  -- INSERT/UPDATE-Asymmetrie, die die Durchsicht im Kopf als eigene
+  -- Pflichtpruefung fuehrt -- nur in der Gegenrichtung, und deshalb von ihr
+  -- nicht erfasst. Sie wiegt hier schwerer als anderswo: Plan 3.8 laesst die
+  -- Umbuchung als UPDATE auf `partner_id` ausdruecklich zu (siehe direkt
+  -- darunter), und eine Route, die die Zeile als ganzes Objekt zurueck-
+  -- schreibt (`.update({...row, partner_id: neu})` oder ein `.upsert()` mit
+  -- der zuvor gelesenen Zeile -- genau das Muster, das bind.ts fuer diese
+  -- Tabelle bereits benutzt), schickt `bound_at` mit. Damit liesse sich die
+  -- Lifetime-Zusage an Partner B auf ein Datum VOR der Zusage an Partner A
+  -- zuruecksetzen. "Die erste Bindung gewinnt" (Abschnitt 3 oben) beruht auf
+  -- genau diesem Zeitstempel; der Beweis fuer "erste" waere faelschbar, und
+  -- zwar ohne jede Spur in der Zeile selbst.
+  -- Bei einer Umbuchung entsteht eine NEUE Zusage -- dort also now() statt
+  -- old, sonst traegt die neue Zusage das Datum der alten. Zum Vergleich:
+  -- affiliate_daily_stats_guard() setzt `rebuilt_at` in beiden Pfaden auf
+  -- now(); hier geht das nicht, weil `bound_at` kein Frischezeitstempel ist,
+  -- sondern der Beleg.
+  if new.partner_id is distinct from old.partner_id then
+    new.bound_at := now();
+  else
+    new.bound_at := old.bound_at;
+  end if;
+
   -- `partner_id` und `source` bleiben fuer 'service_role' AENDERBAR, und das
   -- ist eine Entscheidung, keine Luecke: Plan 3.8 sieht die Aenderung
   -- ausdruecklich vor ("eine Aenderung laeuft ausschliesslich ueber die
@@ -884,6 +1062,22 @@ create index affiliate_daily_stats_program_idx
 -- `where tenant_id = ? and partner_id = ? and day = ?` und das ist genau das
 -- fuehrende Praefix des Primaerschluessels.
 
+-- KORREKTUR NACH GEGENLESEN (K7): die MANDANTENWEITE Tagesabfrage war dabei
+-- uebersehen. Der Primaerschluessel ist (tenant_id, partner_id, day,
+-- campaign) -- `day` steht an dritter Stelle. Das Admin-Diagramm des
+-- Mandanten und der Aggregationslauf aus B4 fragen aber
+-- `where tenant_id = ? and day between ? and ?` OHNE partner_id; Postgres
+-- muesste dafuer das gesamte tenant_id-Praefix lesen, also alle Zeilen aller
+-- Partner ueber die gesamte Laufzeit, und `day` erst danach filtern. Bei 300
+-- Partnern mal 3 Kampagnen mal 2 Jahren sind das rund 650 000 Zeilen fuer ein
+-- Diagramm ueber 30 Tage. Das ist die Tabelle, die bei viel Verkehr haengt --
+-- nicht affiliate_clicks, die haelt der Loeschlauf bei 90 Tagen.
+-- Bewusst NICHT (tenant_id, program_id, day): in v1 gibt es genau ein
+-- Programm je Mandant (Plan 3.2), program_id an zweiter Stelle waere also
+-- eine Spalte ohne Trennschaerfe.
+create index affiliate_daily_stats_day_idx
+  on public.affiliate_daily_stats (tenant_id, day);
+
 create or replace function public.affiliate_daily_stats_guard()
 returns trigger
 language plpgsql
@@ -896,6 +1090,36 @@ begin
     end if;
     new.rebuilt_at := now();
     return new;
+  end if;
+
+  -- KORREKTUR NACH GEGENLESEN (K3): DELETE-Zweig. Er fehlte, und diese Tabelle
+  -- war damit die einzige der vier ohne Loeschschutz -- ausgerechnet die, die
+  -- die einzigen Zahlen traegt, die nicht wiederherstellbar sind: die drei
+  -- Klickzaehler ueberdauern den 90-Tage-Loeschlauf, ihre Quelle nicht (siehe
+  -- den Abschnittskopf oben). Ein `delete from affiliate_daily_stats where
+  -- tenant_id = ... and day < ...` aus einer kuenftigen Aufraeum- oder
+  -- Neuaufbauroute unter `service_role` haette sie endgueltig entfernt.
+  -- Zweite Wirkung, schwerer wiegend: die Tagesobergrenze G18 liest ihren
+  -- Stand aus genau dieser Tabelle (Abschnitt 5.2). Wer die Tageszeile
+  -- loescht, setzt den Deckel von 50 000 auf null zurueck -- der einzige
+  -- Schutz gegen Massenklicks IN der Datenbank haette an einem Wert gehangen,
+  -- den die Datenbank nicht schuetzt.
+  -- Der Zweig steht VOR dem Erlaubniszweig darunter, und das ist kein
+  -- Schoenheitsfehler: der gibt `new` zurueck, und beim DELETE ist NEW nicht
+  -- zugewiesen (55000) -- spiegelbildlich zur Regel, dass der INSERT-Zweig
+  -- ganz vorn steht, weil dort OLD fehlt.
+  -- `pg_trigger_depth() > 1` gibt die Kaskade frei (Mandant, Programm oder
+  -- Partner geloescht) -- an der HERKUNFT der Anweisung, nicht an einer Rolle;
+  -- Herleitung wie in Abschnitt 1.
+  -- FUER B4: ein Neuaufbau des Tagescaches laeuft per Upsert, wie der
+  -- Abschnittskopf ihn beschreibt -- NICHT per Loeschen-und-Neuanlegen. Der
+  -- Weg ist ab hier zu.
+  if tg_op = 'DELETE' then
+    if current_user in ('postgres', 'supabase_admin')
+       or pg_trigger_depth() > 1 then
+      return old;
+    end if;
+    raise exception 'affiliate_daily_stats_immutable';
   end if;
 
   if current_user in ('postgres', 'supabase_admin') then
@@ -914,6 +1138,23 @@ begin
   new.day        := old.day;
   new.campaign   := old.campaign;
   new.program_id := old.program_id;
+
+  -- KORREKTUR NACH GEGENLESEN (K3): die drei Klickzaehler waren beliebig
+  -- aenderbar. Sie sind die einzigen Zahlen dieser Tabelle, die eine
+  -- Neuberechnung NICHT wiederherstellen kann -- ihre Quelle ist nach 90 Tagen
+  -- geloescht --, und sie tragen die Tagesobergrenze. Ein `update ... set
+  -- clicks = 0` genuegte, um den Deckel zurueckzusetzen. Sie duerfen deshalb
+  -- nur wachsen. `greatest` statt Abbruch, weil der einzige legitime Schreiber
+  -- sie ohnehin nur hochzaehlt (Abschnitt 5.2, `s.clicks + 1`) und ein
+  -- Aggregationslauf aus B4, der die Zeile als ganzes Objekt schreibt, sonst
+  -- an einer Null in einem Feld scheiterte, das ihn gar nicht interessiert.
+  -- Die drei anderen Zaehler (leads, orders_count) und alle Betragsspalten
+  -- bleiben absichtlich frei: die berechnet B4 je Lauf neu, und genau das soll
+  -- er koennen -- sie sind aus affiliate_commissions herstellbar.
+  new.clicks        := greatest(new.clicks,        old.clicks);
+  new.unique_clicks := greatest(new.unique_clicks, old.unique_clicks);
+  new.bot_clicks    := greatest(new.bot_clicks,    old.bot_clicks);
+
   -- Der Zeitstempel sagt, wann der Cache zuletzt angefasst wurde. Ihn vom
   -- Aufrufer setzen zu lassen hiesse, einen veralteten Cache als frisch
   -- ausgeben zu koennen -- und genau daran haengt der Abgleichsbericht aus
@@ -924,7 +1165,9 @@ end;
 $$;
 
 drop trigger if exists affiliate_daily_stats_guard_trg on public.affiliate_daily_stats;
-create trigger affiliate_daily_stats_guard_trg before insert or update on public.affiliate_daily_stats
+-- KORREKTUR NACH GEGENLESEN (K3): `or delete` ergaenzt -- ohne den dritten
+-- Pfad feuert der DELETE-Zweig der Funktion nie.
+create trigger affiliate_daily_stats_guard_trg before insert or update or delete on public.affiliate_daily_stats
   for each row execute function public.affiliate_daily_stats_guard();
 
 alter table public.affiliate_daily_stats enable row level security;
@@ -1280,3 +1523,185 @@ grant  execute on function public.affiliate_customer_bindings_guard()  to authen
 revoke execute on function public.affiliate_daily_stats_guard()        from public;
 revoke execute on function public.affiliate_daily_stats_guard()        from anon;
 grant  execute on function public.affiliate_daily_stats_guard()        to authenticated, service_role;
+
+-- =================================================================
+-- 8. KORREKTUR NACH GEGENLESEN (K1): Loeschweg ueber affiliate_partners
+-- =================================================================
+-- WAS WAR FALSCH. Alle vier Tabellen dieser Datei haengen per `on delete
+-- cascade` an affiliate_partners (Abschnitt 1-4). affiliate_partners traegt
+-- aber ein DELETE-Recht fuer `authenticated` (20260910120000) samt Policy
+-- `affiliate_partners_manager_delete`, und der zugehoerige
+-- affiliate_partners_delete_guard() kennt nur affiliate_billing_profiles und
+-- -- als Vorgriff auf B4 -- affiliate_commissions. Die vier Kindtabellen
+-- dieser Datei standen dort nicht, und ihre eigenen DELETE-Guards lassen die
+-- Kaskade ausdruecklich durch (`pg_trigger_depth() > 1`, Abschnitt 1 und 2).
+--
+-- SZENARIO, das damit offen stand: ein owner/admin legt einen Partner an und
+-- schaltet ihn frei. `user_id` bleibt leer (das Konto wird nie verknuepft),
+-- `terms_accepted_at` bleibt null -- track.ts filtert beim Klick nur auf
+-- `status = 'active'`, nicht auf user_id. Der Partnerlink sammelt wochenlang
+-- Klicks, Zuordnungen, Lifetime-Bindungen und Tageszahlen. Dann zwei
+-- gewoehnliche PostgREST-Requests mit dem normalen authenticated-JWT:
+-- PATCH ?id=eq.X {"status":"rejected"} -- `status` steht im UPDATE-Spaltenrecht
+-- des Managers, die G15-Sperre greift nur an SEINER eigenen Zeile --, danach
+-- DELETE ?id=eq.X. Policy erfuellt, Delete-Guard erfuellt (kein
+-- Abrechnungsprofil, noch keine Provisionen). Die Kaskade raeumt alle vier
+-- Tabellen dieses Partners restlos weg. Uebrig bleibt ein Pruefpfad-Eintrag,
+-- dessen entity_id auf nichts mehr zeigt, und ein Attributionsstreit, der
+-- nicht mehr aufloesbar ist.
+--
+-- WARUM DAS DER KERN IST: dieselbe Datei verweigert dem hoeher privilegierten
+-- `service_role` genau dieses Loeschen in zwei ausfuehrlichen
+-- Kommentarbloecken (Abschnitt 1 und 2) und schreibt im Aufbewahrungsabschnitt
+-- oben, eine Referral-Zeile sei "der Beleg, warum eine Provision entstanden
+-- ist". Ein Recht, das der maechtigeren Rolle verwehrt und der schwaecheren
+-- gegeben wird, ist kein Schutz, sondern eine Formalie. Gleiche Bauart wie Z4
+-- in der zweiten B1-Runde, nur eine Tabellengeneration weiter.
+--
+-- WARUM HIER UND NICHT AM FREMDSCHLUESSEL. `on delete restrict` auf
+-- (partner_id, tenant_id) waere die zweite Moeglichkeit, ist aber die
+-- schlechtere: `restrict` feuert SOFORT, waehrend `no action` bis zum Ende der
+-- Anweisung wartet. Die Mandantenloeschung (`delete from tenants`,
+-- src/lib/platform/actions.ts) raeumt Partnerzeilen und Kindzeilen ueber
+-- dieselbe Anweisung; `restrict` haette sie je nach Reihenfolge der
+-- RI-Aktionen blockiert -- genau die Totalblockade, die in B1 zweimal
+-- zurueckgenommen werden musste. Der Guard hat den Kaskadenausweg bereits und
+-- laesst die Mandantenloeschung durch.
+--
+-- WARUM EIN `create or replace` EINER B1-FUNKTION IN DIESER DATEI: der Guard
+-- muss Tabellen kennen, die es in B1 noch nicht gab. Eine Migration ist der
+-- vorgesehene Ort dafuer, und die Reihenfolge stimmt (diese Datei laeuft nach
+-- 20260910120000). Der Rumpf unten ist der aus B1, Wort fuer Wort, plus den
+-- vier neuen Pruefungen -- `create or replace` ersetzt ihn vollstaendig, ein
+-- Auslassen waere ein stilles Zuruecknehmen.
+-- WER DIESE FUNKTION SPAETER ERNEUT ERSETZT (B4 bringt affiliate_commissions
+-- und wird versucht sein, den to_regclass-Vorgriff zu entfernen): DIE VIER
+-- PRUEFUNGEN UNTEN MUESSEN MIT. Sonst steht der Loeschweg wieder offen, und
+-- diesmal auf Zeilen, an denen Provisionen haengen.
+--
+-- GEGENPROBE IN BEIDE RICHTUNGEN, weil daran die erste B1-Korrektur
+-- gescheitert ist:
+--   * WER WIRD JETZT AUSGESPERRT? Der Manager kann eine Partnerzeile nicht
+--     mehr loeschen, sobald sie EINEN Klick gesehen hat. Das ist die Absicht,
+--     und es ist derselbe Preis, den B1 fuer das Abrechnungsprofil bewusst
+--     bezahlt: die Zeile bleibt als 'rejected' stehen und wird im Loeschfall
+--     anonymisiert (Plan 7.8), statt dass ein Klick Beleg und Pruefpfad
+--     auseinanderreisst. Loeschbar bleibt genau das, was loeschbar sein soll:
+--     die versehentlich angelegte Zeile, die nie jemand benutzt hat.
+--   * WER KOMMT JETZT FAELSCHLICH NICHT MEHR DURCH? Niemand: der
+--     Erlaubniszweig ganz oben (postgres/supabase_admin ODER
+--     `pg_trigger_depth() > 1`) steht VOR jeder Pruefung und kehrt sofort
+--     zurueck. Die Mandantenloeschung laeuft also unveraendert, ebenso jede
+--     Migration und jeder Dashboard-Eingriff. Nachgerechnet an allen vier
+--     Loeschpfaden: Mandant (Kaskade, Tiefe >= 2, durchgelassen), Nutzer
+--     (beruehrt affiliate_partners nur per SET NULL auf user_id, ist ein
+--     UPDATE und kommt in dieser Funktion gar nicht an), Programm (kein
+--     DELETE-Recht fuer authenticated, und die Kaskade ginge an
+--     affiliate_partners vorbei), Partner (der Fall, um den es geht).
+--   * SIEHT DER GUARD, WAS ER SEHEN MUSS? Er laeuft OHNE `security definer`
+--     (er braucht `current_user`), die vier `exists` laufen also mit den
+--     Rechten des Aufrufers. Der Aufrufer ist an dieser Stelle immer ein
+--     Manager -- anders kaeme er nicht an der DELETE-Policy vorbei --, und
+--     genau fuer ihn geben die SELECT-Policies dieser Datei die Zeilen frei.
+--     Die Spaltenrechte reichen ebenfalls: geprueft werden nur `tenant_id`
+--     und `partner_id`, und die stehen in beiden Spalten-Grants (Abschnitt 1
+--     und 2). Saehe er die Zeilen doch nicht, bliebe der Schutz trotzdem
+--     bestehen -- dann gehoerten sie zu einem fremden Mandanten, und der
+--     zusammengesetzte Fremdschluessel liesse das DELETE ohnehin nicht zu.
+--   * WARUM AUCH affiliate_daily_stats GEPRUEFT WIRD, obwohl das Gegenlesen
+--     nur drei Tabellen nennt: nach 90 Tagen sind die Klickzeilen weg, die
+--     Tageszahlen nicht. Ohne diese vierte Pruefung waere der Loeschweg nach
+--     einem Quartal wieder offen -- und dann auf die einzigen Zahlen, die
+--     niemand neu berechnen kann.
+create or replace function public.affiliate_partners_delete_guard()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  -- Erlaubnisliste wie ueberall in dieser Datei, PLUS die Herkunft der
+  -- Anweisung: `pg_trigger_depth() > 1` heisst "aus einer Fremdschluessel-
+  -- kaskade heraus", und das ist hier der Loeschvorgang eines ganzen
+  -- Mandanten (`delete from tenants` kaskadiert auf affiliate_partners).
+  -- Ohne diesen Zweig haette der Guard die Mandantenloeschung blockiert --
+  -- derselbe Fehler, der in Abschnitt 7 gerade zurueckgenommen wurde, nur
+  -- eine Tabelle weiter. Begruendung der Zahl: siehe Abschnitt 7.
+  if current_user in ('postgres', 'supabase_admin')
+     or pg_trigger_depth() > 1 then
+    return old;
+  end if;
+
+  -- Ein Abrechnungsprofil entsteht erst, wenn jemand tatsaechlich Partner
+  -- geworden ist und Geld erwartet. Es ist damit das haltbarste Merkmal fuer
+  -- "diese Zeile gehoert zum Beleg" -- haltbarer als jeder Status, weil es der
+  -- Partner selbst anlegt und der Manager es nicht zuruecksetzen kann.
+  if exists (select 1 from public.affiliate_billing_profiles b
+             where b.partner_id = old.id and b.tenant_id = old.tenant_id) then
+    raise exception 'affiliate_partner_has_billing_profile';
+  end if;
+
+  -- Vorgriff auf Block B4: sobald es Provisionszeilen gibt, ist die Zeile
+  -- unwiderruflich Teil des Buches. Die to_regclass-Pruefung haelt den Guard
+  -- bis dahin lauffaehig (plpgsql loest Tabellennamen erst beim Ausfuehren der
+  -- jeweiligen Anweisung auf), gleiche Bauart wie im UPDATE-Zweig oben.
+  if to_regclass('public.affiliate_commissions') is not null then
+    if exists (select 1 from public.affiliate_commissions c
+               where c.tenant_id = old.tenant_id and c.partner_id = old.id) then
+      raise exception 'affiliate_partner_has_commissions';
+    end if;
+  end if;
+
+  -- ---------------- NEU MIT B3 (K1) -----------------------------------------
+  -- Ab hier haengt an einer Partnerzeile ein Pruefpfad, den die Kaskade sonst
+  -- mitnaehme. Die Reihenfolge ist die des Beweiswerts: die Zuordnung zuerst,
+  -- weil sie die Provision begruendet, die Rohklicks danach, weil sie die
+  -- Betrugspruefung tragen.
+  -- `to_regclass` wie beim Vorgriff oben -- nicht, weil die Tabellen fehlen
+  -- koennten (diese Datei legt sie an), sondern damit die Funktion auch dann
+  -- lauffaehig bleibt, wenn jemand sie in einer aelteren Datenbank einspielt
+  -- oder eine der Tabellen spaeter umbenannt wird. Ein Guard, der mit 42P01
+  -- abbricht, blockiert jede Partnerloeschung.
+  if to_regclass('public.affiliate_referrals') is not null then
+    if exists (select 1 from public.affiliate_referrals r
+               where r.tenant_id = old.tenant_id and r.partner_id = old.id) then
+      raise exception 'affiliate_partner_has_referrals';
+    end if;
+  end if;
+
+  if to_regclass('public.affiliate_customer_bindings') is not null then
+    if exists (select 1 from public.affiliate_customer_bindings cb
+               where cb.tenant_id = old.tenant_id and cb.partner_id = old.id) then
+      raise exception 'affiliate_partner_has_bindings';
+    end if;
+  end if;
+
+  if to_regclass('public.affiliate_clicks') is not null then
+    if exists (select 1 from public.affiliate_clicks ac
+               where ac.tenant_id = old.tenant_id and ac.partner_id = old.id) then
+      raise exception 'affiliate_partner_has_clicks';
+    end if;
+  end if;
+
+  -- Die Tageszahlen ueberdauern den 90-Tage-Loeschlauf, die Klickzeilen nicht.
+  -- Ohne diese Pruefung waere der Loeschweg nach einem Quartal wieder offen.
+  if to_regclass('public.affiliate_daily_stats') is not null then
+    if exists (select 1 from public.affiliate_daily_stats ds
+               where ds.tenant_id = old.tenant_id and ds.partner_id = old.id) then
+      raise exception 'affiliate_partner_has_daily_stats';
+    end if;
+  end if;
+
+  return old;
+end;
+$$;
+
+-- Der Trigger affiliate_partners_delete_guard_trg aus 20260910120000 haengt an
+-- der Funktion, nicht an ihrem Rumpf, und zeigt nach dem `create or replace`
+-- unveraendert auf sie -- er wird hier bewusst NICHT neu angelegt.
+-- Die Ausfuehrungsrechte bleiben bei `create or replace` zwar erhalten; sie
+-- stehen hier trotzdem noch einmal, weil dieselbe Datei fuer ihre eigenen
+-- Funktionen "nach JEDEM kuenftigen `create or replace` erneut setzen"
+-- verlangt und eine Ausnahme davon niemand nachpruefen wuerde.
+revoke execute on function public.affiliate_partners_delete_guard() from public;
+revoke execute on function public.affiliate_partners_delete_guard() from anon;
+grant  execute on function public.affiliate_partners_delete_guard() to authenticated, service_role;
