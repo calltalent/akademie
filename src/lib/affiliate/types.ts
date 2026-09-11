@@ -416,7 +416,15 @@ export const AFFILIATE_PARTNER_CLIENT_COLUMNS = [
   "group_id",
   "referred_by",
   "payout_hold",
-  "payout_hold_reason",
+  // `payout_hold_reason` steht hier bewusst NICHT (11.09.2026): das
+  // SELECT-Spaltenrecht auf `affiliate_partners` gibt den Freitext seit der
+  // zweiten Gegenlese-Runde nicht mehr her, weil er sonst ueber den Pruefpfad
+  // im Klartext beim Partner landete. Wer die Spalte in einer Manager-Ansicht
+  // braucht, laedt sie ueber `createAdminClient()` nach und benutzt dafuer
+  // einen eigenen Spaltensatz -- nicht diesen hier. Stuende sie in dieser
+  // Liste, bekaeme der erste Aufrufer erst im Betrieb ein 42501
+  // "permission denied for column payout_hold_reason"; in dieser Umgebung
+  // laeuft kein Test gegen eine echte Datenbank, der das vorher faende.
   "terms_version_accepted",
   "terms_accepted_at",
   "notify_sale",

@@ -70,6 +70,16 @@ function normalizeKey(key: string): string {
  *     `vat_check_log` ist die rohe VIES-Antwort und enthält Name und Anschrift.
  * (b) Spalten, die die Spaltenrechte aus 3.3 dem Partner vorenthalten,
  *     während er seine eigenen Protokollzeilen lesen darf (Grund 1 oben).
+ *     `payout_hold_reason` gehört seit der zweiten Gegenlese-Runde dazu: die
+ *     Spalte stand weder hier noch traf eine der Endungen unten, und der
+ *     Freitext einer Auszahlungssperre („Verdacht auf Eigenbestellungen,
+ *     Anwalt eingeschaltet") erreichte den Partner damit über `before`/`after`
+ *     im Klartext — während `internal_note` und `status_reason` derselben
+ *     Zeile korrekt als „***" erschienen. Gegenstück in der Migration
+ *     20260910120000_affiliate_core.sql, Abschnitt 4: die Spalte ist dort aus
+ *     dem SELECT-Spaltenrecht von `authenticated` entfernt, sonst hätte der
+ *     Partner sie ohnehin an der Quelle gelesen und die Redaktion wäre
+ *     Theater gewesen.
  * (c) Personenbezug, den der Löschantrag anonymisiert (Grund 2 oben).
  * (d) Geheimnisse, die in einer Zeile dieses Moduls nie vorkommen sollten —
  *     Gürtel und Hosenträger für den Fall, dass ein späterer Aufrufer ein
@@ -88,6 +98,7 @@ const AFFILIATE_AUDIT_REDACTED_KEYS: ReadonlySet<string> = new Set(
     // (b)
     "internal_note",
     "status_reason",
+    "payout_hold_reason",
     "application",
     "terms_accepted_ip_hash",
     "ip_hash",

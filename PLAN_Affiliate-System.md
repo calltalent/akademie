@@ -28,9 +28,15 @@ liest ausschließlich diese Momentaufnahme und löst die Zuordnung nicht erneut 
 Klick, der nach dem Checkout-Start passiert, eine bereits laufende Bestellung nicht mehr umhängen.
 
 Provisionssätze werden über eine einzige Tabelle `affiliate_conditions` aufgelöst, deren
-Vorrangkette als generierte Spalte `specificity` in der Datenbank steht (Partner+Produkt 30,
+Vorrangkette als generierte Spalte `specificity` in der Datenbank steht (Partner+Produkt 25,
 Partner 20, Gruppe+Produkt 15, Gruppe 10, Produkt 5, sonst Programmstandard); eine zeitlich
-befristete Aktionskondition ist dieselbe Zeile mit `valid_from`/`valid_to`. Der gewählte Satz und
+befristete Aktionskondition ist dieselbe Zeile mit `valid_from`/`valid_to`.
+Die absoluten Zahlen sind bedeutungslos, allein die Ordnung 25 > 20 > 15 > 10 > 5 zählt: 25 ist
+die natürliche Summe der Zuschläge (Partner 20 + Produkt 5) der generierten Spalte in 3.5 und in
+`20260910120000_affiliate_core.sql`. Hier stand bis zum Gegenlesen am 11.09.2026 fälschlich 30;
+korrigiert wurde der Plan, nicht das SQL — eine Testdatei, die gegen 30 prüft, würde sonst jemanden
+dazu verleiten, die generierte Spalte oder die Sortierung „zu reparieren" und dabei die Kette zu
+brechen. Der gewählte Satz und
 alle Programmparameter, die in die Rechnung eingingen, werden als `condition_snapshot` jsonb in die
 Buchungszeile eingefroren, sodass jede Zeile ohne jede andere Tabelle nachrechenbar ist.
 
@@ -1547,6 +1553,18 @@ limit 1;
 `:at` ist `event.occurred_at`, nicht `now()` — bei einem Stripe-Retry können Tage dazwischenliegen.
 Kein Treffer bedeutet Programmstandard. `valid_from desc` sorgt dafür, dass eine befristete
 Aktionskondition eine dauerhafte Regel gleicher Spezifität schlägt.
+
+`specificity` liefert dabei Partner+Produkt **25** (= 20 + 5), Partner 20, Gruppe+Produkt 15,
+Gruppe 10, Produkt 5 — so wie die generierte Spalte in 3.5 rechnet. Abschnitt 1.1 nannte für die
+oberste Stufe bis zum Gegenlesen am 11.09.2026 fälschlich 30; die Kette ist in beiden Fassungen
+dieselbe, nur die Zahl war falsch. Maßgeblich ist die Ordnung, nicht der Betrag.
+
+Damit die befristete Aktionskondition überhaupt einfügbar ist, trägt `affiliate_conditions` **keinen
+EXCLUDE-Constraint gegen Zeitüberschneidung** mehr (er verbot genau das Paar Dauerregel + Aktion,
+auf dem diese Auflösung beruht), sondern eine Eindeutigkeit je Geltungsbereich **und** `valid_from`.
+Das hält die Sortierung oben sachlich entscheidbar: zwei Zeilen gleicher Spezifität und gleichen
+Geltungsbereichs unterscheiden sich immer in `valid_from`, `id` bleibt nur der letzte formale
+Stichentscheid. Begründung im Kopf von `20260910120000_affiliate_core.sql`, Abschnitt 5.
 
 Danach wird geklammert, auch wenn CHECK-Constraints greifen — dieselbe Verteidigungslinie wie
 `fulfil.ts:212`:

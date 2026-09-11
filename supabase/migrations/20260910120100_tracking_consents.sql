@@ -64,6 +64,71 @@
 -- supabase/config.toml (Plan 12.7). Das Anwenden bleibt Josip vorbehalten
 -- (CLAUDE.md §4.6). Danach: `get_advisors(security)` UND
 -- `get_advisors(performance)` laufen lassen.
+--
+-- =================================================================
+-- KORREKTUREN NACH GEGENLESEN (11.09.2026)
+-- =================================================================
+--   B5 (HOCH) -- Gemeldet war: `tracking_consents_guard()` werfe fuer
+--      `service_role` auch beim DELETE und mache damit die BESTEHENDE
+--      Mandantenloeschung im Betreiber-Portal unmoeglich. WIDERLEGT UND IN DER
+--      ZWEITEN RUNDE ZURUECKGENOMMEN, siehe unten -- blockiert war nichts,
+--      und die Korrektur der ersten Runde machte den gesamten Serverbetrieb
+--      zum Loescher des Einwilligungsnachweises. Richtig bleibt nur der
+--      Nebensatz: eine Mandantenloeschung IST ein Vorgang des laufenden
+--      Betriebs (src/lib/platform/actions.ts:295).
+--   B11 (MITTEL) -- Wiederholbarkeit. Diese Datei braucht dafuer keine
+--      Aenderung, und das ist eine Entscheidung, keine Auslassung: die einzige
+--      Funktion steht bereits als `create or replace` da, und alles andere
+--      (`create index`, `create trigger`, `create policy`) haengt an der
+--      Tabelle, die diese Datei selbst anlegt. `create table if not exists`
+--      wuerde eine bestehende, inhaltlich abweichende Tabelle stillschweigend
+--      durchwinken -- ein Abbruch mit 42P07 ist die ehrlichere Auskunft. Und
+--      solange `create table` abbricht, wird nichts darunter erreicht; ein
+--      `if exists` davor waere Zierrat, der nur Lesbarkeit kostet. Vor dem
+--      `create trigger` steht trotzdem ein `drop trigger if exists`, weil der
+--      Trigger an einer `create or replace`-Funktion haengt und die Zeile so
+--      fuer sich lesbar bleibt.
+--
+-- DURCHSICHT "INSERT-PFAD" (11.09.2026): Kein RECHTE-Loch -- `revoke all`
+-- nimmt anon und authenticated jedes Recht, es gibt keine erlaubende Policy,
+-- geschrieben wird ausschliesslich unter `service_role`. Ein Client erreicht
+-- den INSERT-Pfad also nicht direkt, und weil die Tabelle append-only ist
+-- (ein Widerruf ist eine NEUE Zeile), gibt es auch keinen "gefaehrlichen
+-- Anfangszustand", den eine Zeile beim Anlegen tragen koennte. `created_at`
+-- braucht aus demselben Grund keinen Server-Zeitstempel-Zwang wie in
+-- 20260910120000.
+-- NACHTRAG ZWEITE RUNDE: der INSERT-Pfad ist trotzdem nicht ungeschuetzt
+-- geblieben. Er ist zwar kein RECHTE-Pfad, aber ein MENGEN-Pfad: der einzige
+-- Schreiber ist eine oeffentlich aufrufbare Server Action, die fuer 'denied'
+-- und 'withdrawn' bewusst kein Rate-Limit hat. Der Guard traegt deshalb jetzt
+-- einen INSERT-Zweig mit Entdopplung und Mengenbegrenzung; Begruendung dort.
+--
+-- =================================================================
+-- KORREKTUREN NACH GEGENLESEN, ZWEITE RUNDE (11.09.2026)
+-- =================================================================
+--   Z1 BLOCKIEREND, Abschnitt 2 -- 'service_role' ist aus der
+--      DELETE-Erlaubnisliste WIEDER ENTFERNT. Die Kaskade der
+--      Mandantenloeschung haengt jetzt an `pg_trigger_depth() > 1`, also an
+--      der HERKUNFT der Anweisung statt an der Rolle. Begruendung, Beleg und
+--      die ausdruecklich benannte Restannahme stehen im Funktionsrumpf;
+--      wortgleich in 20260910120000_affiliate_core.sql, Abschnitt 7.
+--   Z2 Abschnitt 2 -- die Tabelle hatte weder Entdopplung noch
+--      Mengenbegrenzung, obwohl ihr einziger Schreiber oeffentlich aufrufbar
+--      ist und fuer 'denied'/'withdrawn' bewusst kein Rate-Limit hat. Der
+--      Guard bekommt einen INSERT-Zweig: eine inhaltsgleiche Wiederholung und
+--      alles jenseits von 100 Entscheidungen je Subjekt und Kategorie wird
+--      uebersprungen -- klaglos, nicht mit einer Ausnahme, damit ein Widerruf
+--      niemals an der Technik scheitert (Art. 7 Abs. 3 DSGVO).
+--
+-- VORAUSSETZUNG FUER B3 (und gleich mit, sobald jemand consent/actions.ts
+-- anfasst): Der Riegel im Trigger begrenzt je SUBJEKT. `subject_key` waehlt
+-- aber der Aufrufer -- wer die opake Consent-ID je Aufruf rotiert, umgeht ihn.
+-- Dagegen hilft nur ein Rate-Limit im Aufrufer, und zwar fuer ALLE Richtungen
+-- statt nur fuer 'granted' (src/lib/consent/actions.ts:145-150). Es darf den
+-- Widerruf nicht abweisen -- also grosszuegiges Fenster, und bei
+-- Ueberschreitung nur den INSERT ueberspringen, waehrend Cookie und Rueckgabe
+-- unveraendert weiterlaufen. Diese Datei kann das nicht leisten: ein Trigger
+-- sieht keine Aufruferkennung ausser dem, was in der Zeile steht.
 
 -- =================================================================
 -- 1. Tabelle
@@ -112,35 +177,181 @@ create index tracking_consents_subject_idx
 -- Ein Einwilligungsnachweis, der aenderbar ist, ist keiner. `service_role`
 -- umgeht RLS und traegt volle Tabellenrechte -- ohne diesen Trigger koennte
 -- ein Fehler im Serverbetrieb eine erteilte oder widerrufene Einwilligung
--- nachtraeglich umschreiben. Die Erlaubnisliste laesst nur Migrationen und
--- Dashboard-Eingriffe durch ('postgres'/'supabase_admin'), damit die Loeschung
--- bzw. Anonymisierung nach Art. 17 DSGVO als bewusster, protokollierter
+-- nachtraeglich umschreiben. Die Erlaubnisliste fuer das AENDERN laesst nur
+-- Migrationen und Dashboard-Eingriffe durch ('postgres'/'supabase_admin'),
+-- damit die Anonymisierung nach Art. 17 DSGVO als bewusster, protokollierter
 -- Eingriff moeglich bleibt; 'service_role', also der normale Serverbetrieb,
--- steht hier bewusst NICHT.
+-- steht dort bewusst NICHT. Fuer das LOESCHEN gilt eine eigene Liste --
+-- dieselben zwei Rollen, ERGAENZT UM DIE HERKUNFT DER ANWEISUNG
+-- (`pg_trigger_depth() > 1`); Begruendung direkt darunter.
 --
--- Nebenwirkung, bewusst in Kauf genommen: der `on delete cascade` von
--- `tenants` greift nur, wenn die Mandantenloeschung unter
--- 'postgres'/'supabase_admin' laeuft. Genau dieselbe Eigenschaft hat
--- affiliate_audit_log (20260910120000_affiliate_core.sql:829-846); eine
--- Mandantenloeschung ist in diesem Projekt ohnehin kein Vorgang des laufenden
--- Betriebs.
+-- KORREKTUR (B5, ZWEITE RUNDE -- die Korrektur der ersten Runde ist
+-- ZURUECKGENOMMEN).
+-- Was in der ERSTEN Runde falsch war: der DELETE-Zweig war um 'service_role'
+-- erweitert worden, weil die Mandantenloeschung im Betreiber-Portal
+-- (src/lib/platform/actions.ts:295, `admin.from("tenants").delete()`) sonst
+-- angeblich blockiert sei. Die Praemisse traegt nicht, und die Folge war ein
+-- echter Schutzverlust: der gesamte Serverbetrieb laeuft unter dieser Rolle --
+-- jede Route mit createAdminClient() konnte den Einwilligungsnachweis danach
+-- zeilenweise und spurlos raeumen. Bei einer Tabelle, die es ausschliesslich
+-- wegen Art. 7 Abs. 1 DSGVO gibt, ist das der Verlust ihres Zwecks.
+-- Warum die Praemisse nicht traegt (lesend belegt, 11.09.2026): eine
+-- ON-DELETE-Kaskade laeuft nicht unter der Rolle des Aufrufers. Sie haengt als
+-- INTERNER Trigger an der ELTERN-Tabelle -- `pg_trigger` join `pg_proc` fuer
+-- `relname = 'tenants'` zeigt je Kind-Fremdschluessel ein
+-- RI_ConstraintTrigger mit tgisinternal = true und der Funktion
+-- `RI_FKey_cascade_del` -- und PostgreSQL schaltet dabei die Benutzerkennung
+-- auf den EIGENTUEMER der referenzierenden Tabelle um
+-- (ri_PerformCheck/SetUserIdAndSecContext auf relowner). Eigentuemer ist
+-- 'postgres': alle 52 Tabellen in `public` gehoeren dieser Rolle
+-- (pg_class.relowner gegen pg_roles gelesen), und 'postgres' stand von Anfang
+-- an in der Liste. Die Mandantenloeschung war also nie blockiert.
+-- ANNAHME, die lesend nicht beweisbar ist: dass `current_user` im
+-- Kind-Trigger tatsaechlich 'postgres' ZEIGT, folgt aus dem Quelltext von
+-- ri_triggers.c, nicht aus einer Messung -- die braeuchte einen
+-- Schreibvorgang, und diese Umgebung darf nicht in die Live-Datenbank
+-- schreiben. Deshalb haengt die Kaskade unten nicht an dieser Annahme,
+-- sondern an der Herkunft der Anweisung.
+-- Warum `pg_trigger_depth() > 1` die richtige Schranke ist: ein direktes
+-- `delete from public.tracking_consents ...` ruft den BEFORE-Trigger DIESER
+-- Anweisung auf und sieht bereits Tiefe 1 -- `> 1` laesst es also NICHT
+-- durch, das gezielte Einzel-DELETE aus einer Server-Route bleibt verboten.
+-- Eine Kaskade ist dagegen mindestens zwei Ebenen tief: die RI-Aktion IST ein
+-- Trigger auf der Elterntabelle (Tiefe 1), das von ihr abgesetzte `delete`
+-- bringt die Trigger der Kindtabelle auf Tiefe 2; verschachtelte Kaskaden
+-- liegen hoeher, deshalb `> 1` statt `= 2`. Ausloesen kann eine Kaskade kein
+-- Client: auf `public.tenants` haben anon und authenticated kein DELETE-Recht
+-- und es gibt dort keine DELETE-Policy.
+-- Unberuehrt bleibt, worum es hier geht: UPDATE ist fuer service_role
+-- weiterhin gesperrt -- eine erteilte oder widerrufene Einwilligung laesst
+-- sich nicht nachtraeglich umschreiben.
+--
+-- KORREKTUR (ZWEITE RUNDE, neuer Befund): Der Guard bekommt einen
+-- INSERT-Zweig -- Entdopplung und Mengenbegrenzung. Begruendung im Rumpf.
 create or replace function public.tracking_consents_guard()
 returns trigger
 language plpgsql
 set search_path = public, pg_temp
 as $$
+declare
+  juengste public.tracking_consents%rowtype;
+  anzahl bigint;
 begin
-  if current_user in ('postgres', 'supabase_admin') then
-    if tg_op = 'DELETE' then
+  -- INSERT: die Tabelle hatte weder Entdopplung noch Mengenbegrenzung, und ihr
+  -- einziger Schreiber ist eine OEFFENTLICH aufrufbare Server Action, die fuer
+  -- 'denied' und 'withdrawn' bewusst KEIN Rate-Limit hat
+  -- (src/lib/consent/actions.ts:145-150; die Begruendung Art. 7 Abs. 3 DSGVO
+  -- traegt fuer das Cookie, nicht fuer die Datenbankzeile -- das Cookie setzt
+  -- dieselbe Action unabhaengig davon, ob der INSERT gelingt).
+  -- Szenario: ein anonymer Aufrufer schickt setTrackingConsent('denied') in
+  -- einer Schleife gegen einen Mandanten-Host. Jeder Aufruf schreibt eine
+  -- Zeile; die Tabelle und ihr Index wachsen unbegrenzt, die
+  -- Zustandsaufloesung (juengste Zeile je Subjekt) wird langsam und die
+  -- DSGVO-Auskunft zu diesem Subjekt unlesbar.
+  --
+  -- Warum ein Trigger und KEIN unique index: der Schreiber wertet einen
+  -- INSERT-Fehler als Misserfolg und bricht die zustimmende Richtung ab
+  -- (actions.ts:200-206). Ein Nutzer, der zweimal auf "Annehmen" klickt,
+  -- bekaeme dann eine Fehlermeldung, obwohl seine Einwilligung laengst im
+  -- Nachweis steht -- der Riegel wuerde als Fehler erscheinen. Ein BEFORE
+  -- INSERT-Trigger, der `null` zurueckgibt, laesst die Anweisung dagegen
+  -- klaglos durchlaufen und schreibt nur nichts.
+  --
+  -- (1) ENTDOPPLUNG, semantisch statt zeitfensterbasiert: uebersprungen wird
+  --     nur, was KEINE neue Auskunft traegt -- die juengste Zeile desselben
+  --     Subjekts und derselben Kategorie sagt bereits dasselbe (gleiche
+  --     `decision` UND gleiche `policy_version`). Die Kette Zustimmung ->
+  --     Widerruf -> erneute Zustimmung bleibt damit vollstaendig, und eine
+  --     erneute Zustimmung nach einer Textaenderung ebenfalls (andere
+  --     policy_version). Verloren geht allein ein abweichender `ip_hash` einer
+  --     inhaltsgleichen Wiederholung -- der Nachweis fuer diese Entscheidung
+  --     existiert dann bereits.
+  -- (2) MENGENBEGRENZUNG je Subjekt und Kategorie. 100 Entscheidungen sind fuer
+  --     einen Menschen unerreichbar viel und fuer eine Schleife in Sekunden
+  --     erreicht. Darueber wird nicht geworfen, sondern uebersprungen: ein
+  --     Widerruf, der an einer Ausnahme scheitert, waere Art. 7 Abs. 3 DSGVO
+  --     zuwider, und das Cookie -- der operative Zustand -- setzt die Action
+  --     ohnehin unabhaengig vom INSERT.
+  --     ACHTUNG, Grenze dieses Riegels: `subject_key` waehlt der Aufrufer
+  --     (opake Consent-ID aus dem Cookie). Wer sie je Aufruf rotiert, umgeht
+  --     die Begrenzung -- dagegen hilft nur ein Rate-Limit im Aufrufer, siehe
+  --     VORAUSSETZUNG im Kopf dieser Datei.
+  -- 'postgres'/'supabase_admin' bleiben aussen vor: ein Migrations- oder
+  -- Dashboard-Eingriff soll genau das schreiben, was er schreibt.
+  if tg_op = 'INSERT' then
+    if current_user in ('postgres', 'supabase_admin') then
+      return new;
+    end if;
+
+    select * into juengste
+    from public.tracking_consents c
+    where c.tenant_id = new.tenant_id
+      and c.subject_kind = new.subject_kind
+      and c.subject_key = new.subject_key
+      and c.category = new.category
+    order by c.created_at desc, c.id desc
+    limit 1;
+
+    if found
+       and juengste.decision = new.decision
+       and juengste.policy_version = new.policy_version then
+      return null;                            -- inhaltsgleiche Wiederholung
+    end if;
+
+    select count(*) into anzahl
+    from public.tracking_consents c
+    where c.tenant_id = new.tenant_id
+      and c.subject_kind = new.subject_kind
+      and c.subject_key = new.subject_key
+      and c.category = new.category;
+
+    -- KORREKTUR 3. RUNDE (11.09.2026): Der Deckel galt vorher auch fuer einen
+    -- WIDERRUF und tat damit genau das, wogegen der Absatz darueber
+    -- argumentiert. `setTrackingConsent` hat fuer 'denied' bewusst kein
+    -- Rate-Limit (src/lib/consent/actions.ts); wer 100-mal zwischen 'granted'
+    -- und 'denied' wechselt, passiert jedes Mal die Entdopplung und erreicht
+    -- den Deckel. Der naechste Klick auf "Widerrufen" setzte dann zwar das
+    -- Cookie und meldete Erfolg -- `return null` ist kein Fehler, supabase-js
+    -- sieht error = null --, die Zeile entstand aber nicht. Juengste Zeile
+    -- blieb 'granted', und `resolveConsentRows()` lieferte serverseitig den
+    -- falschen Zustand. Bei der einen Tabelle, die es ausschliesslich wegen
+    -- Art. 7 Abs. 1 DSGVO gibt, und in der Richtung, die nie verlorengehen
+    -- darf (Art. 7 Abs. 3 DSGVO: Widerruf so leicht wie die Erteilung).
+    -- Der Deckel bleibt wirksam: eine WIEDERHOLTE 'withdrawn'-Zeile faengt
+    -- die semantische Entdopplung eine Anweisung frueher ab, weil
+    -- `juengste.decision` dann bereits 'withdrawn' ist. Nach Erreichen des
+    -- Deckels entsteht also hoechstens EINE weitere Zeile je Subjekt und
+    -- Kategorie, und nur bei einem echten Zustandswechsel.
+    if anzahl >= 100 and new.decision <> 'withdrawn' then
+      return null;                            -- Mengenbegrenzung
+    end if;
+
+    return new;
+  end if;
+
+  if tg_op = 'DELETE' then
+    if current_user in ('postgres', 'supabase_admin')
+       or pg_trigger_depth() > 1 then
       return old;
     end if;
+    raise exception 'tracking_consents_immutable';
+  end if;
+
+  if current_user in ('postgres', 'supabase_admin') then
     return new;
   end if;
   raise exception 'tracking_consents_immutable';
 end;
 $$;
 
-create trigger tracking_consents_guard_trg before update or delete on public.tracking_consents
+-- KORREKTUR (B11): `drop trigger if exists` vorangestellt -- der Trigger haengt
+-- an einer `create or replace`-Funktion, ein zweiter Lauf dieses Abschnitts
+-- soll nicht mit 42710 abbrechen.
+-- KORREKTUR (ZWEITE RUNDE): `before insert or update or delete` statt
+-- `before update or delete` -- der INSERT-Zweig oben traegt Entdopplung und
+-- Mengenbegrenzung.
+drop trigger if exists tracking_consents_guard_trg on public.tracking_consents;
+create trigger tracking_consents_guard_trg before insert or update or delete on public.tracking_consents
   for each row execute function public.tracking_consents_guard();
 
 -- Beim Feuern eines Triggers prueft Postgres kein EXECUTE-Recht (das geschieht

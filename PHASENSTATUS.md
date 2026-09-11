@@ -4706,3 +4706,30 @@ Fehler, `vitest run` 867 von 867 grün (Baseline vorher 785).
    Phantomfehler auf fehlende Message-Schlüssel (`tsconfig.tsbuildinfo` hält
    die alte Form des JSON-Moduls fest). Vor jedem Verifikationslauf
    `rm -f tsconfig.tsbuildinfo` voranstellen; die Datei ist git-ignoriert.
+
+### Risiken des Affiliate-Moduls
+
+1. Löchriges Leserecht. `affiliate_partners`, `affiliate_billing_profiles`
+   und `affiliate_conditions` bekommen `select` nur als Spalten-Grant:
+   Bewerbungstext, interne Notiz, IBAN, Steuernummer, PayPal-Adresse und der
+   Freitext einer Auszahlungssperre sind für `authenticated` gar nicht erst
+   lesbar. Die Folge steht sonst nirgends: `select('*')` bricht auf diesen
+   drei Tabellen mit 42501 ab, jede Client-Abfrage muss ihre Spalten
+   benennen. Wer diese Felder in einer Manager-Ansicht braucht, lädt sie
+   über eine Server-Route mit `createAdminClient()` und ausdrücklicher
+   Spaltenliste nach. Im Repo gibt es dafür kein Vorbild — `public.tenants`
+   trägt das Leserecht auf allen elf Spalten.
+2. Auflösungsreihenfolge der Konditionen. Der ursprüngliche
+   EXCLUDE-Constraint verbot genau das Zeilenpaar, auf dem Plan 5.2 aufbaut
+   (eine befristete Aktionskondition neben einer Dauerregel gleicher
+   Spezifität), und machte die Aktionskondition uneinfügbar. Er ist durch
+   einen Unique-Index über Geltungsbereich plus `valid_from` ersetzt. Damit
+   garantiert nur noch der Anwendungscode, dass genau eine Kondition
+   anwendbar ist: die Sortierung `specificity desc, valid_from desc, id`.
+   Wer die Dauerregel später anfasst und dabei `valid_from` neu setzt,
+   schlägt eine laufende Aktion still. Ein Schatten-Riegel im Guard fängt
+   den häufigen Fall ab, aber nicht die umgekehrte Anlagereihenfolge.
+3. Der Löschschutz für Prüfpfad und Einwilligungsnachweis hängt an
+   `pg_trigger_depth() > 1`. Das heißt „aus irgendeinem Trigger", nicht „aus
+   einer Fremdschlüsselkaskade". Heute existiert kein anderer Trigger auf
+   diesem Weg; wer einen baut, umgeht den Schutz lautlos.
