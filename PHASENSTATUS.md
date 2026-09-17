@@ -4947,3 +4947,121 @@ Interessenkonflikt, Rate-Limit).
 Platzhalter-`.env` (git-ignoriert, keine echten Werte) — ohne sie scheitern
 `src/lib/env.test.ts` und `src/lib/tenant/resolve.test.ts` unabhängig von
 dieser Runde.
+
+## Affiliate-System vollständig gebaut, B1 bis B9 (11.–17.09.2026)
+
+Alle neun Blöcke des Plans stehen. B10 (Gutscheincode mit echtem Preiseingriff
+über Stripe Promotion Codes) ist bewusst nicht gebaut, siehe Plan 13.
+
+### Umfang, gemessen
+
+Sieben Migrationen mit 8.837 Zeilen: 16 Tabellen, 37 Policies, 37 Funktionen,
+27 Trigger, 61 Indizes. 48 Module unter `src/lib/affiliate/` mit 31.919 Zeilen,
+vier unter `src/lib/consent/`, 19 Admin-Seiten, neun Partnerseiten, sieben
+API-Routen, 866 neue i18n-Schlüssel in allen drei Sprachen.
+
+`tsc --noEmit` 0 Fehler, `eslint --max-warnings 0` 0 Fehler, `vitest run`
+1.351 von 1.351 grün (Baseline vor dem Modul: 785). 68 E2E-Tests in 22
+Dateien laden fehlerfrei; ausgeführt wurden sie nicht, siehe unten.
+
+### Was das Gegenlesen gekostet und gebracht hat
+
+Sechs Prüfrunden, 76 Befunde. Sechs davon hätten Geld gekostet oder eine
+Datenpanne ausgelöst:
+
+1. Der Zweig `or partner_id is null` in `affiliate_conditions_select` war an
+   keinen Mandanten gebunden — jeder eingeloggte Nutzer der Plattform hätte die
+   Provisionsstruktur samt Freitextnotizen aller Mandanten gelesen. Dieselbe
+   Bauart wie der bekannte `courses_member_select`-Fund.
+2. Zwei zusammengesetzte Fremdschlüssel mit `on delete set null` ohne
+   Spaltenliste. Postgres nullt dabei auch `tenant_id`, die `not null` ist —
+   Gruppenlöschung, Partnerlöschung und Mandantenlöschung wären mit 23502
+   abgebrochen. Dieser Fehler stand so schon im Plan.
+3. Der Unveränderlichkeits-Guard für `affiliate_billing_profiles` hing nur an
+   `before update`. Ein Partner hätte beim Anlegen seines Profils
+   `vat_check_result = 'valid'` selbst gesetzt und sich Reverse Charge und
+   Auszahlungsfreigabe ausgestellt.
+4. Der Auszahlungsweg war vollständig funktionsunfähig: der Entwurf brach am
+   CHECK ab, die Freigabe rief die RPC mit einem von drei Pflichtargumenten,
+   und das Aufräumen leerer Entwürfe lief gegen den Löschschutz. Keiner der
+   drei fiel auf, weil `payout.test.ts` gegen einen Mock ohne CHECKs und ohne
+   Trigger lief — 1.293 grüne Tests über einem Weg, der beim ersten echten
+   Aufruf abgebrochen wäre.
+5. `bind.ts` weigerte sich ausdrücklich, ein Referral-Token an ein zweites
+   Konto zu binden; `attribution.ts` löste genau dieses Token für jeden
+   fremden Käufer ein, weil `isFreshTokenUsable()` die Spalte `user_id` nicht
+   ansah. Wer ein fremdes `?aff=`-Token aus der Adresszeile kannte, bekam die
+   Provision für fremde Käufe — regelkonform durch alle Stufen bis zum
+   einwandfreien Beleg.
+6. `.rgrid-label` stand auf 2,27:1 bei 11 px. Das ist Bestandscode und trägt
+   unter 1024 px die einzige Spaltenbeschriftung jeder Tabelle im ganzen
+   Produkt, nicht nur im Affiliate-Modul.
+
+Zwei Muster ziehen sich durch. Erstens: jeder Guard war zunächst `before
+update`, der INSERT-Pfad wurde nirgends mitgedacht. Zweitens: dreimal hat eine
+Korrektur einen neuen Fehler erzeugt — einmal wurde der Löschschutz
+aufgeweicht, einmal ein Mengendeckel über einen DSGVO-Widerruf gelegt, einmal
+die Stornofreigabe durch ein Eingabemuster gesperrt. Die letzte Runde war die
+erste ohne solchen Rückschlag.
+
+Mehrfach standen Kontrastwerte in Kommentaren, die gemessen nicht stimmten
+(3,75:1 statt „über 4,5:1"). Seit dem 17.09. gilt für dieses Modul: ein
+Kontrastwert im Kommentar wird nachgerechnet, nicht geschätzt.
+
+### Was Josip tun muss, in dieser Reihenfolge
+
+1. Die sieben Migrationen anwenden, in Dateinamensreihenfolge. Danach beide
+   Advisor-Läufe und die Dateien auf die tatsächlich vergebenen Live-Versionen
+   umbenennen (H26-Drift).
+2. Erst danach ausliefern. Vorher wirft `recordAffiliateEvent()` bei jedem
+   `checkout.session.completed`, weil `affiliate_events` fehlt — der Käufer
+   bekommt seinen Zugriff, aber Stripe wiederholt drei Tage lang.
+3. Im Stripe-Dashboard `charge.refunded`, `charge.dispute.created` und
+   `charge.dispute.closed` am Webhook-Endpunkt abonnieren. Ohne das passiert
+   nach dem Deploy still gar nichts, und Provisionen für erstattete Käufe
+   bleiben stehen.
+4. Die Cloudflare-Rate-Limiting-Regel auf `/api/aff/k` einrichten. Die
+   Parameter stehen im Kopf von `src/app/api/aff/k/route.ts`. Der
+   DB-gestützte Limiter ist fail-open und taugt bei Klicklast nicht.
+5. Den Feature-Schalter je Mandant setzen. Ohne ihn ist das Modul vollständig
+   unsichtbar; das ist die Vorgabe und kein Versehen.
+
+### Zwei kaufmännische Entscheidungen, die offen sind
+
+1. Wer zahlt die Provision (Plan 12.1). Die Plattform ist Merchant of Record —
+   das Geld eines Mandantenverkaufs landet beim Betreiber, nicht beim
+   Mandanten. Gebaut ist Variante (a): der Betreiber zahlt aus und stellt dem
+   Mandanten monatlich die Summe in Rechnung. Der Report dafür steht unter
+   `/portal/affiliate`.
+2. Ob `automatic_tax` aktiviert wird (Plan 12.2). Heute ist `amount_tax` in
+   beiden Checkout-Pfaden immer 0; eine Zusage „20 % vom Nettoumsatz" wäre ab
+   dem ersten Tag um 19 % falsch. Vorbelegt ist `gross`, also „vom
+   Bruttopreis" — der Weg, der an bestehenden Käufen nichts ändert.
+
+### Grenzen dieser Prüfung
+
+Kein lokales Postgres, kein Docker, keine `.env`, kein Build, kein Browser,
+keine Stripe-Testumgebung. Konkret heißt das:
+
+1. Die sieben Migrationen sind nie gefahren worden. Sie sind sechsmal
+   gegengelesen und lesend gegen die Live-Datenbank geprüft, aber das ersetzt
+   keinen Lauf.
+2. Die Unit-Tests laufen gegen In-Memory-Nachbauten. Der Mock für
+   `affiliate_payouts` bildet jetzt CHECKs, Übergangstabelle, beide Fröste,
+   den Löschschutz, die Teil-Unique-Indizes und die RPC-Signatur ab; zwei
+   CHECKs der eigenen Tabelle fehlen ihm noch, und der Nachbau von
+   `affiliate_commissions` hat weder Guard noch CHECKs.
+3. Die E2E-Tests sind geschrieben und ladbar, aber nie gelaufen — sie
+   überspringen sich selbst mit Begründung, solange die Migrationen fehlen.
+4. Nicht belegt sind die Abnahmekriterien, die eine Messung brauchen:
+   Antwortzeit des Klick-Endpunkts unter 200 ms, Lighthouse mobil ≥ 90 mit
+   dem Einwilligungsdialog, Bundlegröße unter 3 MiB gzip, und der erste
+   echte Stripe-Testkauf mit Partnerlink.
+
+### Offene Kleinigkeiten
+
+Drei Testlücken (Stornofreigabe bei gesperrtem Partner, zwei fehlende CHECKs
+im Mock, fehlender Guard im Provisionsbuch-Mock), eine doppelte
+IP-Ableitung in `consent/actions.ts`, ein irreführendes `payouts_kept: true`
+im Prüfpfad der Anonymisierung, und die Fremdwährungssperre, die an der
+Buchung noch nicht durchgesetzt ist. Alle einzeln in den Dateien vermerkt.
