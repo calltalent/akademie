@@ -42,7 +42,11 @@ import {
  *   0. Origin-Prüfung (fail-closed)
  *   1. Honeypot                     -> STILL als Erfolg quittiert
  *   2. Zeitfalle (signiertes Token) -> STILL als Erfolg quittiert
- *   3. Rate-Limits: IP 5/300 s, global 300/3600 s, Mandant 30/3600 s
+ *   3. Rate-Limits: IP 5/300 s, Mandant 30/3600 s (der Mandantenzähler erst
+ *      nach dem Gate, weil er den Mandanten kennen muss). Dazu ein
+ *      plattformweiter Zähler 300/3600 s, der NUR protokolliert und nie
+ *      abweist — siehe `GLOBAL_LIMIT`: als Sperre hätte er einem Angreifer
+ *      erlaubt, die Bewerbung ALLER Kunden lahmzulegen.
  *   4. Cloudflare Turnstile, sobald konfiguriert (fail-open bei Ausfall)
  *   5. zod (`affiliatePartnerApplicationSchema`) inkl. Link-/Markup-Sperre
  *      für die Namensfelder
@@ -121,10 +125,28 @@ const ORIGIN_REJECTED = "Anfrage abgelehnt (ungültiger Origin).";
 const IP_LIMIT = { maxRequests: 5, windowSeconds: 300 } as const;
 
 /**
- * Zweite Ebene, über ALLE Mandanten. Nicht im Plan, aber ausdrücklich im
- * Auftrag zu B7-B: der verteilte Bot aus dem Vorfall vom 24.08.2026 kam mit je
- * einem Treffer von vier verschiedenen IPs — ein reines IP-Limit greift gegen
- * ihn nie. 300/Stunde liegt weit über jedem realen Bewerbungsaufkommen.
+ * Plattformweiter Zähler über ALLE Mandanten. Nicht im Plan, aber im Auftrag
+ * zu B7-B: der verteilte Bot aus dem Vorfall vom 24.08.2026 kam mit je einem
+ * Treffer von vier verschiedenen IPs — ein reines IP-Limit greift gegen ihn
+ * nie.
+ *
+ * ER SPERRT NICHTS (Korrektur 11.09.2026, Befund SEC-1). Vorher war dies eine
+ * harte Sperre und lief noch VOR der Mandantenprüfung und vor Turnstile.
+ * Damit haftete jeder Mandant für das Verhalten aller anderen: ein Angreifer
+ * holt sich EIN gültiges Formular-Token von einer beliebigen Mandanten-Domain
+ * (die Zeitfalle prüft Alter und Signatur, sie ist nicht einmalig), lässt den
+ * Honeypot leer und schickt von fünf IPs je 60 POSTs pro Stunde. Nach 300
+ * Anfragen war das Partnerprogramm JEDES Kunden der Plattform für den Rest
+ * des Fensters bewerbungsunfähig — und kein Betreiber hätte die Ursache in
+ * seinem eigenen Mandanten gefunden.
+ *
+ * Ein Mandant darf einen anderen nicht aussperren können. Die Sperrwirkung
+ * liegt deshalb ausschließlich bei den Zählern, die einem einzelnen
+ * Verursacher zuzurechnen sind: IP, Mandant, Bewerber-Adresse. Gegen den
+ * verteilten Bot greift davon das Mandantenlimit (30/Stunde) — es sieht ihn
+ * genauso, und es trifft nur den Mandanten, auf den er zielt. Dieser Zähler
+ * hier bleibt als ALARM erhalten: er läuft nach dem Mandanten-Gate, sein
+ * Überschreiten wird protokolliert, und die Anfrage läuft weiter.
  */
 const GLOBAL_LIMIT = { maxRequests: 300, windowSeconds: 3600 } as const;
 
@@ -141,6 +163,38 @@ const EMAIL_LIMIT = { maxRequests: 3, windowSeconds: 3600 } as const;
  * verlangte Eingabe, und ein Bewerber, der seinen Kanal nennt, ist kein Bot.
  */
 const MAX_LINKS_IN_ANSWER = 3;
+
+/**
+ * Mindestlaufzeit der STILLEN Erfolgszweige (Korrektur 11.09.2026, Befund
+ * SEC-4).
+ *
+ * Honeypot, Zeitfalle und Doppelbewerbung quittieren wortgleich wie ein
+ * Mensch — TEXTLICH war das dicht, ZEITLICH nicht: sie kehrten nach wenigen
+ * Millisekunden zurück, während ein echter Durchlauf mehrere Rundläufe
+ * inklusive Turnstile-Verifikation braucht. Über die Antwortzeit allein
+ * konnte ein Bot-Betreiber also ablesen, dass er erkannt wurde, und genau
+ * das Muster anpassen, das der Kopfkommentar verhindern will. Beim
+ * Duplikat-Zweig hängt zusätzlich ein Personenbezug daran: die Antwortzeit
+ * verriet, ob eine Adresse bei diesem Mandanten schon beworben ist (§2.15).
+ *
+ * Eine exakte Angleichung ist nicht erreichbar (der echte Pfad schwankt
+ * selbst) und auch nicht nötig: es genügt, dass die stille Antwort im
+ * Streubereich einer echten liegt und nicht systematisch darunter. Die
+ * Untergrenze ist deshalb gesetzt und die Spanne zufällig, damit auch eine
+ * über viele Anfragen gemittelte Messung keinen scharfen Schwellwert findet.
+ *
+ * `crypto.getRandomValues` statt `Math.random`: der Wert ist ein
+ * Verschleierungsmittel, und ein vorhersagbarer PRNG wäre keines.
+ */
+const SILENT_DELAY_MIN_MS = 150;
+const SILENT_DELAY_SPAN_MS = 250;
+
+async function silentSuccess(): Promise<AffiliateApplicationActionState> {
+  const [sample] = crypto.getRandomValues(new Uint16Array(1));
+  const delay = SILENT_DELAY_MIN_MS + ((sample ?? 0) / 0x10000) * SILENT_DELAY_SPAN_MS;
+  await new Promise((resolve) => setTimeout(resolve, delay));
+  return { error: null, success: true };
+}
 
 /** Domänenpräfix des Zustimmungsnachweises (Plan 11.6, statisches Salz). */
 const TERMS_IP_HASH_DOMAIN = "calltalent:affiliate-terms-ip";
@@ -391,23 +445,20 @@ export async function submitAffiliateApplication(
     const honeypot = formData.get(CONTACT_HONEYPOT_FIELD);
     if (typeof honeypot === "string" && honeypot.trim() !== "") {
       console.warn("Partnerbewerbung: Honeypot ausgelöst, Anfrage verworfen.");
-      return { error: null, success: true };
+      return await silentSuccess();
     }
 
     // --- Schicht 2: Zeitfalle --------------------------------------------
     const tokenVerdict = await verifyContactFormToken(formData.get(CONTACT_TOKEN_FIELD));
     if (tokenVerdict === "too-fast" || tokenVerdict === "invalid") {
       console.warn(`Partnerbewerbung: Zeitfalle ausgelöst (${tokenVerdict}), Anfrage verworfen.`);
-      return { error: null, success: true };
+      return await silentSuccess();
     }
     if (tokenVerdict === "expired") return { error: FORM_EXPIRED };
 
     // --- Schicht 3: Rate-Limits ------------------------------------------
+    // Nur Zähler, die EINEM Verursacher zuzurechnen sind, dürfen sperren.
     if (!(await checkRateLimit("affiliate-apply-ip", IP_LIMIT))) {
-      return { error: RATE_LIMIT_MESSAGE };
-    }
-    if (!(await checkRateLimit("affiliate-apply-global", { ...GLOBAL_LIMIT, extraKey: "all" }))) {
-      console.warn("Partnerbewerbung: globales Stundenlimit erreicht.");
       return { error: RATE_LIMIT_MESSAGE };
     }
 
@@ -424,6 +475,17 @@ export async function submitAffiliateApplication(
     ) {
       console.warn("Partnerbewerbung: Stundenlimit des Mandanten erreicht.");
       return { error: RATE_LIMIT_MESSAGE };
+    }
+
+    // Plattformweiter Zähler — NACH dem Mandanten-Gate und ohne Sperrwirkung
+    // (Begründung bei `GLOBAL_LIMIT`). Er beantwortet die Frage „läuft gerade
+    // etwas über alle Mandanten hinweg?", ohne dass ein Mandant einen anderen
+    // aussperren kann. Der Mandant steht im Log, damit die Auswertung weiß,
+    // wo sie nachsehen muss — eine ID, keine Personendaten (§2.11).
+    if (!(await checkRateLimit("affiliate-apply-global", { ...GLOBAL_LIMIT, extraKey: "all" }))) {
+      console.warn(
+        `Partnerbewerbung: plattformweiter Stundenzähler überschritten (Mandant ${tenant.id}). Anfrage NICHT abgewiesen.`,
+      );
     }
 
     const admin = createAdminClient();
@@ -515,7 +577,10 @@ export async function submitAffiliateApplication(
       });
       return { error: APPLICATION_FAILED };
     }
-    if (existing !== null) return { error: null, success: true };
+    // Wortgleich UND zeitlich unauffällig (siehe `silentSuccess()`): sonst
+    // wäre die Antwortzeit ein Orakel darüber, wer sich bei diesem Mandanten
+    // schon beworben hat.
+    if (existing !== null) return await silentSuccess();
 
     // --- Zeile schreiben --------------------------------------------------
     // Immer `pending`, nie mehr (siehe Kopf und

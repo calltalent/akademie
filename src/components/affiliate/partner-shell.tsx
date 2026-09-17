@@ -39,8 +39,13 @@ import { getTranslations } from "next-intl/server";
  *     der Sprung bleibt für den Screenreader wirkungslos.
  *   - `<nav aria-label>`, aktiver Punkt mit `aria-current="page"` UND fett,
  *     nie nur farblich.
- *   - Sekundärtext `#66679B` (rund 5,3:1 auf Weiß). `#A9AAC4` (2,3:1) fällt
- *     durch AA und kommt im Partnerbereich nicht vor.
+ *   - Sekundärtext `#66679B` (5,28:1 auf Weiß, nachgerechnet). `#A9AAC4`
+ *     (2,27:1) fällt durch AA und kommt im Partnerbereich nicht vor. Bis zum
+ *     11.09.2026 stimmte das NICHT: die globale Klasse `.rgrid-label`
+ *     (globals.css) trug diese Farbe bei 11px und damit unter 1024px die
+ *     EINZIGE Spaltenbeschriftung jeder Tabelle hier. Dort steht jetzt
+ *     `#66679B` bei 12px. Eine Farbregel gilt nur so weit, wie die
+ *     verwendeten Klassen mitgeprüft werden.
  *   - Fließtext mindestens 15 px, Label und Chips 13 px; keine festen
  *     Pixelhöhen an Textcontainern, damit bei 200 % Zoom nichts abschneidet
  *     (`min-h-[40px]` an Bedienelementen ist eine MINDEST-, keine Festhöhe).
@@ -154,7 +159,14 @@ export async function PartnerShell({
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
       <a
         href="#partner-main"
-        className={`sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-[10px] focus:bg-white focus:px-4 focus:py-3 focus:text-[15px] focus:font-bold ${PARTNER_FOCUS_RING}`}
+        /* `focus:left-4 focus:top-4` ergänzt (Korrektur 11.09.2026, Befund
+           A11Y-10): `position:absolute` OHNE Positionsangaben platziert das
+           Element an seiner statischen Position — der sichtbar gewordene
+           Sprunglink legte sich damit über den Akzentbalken bzw. die
+           Kopfzeile, statt sauber davor zu stehen. Gleiche Angaben wie auf
+           der öffentlichen Programmseite. Der Fokusring selbst war in
+           Ordnung: `outline-[#3E3F66]` auf Weiß = 9,96:1. */
+        className={`sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-[10px] focus:bg-white focus:px-4 focus:py-3 focus:text-[15px] focus:font-bold ${PARTNER_FOCUS_RING}`}
         style={{ color: PARTNER_NAVY, border: `1px solid ${PARTNER_BORDER}` }}
       >
         {t("skipLink")}

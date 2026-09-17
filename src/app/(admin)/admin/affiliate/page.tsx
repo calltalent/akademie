@@ -624,15 +624,21 @@ function LatestCommissionRow({
         <span className="rgrid-label">{labels.date}</span>
         <span style={{ color: MUTED }}>{dateText}</span>
       </div>
+      {/* `break-words` statt `truncate` (Korrektur 11.09.2026, Befund
+          A11Y-5): abgeschnitten stand hier bei 200 % Zoom (WCAG 1.4.4) ein
+          Partnername ohne jeden Ersatz — es gibt keine zweite Stelle in der
+          Zeile, an der er vollständig steht, und kein `title`-Attribut. Die
+          Zeile darf stattdessen höher werden; `.rgrid-row` setzt keine feste
+          Höhe, nur `align-items:center`. */}
       <div className="min-w-0">
         <span className="rgrid-label">{labels.partner}</span>
-        <span className="truncate font-semibold" style={{ color: INK }}>
+        <span className="break-words font-semibold" style={{ color: INK }}>
           {partnerName}
         </span>
       </div>
       <div className="min-w-0">
         <span className="rgrid-label">{labels.campaign}</span>
-        <span className="truncate" style={{ color: MUTED }}>
+        <span className="break-words" style={{ color: MUTED }}>
           {campaignText}
         </span>
       </div>

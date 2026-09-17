@@ -144,6 +144,30 @@ export default async function PartnerStatistikPage({
   const ratio = (bp: number | null): string =>
     bp === null ? "—" : format.number(bp / 10000, { style: "percent", maximumFractionDigits: 2 });
 
+  /**
+   * Kennzahlen unter Vorbehalt (Korrektur 11.09.2026, Befund A11Y-6).
+   *
+   * `daily.ok === false` heißt: eine Seite der Abfrage fehlt. Die acht
+   * Kacheln gaben ihre Zahlen trotzdem bedingungslos aus — eine zu kleine
+   * Summe, die neben dem Warnsatz genauso plausibel aussieht wie eine
+   * richtige. Das Partner-Dashboard macht es an derselben Stelle bereits
+   * richtig (`partner/page.tsx`), und beide Kopfkommentare begründen, warum:
+   * „ein sehbehinderter Betrachter hat keine Chance, sie als falsch zu
+   * erkennen". Lieber keine Zahl als eine falsche — das gilt für eine
+   * Geldzahl doppelt.
+   *
+   * Der Text kommt aus `affiliate.dashboard`, weil er dort schon steht; ein
+   * zweiter, wortgleicher Schlüssel unter `affiliate.statistics` wäre eine
+   * zweite Stelle, die dasselbe anders sagen kann. (Anmerkung an die
+   * i18n-Pflege: ein eigener Schlüssel `affiliate.statistics.unavailable`
+   * wäre die sauberere Heimat — dann kann dieser zweite Übersetzer weg.)
+   */
+  const tShared = await getTranslations("affiliate.dashboard");
+  const unavailable = tShared("unavailable");
+  const metric = (value: number): string => (daily.ok ? format.number(value) : unavailable);
+  const metricRatio = (bp: number | null): string => (daily.ok ? ratio(bp) : unavailable);
+  const metricMoney = (cents: number): string => (daily.ok ? money(cents) : unavailable);
+
   const totals = sumStats(daily.rows);
   const derived = deriveStats(totals);
 
@@ -301,19 +325,21 @@ export default async function PartnerStatistikPage({
       {/* Die Gesamtkennzahlen zuerst als Text — vor jeder Aufschlüsselung
           und vor jedem Diagramm (8.5). */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <PartnerMetric label={t("columnClicks")} value={format.number(totals.clicks)} />
-        <PartnerMetric label={t("columnUniqueClicks")} value={format.number(totals.unique_clicks)} />
-        <PartnerMetric label={t("columnLeads")} value={format.number(totals.leads)} />
-        <PartnerMetric label={t("columnSales")} value={format.number(totals.orders_count)} />
-        <PartnerMetric label={t("columnConversion")} value={ratio(derived.conversion_bp)} />
+        <PartnerMetric label={t("columnClicks")} value={metric(totals.clicks)} />
+        <PartnerMetric label={t("columnUniqueClicks")} value={metric(totals.unique_clicks)} />
+        <PartnerMetric label={t("columnLeads")} value={metric(totals.leads)} />
+        <PartnerMetric label={t("columnSales")} value={metric(totals.orders_count)} />
+        <PartnerMetric label={t("columnConversion")} value={metricRatio(derived.conversion_bp)} />
         <PartnerMetric
           label={t("columnEpc")}
-          value={derived.epc_cents === null ? "—" : money(derived.epc_cents)}
+          value={
+            !daily.ok ? unavailable : derived.epc_cents === null ? "—" : money(derived.epc_cents)
+          }
         />
-        <PartnerMetric label={t("columnCommission")} value={money(totals.commission_cents)} />
+        <PartnerMetric label={t("columnCommission")} value={metricMoney(totals.commission_cents)} />
         <PartnerMetric
           label={t("columnReversalRate")}
-          value={ratio(derived.reversal_rate_bp)}
+          value={metricRatio(derived.reversal_rate_bp)}
         />
       </div>
 
@@ -386,6 +412,7 @@ export default async function PartnerStatistikPage({
           currency={currency}
           heading={group === "campaign" ? t("groupCampaign") : t("groupDay")}
           firstColumnLabel={group === "campaign" ? t("columnCampaign") : t("columnDay")}
+          incompleteLabel={daily.ok ? null : unavailable}
         />
       )}
 

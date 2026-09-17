@@ -22,6 +22,7 @@ import {
   FOCUS_RING,
   INK,
   MUTED,
+  SUCCESS,
 } from "../../affiliate-format";
 
 /**
@@ -225,7 +226,7 @@ function StatusActionForm({
           role="status"
           aria-live="polite"
           className="mb-3 text-[15px] font-semibold outline-none"
-          style={{ color: "#1F8A5B" }}
+          style={{ color: SUCCESS }}
         >
           {t("partner.actions.saved")}
         </p>
@@ -435,7 +436,7 @@ function AdminFieldsForm({
             role="status"
             aria-live="polite"
             className="mb-3 text-[15px] font-semibold outline-none"
-            style={{ color: "#1F8A5B" }}
+            style={{ color: SUCCESS }}
           >
             {t("partner.actions.saved")}
           </p>

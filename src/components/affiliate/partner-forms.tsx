@@ -74,9 +74,26 @@ const PARTNER_BUTTON_CLASS =
   "inline-flex min-h-[40px] items-center justify-center rounded-[11px] px-[18px] text-[15px] font-bold text-white no-underline disabled:opacity-60";
 const PARTNER_BUTTON_BG = "#5663AE";
 
-/** Fehlerrot auf Weiß ≈ 5,0:1; Erfolgsgrün ≈ 4,6:1 — beide über AA. */
+/**
+ * Rückmeldefarben auf weißem Kartengrund. Beide Werte sind nachgerechnet
+ * (WCAG 2.1, relative Luminanz), nicht geschätzt:
+ *
+ *   #B24343 auf #FFFFFF = 5,56:1  (Fehler; der alte Kommentar nannte 5,0:1)
+ *   #166B47 auf #FFFFFF = 6,51:1  (Erfolg)
+ *
+ * Korrektur 11.09.2026 (Befund A11Y-4): das Erfolgsgrün war #1F8A5B und damit
+ * 4,33:1 — UNTER AA, obwohl hier „≈ 4,6:1" zugesichert wurde. Das trifft
+ * ausgerechnet die Meldung, auf die `useStatusFocus()` den Fokus setzt: den
+ * Satz, den der Nutzer nach jeder Aktion lesen soll.
+ *
+ * Bewusste Zweitkopie von `SUCCESS` aus
+ * `src/app/(admin)/admin/affiliate/affiliate-format.ts`: diese Datei ist die
+ * Partnerfläche und hält ihre Palette absichtlich getrennt von der
+ * Admin-Fläche (gleiche Trennung wie PARTNER_INK/PARTNER_BORDER oben). Wer
+ * einen der beiden Werte ändert, ändert den anderen mit.
+ */
 const PARTNER_ERROR = "#B24343";
-const PARTNER_SUCCESS = "#1F8A5B";
+const PARTNER_SUCCESS = "#166B47";
 
 // --- gemeinsame Bausteine ----------------------------------------------
 

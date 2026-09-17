@@ -25,6 +25,7 @@ import {
   MUTED,
   NAVY,
   PARTNER_STATUS_STYLE,
+  SUCCESS,
   bpToRatio,
   centsToAmount,
   currencyCode,
@@ -348,7 +349,7 @@ export default async function AdminAffiliatePartnerDetailPage({
           </h3>
           <p
             className="mt-1 text-[15px]"
-            style={{ color: missing.length === 0 ? "#1F8A5B" : "#8A6D1F" }}
+            style={{ color: missing.length === 0 ? SUCCESS : "#8A6D1F" }}
           >
             {missing.length === 0
               ? t("partner.banking.complete")

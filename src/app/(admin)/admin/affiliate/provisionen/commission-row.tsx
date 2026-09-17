@@ -21,6 +21,7 @@ import {
   HAIRLINE,
   INK,
   MUTED,
+  SUCCESS,
   bpToRatio,
   centsToAmount,
   currencyCode,
@@ -89,6 +90,15 @@ export function CommissionRow({
   const t = useTranslations("admin.affiliate");
   const format = useFormatter();
   const [expanded, setExpanded] = useState(false);
+  /**
+   * `aria-controls` braucht eine stabile ID am aufklappbaren Bereich
+   * (Korrektur 11.09.2026, Befund A11Y-8). Vorher trug der Knopf nur
+   * `aria-expanded`: ein Screenreader-Nutzer erfuhr, DASS etwas aufgeklappt
+   * ist, aber nicht wo — und der neue Inhalt (drei Abschnitte samt vier
+   * Formularen) erscheint weiter unten im Baum, während der Fokus auf dem
+   * Knopf bleibt. Mit der Verknüpfung kann er direkt dorthin springen.
+   */
+  const detailsId = `${useId()}-details`;
 
   // Der Snapshot speichert Cent und Basispunkte (3.11). Formatiert wird mit
   // dem Formatter der aktiven Sprache — dieselbe Schreibweise wie in jeder
@@ -172,6 +182,7 @@ export function CommissionRow({
             type="button"
             onClick={() => setExpanded((value) => !value)}
             aria-expanded={expanded}
+            aria-controls={detailsId}
             className={`mt-2 min-h-[40px] text-[15px] font-semibold underline ${FOCUS_RING}`}
             style={{ color: "#5663AE" }}
           >
@@ -183,7 +194,7 @@ export function CommissionRow({
       </div>
 
       {expanded && (
-        <div className="flex flex-col gap-5 px-[18px] pb-6 lg:px-[24px]">
+        <div id={detailsId} className="flex flex-col gap-5 px-[18px] pb-6 lg:px-[24px]">
           {/* 1. Zuordnung im Klartext. */}
           <section>
             <h3 className="text-[15px] font-bold" style={{ color: INK }}>
@@ -632,7 +643,7 @@ function ActionFeedback({
         role="status"
         aria-live="polite"
         className="text-[15px] font-semibold outline-none"
-        style={{ color: "#1F8A5B" }}
+        style={{ color: SUCCESS }}
       >
         {successText}
       </p>

@@ -219,10 +219,17 @@ export async function POST(request: Request) {
       note: "Zurückgesetzte Ereignisse werden vom Cron-Verarbeiter erneut aufgegriffen.",
     });
   } catch (e) {
-    console.error(
-      "[affiliate/reprocess] Unerwarteter Fehler:",
-      e instanceof Error ? e.message : "unbekannt",
-    );
+    // NUR der Fehlername, nie die Rohmeldung (Korrektur 11.09.2026, Befund
+    // SEC-3; CLAUDE.md §2.11). Hier stand `e.message` — im Widerspruch zum
+    // Kopfkommentar dieser Datei, der genau das verbietet: eine
+    // PostgREST-Meldung trägt bei einer Constraint-Verletzung den
+    // Schlüsselwert im Klartext, hier also Stripe-Kennungen und
+    // Referral-Token, und ein `fetch`-Fehler der Supabase-Bibliothek trägt
+    // die URL samt Query-String mit `tenant_id`- und `status`-Filtern. Der
+    // Name reicht zur Einordnung, die Nutzlast bleibt draußen — gleiches
+    // Muster wie in der Schwester-Route `/backfill`.
+    const failureKind = e instanceof Error ? e.name : "unbekannt";
+    console.error(`[affiliate/reprocess] Unerwarteter Fehler (${failureKind}).`);
     return NextResponse.json({ error: "Verarbeitung fehlgeschlagen." }, { status: 500 });
   }
 }

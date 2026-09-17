@@ -20,15 +20,32 @@ import type {
 /**
  * Statusfarben. Jede dieser Flächen trägt in der Oberfläche ZUSÄTZLICH den
  * ausgeschriebenen Statustext (8.5: „Status nie nur über Farbe") — die Farbe
- * ist Wiederholung, nie die Information selbst. Vordergrund auf Fläche
- * jeweils über 4,5:1.
+ * ist Wiederholung, nie die Information selbst.
+ *
+ * KONTRAST (Korrektur 11.09.2026, Befunde A11Y-2 und A11Y-3). Hier stand
+ * pauschal „jeweils über 4,5:1"; nachgemessen stimmte das für zwei Paare
+ * NICHT — die Zusage war ungeprüft übernommen. Die Chips sind 13px und fett,
+ * zählen also als Normaltext (Large Text beginnt erst bei 18,66px fett), die
+ * Schwelle ist damit 4,5:1 und nicht 3:1.
+ *
+ * Jeder Wert unten ist einzeln nachgerechnet (WCAG 2.1, relative Luminanz):
+ *
+ *   #7D6119 auf #FBF1DC = 5,21:1  (vorher #8A6D1F = 4,37:1 — durchgefallen)
+ *   #156F45 auf #E3F2EA = 5,35:1  (vorher #1F8A5B = 3,75:1 — durchgefallen)
+ *   #B24343 auf #FBEAEA = 4,78:1
+ *   #66679B auf #EEF0F7 = 4,64:1
+ *   #3E3F66 auf #E7E8F2 = 8,17:1
+ *
+ * Die Flächen bleiben unverändert; nur die Vordergründe wurden abgedunkelt.
+ * Wer hier eine Farbe ändert, rechnet den Wert nach und schreibt den
+ * GEMESSENEN Wert in diese Liste — keine geschätzten Zahlen.
  */
 export const PARTNER_STATUS_STYLE: Record<
   AffiliatePartnerStatus,
   { color: string; background: string }
 > = {
-  pending: { color: "#8A6D1F", background: "#FBF1DC" },
-  active: { color: "#1F8A5B", background: "#E3F2EA" },
+  pending: { color: "#7D6119", background: "#FBF1DC" },
+  active: { color: "#156F45", background: "#E3F2EA" },
   rejected: { color: "#B24343", background: "#FBEAEA" },
   suspended: { color: "#66679B", background: "#EEF0F7" },
 };
@@ -38,8 +55,8 @@ export const COMMISSION_STATUS_STYLE: Record<
   { color: string; background: string }
 > = {
   pending: { color: "#66679B", background: "#EEF0F7" },
-  on_hold: { color: "#8A6D1F", background: "#FBF1DC" },
-  approved: { color: "#1F8A5B", background: "#E3F2EA" },
+  on_hold: { color: "#7D6119", background: "#FBF1DC" },
+  approved: { color: "#156F45", background: "#E3F2EA" },
   paid: { color: "#3E3F66", background: "#E7E8F2" },
   cancelled: { color: "#B24343", background: "#FBEAEA" },
 };
@@ -106,6 +123,23 @@ export const INK = "#1A1A2E";
 export const NAVY = "#3E3F66";
 export const CARD_BORDER = "#E7E8F2";
 export const HAIRLINE = "#EEF0F7";
+
+/**
+ * Erfolgsgrün für Rückmeldungen auf weißem Kartengrund — der Satz, auf den
+ * `useStatusFocus()` nach jeder Server Action den Fokus setzt.
+ *
+ * Korrektur 11.09.2026 (Befund A11Y-4): hier stand an elf Stellen das Literal
+ * `#1F8A5B`. Gemessen sind das 4,33:1 auf Weiß und damit UNTER AA, obwohl der
+ * Kommentar daneben „≈ 4,6:1" zusicherte — wieder ein geschätzter statt eines
+ * gerechneten Werts. Jetzt #166B47 auf #FFFFFF = 6,51:1 (nachgerechnet),
+ * dieselbe Farbe, die das Bewerbungsformular schon führt.
+ *
+ * Als KONSTANTE und nicht als Literal, damit die nächste Korrektur eine
+ * Stelle hat statt elf. Die Partnerfläche hält in `partner-forms.tsx` eine
+ * bewusste Zweitkopie (Begründung dort) — die beiden gehören zusammen
+ * gepflegt.
+ */
+export const SUCCESS = "#166B47";
 
 /**
  * Ein sichtbarer Fokusring an JEDEM Bedienelement (8.5). Als Konstante und

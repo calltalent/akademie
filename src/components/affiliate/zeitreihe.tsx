@@ -61,20 +61,47 @@ export type ZeitreihePunkt = {
 
 const COLS = "1.4fr 1fr 1fr 1fr 1.2fr";
 
+/**
+ * Farbe des Verkaufsbalkens und der Grundlinie (Korrektur 11.09.2026, Befund
+ * A11Y-7). #7C84BC auf #FFFFFF = 3,57:1 — nachgerechnet, über der
+ * 3:1-Schwelle für grafische Objekte (WCAG 1.4.11 Non-text Contrast). Der
+ * Vorgänger #9AA0D0 lag mit 2,53:1 darunter, die Grundlinie mit #E7E8F2
+ * sogar bei 1,22:1 — auf einem kontrastarmen Bildschirm war der Nullpunkt
+ * des Diagramms schlicht nicht zu sehen. Wer die Farbe ändert, rechnet nach.
+ */
+const CHART_SALES = "#7C84BC";
+
 export async function Zeitreihe({
   points,
   currency,
   heading,
   firstColumnLabel,
+  incompleteLabel = null,
 }: {
   points: readonly ZeitreihePunkt[];
   currency: string;
   heading: string;
   /** „Tag" oder „Kampagne" — die einzige Spalte, die sich je Sicht ändert. */
   firstColumnLabel: string;
+  /**
+   * Gesetzt, wenn die zugrunde liegende Abfrage NICHT vollständig geladen hat
+   * (Korrektur 11.09.2026, Befund A11Y-6). Der Text ist die lokalisierte
+   * Ersatzangabe („Nicht ermittelbar"); `null` heißt vollständig.
+   *
+   * Die Einzelzeilen bleiben stehen — die geladenen Zeilen sind für sich
+   * richtig. Falsch werden nur die SUMME (sie addiert über eine Lücke) und
+   * die Form des Diagramms (ihm fehlen Tage). Genau diese beiden werden
+   * deshalb zurückgehalten, statt eine zu kleine Zahl fett darzustellen: „ein
+   * sehbehinderter Betrachter hat keine Chance, sie als falsch zu erkennen"
+   * (Kopfkommentar von `partner/page.tsx`).
+   */
+  incompleteLabel?: string | null;
 }) {
   const t = await getTranslations("affiliate.statistics");
   const format = await getFormatter();
+
+  /** Kurzform: eine Ersatzangabe liegt vor, die Reihe ist also lückenhaft. */
+  const incomplete = typeof incompleteLabel === "string" && incompleteLabel !== "";
 
   const code = /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : "EUR";
   const money = (cents: number): string =>
@@ -184,7 +211,8 @@ export async function Zeitreihe({
             ))}
 
             {/* 2. Summenzeile — sie beantwortet die Frage, die sonst jeder
-                   selbst addieren müsste. */}
+                   selbst addieren müsste. Bei unvollständiger Abfrage steht
+                   hier die Ersatzangabe statt einer zu kleinen Summe. */}
             <div
               role="row"
               className="rgrid-row px-[18px] py-3 text-[15px] font-bold lg:px-[24px]"
@@ -193,71 +221,86 @@ export async function Zeitreihe({
               <div role="cell">{t("totalRow")}</div>
               <div role="cell">
                 <span className="rgrid-label">{t("columnClicks")}</span>
-                {num(total.clicks)}
+                {incomplete ? incompleteLabel : num(total.clicks)}
               </div>
               <div role="cell">
                 <span className="rgrid-label">{t("columnUniqueClicks")}</span>
-                {num(total.unique_clicks)}
+                {incomplete ? incompleteLabel : num(total.unique_clicks)}
               </div>
               <div role="cell">
                 <span className="rgrid-label">{t("columnSales")}</span>
-                {num(total.orders)}
+                {incomplete ? incompleteLabel : num(total.orders)}
               </div>
               <div role="cell">
                 <span className="rgrid-label">{t("columnCommission")}</span>
-                {money(total.commission_cents)}
+                {incomplete ? incompleteLabel : money(total.commission_cents)}
               </div>
             </div>
           </div>
 
-          {/* 3. Erst jetzt das Diagramm. */}
-          <div
-            className={`${PARTNER_CARD_CLASS} p-[18px_20px]`}
-            style={{ borderColor: PARTNER_BORDER }}
-          >
-            <svg
-              role="img"
-              aria-label={chartLabel}
-              viewBox={`0 0 ${Math.max(points.length * 10, 10)} 40`}
-              preserveAspectRatio="none"
-              className="h-auto w-full"
-              style={{ maxHeight: "12rem", minHeight: "6rem" }}
-            >
-              {points.map((point, index) => {
-                // Höhe relativ zum Spitzenwert. `maxClicks === 0` wird als
-                // Höhe 0 gezeichnet statt durch null geteilt.
-                const height = maxClicks === 0 ? 0 : (point.clicks / maxClicks) * 34;
-                const ordersHeight =
-                  maxClicks === 0 ? 0 : Math.min((point.orders / maxClicks) * 34, 34);
-                return (
-                  <g key={point.key}>
-                    <rect
-                      x={index * 10 + 1.5}
-                      y={38 - height}
-                      width={4}
-                      height={height}
-                      fill={PARTNER_NAVY}
-                    />
-                    {/* Verkäufe als zweiter, schmalerer Balken. Er ist nicht
-                        nur anders gefärbt, sondern anders breit und versetzt —
-                        eine Unterscheidung allein über Farbe wäre für eine
-                        Farbsehschwäche keine. */}
-                    <rect
-                      x={index * 10 + 6}
-                      y={38 - ordersHeight}
-                      width={2.5}
-                      height={ordersHeight}
-                      fill="#9AA0D0"
-                    />
-                  </g>
-                );
-              })}
-              <line x1="0" y1="38" x2={Math.max(points.length * 10, 10)} y2="38" stroke={PARTNER_BORDER} strokeWidth="0.5" />
-            </svg>
-            <p className="mt-2 text-[13px]" style={{ color: PARTNER_MUTED }}>
-              {t("chartLegend")}
+          {/* 3. Erst jetzt das Diagramm — und nur, wenn die Reihe
+                 vollständig ist (Befund A11Y-6). Einem Verlauf sieht niemand
+                 an, dass ihm Tage fehlen; die Kurve wirkt genauso plausibel
+                 wie eine richtige. Die Einzelwerte stehen oben in der
+                 Tabelle, es geht also keine Information verloren. */}
+          {incomplete ? (
+            <p className="text-[15px] font-semibold" style={{ color: PARTNER_MUTED }}>
+              {incompleteLabel}
             </p>
-          </div>
+          ) : (
+            <div
+              className={`${PARTNER_CARD_CLASS} p-[18px_20px]`}
+              style={{ borderColor: PARTNER_BORDER }}
+            >
+              <svg
+                role="img"
+                aria-label={chartLabel}
+                viewBox={`0 0 ${Math.max(points.length * 10, 10)} 40`}
+                preserveAspectRatio="none"
+                className="h-auto w-full"
+                style={{ maxHeight: "12rem", minHeight: "6rem" }}
+              >
+                {points.map((point, index) => {
+                  // Höhe relativ zum Spitzenwert. `maxClicks === 0` wird als
+                  // Höhe 0 gezeichnet statt durch null geteilt.
+                  const height = maxClicks === 0 ? 0 : (point.clicks / maxClicks) * 34;
+                  const ordersHeight =
+                    maxClicks === 0 ? 0 : Math.min((point.orders / maxClicks) * 34, 34);
+                  return (
+                    <g key={point.key}>
+                      <rect
+                        x={index * 10 + 1.5}
+                        y={38 - height}
+                        width={4}
+                        height={height}
+                        fill={PARTNER_NAVY}
+                      />
+                      {/* Verkäufe als zweiter, schmalerer Balken. Er ist nicht
+                          nur anders gefärbt, sondern anders breit und versetzt —
+                          eine Unterscheidung allein über Farbe wäre für eine
+                          Farbsehschwäche keine. Farbe jetzt `CHART_SALES`
+                          (3,57:1 statt 2,53:1, Befund A11Y-7); der Abstand zum
+                          Hauptbalken (#3E3F66 = 9,96:1 auf Weiß) bleibt dabei
+                          deutlich erhalten. */}
+                      <rect
+                        x={index * 10 + 6}
+                        y={38 - ordersHeight}
+                        width={2.5}
+                        height={ordersHeight}
+                        fill={CHART_SALES}
+                      />
+                    </g>
+                  );
+                })}
+                {/* Grundlinie im selben Ton wie der Verkaufsbalken: vorher
+                    `PARTNER_BORDER` mit 1,22:1 auf Weiß (Befund A11Y-7). */}
+                <line x1="0" y1="38" x2={Math.max(points.length * 10, 10)} y2="38" stroke={CHART_SALES} strokeWidth="0.5" />
+              </svg>
+              <p className="mt-2 text-[13px]" style={{ color: PARTNER_MUTED }}>
+                {t("chartLegend")}
+              </p>
+            </div>
+          )}
         </>
       )}
     </section>

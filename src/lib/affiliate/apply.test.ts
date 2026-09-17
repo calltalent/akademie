@@ -18,10 +18,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  *      echte Bewerbung UND dass trotzdem keine Zeile entsteht. Ein Bot, der am
  *      Antworttext erkennt, dass er aufgeflogen ist, probiert die nächste
  *      Variante; genau deshalb ist der gleiche Text hier Prüfgegenstand.
- *   2. DREI RATE-LIMIT-EBENEN. IP, global und Mandant greifen vor jeder
- *      Datenbankarbeit, das Adresslimit danach. Der verteilte Bot aus dem
- *      Vorfall vom 24.08.2026 kam mit je einem Treffer von vier IPs — ein
- *      reines IP-Limit hätte ihn nie gesehen.
+ *   2. RATE-LIMITS SPERREN NUR JE VERURSACHER. IP vor jeder Datenbankarbeit,
+ *      Mandant direkt nach dem Gate, Adresse danach. Der verteilte Bot aus
+ *      dem Vorfall vom 24.08.2026 kam mit je einem Treffer von vier IPs — ein
+ *      reines IP-Limit hätte ihn nie gesehen, das Mandantenlimit sieht ihn.
+ *      Der plattformweite Zähler PROTOKOLLIERT nur (Korrektur 11.09.2026,
+ *      Befund SEC-1): als Sperre lief er vor der Mandantenprüfung und machte
+ *      damit die Bewerbung ALLER Mandanten mit 300 Anfragen unbenutzbar. Dass
+ *      er nicht mehr abweist, ist deshalb selbst Prüfgegenstand.
  *   3. KEIN ORAKEL (CLAUDE.md §2.15, Plan 11.15). „Modul aus", „Programm
  *      privat", „Programm im Entwurf" und „Programm existiert nicht" liefern
  *      denselben Text; eine bereits vorhandene Bewerbung liefert den
@@ -442,20 +446,38 @@ describe("Honeypot und Zeitfalle quittieren wie ein Mensch", () => {
 // --- 3. Rate-Limits -----------------------------------------------------
 
 describe("Rate-Limits auf vier Ebenen", () => {
-  it("fragt IP, global und Mandant, bevor irgendetwas geschrieben wird", async () => {
+  it("fragt IP, Mandant und Adresse, bevor irgendetwas geschrieben wird", async () => {
     await submit();
 
+    // Der plattformweite Zähler läuft NACH dem Mandanten-Gate: er darf einen
+    // Mandanten nicht mehr aussperren, also darf er auch nicht mehr vor ihm
+    // ausgewertet werden.
     expect(rateLimitCalls).toEqual([
       "affiliate-apply-ip",
-      "affiliate-apply-global",
       "affiliate-apply-tenant",
+      "affiliate-apply-global",
       "affiliate-apply-email",
     ]);
   });
 
+  /**
+   * Der Kern von Befund SEC-1: über einen einzigen mandantenübergreifenden
+   * Zähler konnte ein Angreifer die Bewerbung JEDES Kunden der Plattform
+   * lahmlegen — 300 Anfragen, und kein Betreiber hätte die Ursache in seinem
+   * eigenen Mandanten gefunden. Der Zähler ist deshalb ein Alarm, keine
+   * Sperre. Läuft dieser Test rot, ist die Sperrwirkung zurück.
+   */
+  it("der plattformweite Zähler sperrt NICHT — ein Mandant haftet nie für andere", async () => {
+    state.blockedLimits.add("affiliate-apply-global");
+
+    const result = await submit();
+
+    expect(result).toEqual({ error: null, success: true });
+    expect(partners()).toHaveLength(1);
+  });
+
   it.each([
     ["affiliate-apply-ip"],
-    ["affiliate-apply-global"],
     ["affiliate-apply-tenant"],
     ["affiliate-apply-email"],
   ])("%s abgewiesen: keine Zeile", async (namespace) => {

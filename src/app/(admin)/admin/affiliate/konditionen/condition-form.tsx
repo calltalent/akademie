@@ -11,7 +11,7 @@ import { centsToEuroInput } from "@/lib/affiliate/schema";
 import type { AffiliateRateKind } from "@/lib/affiliate/types";
 
 import { useStatusFocus } from "../use-status-focus";
-import { CARD_BORDER, FOCUS_RING, INK, MUTED } from "../affiliate-format";
+import { CARD_BORDER, FOCUS_RING, INK, MUTED, SUCCESS } from "../affiliate-format";
 
 /**
  * Affiliate-System, Block B6-B — Formular einer Kondition
@@ -372,7 +372,7 @@ export function ConditionForm({
           role="status"
           aria-live="polite"
           className="mb-3 text-[15px] font-semibold outline-none"
-          style={{ color: "#1F8A5B" }}
+          style={{ color: SUCCESS }}
         >
           {t("conditions.form.saved")}
         </p>

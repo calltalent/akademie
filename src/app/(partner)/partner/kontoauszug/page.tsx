@@ -226,7 +226,12 @@ export default async function PartnerKontoauszugPage() {
                     </div>
                     <div role="cell">
                       <span className="rgrid-label">{t("columnProduct")}</span>
-                      <span className="block truncate">
+                      {/* `break-words` statt `truncate` (Befund A11Y-5):
+                          diese Zelle ist für den Partner die Antwort auf
+                          „wofür habe ich das bekommen?". Der Titel steht
+                          nirgendwo sonst in der Zeile — abgeschnitten wäre
+                          er ersatzlos weg. */}
+                      <span className="block break-words">
                         {row.product_id === null
                           ? "—"
                           : (productTitles.get(row.product_id) ?? "—")}

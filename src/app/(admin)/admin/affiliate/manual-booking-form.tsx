@@ -12,6 +12,7 @@ import {
   FOCUS_RING,
   INK,
   MUTED,
+  SUCCESS,
 } from "./affiliate-format";
 
 /**
@@ -152,34 +153,44 @@ export function ManualBookingForm({
           {t("commissions.manual.amountHint")}
         </p>
 
-        {needsConfirm && (
-          <>
-            <label
-              htmlFor={`${idPrefix}-confirm`}
-              className={labelClass}
-              style={{ color: "#8A6D1F" }}
-            >
-              {t("commissions.manual.confirmLabel")}
-            </label>
-            <input
-              id={`${idPrefix}-confirm`}
-              name="confirmAmountEuro"
-              type="text"
-              inputMode="decimal"
-              required
-              aria-describedby={`${idPrefix}-confirm-hint`}
-              className={`${fieldClass} mb-1 ${FOCUS_RING}`}
-              style={{ borderColor: "#E7C98F", color: INK }}
-            />
-            <p
-              id={`${idPrefix}-confirm-hint`}
-              className="mb-4 text-[13px]"
-              style={{ color: "#8A6D1F" }}
-            >
-              {t("commissions.manual.confirmHint")}
-            </p>
-          </>
-        )}
+        {/* Live-Region, die IMMER im DOM steht (Korrektur 11.09.2026, Befund
+            A11Y-9). Ab der Schwelle taucht hier ein zweites PFLICHTFELD auf.
+            Vorher geschah das stumm: wer das Formular nicht sieht, bekam beim
+            Absenden einen Fehler über ein Feld, von dessen Existenz er nie
+            erfahren hatte. Eine erst im Moment des Ereignisses eingefügte
+            Region lesen mehrere Screenreader nicht vor — deshalb steht die
+            Hülle dauerhaft und füllt sich nur (Bauart wie in
+            `src/components/affiliate/partner-forms.tsx`). */}
+        <div role="status" aria-live="polite">
+          {needsConfirm && (
+            <>
+              <label
+                htmlFor={`${idPrefix}-confirm`}
+                className={labelClass}
+                style={{ color: "#8A6D1F" }}
+              >
+                {t("commissions.manual.confirmLabel")}
+              </label>
+              <input
+                id={`${idPrefix}-confirm`}
+                name="confirmAmountEuro"
+                type="text"
+                inputMode="decimal"
+                required
+                aria-describedby={`${idPrefix}-confirm-hint`}
+                className={`${fieldClass} mb-1 ${FOCUS_RING}`}
+                style={{ borderColor: "#E7C98F", color: INK }}
+              />
+              <p
+                id={`${idPrefix}-confirm-hint`}
+                className="mb-4 text-[13px]"
+                style={{ color: "#8A6D1F" }}
+              >
+                {t("commissions.manual.confirmHint")}
+              </p>
+            </>
+          )}
+        </div>
 
         <label
           htmlFor={`${idPrefix}-note`}
@@ -217,7 +228,7 @@ export function ManualBookingForm({
             role="status"
             aria-live="polite"
             className="mb-3 text-[15px] font-semibold outline-none"
-            style={{ color: "#1F8A5B" }}
+            style={{ color: SUCCESS }}
           >
             {t("commissions.manual.saved")}
           </p>

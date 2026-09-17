@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   createAffiliateGroup,
@@ -17,6 +17,7 @@ import {
   HAIRLINE,
   INK,
   MUTED,
+  SUCCESS,
 } from "../affiliate-format";
 
 /**
@@ -128,7 +129,7 @@ export function PartnerGroups({
             role="status"
             aria-live="polite"
             className="mb-3 text-[15px] font-semibold outline-none"
-            style={{ color: "#1F8A5B" }}
+            style={{ color: SUCCESS }}
           >
             {t("partners.groups.created")}
           </p>
@@ -159,6 +160,19 @@ function GroupRow({ group }: { group: { id: string; name: string } }) {
     initialAffiliateGroupActionState,
   );
   const [confirming, setConfirming] = useState(false);
+
+  /**
+   * Lösch-Rückfrage hörbar und fokussiert (Korrektur 11.09.2026, Befund
+   * A11Y-8). Vorher erschien die Frage stumm, und der Fokus blieb auf der
+   * Stelle, an der jetzt „Ja, löschen" steht — wer den Wechsel nicht sieht,
+   * löscht mit dem nächsten Tastendruck eine Gruppe, statt ihre Löschung erst
+   * zu verlangen. `role="alert"` unterbricht, der Fokus wandert auf den
+   * Bestätigungsknopf, damit die Frage vor der Antwort ankommt.
+   */
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (confirming) confirmRef.current?.focus();
+  }, [confirming]);
   const statusRef = useStatusFocus(
     Boolean(renameState.success) ||
       Boolean(renameState.error) ||
@@ -210,10 +224,11 @@ function GroupRow({ group }: { group: { id: string; name: string } }) {
           className="flex flex-wrap items-center gap-2"
         >
           <input type="hidden" name="groupId" value={group.id} />
-          <p className="w-full text-[15px]" style={{ color: "#B24343" }}>
+          <p role="alert" className="w-full text-[15px]" style={{ color: "#B24343" }}>
             {t("partners.groups.deleteConfirm", { name: group.name })}
           </p>
           <button
+            ref={confirmRef}
             type="submit"
             disabled={deletePending}
             className={`min-h-[40px] rounded-[11px] px-[14px] text-[15px] font-bold text-white disabled:opacity-50 ${FOCUS_RING}`}
@@ -261,7 +276,7 @@ function GroupRow({ group }: { group: { id: string; name: string } }) {
           role="status"
           aria-live="polite"
           className="text-[15px] font-semibold outline-none"
-          style={{ color: "#1F8A5B" }}
+          style={{ color: SUCCESS }}
         >
           {t("partners.groups.saved")}
         </p>

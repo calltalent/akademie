@@ -7,7 +7,8 @@ import {
   inviteAffiliatePartner,
 } from "@/lib/affiliate/actions";
 import { initialAffiliatePartnerActionState } from "@/lib/affiliate/state";
-import { CARD_BORDER, FOCUS_RING, INK, MUTED } from "../affiliate-format";
+import { useStatusFocus } from "../use-status-focus";
+import { CARD_BORDER, FOCUS_RING, INK, MUTED, SUCCESS } from "../affiliate-format";
 
 /**
  * Affiliate-System, Block B6-B — Einladung und Handanlage eines Partners
@@ -52,6 +53,22 @@ export function PartnerInviteForm({
     initialAffiliatePartnerActionState,
   );
   const [copied, setCopied] = useState(false);
+
+  /**
+   * Fokusführung wie in den Schwesterformularen (Korrektur 11.09.2026,
+   * Befund A11Y-9). Dies war das einzige Formular des Moduls ohne
+   * `useStatusFocus()`: Fehler und Erfolg wurden gerendert, der Fokus blieb
+   * aber auf dem Absende-Knopf — und damit auch die Position in einer langen
+   * Seite.
+   *
+   * Zwei getrennte Refs, weil Fehler und Erfolg zwei verschiedene Absätze
+   * sind: ein gemeinsamer Ref zeigte beim Umschlagen von Fehler auf Erfolg
+   * auf den bereits ausgehängten Knoten.
+   */
+  const errorRef = useStatusFocus<HTMLParagraphElement>(state.error !== null);
+  const successRef = useStatusFocus<HTMLParagraphElement>(
+    state.success === true && state.error === null,
+  );
   const [code, setCode] = useState("");
   const idPrefix = useId();
 
@@ -200,8 +217,10 @@ export function PartnerInviteForm({
 
       {state.error && (
         <p
+          ref={errorRef}
+          tabIndex={-1}
           role="alert"
-          className="mb-3 text-[15px] font-semibold"
+          className="mb-3 text-[15px] font-semibold outline-none"
           style={{ color: "#B24343" }}
         >
           {state.error}
@@ -209,7 +228,12 @@ export function PartnerInviteForm({
       )}
       {state.success && !state.error && (
         <div role="status" aria-live="polite" className="mb-3 text-[15px]">
-          <p className="font-semibold" style={{ color: "#1F8A5B" }}>
+          <p
+            ref={successRef}
+            tabIndex={-1}
+            className="font-semibold outline-none"
+            style={{ color: SUCCESS }}
+          >
             {mode === "invite"
               ? t("partners.invite.savedInvite")
               : t("partners.invite.savedCreate")}
@@ -239,16 +263,21 @@ export function PartnerInviteForm({
               >
                 {t("partners.invite.copy")}
               </button>
-              {copied && (
-                <p
-                  role="status"
-                  aria-live="polite"
-                  className="mt-1 text-[15px]"
-                  style={{ color: "#1F8A5B" }}
-                >
-                  {t("partners.invite.copied")}
-                </p>
-              )}
+              {/* Die Live-Region steht IMMER im DOM; sie füllt sich nur
+                  (Befund A11Y-9). Vorher war sie an `copied` gebunden und
+                  wurde erst IM MOMENT des Ereignisses eingefügt — mehrere
+                  Screenreader lesen eine Region, die es beim Eintreten der
+                  Änderung noch gar nicht gab, nicht vor. Gleiche Bauart und
+                  gleiche Begründung wie in
+                  `src/components/affiliate/partner-forms.tsx`. */}
+              <p
+                role="status"
+                aria-live="polite"
+                className="mt-1 min-h-[1lh] text-[15px]"
+                style={{ color: SUCCESS }}
+              >
+                {copied ? t("partners.invite.copied") : ""}
+              </p>
             </div>
           )}
         </div>

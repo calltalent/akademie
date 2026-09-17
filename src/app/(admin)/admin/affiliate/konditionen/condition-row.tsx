@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { deleteAffiliateCondition } from "@/lib/affiliate/actions";
 import { initialAffiliateConditionActionState } from "@/lib/affiliate/state";
@@ -63,6 +63,27 @@ export function ConditionRow({
   const tCommon = useTranslations("admin.common");
   const [expanded, setExpanded] = useState(false);
   const [confirming, setConfirming] = useState(false);
+
+  /**
+   * Verknüpfung Knopf -> aufklappbarer Bereich (Korrektur 11.09.2026, Befund
+   * A11Y-8). Vorher trug der Knopf nur `aria-expanded`; hier erscheint beim
+   * Aufklappen zusätzlich das KOMPLETTE Bearbeitungsformular weiter unten im
+   * Baum, ohne dass der Nutzer erfährt, wo.
+   */
+  const detailsId = `${useId()}-details`;
+
+  /**
+   * Die Lösch-Rückfrage war ein stummer Texteinschub: sie erschien, ohne
+   * angesagt zu werden, und der Fokus blieb an der Stelle, an der nun „Ja,
+   * löschen" steht. Wer den Wechsel nicht sieht, drückt als Nächstes blind
+   * auf das, was gerade dort ist. Deshalb `role="alert"` an der Frage (sie
+   * MUSS unterbrechen) und der Fokus ausdrücklich auf den Bestätigungsknopf:
+   * die Frage muss gehört werden, bevor geklickt wird.
+   */
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (confirming) confirmRef.current?.focus();
+  }, [confirming]);
   const [deleteState, deleteAction, deletePending] = useActionState(
     deleteAffiliateCondition,
     initialAffiliateConditionActionState,
@@ -108,6 +129,7 @@ export function ConditionRow({
             type="button"
             onClick={() => setExpanded((value) => !value)}
             aria-expanded={expanded}
+            aria-controls={detailsId}
             className={`min-h-[40px] rounded-[11px] border px-[14px] text-[15px] font-semibold ${FOCUS_RING}`}
             style={{ borderColor: CARD_BORDER, color: INK }}
           >
@@ -138,7 +160,7 @@ export function ConditionRow({
       )}
 
       {expanded && (
-        <div className="flex flex-col gap-4 px-[18px] pb-6 lg:px-[24px]">
+        <div id={detailsId} className="flex flex-col gap-4 px-[18px] pb-6 lg:px-[24px]">
           <ConditionForm
             condition={values}
             partners={partners}
@@ -153,10 +175,11 @@ export function ConditionRow({
               className="flex flex-wrap items-center gap-2"
             >
               <input type="hidden" name="conditionId" value={values.id} />
-              <p className="w-full text-[15px]" style={{ color: "#B24343" }}>
+              <p role="alert" className="w-full text-[15px]" style={{ color: "#B24343" }}>
                 {t("conditions.form.deleteConfirm")}
               </p>
               <button
+                ref={confirmRef}
                 type="submit"
                 disabled={deletePending}
                 className={`min-h-[40px] rounded-[11px] px-[14px] text-[15px] font-bold text-white disabled:opacity-50 ${FOCUS_RING}`}

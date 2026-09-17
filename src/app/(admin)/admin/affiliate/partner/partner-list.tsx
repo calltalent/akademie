@@ -158,8 +158,13 @@ export function PartnerList({ rows }: { rows: PartnerListRow[] }) {
                 >
                   {row.displayName}
                 </Link>
+                {/* `break-all` statt `truncate` (Befund A11Y-5): eine
+                    abgeschnittene E-Mail-Adresse ist keine Adresse mehr, und
+                    bei 200 % Zoom blieben wenige Zeichen übrig. `break-all`
+                    statt `break-words`, weil eine Adresse keine Wortgrenzen
+                    hat, an denen ein Umbruch fiele. */}
                 <span
-                  className="block truncate text-[13px]"
+                  className="block break-all text-[13px]"
                   style={{ color: MUTED }}
                 >
                   {row.email}

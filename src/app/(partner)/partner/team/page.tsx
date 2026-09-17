@@ -47,10 +47,17 @@ import {
  *
  * ## Was der Werber sieht und was nicht
  *
- * Name, Beitrittsdatum, Umsatz und die daraus entstandene
- * Zweitstufen-Provision (8.2). NICHT: Bewerbungstext, interne Notiz,
- * E-Mail-Adresse, Anschrift, Bankdaten, Status. Und ganz sicher nicht die
- * Käufer der Geworbenen — die Umsatzsumme ist eine Zahl, keine Liste.
+ * Name, Beitrittsdatum, die eigene Zweitstufen-Provision und die
+ * Bemessungsgrundlage, aus der sie gerechnet wurde (8.2, Plan Zeile 2266).
+ * NICHT: Bewerbungstext, interne Notiz, E-Mail-Adresse, Anschrift,
+ * Bankdaten, Status. Und ganz sicher nicht die Käufer der Geworbenen — die
+ * Summe ist eine Zahl, keine Liste.
+ *
+ * Die Umsatzspalte ist dabei ausdrücklich NICHT der Gesamtumsatz des
+ * Geworbenen, sondern nur der Teil, an dem der Werber selbst verdient hat
+ * (Begründung im Rumpf bei `revenueByPartner`). Ein Werber ist kein
+ * Mitgesellschafter: was er sehen darf, endet an seiner eigenen
+ * Provisionsgrundlage.
  *
  * ## Die Seite existiert nur bei `tier2_enabled`
  *
@@ -60,6 +67,15 @@ import {
  */
 
 const COLS = "1.6fr 1fr 1fr 1fr";
+
+type SaleRow = {
+  id: string;
+  partner_id: string;
+  base_cents: number;
+  currency: string;
+  status: string;
+  is_test: boolean;
+};
 
 type Tier2Row = {
   id: string;
@@ -131,11 +147,14 @@ export default async function PartnerTeamPage() {
         .eq("tenant_id", access.tenant.id)
         .in("id", ids)
         .order("created_at", { ascending: true }),
-      // Umsatz der Geworbenen: die Bemessungsgrundlage ihrer Verkaufszeilen.
-      // Keine Käuferspalte, keine Bestellnummer — nur Summanden.
+      // Die Verkaufszeilen der Geworbenen — NUR als Nachschlagewerk für die
+      // eigene Provision, nicht als Geschäftszahl des anderen (siehe „Was der
+      // Werber sieht" im Kopf). Keine Käuferspalte, keine Bestellnummer.
+      // `currency` ist neu und trägt hier Gewicht: ohne sie wurde
+      // währungsübergreifend addiert (5.11).
       admin
         .from("affiliate_commissions")
-        .select("id, partner_id, base_cents, status, is_test")
+        .select("id, partner_id, base_cents, currency, status, is_test")
         .eq("tenant_id", access.tenant.id)
         .in("partner_id", ids)
         .eq("kind", "sale"),
@@ -151,25 +170,72 @@ export default async function PartnerTeamPage() {
         .eq("kind", "tier2"),
     ]);
 
-    const saleOwner = new Map<string, string>();
-    const revenueByPartner = new Map<string, number>();
-    for (const sale of sales ?? []) {
-      saleOwner.set(sale.id as string, sale.partner_id as string);
-      if (sale.is_test === true || sale.status === "cancelled") continue;
-      const key = sale.partner_id as string;
-      revenueByPartner.set(key, (revenueByPartner.get(key) ?? 0) + Number(sale.base_cents ?? 0));
-    }
+    /**
+     * DIE UMSATZSPALTE ZEIGT NUR DIE EIGENE BEMESSUNGSGRUNDLAGE (Korrektur
+     * 11.09.2026, Befund SEC-2).
+     *
+     * Vorher wurden ALLE `kind='sale'`-Zeilen der Geworbenen zu „Umsatz"
+     * summiert — ohne Abgleich, ob daraus überhaupt eine Zweitstufen-Zeile
+     * für den Aufrufer entstanden ist. Das ging über seine Rolle hinaus: bei
+     * `recurring_mode='first_only'`, bei nachträglich eingeschalteter zweiter
+     * Stufe, bei stornierten `tier2`-Zeilen oder nach einem Wechsel der
+     * Werberbindung sah er das volle Geschäftsvolumen eines fremden Partners,
+     * an dem er nichts verdient hat. Genau davor warnt die Migration
+     * 20260911120000 (Policy `affiliate_daily_stats_select`) wörtlich: „gäbe
+     * dem Werber die vollen Tageszeilen seiner Geworbenen — also deren
+     * Umsatz, nicht nur die eigene Zweitstufen-Provision".
+     *
+     * Deshalb ist die Reihenfolge jetzt umgekehrt: ZUERST die eigenen
+     * `tier2`-Zeilen, und der Umsatz speist sich ausschließlich aus den
+     * Eltern-Verkäufen, die darin vorkommen. Was neben der Provision steht,
+     * ist damit die Zahl, aus der SIE gerechnet wurde — für den Werber
+     * nachprüfbar, und keine Zeile mehr als das.
+     *
+     * Beide Summen laufen zusätzlich nur über die PROGRAMMWÄHRUNG. Vorher war
+     * das nur bei der Provision so; der Umsatz wurde währungsübergreifend
+     * addiert und dann in der Programmwährung beschriftet — bei einem
+     * Mandanten mit zwei Währungen stand dort eine Zahl, die es nicht gibt
+     * (5.11 verbietet jede währungsübergreifende Summe).
+     *
+     * (Anmerkung an die i18n-Pflege: `affiliate.team.columnRevenue` heißt
+     * „Umsatz". Treffender wäre „Bemessungsgrundlage deiner Provision" — die
+     * Spalte zeigt bewusst nicht mehr den gesamten Umsatz.)
+     */
+    // Nachschlagewerk, UNGEFILTERT: die Verkaufszeile dient hier zuerst dazu,
+    // die eigene `tier2`-Zeile ihrem Partner zuzuordnen. Wer sie schon an
+    // dieser Stelle nach Status filtert, verliert die Provision zu einem
+    // stornierten Elternverkauf — und eine zu kleine Geldzahl ist schlimmer
+    // als gar keine (Kopfkommentar `partner/page.tsx`). Der Status entscheidet
+    // weiter unten über den UMSATZ, nicht über die Zuordnung.
+    const saleById = new Map<string, SaleRow>();
+    for (const sale of (sales ?? []) as SaleRow[]) saleById.set(sale.id, sale);
 
     const commissionByPartner = new Map<string, number>();
+    const revenueByPartner = new Map<string, number>();
+    // Ein Elternverkauf zählt einmal, auch wenn mehrere eigene `tier2`-Zeilen
+    // auf ihn zeigen — sonst stünde derselbe Umsatz doppelt in der Spalte.
+    const countedSales = new Set<string>();
+
     for (const row of (tier2 ?? []) as Tier2Row[]) {
       if (row.is_test || row.status === "cancelled" || row.parent_id === null) continue;
       if (row.currency !== currency) continue;
-      const owner = saleOwner.get(row.parent_id);
-      if (owner === undefined) continue;
+      const sale = saleById.get(row.parent_id);
+      if (sale === undefined) continue;
+      const owner = sale.partner_id;
+
+      // Die eigene Provision — unverändert gegenüber vorher.
       commissionByPartner.set(
         owner,
         (commissionByPartner.get(owner) ?? 0) + Number(row.amount_cents ?? 0),
       );
+
+      // Der Umsatz nur, wenn der Elternverkauf selbst zählt: kein Testlauf,
+      // nicht storniert, und in der Programmwährung (5.11).
+      if (sale.is_test === true || sale.status === "cancelled") continue;
+      if (sale.currency !== currency) continue;
+      if (countedSales.has(sale.id)) continue;
+      countedSales.add(sale.id);
+      revenueByPartner.set(owner, (revenueByPartner.get(owner) ?? 0) + Number(sale.base_cents ?? 0));
     }
 
     rows = (partners ?? []).map((row) => ({

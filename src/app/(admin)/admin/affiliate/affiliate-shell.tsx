@@ -29,8 +29,15 @@ import {
  *   - Die Unternavigation ist eine echte `<nav>` mit `aria-label`; der aktive
  *     Punkt trägt `aria-current="page"` und ist zusätzlich fett — nie nur
  *     farblich.
- *   - Sekundärtext durchgehend `#66679B` (rund 5,3:1 auf Weiß). `#A9AAC4`
- *     (2,3:1) fällt durch AA und kommt in diesen Seiten nicht vor.
+ *   - Sekundärtext durchgehend `#66679B` (5,28:1 auf Weiß, nachgerechnet).
+ *     `#A9AAC4` (2,27:1) fällt durch AA und kommt in diesen Seiten nicht vor.
+ *     Bis zum 11.09.2026 stimmte dieser Satz NICHT: die globale Klasse
+ *     `.rgrid-label` (globals.css) trug genau diese Farbe und damit jede
+ *     Kartenbeschriftung unter 1024px — eine im Kopf formulierte Regel, die
+ *     über eine fremde Datei unbemerkt unterlaufen wurde. Dort steht jetzt
+ *     ebenfalls `#66679B`. Wer eine Klasse von außerhalb dieses Moduls
+ *     verwendet, prüft deren Farben mit, sonst ist diese Zusage wieder
+ *     unwahr.
  *   - Klickziele mindestens 40 px hoch (`min-h-[40px]`), Fokusring sichtbar
  *     (`FOCUS_RING`), nie `outline-none` ohne Ersatz.
  */
@@ -111,7 +118,14 @@ export async function AffiliateShell({
     <div className="flex flex-col gap-6">
       <a
         href="#affiliate-main"
-        className={`sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-[10px] focus:bg-white focus:px-4 focus:py-3 focus:text-[15px] focus:font-bold ${FOCUS_RING}`}
+        /* `focus:left-4 focus:top-4` ergänzt (Korrektur 11.09.2026, Befund
+           A11Y-10): `position:absolute` OHNE Positionsangaben platziert das
+           Element an seiner statischen Position — der sichtbar gewordene
+           Sprunglink legte sich damit über den Akzentbalken bzw. die
+           Kopfzeile, statt sauber davor zu stehen. Gleiche Angaben wie auf
+           der öffentlichen Programmseite. Der Fokusring selbst war in
+           Ordnung: `outline-[#3E3F66]` auf Weiß = 9,96:1. */
+        className={`sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-[10px] focus:bg-white focus:px-4 focus:py-3 focus:text-[15px] focus:font-bold ${FOCUS_RING}`}
         style={{ color: NAVY, border: `1px solid ${CARD_BORDER}` }}
       >
         {t("skipToContent")}

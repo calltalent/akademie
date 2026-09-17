@@ -129,14 +129,34 @@ body {
 }
 /* Mikro-Label vor Zellen, deren Wert gestapelt ohne Spaltenüberschrift
    unklar wäre (z. B. eine bloße Zahl oder ein bloßes Datum) — nur an den
-   mehrdeutigen Zellen eingesetzt, nicht überall. */
+   mehrdeutigen Zellen eingesetzt, nicht überall.
+
+   BARRIEREFREIHEIT (Korrektur 11.09.2026, Befund A11Y-1): hier stand
+   `color: #a9aac4` bei `font-size: 11px`. Gemessen sind das 2,27:1 auf
+   Weiß — nicht einmal die Hälfte der AA-Schwelle von 4,5:1, und zugleich
+   der kleinste Text im Produkt. Das ist keine Randnotiz: unterhalb von
+   1024px steht `.rgrid-header` auf `display:none` (siehe oben), dieses
+   Mikro-Label ist dort also die EINZIGE Spaltenbeschriftung, die eine
+   Zelle noch trägt. Auf einem Telefon stand damit „1.250,00 €" ohne
+   erkennbare Angabe, ob das Basis, Betrag oder Saldo ist.
+
+   Jetzt #66679B auf #FFFFFF = 5,28:1 (nachgerechnet nach WCAG 2.1,
+   relative Luminanz) — derselbe Sekundärton, den beide Shells als MUTED
+   führen und dessen Abwesenheit sie in ihren Kopfkommentaren behaupten.
+   Auf dem Seitengrund #F4F5FA sind es 4,85:1, ebenfalls über AA.
+   Schriftgröße von 11px auf 12px angehoben; 11px ist für eine
+   Beschriftung zu klein.
+
+   Die Klasse ist global und wird auch von den älteren Admin-Tabellen
+   benutzt: die Änderung wirkt bewusst produktweit. Dass bestehende Seiten
+   dadurch anders aussehen, ist gewollt — diese Labels werden gelesen. */
 .rgrid-label {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #a9aac4;
+  color: #66679b;
   margin-bottom: 2px;
 }
 @media (min-width: 1024px) {

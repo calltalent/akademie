@@ -27,6 +27,7 @@ import {
   FOCUS_RING,
   INK,
   MUTED,
+  SUCCESS,
 } from "../affiliate-format";
 
 /**
@@ -641,7 +642,7 @@ export function AffiliateSettingsForm({
           role="status"
           aria-live="polite"
           className="text-[15px] font-semibold outline-none"
-          style={{ color: "#1F8A5B" }}
+          style={{ color: SUCCESS }}
         >
           {t("settings.saved")}
         </p>
