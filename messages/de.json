@@ -1109,7 +1109,11 @@
           "courseCompleted": "Kurs abgeschlossen",
           "quizPassed": "Quiz bestanden",
           "submissionCreated": "Abgabe eingereicht",
-          "orderPaid": "Zahlung erhalten"
+          "orderPaid": "Zahlung erhalten",
+          "affiliateApplication": "Partner-Bewerbung eingegangen",
+          "affiliateApproved": "Partner freigegeben",
+          "affiliateCommission": "Provision gebucht",
+          "affiliateReversal": "Provision zurückgenommen"
         }
       },
       "webhookSecretDialog": {
@@ -2012,6 +2016,8 @@
       },
       "payouts": {
         "title": "Auszahlungen",
+        "description": "Entwürfe prüfen, Auszahlungen freigeben, Zahlungsdatei erzeugen und die Überweisung vermerken.",
+        "tabsLabel": "Ansichten der Auszahlungen",
         "tabs": {
           "drafts": "Entwürfe",
           "approved": "Freigegeben",
@@ -2029,9 +2035,10 @@
         "columnCompleteness": "Vollständigkeit",
         "columnReference": "Referenz",
         "columnDocument": "Beleg",
+        "columnStatus": "Status",
         "empty": "Keine Auszahlungen in dieser Ansicht.",
         "complete": "Vollständig",
-        "incomplete": "Unvollständig. Es fehlt: {fields}",
+        "incomplete": "Unvollständig: {fields}",
         "releaseSelected": "Ausgewählte freigeben",
         "releaseConfirm": "{count} Auszahlungen über insgesamt {amount} freigeben?",
         "releaseConfirmYes": "Freigeben",
@@ -2053,6 +2060,61 @@
           "sepa": "SEPA-Überweisung",
           "paypal": "PayPal",
           "manual": "Manuell"
+        },
+        "selectRow": "Auszahlung an {partner} über {amount} auswählen",
+        "selectHint": "Bitte zuerst mindestens eine Auszahlung auswählen.",
+        "documentPending": "Noch keine Belegnummer",
+        "documentFileMissing": "Beleg gültig, PDF wird nachgereicht.",
+        "subtotalLabel": "Nettobetrag",
+        "taxLabel": "Umsatzsteuer",
+        "methodUnknown": "Kein Zahlweg hinterlegt",
+        "referenceHint": "Referenz aus dem Bankauszug, damit die Zahlung später wiederzufinden ist.",
+        "markPaidDone": "Die Überweisung ist vermerkt.",
+        "markFailed": "Überweisung fehlgeschlagen",
+        "markFailedHint": "Der Beleg bleibt bestehen; die Provisionszeilen laufen in den nächsten Entwurf.",
+        "markFailedDone": "Der Fehlschlag ist vermerkt.",
+        "releaseHeading": "Freigabe",
+        "releaseSelectedCount": "{count, plural, one {# Auszahlung ausgewählt.} other {# Auszahlungen ausgewählt.}}",
+        "releaseConfirmDetail": "{partners, plural, one {Es wird {amount} an # Partner ausgezahlt.} other {Es werden {amount} an # Partner ausgezahlt.}}",
+        "releaseConfirmHint": "Mit der Freigabe entstehen Belegnummern. Ein Beleg wird danach nicht mehr gelöscht.",
+        "releasePending": "Wird freigegeben …",
+        "releaseDone": "Die Auszahlungen sind freigegeben.",
+        "exportHeading": "Zahlungsdatei",
+        "exportDescription": "{count, plural, one {# ausgewählte Auszahlung als Datei für die Bank oder für PayPal.} other {# ausgewählte Auszahlungen als Datei für die Bank oder für PayPal.}}",
+        "exportMethodHint": "Exportiert werden nur Auszahlungen mit diesem Zahlweg.",
+        "exportNothing": "Zu dieser Auswahl gibt es keine freigegebene Auszahlung mit diesem Zahlweg.",
+        "exportUnusable": "Für diese Belege fehlt eine verwertbare Zahlungsverbindung: {documents}",
+        "debtorHeading": "Auftraggeber",
+        "debtorHint": "Das Konto, von dem überwiesen wird. Die Angabe steht nur in der erzeugten Datei und wird nicht gespeichert.",
+        "debtorName": "Name des Auftraggebers",
+        "debtorIban": "IBAN des Auftraggebers",
+        "debtorBic": "BIC (optional)",
+        "executionDate": "Ausführungstag (optional)",
+        "legalEntityMissing": "Für diese Akademie ist kein Rechtsträger hinterlegt. Ohne ihn kann keine Gutschrift ausgestellt werden.",
+        "planUnavailable": "Die Vorschau konnte nicht geladen werden. Bitte die Seite später erneut aufrufen.",
+        "blockedEmpty": "Derzeit ist kein Partner von der Auszahlung ausgeschlossen.",
+        "run": {
+          "heading": "Auszahlungslauf",
+          "description": "Erzeugt je Partner und Währung einen Entwurf aus allen freigegebenen Provisionen des Zeitraums.",
+          "preview": "{count, plural, one {# Partner ist derzeit auszahlbar.} other {# Partner sind derzeit auszahlbar.}}",
+          "previewTotal": "Voraussichtlich {amount}",
+          "periodFrom": "Zeitraum von",
+          "periodTo": "Zeitraum bis",
+          "submit": "Entwürfe erzeugen",
+          "pending": "Entwürfe werden erzeugt …",
+          "done": "Die Entwürfe sind angelegt."
+        },
+        "csv": {
+          "partner": "Partner",
+          "accountHolder": "Kontoinhaber",
+          "iban": "IBAN",
+          "bic": "BIC",
+          "paypalEmail": "PayPal-Adresse",
+          "amount": "Betrag",
+          "currency": "Währung",
+          "documentNo": "Belegnummer",
+          "period": "Zeitraum",
+          "taxMode": "Steuermodus"
         }
       },
       "creatives": {
@@ -2748,7 +2810,31 @@
       "notAvailableYet": "Es gab noch keine Auszahlung.",
       "balanceHint": "Was bereits freigegeben ist, steht auf der Übersicht unter „Verfügbar“.",
       "toOverview": "Zur Übersicht",
-      "toStatement": "Zum Kontoauszug"
+      "toStatement": "Zum Kontoauszug",
+      "downloadNotFound": "Der Beleg wurde nicht gefunden."
+    },
+    "payoutRun": {
+      "blocked": {
+        "negative_balance": "Saldo negativ, wird mit den nächsten Provisionen verrechnet",
+        "below_minimum": "Unter dem Mindestauszahlungsbetrag, wird vorgetragen",
+        "partner_inactive": "Partnerkonto nicht aktiv",
+        "payout_hold": "Auszahlung für dieses Partnerkonto gesperrt",
+        "billing_profile_missing": "Abrechnungsdaten fehlen",
+        "address_incomplete": "Name, Straße, Postleitzahl oder Ort fehlt",
+        "tax_entity_kind_missing": "Rechtsform fehlt (Unternehmen oder Privatperson)",
+        "tax_country_missing": "Land der Anschrift fehlt",
+        "tax_private_entity": "An Privatpersonen kann keine Gutschrift ausgestellt werden",
+        "tax_eu_vat_missing": "Geprüfte USt-IdNr. fehlt (Prüfung höchstens 90 Tage alt)",
+        "payout_method_missing": "Auszahlungsart fehlt",
+        "iban_invalid": "IBAN nicht gültig",
+        "paypal_missing": "PayPal-Adresse fehlt"
+      }
+    },
+    "tax": {
+      "modeRegular": "Regelbesteuerung, 19 % Umsatzsteuer",
+      "modeSmallBusiness": "Kleinunternehmer nach § 19 UStG, kein Steuerausweis",
+      "modeReverseCharge": "Reverse Charge, Steuerschuldnerschaft des Leistungsempfängers",
+      "modeNonEu": "Drittland, nicht im Inland steuerbar"
     },
     "team": {
       "title": "Team",
@@ -2935,6 +3021,11 @@
       "currencyColumn": "Währung",
       "freeFromColumn": "Frei ab",
       "reversalColumn": "Storniert"
+    },
+    "integrity": {
+      "payoutSubtotalMismatch": "Die Summe der zugeordneten Provisionszeilen weicht vom Betrag des Auszahlungssatzes ab. Der Satz wird nicht exportiert.",
+      "dailyStatsMismatch": "Die Tageskennzahl weicht vom Provisionsbuch ab. Das Buch gilt; das Aggregat wird neu berechnet.",
+      "overReversal": "Zu dieser Bestellung wurde mehr gegengebucht als ursprünglich an Provision entstanden ist."
     }
   },
   "consent": {

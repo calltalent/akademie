@@ -16,6 +16,14 @@ const EVENT_LABEL_KEYS = {
   "quiz.passed": "quizPassed",
   "submission.created": "submissionCreated",
   "order.paid": "orderPaid",
+  // Affiliate-Modul, Block B9 (PLAN_Affiliate-System.md 9.10). `satisfies
+  // Record<WebhookEvent, string>` erzwingt diese vier Zeilen: wer in
+  // `webhooks/events.ts` einen Namen ergänzt und hier nichts tut, bekommt
+  // einen Typfehler statt eines leeren Kästchens in der Oberfläche.
+  "affiliate.application": "affiliateApplication",
+  "affiliate.approved": "affiliateApproved",
+  "affiliate.commission": "affiliateCommission",
+  "affiliate.reversal": "affiliateReversal",
 } as const satisfies Record<WebhookEvent, string>;
 
 type WebhookRow = {

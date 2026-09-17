@@ -36,7 +36,64 @@ import { genericErrorMessage } from "@/lib/errors/generic";
  * (siehe PHASENSTATUS.md-Design-Entscheidung — abgeleiteter, aus
  * `lessons.content`/`transcript` regenerierbarer Inhalt, kein Primärdatum,
  * der reine Vektor ist ohnehin nicht sinnvoll lesbar).
+ *
+ * AFFILIATE-NACHZUG (Block B9, 17.09.2026, PLAN_Affiliate-System.md 7.8/9.10).
+ *
+ * ABWEICHUNG VOM PLAN-WORTLAUT, begründet: 7.8 schreibt hier „dieselben"
+ * sieben Abfragen vor wie in `src/lib/gdpr/export.ts`. Wörtlich genommen
+ * bekäme der Mandant einen Auszug, der seine Partner und deren Provisionen
+ * enthält, aber weder das Programm, unter dem sie laufen, noch die
+ * Konditionen, nach denen gerechnet wurde, noch die Auszahlungsbelege. Diese
+ * Route ist aber per Konstruktion der VOLLSTÄNDIGE Mandantenauszug (Art. 28
+ * DSGVO gegenüber dem Mandanten als Verantwortlichem) — sie listet schon
+ * heute 25 Tabellen, nicht eine Auswahl. Ein halber Modulauszug wäre für
+ * eine Datenmitnahme schlechter als gar keiner, weil er vollständig
+ * AUSSIEHT. Deshalb: ALLE Tabellen des Moduls, die eine `tenant_id` tragen.
+ *
+ * `affiliate_events` ist die Stripe-Outbox und trägt eine NULLABLE
+ * `tenant_id` (3.10): für `charge.refunded` und die Dispute-Ereignisse ist
+ * der Mandant zum Aufnahmezeitpunkt noch unbekannt. Ein Filter auf
+ * `tenant_id` lässt genau diese noch unaufgelösten Zeilen aus. Das ist
+ * richtig so — eine Zeile ohne aufgelösten Mandanten gehört keinem Mandanten
+ * zu, und sie hier mitzugeben hieße, Zahlungsereignisse eines fremden
+ * Mandanten auszuliefern.
+ *
+ * Spaltenlisten statt `*` bei `affiliate_partners`,
+ * `affiliate_billing_profiles`, `affiliate_conditions`,
+ * `affiliate_referrals` und `affiliate_commissions`: diese fünf tragen
+ * Spalten-Grants (3.3/3.13), an denen ein `select("*")` mit 42501 abbricht,
+ * sobald die Abfrage je gegen eine andere Rolle als `service_role` läuft.
+ * `terms_accepted_ip_hash` bleibt draußen (Zustimmungsnachweis, 11.6) —
+ * dieselbe Grenze wie in `src/lib/gdpr/export.ts` und `queries.ts`.
  */
+
+const AFFILIATE_PARTNER_COLUMNS =
+  "id, tenant_id, program_id, user_id, applicant_email, display_name, company, code, " +
+  "status, status_reason, group_id, referred_by, payout_hold, payout_hold_reason, " +
+  "internal_note, application, terms_version_accepted, terms_accepted_at, " +
+  "notify_sale, notify_reversal, notify_payout, created_at, updated_at";
+
+const AFFILIATE_CONDITION_COLUMNS =
+  "id, tenant_id, program_id, partner_id, group_id, product_id, rate_kind, rate_bp, " +
+  "fixed_cents, valid_from, valid_to, note, specificity, created_at, updated_at";
+
+const AFFILIATE_BILLING_COLUMNS =
+  "partner_id, tenant_id, entity_kind, legal_name, street, postal_code, city, country, " +
+  "small_business, vat_id, tax_number, vat_checked_at, vat_check_result, payout_method, " +
+  "account_holder, iban, bic, paypal_email, created_at, updated_at";
+
+const AFFILIATE_REFERRAL_COLUMNS =
+  "id, tenant_id, program_id, partner_id, click_id, campaign, user_id, bound_at, " +
+  "status, expires_at, created_at";
+
+const AFFILIATE_COMMISSION_COLUMNS =
+  "id, tenant_id, program_id, partner_id, kind, order_id, stripe_invoice_id, " +
+  "stripe_subscription_id, stripe_charge_id, product_id, campaign, referral_id, " +
+  "parent_id, reverses_id, base_cents, basis_kind, rate_kind, rate_bp, fixed_cents, " +
+  "amount_cents, currency, condition_id, condition_snapshot, status, cancel_reason, " +
+  "hold_until, booked_at, payout_id, paid_at, flagged, flag_reason, is_test, note, " +
+  "dedup_key, created_at, updated_at";
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -98,6 +155,21 @@ export async function GET(
       auditLog,
       bunnyVideos,
       deletionRequests,
+      affiliatePrograms,
+      affiliateGroups,
+      affiliatePartners,
+      affiliateConditions,
+      affiliateBillingProfiles,
+      affiliateClicks,
+      affiliateReferrals,
+      affiliateCustomerBindings,
+      affiliateDailyStats,
+      affiliateEvents,
+      affiliateCommissions,
+      affiliateSubscriptionBindings,
+      affiliatePayouts,
+      affiliateDocumentCounters,
+      affiliateAuditLog,
     ] = await Promise.all([
       admin.from("memberships").select("*").eq("tenant_id", id),
       admin.from("courses").select("*").eq("tenant_id", id),
@@ -127,6 +199,21 @@ export async function GET(
       admin.from("audit_log").select("*").eq("tenant_id", id),
       admin.from("bunny_videos").select("*").eq("tenant_id", id),
       admin.from("deletion_requests").select("*").eq("tenant_id", id),
+      admin.from("affiliate_programs").select("*").eq("tenant_id", id),
+      admin.from("affiliate_groups").select("*").eq("tenant_id", id),
+      admin.from("affiliate_partners").select(AFFILIATE_PARTNER_COLUMNS).eq("tenant_id", id),
+      admin.from("affiliate_conditions").select(AFFILIATE_CONDITION_COLUMNS).eq("tenant_id", id),
+      admin.from("affiliate_billing_profiles").select(AFFILIATE_BILLING_COLUMNS).eq("tenant_id", id),
+      admin.from("affiliate_clicks").select("*").eq("tenant_id", id),
+      admin.from("affiliate_referrals").select(AFFILIATE_REFERRAL_COLUMNS).eq("tenant_id", id),
+      admin.from("affiliate_customer_bindings").select("*").eq("tenant_id", id),
+      admin.from("affiliate_daily_stats").select("*").eq("tenant_id", id),
+      admin.from("affiliate_events").select("*").eq("tenant_id", id),
+      admin.from("affiliate_commissions").select(AFFILIATE_COMMISSION_COLUMNS).eq("tenant_id", id),
+      admin.from("affiliate_subscription_bindings").select("*").eq("tenant_id", id),
+      admin.from("affiliate_payouts").select("*").eq("tenant_id", id),
+      admin.from("affiliate_document_counters").select("*").eq("tenant_id", id),
+      admin.from("affiliate_audit_log").select("*").eq("tenant_id", id),
     ]);
 
     const membershipRows = memberships.data ?? [];
@@ -173,6 +260,21 @@ export async function GET(
       audit_log: auditLog.data ?? [],
       bunny_videos: bunnyVideos.data ?? [],
       deletion_requests: deletionRequests.data ?? [],
+      affiliate_programs: affiliatePrograms.data ?? [],
+      affiliate_groups: affiliateGroups.data ?? [],
+      affiliate_partners: affiliatePartners.data ?? [],
+      affiliate_conditions: affiliateConditions.data ?? [],
+      affiliate_billing_profiles: affiliateBillingProfiles.data ?? [],
+      affiliate_clicks: affiliateClicks.data ?? [],
+      affiliate_referrals: affiliateReferrals.data ?? [],
+      affiliate_customer_bindings: affiliateCustomerBindings.data ?? [],
+      affiliate_daily_stats: affiliateDailyStats.data ?? [],
+      affiliate_events: affiliateEvents.data ?? [],
+      affiliate_commissions: affiliateCommissions.data ?? [],
+      affiliate_subscription_bindings: affiliateSubscriptionBindings.data ?? [],
+      affiliate_payouts: affiliatePayouts.data ?? [],
+      affiliate_document_counters: affiliateDocumentCounters.data ?? [],
+      affiliate_audit_log: affiliateAuditLog.data ?? [],
     };
 
     const filename = `mandant-${tenant.slug}-export.json`;

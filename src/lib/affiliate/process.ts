@@ -11,12 +11,14 @@ import {
   type AffiliateConditionCandidate,
 } from "@/lib/affiliate/compute";
 import type { AffiliateEventPayload } from "@/lib/affiliate/intake";
+import { notifyAffiliateCommissions, notifyAffiliateReversal } from "@/lib/affiliate/notify";
 import {
   recreditForWonDispute,
   reverseForDispute,
   reverseForRefund,
   type AffiliateReversalResult,
 } from "@/lib/affiliate/reversal";
+import type { AffiliateReversalReason } from "@/lib/email/templates";
 import type {
   AffiliateBasisKind,
   AffiliateCancelReason,
@@ -583,7 +585,43 @@ async function bookAffiliateRows(
   }
 
   const rows = (data as { rows?: AffiliateBookedRow[] } | null)?.rows;
-  return Array.isArray(rows) ? rows : [];
+  const booked = Array.isArray(rows) ? rows : [];
+
+  // --- Benachrichtigung des Partners (B9, 10/B9) -------------------------
+  // HIER und nicht an den drei Aufrufstellen: durch diese Funktion läuft
+  // JEDE Buchung des Moduls — Direktkauf, Abo-Folgerate und zweite Stufe.
+  // Drei Blöcke mit demselben Inhalt wären drei Orte, an denen einer
+  // vergessen wird, sobald eine vierte Buchungsart dazukommt.
+  //
+  // Gemeldet werden ausschließlich NEU entstandene Zeilen (`inserted`, G3):
+  // Stripe stellt „at least once" zu, und eine zweite Zustellung derselben
+  // Bestellung darf keine zweite Mail auslösen. Welche Buchungsarten
+  // überhaupt eine Mail wert sind, entscheidet `notify.ts` (der
+  // Sicherheitseinbehalt zum Beispiel nicht — er ist dieselbe Vermittlung).
+  //
+  // Fail-soft: `notifyAffiliateCommissions()` wirft nie (notify.ts, Regel 1).
+  // Die Zeilen stehen bereits in der Datenbank; eine Ausnahme hier ließe den
+  // Verarbeiter das Ereignis als `error` ablegen und den ganzen Stapel
+  // erneut versuchen — für eine E-Mail.
+  const insertedRefs = new Set(booked.filter((entry) => entry.inserted).map((entry) => entry.ref));
+  if (insertedRefs.size > 0) {
+    await notifyAffiliateCommissions(admin, {
+      tenantId: request.tenant_id,
+      rows: request.rows
+        .filter((row) => insertedRefs.has(row.ref))
+        .map((row) => ({
+          partner_id: row.partner_id,
+          kind: row.kind,
+          amount_cents: row.amount_cents,
+          currency: row.currency,
+          status: row.status,
+          product_id: row.product_id,
+          is_test: row.is_test,
+        })),
+    });
+  }
+
+  return booked;
 }
 
 /**
@@ -1378,7 +1416,26 @@ function reversalOrigin(row: EventRow): { order_id: string | null; stripe_invoic
  * mitgesetzt werden. Das ist genau der Zweck dieses Endpunkts, und er setzt
  * `error`-Zeilen ohnehin gemeinsam zurück.
  */
-function reversalOutcome(result: AffiliateReversalResult): EventOutcome {
+/**
+ * ERWEITERT (B9): dieselbe Abbildung wie zuvor, plus der Versand an die
+ * betroffenen Partner. `result.notifications` gab es seit B5
+ * (`summarise()` in reversal.ts, je `(partner_id, currency)` eine positive
+ * Summe) — gelesen hat es niemand, und der Partner erfuhr von einer
+ * Rücknahme deshalb gar nichts. Genau hier ist die Stelle, an der alle drei
+ * Storno-Zweige zusammenlaufen.
+ *
+ * Fail-soft: `notifyAffiliateReversal()` wirft nie (notify.ts, Regel 1). Die
+ * Gegenbuchungen stehen bereits in der Datenbank; eine Ausnahme ließe das
+ * Ereignis als `error` liegen und den ganzen Vorgang erneut laufen — für
+ * eine E-Mail.
+ */
+async function reversalOutcome(
+  admin: Admin,
+  tenantId: string,
+  reason: AffiliateReversalReason,
+  result: AffiliateReversalResult,
+): Promise<EventOutcome> {
+  await notifyAffiliateReversal(admin, { tenantId, reason, notifications: result.notifications });
   return result.matched ? DONE : { kind: "skipped", reason: "no_attribution" };
 }
 
@@ -1421,6 +1478,9 @@ async function handleChargeRefunded(admin: Admin, row: EventRow): Promise<EventO
   }
 
   return reversalOutcome(
+    admin,
+    row.tenant_id,
+    "refund",
     await reverseForRefund(
       admin,
       {
@@ -1472,6 +1532,9 @@ async function handleDisputeCreated(admin: Admin, row: EventRow): Promise<EventO
   if (disputeAmount <= 0) return { kind: "skipped", reason: "no_attribution" };
 
   return reversalOutcome(
+    admin,
+    row.tenant_id,
+    "dispute",
     await reverseForDispute(
       admin,
       {
@@ -1513,6 +1576,9 @@ async function handleDisputeClosed(admin: Admin, row: EventRow): Promise<EventOu
   if (disputeId === null) return { kind: "error", reason: "booking_failed" };
 
   return reversalOutcome(
+    admin,
+    row.tenant_id,
+    "recredit",
     await recreditForWonDispute(
       admin,
       { tenant_id: row.tenant_id, ...origin, dispute_id: disputeId },

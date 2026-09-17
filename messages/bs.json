@@ -1109,7 +1109,11 @@
           "courseCompleted": "Kurs završen",
           "quizPassed": "Kviz položen",
           "submissionCreated": "Predaja poslana",
-          "orderPaid": "Plaćanje primljeno"
+          "orderPaid": "Plaćanje primljeno",
+          "affiliateApplication": "Primljena prijava partnera",
+          "affiliateApproved": "Partner odobren",
+          "affiliateCommission": "Provizija proknjižena",
+          "affiliateReversal": "Provizija stornirana"
         }
       },
       "webhookSecretDialog": {
@@ -2012,6 +2016,8 @@
       },
       "payouts": {
         "title": "Isplate",
+        "description": "Pregled nacrta, odobravanje isplata, kreiranje datoteke za plaćanje i bilježenje doznake.",
+        "tabsLabel": "Prikazi isplata",
         "tabs": {
           "drafts": "Nacrti",
           "approved": "Odobreno",
@@ -2029,9 +2035,10 @@
         "columnCompleteness": "Potpunost",
         "columnReference": "Referenca",
         "columnDocument": "Dokument",
+        "columnStatus": "Status",
         "empty": "Nema isplata u ovom prikazu.",
         "complete": "Potpuno",
-        "incomplete": "Nepotpuno. Nedostaje: {fields}",
+        "incomplete": "Nepotpuno: {fields}",
         "releaseSelected": "Odobri odabrano",
         "releaseConfirm": "Odobriti {count} isplata u ukupnom iznosu od {amount}?",
         "releaseConfirmYes": "Odobri",
@@ -2053,6 +2060,61 @@
           "sepa": "SEPA doznaka",
           "paypal": "PayPal",
           "manual": "Ručno"
+        },
+        "selectRow": "Odaberi isplatu partneru {partner} u iznosu od {amount}",
+        "selectHint": "Prvo odaberite najmanje jednu isplatu.",
+        "documentPending": "Još nema broja dokumenta",
+        "documentFileMissing": "Dokument važi, PDF slijedi.",
+        "subtotalLabel": "Neto iznos",
+        "taxLabel": "PDV",
+        "methodUnknown": "Nije upisan način plaćanja",
+        "referenceHint": "Referenca iz bankovnog izvoda, kako bi se plaćanje kasnije moglo pronaći.",
+        "markPaidDone": "Doznaka je zabilježena.",
+        "markFailed": "Doznaka nije uspjela",
+        "markFailedHint": "Dokument ostaje na snazi; stavke provizije ulaze u sljedeći nacrt.",
+        "markFailedDone": "Neuspjeh je zabilježen.",
+        "releaseHeading": "Odobrenje",
+        "releaseSelectedCount": "{count, plural, one {# isplata odabrana.} few {# isplate odabrane.} other {# isplata odabrano.}}",
+        "releaseConfirmDetail": "{partners, plural, one {Isplaćuje se {amount} za # partnera.} other {Isplaćuje se {amount} za # partnera.}}",
+        "releaseConfirmHint": "Odobrenjem nastaju brojevi dokumenata. Dokument se nakon toga više ne briše.",
+        "releasePending": "Odobrava se …",
+        "releaseDone": "Isplate su odobrene.",
+        "exportHeading": "Datoteka za plaćanje",
+        "exportDescription": "{count, plural, one {# odabrana isplata kao datoteka za banku ili za PayPal.} few {# odabrane isplate kao datoteka za banku ili za PayPal.} other {# odabranih isplata kao datoteka za banku ili za PayPal.}}",
+        "exportMethodHint": "Izvoze se samo isplate s ovim načinom plaćanja.",
+        "exportNothing": "U ovom odabiru nema odobrene isplate s ovim načinom plaćanja.",
+        "exportUnusable": "Za ove dokumente nedostaju upotrebljivi podaci za plaćanje: {documents}",
+        "debtorHeading": "Nalogodavac",
+        "debtorHint": "Račun s kojeg se doznačuje. Podatak stoji samo u kreiranoj datoteci i ne pohranjuje se.",
+        "debtorName": "Ime nalogodavca",
+        "debtorIban": "IBAN nalogodavca",
+        "debtorBic": "BIC (opcionalno)",
+        "executionDate": "Dan izvršenja (opcionalno)",
+        "legalEntityMissing": "Za ovu akademiju nije upisan pravni subjekt. Bez njega se ne može izdati knjižno odobrenje.",
+        "planUnavailable": "Pregled nije moguće učitati. Otvorite stranicu ponovo kasnije.",
+        "blockedEmpty": "Trenutno nijedan partner nije isključen iz isplate.",
+        "run": {
+          "heading": "Obračun isplata",
+          "description": "Kreira po jedan nacrt za svakog partnera i valutu iz svih odobrenih provizija u periodu.",
+          "preview": "{count, plural, one {# partner se trenutno može isplatiti.} few {# partnera se trenutno mogu isplatiti.} other {# partnera se trenutno može isplatiti.}}",
+          "previewTotal": "Očekivano {amount}",
+          "periodFrom": "Period od",
+          "periodTo": "Period do",
+          "submit": "Kreiraj nacrte",
+          "pending": "Nacrti se kreiraju …",
+          "done": "Nacrti su kreirani."
+        },
+        "csv": {
+          "partner": "Partner",
+          "accountHolder": "Vlasnik računa",
+          "iban": "IBAN",
+          "bic": "BIC",
+          "paypalEmail": "PayPal adresa",
+          "amount": "Iznos",
+          "currency": "Valuta",
+          "documentNo": "Broj dokumenta",
+          "period": "Period",
+          "taxMode": "Poreski tretman"
         }
       },
       "creatives": {
@@ -2748,7 +2810,31 @@
       "notAvailableYet": "Još nije bilo isplate.",
       "balanceHint": "Ono što je već odobreno stoji na pregledu pod „Dostupno“.",
       "toOverview": "Na pregled",
-      "toStatement": "Na izvod"
+      "toStatement": "Na izvod",
+      "downloadNotFound": "Dokument nije pronađen."
+    },
+    "payoutRun": {
+      "blocked": {
+        "negative_balance": "Saldo negativan, prebija se s narednim provizijama",
+        "below_minimum": "Ispod minimalnog iznosa za isplatu, prenosi se dalje",
+        "partner_inactive": "Partnerski račun nije aktivan",
+        "payout_hold": "Isplata za ovaj partnerski račun je blokirana",
+        "billing_profile_missing": "Nedostaju podaci za obračun",
+        "address_incomplete": "Nedostaje ime, ulica, poštanski broj ili mjesto",
+        "tax_entity_kind_missing": "Nedostaje pravni oblik (firma ili fizičko lice)",
+        "tax_country_missing": "Nedostaje država adrese",
+        "tax_private_entity": "Fizičkim licima se ne može izdati knjižno odobrenje",
+        "tax_eu_vat_missing": "Nedostaje provjereni PDV broj (provjera najviše 90 dana stara)",
+        "payout_method_missing": "Nedostaje način isplate",
+        "iban_invalid": "IBAN nije važeći",
+        "paypal_missing": "Nedostaje PayPal adresa"
+      }
+    },
+    "tax": {
+      "modeRegular": "Redovno oporezivanje, 19 % njemačkog PDV-a",
+      "modeSmallBusiness": "Mali preduzetnik prema § 19 UStG, bez iskazanog PDV-a",
+      "modeReverseCharge": "Reverse charge, poreski dužnik je primalac usluge",
+      "modeNonEu": "Treća zemlja, nije oporezivo u Njemačkoj"
     },
     "team": {
       "title": "Tim",
@@ -2935,6 +3021,11 @@
       "currencyColumn": "Valuta",
       "freeFromColumn": "Oslobađa se",
       "reversalColumn": "Stornirano"
+    },
+    "integrity": {
+      "payoutSubtotalMismatch": "Zbir dodijeljenih stavki provizije odstupa od iznosa zapisa o isplati. Zapis se ne izvozi.",
+      "dailyStatsMismatch": "Dnevni pokazatelj odstupa od knjige provizija. Knjiga važi; agregat se ponovo izračunava.",
+      "overReversal": "Za ovu narudžbu je protuknjiženo više nego što je izvorno nastalo provizije."
     }
   },
   "consent": {

@@ -10,6 +10,7 @@ import {
   computeCommissionParts,
   resolveCondition,
 } from "@/lib/affiliate/compute";
+import { notifyAffiliatePartnerDecision } from "@/lib/affiliate/notify";
 import {
   affiliateCommissionDecisionSchema,
   affiliateCommissionFlagSchema,
@@ -701,6 +702,25 @@ async function changePartnerStatus(params: {
     before: { status: row.status, status_reason: row.status_reason },
     after: { status: input.status, status_reason: input.reason },
   });
+
+  // --- Benachrichtigung des Bewerbers (B9, 10/B9) ------------------------
+  // Nur Freigabe und Ablehnung, NICHT die Sperre: eine Sperre ist eine
+  // laufende Maßnahme des Managers (Betrugsverdacht, offene Prüfung), und
+  // eine automatische Mail dazu würde ihm die Entscheidung abnehmen, ob und
+  // wie er den Partner anspricht. Freigabe und Ablehnung schließen dagegen
+  // einen Vorgang ab, den der Bewerber selbst angestoßen hat.
+  //
+  // Fail-soft und NACH dem Prüfpfad: wirft nie (notify.ts, Regel 1), und ein
+  // Mailfehler darf den bereits geschriebenen Statuswechsel nicht in eine
+  // Fehlermeldung verwandeln.
+  if (params.action === "partner.approve" || params.action === "partner.reject") {
+    await notifyAffiliatePartnerDecision(admin, {
+      tenantId: params.tenantId,
+      partnerId: input.partnerId,
+      decision: params.action === "partner.approve" ? "approved" : "rejected",
+      reason: input.reason,
+    });
+  }
 
   revalidatePath(AFFILIATE_PATH);
   revalidatePath(`${AFFILIATE_PATH}/partner`);

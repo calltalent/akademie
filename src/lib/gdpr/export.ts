@@ -2,6 +2,52 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
+ * Partnerspalten für die Selbstauskunft. Wortgleich zu
+ * `PARTNER_ADMIN_COLUMNS` (`src/lib/affiliate/queries.ts`) — inklusive
+ * `internal_note` und `status_reason`, denn ein Vermerk ÜBER den Betroffenen
+ * ist sein personenbezogenes Datum (Art. 15 Abs. 1 DSGVO), und ohne
+ * `terms_accepted_ip_hash`, siehe Kopf.
+ */
+const AFFILIATE_PARTNER_EXPORT_COLUMNS =
+  "id, tenant_id, program_id, user_id, applicant_email, display_name, company, code, " +
+  "status, status_reason, group_id, referred_by, payout_hold, payout_hold_reason, " +
+  "internal_note, application, terms_version_accepted, terms_accepted_at, " +
+  "notify_sale, notify_reversal, notify_payout, created_at, updated_at";
+
+const AFFILIATE_COMMISSION_EXPORT_COLUMNS =
+  "id, tenant_id, program_id, partner_id, kind, order_id, stripe_invoice_id, " +
+  "stripe_subscription_id, stripe_charge_id, product_id, campaign, referral_id, " +
+  "parent_id, reverses_id, base_cents, basis_kind, rate_kind, rate_bp, fixed_cents, " +
+  "amount_cents, currency, condition_id, condition_snapshot, status, cancel_reason, " +
+  "hold_until, booked_at, payout_id, paid_at, flagged, flag_reason, is_test, note, " +
+  "dedup_key, created_at, updated_at";
+
+const AFFILIATE_PAYOUT_EXPORT_COLUMNS =
+  "id, tenant_id, program_id, partner_id, period_from, period_to, currency, " +
+  "gross_cents, reversal_cents, subtotal_cents, tax_mode, tax_rate_bp, tax_cents, " +
+  "total_cents, status, method, document_no, document_path, document_issued_at, " +
+  "reference, approved_at, paid_at, created_at, updated_at";
+
+/**
+ * Das Abrechnungsprofil MIT Bankverbindung: der Empfänger dieses Exports ist
+ * der Kontoinhaber selbst, und die Selbstauskunft soll ihm zeigen, welche
+ * Zahlungsdaten der Mandant über ihn führt. `vat_check_log` bleibt draußen —
+ * das ist das Rohprotokoll der VIES-Abfrage (technische Antwortdaten eines
+ * Drittdienstes), kein Datum über die Person.
+ */
+const AFFILIATE_BILLING_EXPORT_COLUMNS =
+  "partner_id, tenant_id, entity_kind, legal_name, street, postal_code, city, country, " +
+  "small_business, vat_id, tax_number, vat_checked_at, vat_check_result, payout_method, " +
+  "account_holder, iban, bic, paypal_email, created_at, updated_at";
+
+const AFFILIATE_REFERRAL_EXPORT_COLUMNS =
+  "id, tenant_id, program_id, partner_id, click_id, campaign, user_id, bound_at, " +
+  "status, expires_at, created_at";
+
+const AFFILIATE_BINDING_EXPORT_COLUMNS =
+  "id, tenant_id, program_id, user_id, partner_id, source, bound_at";
+
+/**
  * DSGVO-Selbstauskunft/-Datenexport (Art. 15/20 DSGVO), Phase 4 Block 3.
  *
  * Sammelt alle personenbezogenen Daten EINES Nutzers über ALLE Mandanten
@@ -57,6 +103,44 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Schritt-Prinzip wie `calendar_shifts`/`calendar_time_entries`/
  * `calendar_absences` oben, über dieselben bereits geladenen
  * `calendarWorkerIds`.
+ *
+ * Affiliate-Nachzug (Block B9, 17.09.2026, PLAN_Affiliate-System.md 7.8):
+ * ZWEI GETRENNTE SICHTEN, weil ein und derselbe Mensch beides sein kann —
+ * Partner UND geworbener Käufer. Wer als Partner wirbt und beim selben
+ * Mandanten selbst kauft, hat zwei völlig verschiedene Rollen in diesem
+ * Modul, und eine gemeinsame Liste ließe nicht erkennen, welche Zeile zu
+ * welcher Rolle gehört:
+ *
+ *   `affiliate_partner` / `affiliate_commissions` / `affiliate_payouts` /
+ *   `affiliate_billing_profile`     — er als WERBENDER,
+ *   `affiliate_referrals` / `affiliate_customer_bindings`
+ *                                   — er als GEWORBENER.
+ *
+ * ZWEI-SCHRITT-PRINZIP wie bei `tutor_messages` und `calendar_workers`:
+ * `affiliate_commissions`, `affiliate_payouts` und
+ * `affiliate_billing_profiles` haben KEINE `user_id`-Spalte, sie hängen
+ * ausschließlich an `partner_id`. Ein Partner wird deshalb zuerst über
+ * `affiliate_partners.user_id` gesucht (ein Nutzer kann bei mehreren
+ * Mandanten Partner sein, deshalb eine Liste von IDs, kein einzelner Wert),
+ * danach laufen die drei Abfragen über `partner_id in (…)`.
+ *
+ * `affiliate_clicks` ist NICHT dabei und kann es nicht sein: die Tabelle hat
+ * keine `user_id`, die IP steht dort nur als HMAC mit täglich rotierendem
+ * Salz (3.6) und ist nach der Rotation faktisch nicht mehr auf eine Person
+ * zurückzuführen. Es gibt keinen Weg, die Klickzeilen EINES Nutzers zu
+ * bestimmen, ohne genau die Wiedererkennbarkeit herzustellen, die das
+ * rotierende Salz verhindert.
+ *
+ * `affiliate_daily_stats` fehlt bewusst: rein abgeleitete Tagessummen, aus
+ * Klicks und Provisionen jederzeit neu berechenbar — dieselbe Begründung,
+ * mit der der Mandanten-Export die Vektorspalte von `embeddings` auslässt.
+ *
+ * SPALTEN WERDEN NAMENTLICH GENANNT, kein `select("*")`. Zwei Gründe: die
+ * fünf Affiliate-Tabellen tragen Spalten-Grants (3.3/3.13), an denen ein
+ * `*` mit 42501 abbricht, sobald die Abfrage je gegen eine andere Rolle als
+ * `service_role` läuft — und `affiliate_partners.terms_accepted_ip_hash` ist
+ * der Zustimmungsnachweis (11.6), der in keiner Liste und keinem Export
+ * etwas zu suchen hat, hier genauso wenig wie in `queries.ts`.
  */
 export async function exportUserData(supabase: SupabaseClient, userId: string) {
   const [
@@ -70,6 +154,9 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
     ordersRes,
     tutorConversationsRes,
     calendarWorkersRes,
+    affiliatePartnersRes,
+    affiliateReferralsRes,
+    affiliateBindingsRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
     supabase.from("memberships").select("*").eq("user_id", userId),
@@ -81,6 +168,16 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
     supabase.from("orders").select("*").eq("user_id", userId),
     supabase.from("tutor_conversations").select("*").eq("user_id", userId),
     supabase.from("calendar_workers").select("*").eq("user_id", userId),
+    // Sicht 1 (WERBENDER): ein Nutzer kann bei mehreren Mandanten Partner
+    // sein — deshalb eine Liste, kein `maybeSingle()`.
+    supabase.from("affiliate_partners").select(AFFILIATE_PARTNER_EXPORT_COLUMNS).eq("user_id", userId),
+    // Sicht 2 (GEWORBENER): `affiliate_referrals.user_id` ist der KÄUFER,
+    // nicht der Partner (3.7, „Kontobindung nach Registrierung/Login").
+    supabase.from("affiliate_referrals").select(AFFILIATE_REFERRAL_EXPORT_COLUMNS).eq("user_id", userId),
+    supabase
+      .from("affiliate_customer_bindings")
+      .select(AFFILIATE_BINDING_EXPORT_COLUMNS)
+      .eq("user_id", userId),
   ]);
 
   const conversations = tutorConversationsRes.data ?? [];
@@ -115,6 +212,39 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
     calendarChangeRequests = changeRequestsRes.data ?? [];
   }
 
+  // --- Affiliate, zweiter Schritt (7.8) ---------------------------------
+  // `affiliate_commissions`, `affiliate_payouts` und
+  // `affiliate_billing_profiles` hängen an `partner_id`, nicht an `user_id`.
+  // Die Zeilenform kommt aus einer Spalten-ZEICHENKETTE; der Supabase-Typ
+  // kann sie ohne generierte Datenbanktypen nicht auflösen und liefert eine
+  // Union mit `GenericStringError`. Deshalb eine ausdrückliche, enge
+  // Zusicherung auf genau das eine Feld, das hier gebraucht wird.
+  const affiliatePartners = (affiliatePartnersRes.data ?? []) as unknown as Array<{ id: string }>;
+  const affiliatePartnerIds = affiliatePartners.map((p) => p.id);
+
+  let affiliateCommissions: unknown[] = [];
+  let affiliatePayouts: unknown[] = [];
+  let affiliateBillingProfiles: unknown[] = [];
+  if (affiliatePartnerIds.length > 0) {
+    const [commissionsRes, payoutsRes, billingRes] = await Promise.all([
+      supabase
+        .from("affiliate_commissions")
+        .select(AFFILIATE_COMMISSION_EXPORT_COLUMNS)
+        .in("partner_id", affiliatePartnerIds),
+      supabase
+        .from("affiliate_payouts")
+        .select(AFFILIATE_PAYOUT_EXPORT_COLUMNS)
+        .in("partner_id", affiliatePartnerIds),
+      supabase
+        .from("affiliate_billing_profiles")
+        .select(AFFILIATE_BILLING_EXPORT_COLUMNS)
+        .in("partner_id", affiliatePartnerIds),
+    ]);
+    affiliateCommissions = commissionsRes.data ?? [];
+    affiliatePayouts = payoutsRes.data ?? [];
+    affiliateBillingProfiles = billingRes.data ?? [];
+  }
+
   return {
     exported_at: new Date().toISOString(),
     profile: profileRes.data ?? null,
@@ -132,5 +262,13 @@ export async function exportUserData(supabase: SupabaseClient, userId: string) {
     calendar_time_entries: calendarTimeEntries,
     calendar_absences: calendarAbsences,
     calendar_shift_change_requests: calendarChangeRequests,
+    // Sicht WERBENDER (4 Schlüssel) …
+    affiliate_partners: affiliatePartners,
+    affiliate_commissions: affiliateCommissions,
+    affiliate_payouts: affiliatePayouts,
+    affiliate_billing_profiles: affiliateBillingProfiles,
+    // … und Sicht GEWORBENER (2 Schlüssel), getrennt gehalten, siehe Kopf.
+    affiliate_referrals: affiliateReferralsRes.data ?? [],
+    affiliate_customer_bindings: affiliateBindingsRes.data ?? [],
   };
 }

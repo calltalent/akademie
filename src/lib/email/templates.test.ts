@@ -3,7 +3,12 @@ import de from "../../../messages/de.json";
 import bs from "../../../messages/bs.json";
 import en from "../../../messages/en.json";
 import {
+  affiliateApplicationReceived,
+  affiliateApproved,
+  affiliatePayout,
+  affiliateRejected,
   affiliateReversal,
+  affiliateSale,
   certificateIssued,
   confirmSignup,
   contactFormNotification,
@@ -501,5 +506,157 @@ describe("affiliateReversal (Affiliate B5)", () => {
     expect(html).not.toContain("<img src=x onerror=alert(2)>");
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).toContain("&lt;img src=x onerror=alert(2)&gt;");
+  });
+});
+
+/**
+ * Affiliate-System Block B9 — die fünf Vorlagen entlang des
+ * Partner-Lebenslaufs (PLAN_Affiliate-System.md 10/B9).
+ *
+ * Der Mock oben wirft bei einem fehlenden Message-Key — aber nur für
+ * Vorlagen, die auch wirklich gerendert werden. Deshalb rendert der erste
+ * Test JEDE der fünf Vorlagen mit JEDEM optionalen Feld in ALLEN DREI
+ * Sprachen: erst dadurch wird ein in `bs.json` vergessener Schlüssel oder
+ * ein Tippfehler in `templates.ts` hier sichtbar statt bei der ersten
+ * echten Mail an einen Partner. `src/i18n/messages.test.ts` vergleicht
+ * zwar die Pfadlisten der drei Dateien, kennt aber nicht die Schlüssel,
+ * die der Code TATSÄCHLICH liest.
+ */
+describe("Affiliate-Vorlagen B9", () => {
+  const locales = ["de", "en", "bs"] as const;
+
+  it("rendert alle fünf Vorlagen in allen drei Sprachen ohne fehlenden Message-Key", async () => {
+    for (const locale of locales) {
+      const rendered = await Promise.all([
+        affiliateApplicationReceived({
+          tenantName: "Demo Akademie",
+          recipientName: "Erika Musterfrau",
+          applicantName: "Max Mustermann",
+          locale,
+          actionUrl: "https://demo.example.invalid/admin/affiliate/partner",
+        }),
+        affiliateApproved({
+          tenantName: "Demo Akademie",
+          recipientName: "Max Mustermann",
+          partnerCode: "max-mustermann",
+          locale,
+          actionUrl: "https://demo.example.invalid/partner",
+        }),
+        affiliateRejected({
+          tenantName: "Demo Akademie",
+          recipientName: "Max Mustermann",
+          reason: "Zielgruppe passt nicht zum Programm.",
+          locale,
+        }),
+        affiliateSale({
+          tenantName: "Demo Akademie",
+          recipientName: "Max Mustermann",
+          amountLabel: "118,88 EUR",
+          statusLabel: "Sperrfrist läuft",
+          productName: "Telefonakquise-Intensivkurs",
+          locale,
+          actionUrl: "https://demo.example.invalid/partner/kontoauszug",
+        }),
+        affiliatePayout({
+          tenantName: "Demo Akademie",
+          recipientName: "Max Mustermann",
+          amountLabel: "188,60 EUR",
+          periodLabel: "01.08.2026–31.08.2026",
+          reference: "SEPA-20260901-004",
+          locale,
+          actionUrl: "https://demo.example.invalid/partner/auszahlungen",
+        }),
+      ]);
+
+      for (const html of rendered) {
+        expect(html).toContain(`<html lang="${locale}">`);
+        expect(html).toContain("Demo Akademie");
+      }
+    }
+  });
+
+  it("nennt Bewerbernamen und Handlungsaufruf in der Manager-Mail (de)", async () => {
+    const html = await affiliateApplicationReceived({
+      tenantName: "Demo Akademie",
+      applicantName: "Max Mustermann",
+      locale: "de",
+      actionUrl: "https://demo.example.invalid/admin/affiliate/partner",
+    });
+    expect(html).toContain("Max Mustermann");
+    expect(html).toContain("Bewerbung ansehen");
+    expect(html).toContain("https://demo.example.invalid/admin/affiliate/partner");
+  });
+
+  it("nennt den Partner-Code in der Freigabe-Mail (de)", async () => {
+    const html = await affiliateApproved({
+      tenantName: "Demo Akademie",
+      partnerCode: "max-mustermann",
+      locale: "de",
+    });
+    expect(html).toContain("max-mustermann");
+  });
+
+  it("lässt den Begründungsblock weg, wenn keine Begründung übergeben wird", async () => {
+    const withReason = await affiliateRejected({
+      tenantName: "Demo Akademie",
+      reason: "Zielgruppe passt nicht zum Programm.",
+      locale: "de",
+    });
+    const withoutReason = await affiliateRejected({ tenantName: "Demo Akademie", locale: "de" });
+
+    expect(withReason).toContain("Begründung");
+    expect(withoutReason).not.toContain("Begründung");
+  });
+
+  it("zeigt Betrag UND Status in der Provisionsmail — nicht nur den Betrag", async () => {
+    // Eine Provision, die als gutgeschrieben gemeldet wird und danach 14 Tage
+    // nicht auszahlbar ist, erzeugt sonst genau die Rückfrage, die diese Mail
+    // sparen soll.
+    const html = await affiliateSale({
+      tenantName: "Demo Akademie",
+      amountLabel: "118,88 EUR",
+      statusLabel: "Sperrfrist läuft",
+      locale: "de",
+    });
+    expect(html).toContain("118,88 EUR");
+    expect(html).toContain("Sperrfrist läuft");
+  });
+
+  it("lässt Produktzeile und Referenzzeile weg, wenn sie fehlen", async () => {
+    const sale = await affiliateSale({
+      tenantName: "Demo Akademie",
+      amountLabel: "118,88 EUR",
+      statusLabel: "Verfügbar",
+      locale: "de",
+    });
+    const payout = await affiliatePayout({
+      tenantName: "Demo Akademie",
+      amountLabel: "188,60 EUR",
+      periodLabel: "01.08.2026–31.08.2026",
+      locale: "de",
+    });
+
+    expect(sale).not.toContain("Produkt:");
+    expect(payout).not.toContain("Referenz:");
+    expect(payout).toContain("Zeitraum:");
+  });
+
+  it("escaped bösartige Freitexte in allen fünf Vorlagen", async () => {
+    // Bewerbername und Ablehnungsgrund sind freie Eingaben (öffentliches
+    // Formular bzw. Managerfeld), Produktname und Bankreferenz stammen vom
+    // Mandanten. Keiner dieser Werte darf als HTML ausgeführt werden.
+    const evil = "<script>alert(1)</script>";
+    const rendered = await Promise.all([
+      affiliateApplicationReceived({ tenantName: "Demo", applicantName: evil, locale: "de" }),
+      affiliateApproved({ tenantName: "Demo", partnerCode: evil, locale: "de" }),
+      affiliateRejected({ tenantName: "Demo", reason: evil, locale: "de" }),
+      affiliateSale({ tenantName: "Demo", amountLabel: "1,00 EUR", statusLabel: "Verfügbar", productName: evil, locale: "de" }),
+      affiliatePayout({ tenantName: "Demo", amountLabel: "1,00 EUR", periodLabel: "…", reference: evil, locale: "de" }),
+    ]);
+
+    for (const html of rendered) {
+      expect(html).not.toContain(evil);
+      expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    }
   });
 });

@@ -638,3 +638,235 @@ export async function affiliateReversal({
     t,
   });
 }
+
+// =====================================================================
+// Affiliate-System Block B9 (17.09.2026) — Benachrichtigungen entlang des
+// Partner-Lebenslaufs (PLAN_Affiliate-System.md 10/B9). Bestehende
+// Vorlagen oben UNVERÄNDERT.
+//
+// Fünf Anlässe, fünf Vorlagen — anders als bei `affiliateReversal()`, das
+// drei Anlässe in EINER Vorlage führt: dort sind Aufbau, Betragszeile und
+// Fuß identisch und nur ein Satz unterscheidet sich. Hier unterscheiden
+// sich Empfängerkreis (Manager vs. Partner), Felder und Handlungsaufruf,
+// eine gemeinsame Vorlage wäre eine Kette von Verzweigungen.
+//
+// DURCHGEHEND: Beträge, Zeiträume und Statuswerte kommen FERTIG
+// FORMATIERT herein (`amountLabel`, `periodLabel`, `statusLabel`) — wie
+// `shiftLabel` in den Schichtplan-Vorlagen und `amountLabel` in
+// `affiliateReversal()`. Die Vorlage rechnet nicht und formatiert nicht:
+// Beträge stehen in Cent in `affiliate_commissions`/`affiliate_payouts`,
+// die Währung gehört zur Zeile (5.11) und nicht zur Sprache des
+// Empfängers, und der Statustext lebt im Namensraum `affiliate.status.*`,
+// nicht in `email.*`.
+//
+// KEINE KÄUFERDATEN: wie bei `affiliateReversal()` steht in keiner Mail an
+// einen Partner ein Käufer- oder Bestelldetail. `productName` ist der
+// Produktname des Mandanten — eine unverfängliche Angabe, kein Name und
+// keine Adresse.
+// =====================================================================
+
+/**
+ * Neue Bewerbung — an die Manager (`owner`/`admin`) des Mandanten, NICHT an
+ * den Bewerber. Der Bewerber selbst bekommt bewusst keine Eingangsmail: die
+ * öffentliche Bewerbung antwortet auf jeden Ausgang wortgleich und zeitlich
+ * gleich (`silentSuccess()` in `apply.ts`, Plan 11.15), eine Mail „Bewerbung
+ * eingegangen" wäre genau das Orakel, das diese Gleichbehandlung vermeidet:
+ * wer sie bekommt, weiß, dass er noch nicht eingetragen war.
+ *
+ * `applicantName` ist der frei eingegebene Anzeigename aus dem öffentlichen
+ * Formular — die unsicherste Zeichenkette dieses Moduls und deshalb durch
+ * `escapeHtml()` gedreht, bevor sie in `<strong>` landet.
+ */
+export async function affiliateApplicationReceived({
+  tenantName,
+  recipientName,
+  applicantName,
+  accentColor,
+  locale,
+  actionUrl,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  applicantName: string;
+  accentColor?: string;
+  locale: Locale;
+  actionUrl?: string;
+}): Promise<string> {
+  const t = await getTranslations({ locale, namespace: "email" });
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName, t)}</p>
+    <p style="margin:0 0 16px 0;">${t("affiliateApplicationReceived.body", {
+      name: `<strong>${escapeHtml(applicantName)}</strong>`,
+      tenantName: `<strong>${escapeHtml(tenantName)}</strong>`,
+    })}</p>
+    ${actionUrl ? actionButton(actionUrl, t("affiliateApplicationReceived.actionButton"), accentColor) : ""}
+  `;
+  return renderLayout({
+    tenantName,
+    accentColor,
+    heading: t("affiliateApplicationReceived.heading"),
+    bodyHtml,
+    locale,
+    t,
+  });
+}
+
+/**
+ * Freigabe — an den Partner. Der Partner-Code steht mit in der Mail, weil er
+ * das einzige ist, was der Partner nach der Freigabe sofort braucht (er
+ * bildet seinen Werbelink, 4.2) und weil er sich nach der Freigabe nicht mehr
+ * ändert (`code` ist für `authenticated` nicht schreibbar, 3.3).
+ */
+export async function affiliateApproved({
+  tenantName,
+  recipientName,
+  partnerCode,
+  accentColor,
+  locale,
+  actionUrl,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  partnerCode: string;
+  accentColor?: string;
+  locale: Locale;
+  actionUrl?: string;
+}): Promise<string> {
+  const t = await getTranslations({ locale, namespace: "email" });
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName, t)}</p>
+    <p style="margin:0 0 16px 0;">${t("affiliateApproved.body", {
+      tenantName: `<strong>${escapeHtml(tenantName)}</strong>`,
+      code: `<strong>${escapeHtml(partnerCode)}</strong>`,
+    })}</p>
+    ${actionUrl ? actionButton(actionUrl, t("affiliateApproved.actionButton"), accentColor) : ""}
+  `;
+  return renderLayout({ tenantName, accentColor, heading: t("affiliateApproved.heading"), bodyHtml, locale, t });
+}
+
+/**
+ * Ablehnung — an den Bewerber. `reason` ist der vom Manager eingegebene
+ * Freitext (`affiliate_partners.status_reason`, im Ablehnungsfall
+ * Pflichtfeld laut `affiliatePartnerStatusSchema`). Er wird escaped und
+ * mit erhaltenen Zeilenumbrüchen dargestellt, genau wie das
+ * Bewertungs-Feedback in `submissionGraded()`.
+ *
+ * KEIN Handlungsaufruf: es gibt für einen abgelehnten Bewerber keine Seite,
+ * auf die zu führen sinnvoll wäre — er hat keinen Partnerbereich, und eine
+ * zweite Bewerbung wird von der Eindeutigkeit
+ * `(tenant_id, program_id, applicant_email)` ohnehin still verschluckt.
+ */
+export async function affiliateRejected({
+  tenantName,
+  recipientName,
+  reason,
+  accentColor,
+  locale,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  reason?: string;
+  accentColor?: string;
+  locale: Locale;
+}): Promise<string> {
+  const t = await getTranslations({ locale, namespace: "email" });
+  const reasonHtml = reason
+    ? `<div style="margin:16px 0 0 0;padding:12px 16px;background:#f9fafb;border-radius:6px;font-size:14px;">
+        <strong>${escapeHtml(t("affiliateRejected.reasonLabel"))}:</strong><br>
+        ${escapeHtml(reason).replace(/\n/g, "<br>")}
+      </div>`
+    : "";
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName, t)}</p>
+    <p style="margin:0 0 16px 0;">${t("affiliateRejected.body", {
+      tenantName: `<strong>${escapeHtml(tenantName)}</strong>`,
+    })}</p>
+    ${reasonHtml}
+  `;
+  return renderLayout({ tenantName, accentColor, heading: t("affiliateRejected.heading"), bodyHtml, locale, t });
+}
+
+/**
+ * Neue Provision — an den Partner, nur wenn `notify_sale` steht (die Prüfung
+ * liegt beim Aufrufer, `affiliate/notify.ts`).
+ *
+ * `statusLabel` ist der übersetzte Zustand der Zeile („Sperrfrist läuft",
+ * „In Prüfung") aus dem Namensraum `affiliate.status.commission.*`. Er steht
+ * bewusst IN der Mail: eine Provision, die als gutgeschrieben gemeldet wird
+ * und danach 14 Tage lang nicht auszahlbar ist, erzeugt sonst genau die
+ * Rückfrage, die diese Mail sparen soll.
+ */
+export async function affiliateSale({
+  tenantName,
+  recipientName,
+  amountLabel,
+  statusLabel,
+  productName,
+  accentColor,
+  locale,
+  actionUrl,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  amountLabel: string;
+  statusLabel: string;
+  productName?: string;
+  accentColor?: string;
+  locale: Locale;
+  actionUrl?: string;
+}): Promise<string> {
+  const t = await getTranslations({ locale, namespace: "email" });
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName, t)}</p>
+    <p style="margin:0 0 16px 0;">${t("affiliateSale.body", {
+      amount: `<strong>${escapeHtml(amountLabel)}</strong>`,
+    })}</p>
+    ${productName ? detailBlock(t("affiliateSale.productLabel"), productName) : ""}
+    ${detailBlock(t("affiliateSale.amountLabel"), amountLabel)}
+    ${detailBlock(t("affiliateSale.statusLabel"), statusLabel)}
+    ${actionUrl ? actionButton(actionUrl, t("affiliateSale.actionButton"), accentColor) : ""}
+  `;
+  return renderLayout({ tenantName, accentColor, heading: t("affiliateSale.heading"), bodyHtml, locale, t });
+}
+
+/**
+ * Auszahlung überwiesen — an den Partner, nur wenn `notify_payout` steht.
+ *
+ * `reference` ist die Bankreferenz aus dem Abgleich (7.7), NICHT die IBAN und
+ * nicht die Belegnummer-Vergabe — eine Kontonummer gehört in keine E-Mail
+ * (CLAUDE.md §2.11 verbietet sie schon im Log). `actionUrl` zeigt auf die
+ * Auszahlungsliste des Partnerbereichs, aus der er die Gutschrift
+ * herunterlädt; die PDF selbst hängt bewusst nicht an der Mail, weil sie
+ * hinter der Anmeldung liegt und dort auch nach Jahren noch abrufbar ist.
+ */
+export async function affiliatePayout({
+  tenantName,
+  recipientName,
+  amountLabel,
+  periodLabel,
+  reference,
+  accentColor,
+  locale,
+  actionUrl,
+}: {
+  tenantName: string;
+  recipientName?: string;
+  amountLabel: string;
+  periodLabel: string;
+  reference?: string;
+  accentColor?: string;
+  locale: Locale;
+  actionUrl?: string;
+}): Promise<string> {
+  const t = await getTranslations({ locale, namespace: "email" });
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">${greeting(recipientName, t)}</p>
+    <p style="margin:0 0 16px 0;">${t("affiliatePayout.body", {
+      amount: `<strong>${escapeHtml(amountLabel)}</strong>`,
+    })}</p>
+    ${detailBlock(t("affiliatePayout.periodLabel"), periodLabel)}
+    ${reference ? detailBlock(t("affiliatePayout.referenceLabel"), reference) : ""}
+    ${actionUrl ? actionButton(actionUrl, t("affiliatePayout.actionButton"), accentColor) : ""}
+  `;
+  return renderLayout({ tenantName, accentColor, heading: t("affiliatePayout.heading"), bodyHtml, locale, t });
+}

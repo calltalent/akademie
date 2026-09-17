@@ -6,6 +6,7 @@ import { getTenant } from "@/lib/tenant/context";
 import { isAffiliateEnabled } from "@/lib/tenant/types";
 import { writeAuditEntry } from "@/lib/affiliate/audit";
 import { normalizeIp } from "@/lib/affiliate/hash";
+import { notifyAffiliateApplicationReceived } from "@/lib/affiliate/notify";
 import {
   AFFILIATE_PARTNER_CODE_PATTERN,
   affiliatePartnerApplicationSchema,
@@ -656,6 +657,22 @@ export async function submitAffiliateApplication(
       });
     } catch {
       console.error("Partnerbewerbung: Prüfpfad-Eintrag nicht geschrieben.");
+    }
+
+    // --- Benachrichtigung der Manager (B9, 10/B9) -------------------------
+    // Fail-soft und bewusst NACH dem Prüfpfad: `notifyAffiliateApplication-
+    // Received()` wirft nie (siehe notify.ts, Regel 1), und ein Mandant ohne
+    // erreichbaren Manager darf keine Bewerbung verlieren. Der BEWERBER
+    // bekommt hier bewusst keine Mail — die Begründung steht an der Vorlage
+    // (`affiliateApplicationReceived()` in email/templates.ts): eine
+    // Eingangsbestätigung wäre genau das Orakel, das `silentSuccess()` oben
+    // vermeidet.
+    if (partnerId !== null) {
+      await notifyAffiliateApplicationReceived(admin, {
+        tenantId: tenant.id,
+        partnerId,
+        applicantName: input.displayName,
+      });
     }
 
     return { error: null, success: true };

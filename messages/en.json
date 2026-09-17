@@ -1109,7 +1109,11 @@
           "courseCompleted": "Course completed",
           "quizPassed": "Quiz passed",
           "submissionCreated": "Submission received",
-          "orderPaid": "Payment received"
+          "orderPaid": "Payment received",
+          "affiliateApplication": "Partner application received",
+          "affiliateApproved": "Partner approved",
+          "affiliateCommission": "Commission booked",
+          "affiliateReversal": "Commission reversed"
         }
       },
       "webhookSecretDialog": {
@@ -2012,6 +2016,8 @@
       },
       "payouts": {
         "title": "Payouts",
+        "description": "Review drafts, release payouts, create the payment file and record the transfer.",
+        "tabsLabel": "Payout views",
         "tabs": {
           "drafts": "Drafts",
           "approved": "Released",
@@ -2029,9 +2035,10 @@
         "columnCompleteness": "Completeness",
         "columnReference": "Reference",
         "columnDocument": "Document",
+        "columnStatus": "Status",
         "empty": "No payouts in this view.",
         "complete": "Complete",
-        "incomplete": "Incomplete. Missing: {fields}",
+        "incomplete": "Incomplete: {fields}",
         "releaseSelected": "Release selected",
         "releaseConfirm": "Release {count} payouts totalling {amount}?",
         "releaseConfirmYes": "Release",
@@ -2053,6 +2060,61 @@
           "sepa": "SEPA transfer",
           "paypal": "PayPal",
           "manual": "Manual"
+        },
+        "selectRow": "Select the payout of {amount} to {partner}",
+        "selectHint": "Please select at least one payout first.",
+        "documentPending": "No document number yet",
+        "documentFileMissing": "Document valid, PDF will follow.",
+        "subtotalLabel": "Net amount",
+        "taxLabel": "VAT",
+        "methodUnknown": "No payment method on file",
+        "referenceHint": "Reference from the bank statement, so the payment can be found again later.",
+        "markPaidDone": "The transfer has been recorded.",
+        "markFailed": "Transfer failed",
+        "markFailedHint": "The document stays valid; the commission entries move into the next draft.",
+        "markFailedDone": "The failure has been recorded.",
+        "releaseHeading": "Release",
+        "releaseSelectedCount": "{count, plural, one {# payout selected.} other {# payouts selected.}}",
+        "releaseConfirmDetail": "{partners, plural, one {{amount} will be paid out to # partner.} other {{amount} will be paid out to # partners.}}",
+        "releaseConfirmHint": "Releasing creates document numbers. A document is never deleted afterwards.",
+        "releasePending": "Releasing …",
+        "releaseDone": "The payouts have been released.",
+        "exportHeading": "Payment file",
+        "exportDescription": "{count, plural, one {# selected payout as a file for the bank or for PayPal.} other {# selected payouts as a file for the bank or for PayPal.}}",
+        "exportMethodHint": "Only payouts with this payment method are exported.",
+        "exportNothing": "There is no released payout with this payment method in this selection.",
+        "exportUnusable": "These documents have no usable payment details: {documents}",
+        "debtorHeading": "Ordering party",
+        "debtorHint": "The account the money is transferred from. It only appears in the generated file and is not stored.",
+        "debtorName": "Name of the ordering party",
+        "debtorIban": "IBAN of the ordering party",
+        "debtorBic": "BIC (optional)",
+        "executionDate": "Execution date (optional)",
+        "legalEntityMissing": "No legal entity is on file for this academy. Without it no credit note can be issued.",
+        "planUnavailable": "The preview could not be loaded. Please open the page again later.",
+        "blockedEmpty": "No partner is currently excluded from the payout.",
+        "run": {
+          "heading": "Payout run",
+          "description": "Creates one draft per partner and currency from all released commissions of the period.",
+          "preview": "{count, plural, one {# partner can currently be paid out.} other {# partners can currently be paid out.}}",
+          "previewTotal": "Expected {amount}",
+          "periodFrom": "Period from",
+          "periodTo": "Period to",
+          "submit": "Create drafts",
+          "pending": "Creating drafts …",
+          "done": "The drafts have been created."
+        },
+        "csv": {
+          "partner": "Partner",
+          "accountHolder": "Account holder",
+          "iban": "IBAN",
+          "bic": "BIC",
+          "paypalEmail": "PayPal address",
+          "amount": "Amount",
+          "currency": "Currency",
+          "documentNo": "Document number",
+          "period": "Period",
+          "taxMode": "Tax treatment"
         }
       },
       "creatives": {
@@ -2748,7 +2810,31 @@
       "notAvailableYet": "There has not been a payout yet.",
       "balanceHint": "Whatever has already been released is shown on the overview under “Available”.",
       "toOverview": "Go to overview",
-      "toStatement": "Go to account statement"
+      "toStatement": "Go to account statement",
+      "downloadNotFound": "The document was not found."
+    },
+    "payoutRun": {
+      "blocked": {
+        "negative_balance": "Balance negative, offset against the next commissions",
+        "below_minimum": "Below the minimum payout amount, carried over",
+        "partner_inactive": "Partner account not active",
+        "payout_hold": "Payout on hold for this partner account",
+        "billing_profile_missing": "Billing details missing",
+        "address_incomplete": "Name, street, postal code or city missing",
+        "tax_entity_kind_missing": "Legal form missing (company or private individual)",
+        "tax_country_missing": "Country of the address missing",
+        "tax_private_entity": "No credit note can be issued to private individuals",
+        "tax_eu_vat_missing": "Verified VAT ID missing (verification at most 90 days old)",
+        "payout_method_missing": "Payout method missing",
+        "iban_invalid": "IBAN not valid",
+        "paypal_missing": "PayPal address missing"
+      }
+    },
+    "tax": {
+      "modeRegular": "Standard taxation, 19% German VAT",
+      "modeSmallBusiness": "Small business under section 19 UStG, no VAT shown",
+      "modeReverseCharge": "Reverse charge, VAT owed by the recipient of the service",
+      "modeNonEu": "Non-EU country, not taxable in Germany"
     },
     "team": {
       "title": "Team",
@@ -2935,6 +3021,11 @@
       "currencyColumn": "Currency",
       "freeFromColumn": "Released on",
       "reversalColumn": "Reversed"
+    },
+    "integrity": {
+      "payoutSubtotalMismatch": "The sum of the assigned commission entries differs from the amount of the payout record. The record is not exported.",
+      "dailyStatsMismatch": "The daily figure differs from the commission ledger. The ledger prevails; the aggregate is recalculated.",
+      "overReversal": "More has been reversed for this order than was originally booked as commission."
     }
   },
   "consent": {

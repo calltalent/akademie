@@ -591,7 +591,13 @@ export function computeBalances(rows: readonly AffiliateBalanceInput[]): Affilia
   for (const row of rows) {
     if (row.is_test) continue;
 
-    const key = `${row.partner_id} ${row.currency}`;
+    // Trennzeichen als ESCAPE `\u0000`, nicht als rohes NUL-Byte in der
+    // Quelle: ein echtes NUL macht die Datei fuer `grep -r`, `git diff`
+    // und jeden Secret-Scan zu einer Binaerdatei, deren Inhalt dann still
+    // uebersprungen wird. Die erzeugte Zeichenkette ist identisch. NUL
+    // bleibt richtig, weil es in keiner UUID und keinem Waehrungscode
+    // vorkommt und den Schluessel damit eindeutig macht.
+    const key = `${row.partner_id}\u0000${row.currency}`;
     let balances = buckets.get(key);
     if (balances === undefined) {
       balances = {

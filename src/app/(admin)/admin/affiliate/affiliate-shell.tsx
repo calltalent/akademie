@@ -47,17 +47,21 @@ export type AffiliateNavId =
   | "partners"
   | "conditions"
   | "commissions"
+  | "payouts"
   | "creatives"
   | "settings";
 
 /**
  * Die Unternavigation des Moduls.
  *
- * ABWEICHUNG VOM PLAN, bewusst: `admin.affiliate.nav.payouts` existiert im
- * Schlüsselgerüst, `/admin/affiliate/auszahlungen` aber erst mit Block B8.
- * Ein Menüpunkt auf eine Route, die es nicht gibt, ist eine Sackgasse — und
- * für einen sehbehinderten Betreiber eine besonders teure: er merkt den
- * Fehlgriff erst nach dem Laden. Der Punkt kommt mit seiner Seite.
+ * `payouts` war bis Block B8 bewusst NICHT hier eingetragen: der Schlüssel
+ * `admin.affiliate.nav.payouts` stand zwar im Gerüst, die Seite
+ * `/admin/affiliate/auszahlungen` aber nicht. Ein Menüpunkt auf eine Route,
+ * die es nicht gibt, ist eine Sackgasse — und für einen sehbehinderten
+ * Betreiber eine besonders teure, weil er den Fehlgriff erst nach dem Laden
+ * bemerkt. Mit B8-C existiert die Seite, also steht der Punkt jetzt hier
+ * (zwei Zeilen, rein additiv — genau die Ergänzung, die dieser Kommentar
+ * angekündigt hat).
  */
 const NAV_ITEMS: ReadonlyArray<{
   id: AffiliateNavId;
@@ -69,6 +73,7 @@ const NAV_ITEMS: ReadonlyArray<{
     | "nav.partners"
     | "nav.conditions"
     | "nav.commissions"
+    | "nav.payouts"
     | "nav.creatives"
     | "nav.settings";
 }> = [
@@ -83,6 +88,11 @@ const NAV_ITEMS: ReadonlyArray<{
     id: "commissions",
     href: "/admin/affiliate/provisionen",
     key: "nav.commissions",
+  },
+  {
+    id: "payouts",
+    href: "/admin/affiliate/auszahlungen",
+    key: "nav.payouts",
   },
   {
     id: "creatives",
