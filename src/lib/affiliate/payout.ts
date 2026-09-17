@@ -8,6 +8,7 @@ import { notifyAffiliatePayoutPaid } from "@/lib/affiliate/notify";
 import { isValidIban } from "@/lib/affiliate/sepa";
 import {
   computeAffiliateTax,
+  normalizeVatId,
   resolveAffiliateTax,
   type AffiliateTaxBlockReason,
 } from "@/lib/affiliate/tax";
@@ -77,22 +78,30 @@ const PROGRAM_COLUMNS = "id, tenant_id, min_payout_cents, payout_schedule, curre
 const PARTNER_COLUMNS = "id, program_id, status, payout_hold, display_name, company, user_id";
 
 /**
- * Abrechnungsprofil. `tax_number` fehlt bewusst: für den Steuermodus ist sie
- * unerheblich (nur die USt-IdNr. zählt), und das Gutschrift-PDF liest sie in
- * einem eigenen, engeren Schritt.
+ * Abrechnungsprofil. `tax_number` war hier bewusst nicht dabei — für den
+ * Steuermodus ist sie unerheblich. Sie steht jetzt trotzdem in der Liste, und
+ * zwar aus einem anderen Grund (Abnahme B8/B9, Befund 10): sie gehört zum
+ * EINGEFRORENEN Empfänger auf dem Beleg (§ 14 Abs. 4 Nr. 2 UStG). Gelesen wird
+ * sie ausschließlich in den Schnappschuss; sie verlässt den Server nur als
+ * Bestandteil des Gutschrift-PDF.
  */
 const BILLING_COLUMNS =
   "partner_id, entity_kind, legal_name, street, postal_code, city, country, " +
-  "small_business, vat_id, vat_check_result, vat_checked_at, payout_method, " +
+  "small_business, vat_id, tax_number, vat_check_result, vat_checked_at, payout_method, " +
   "account_holder, iban, bic, paypal_email";
 
 const PAYOUT_COLUMNS =
   "id, tenant_id, program_id, partner_id, period_from, period_to, currency, " +
   "gross_cents, reversal_cents, subtotal_cents, tax_mode, tax_rate_bp, tax_cents, " +
   "total_cents, status, method, document_no, document_path, document_issued_at, " +
-  "reference, approved_at, paid_at, created_at, updated_at";
+  "reverses_payout_id, reference, approved_at, paid_at, created_at, updated_at";
 
-const CLAIM_COLUMNS = "id, amount_cents, kind";
+/**
+ * `booked_at` ist dabei, weil der Leistungszeitraum des Belegs aus den
+ * TATSÄCHLICH eingesammelten Zeilen kommt (Abnahme B8/B9, Befund 13) — nicht
+ * aus dem Zeitraum, den jemand ins Formular geschrieben hat.
+ */
+const CLAIM_COLUMNS = "id, amount_cents, kind, booked_at";
 
 // --- Zeilenformen -------------------------------------------------------
 
@@ -124,6 +133,7 @@ type BillingRow = {
   country: string | null;
   small_business: boolean;
   vat_id: string | null;
+  tax_number: string | null;
   vat_check_result: AffiliateVatCheckResult | null;
   vat_checked_at: string | null;
   payout_method: AffiliatePayoutMethod | null;
@@ -152,18 +162,22 @@ export const AFFILIATE_PAYOUT_BLOCK_REASONS = [
   "tax_country_missing",
   "tax_private_entity",
   "tax_eu_vat_missing",
+  "tax_vat_country_mismatch",
+  "issuer_vat_id_missing",
+  "foreign_currency",
   "payout_method_missing",
   "iban_invalid",
   "paypal_missing",
 ] as const;
 export type AffiliatePayoutBlockReason = (typeof AFFILIATE_PAYOUT_BLOCK_REASONS)[number];
 
-/** Die vier Blockaden aus `tax.ts` in die Sprache des Auszahlungslaufs. */
+/** Die fünf Blockaden aus `tax.ts` in die Sprache des Auszahlungslaufs. */
 const TAX_BLOCK_MAPPING: Record<AffiliateTaxBlockReason, AffiliatePayoutBlockReason> = {
   entity_kind_missing: "tax_entity_kind_missing",
   country_missing: "tax_country_missing",
   private_entity: "tax_private_entity",
   eu_vat_missing: "tax_eu_vat_missing",
+  vat_country_mismatch: "tax_vat_country_mismatch",
 };
 
 /**
@@ -182,6 +196,11 @@ const BLOCK_FIELDS: Record<AffiliatePayoutBlockReason, string | null> = {
   tax_country_missing: "country",
   tax_private_entity: "entity_kind",
   tax_eu_vat_missing: "vat_id",
+  tax_vat_country_mismatch: "vat_id",
+  // Nicht der Partner ist gemeint, sondern der Mandant: der Link ins
+  // Partnerformular wäre eine falsche Fährte.
+  issuer_vat_id_missing: null,
+  foreign_currency: null,
   payout_method_missing: "payout_method",
   iban_invalid: "iban",
   paypal_missing: "paypal_email",
@@ -216,6 +235,25 @@ function blocker(
 
 // --- Kandidaten ---------------------------------------------------------
 
+/**
+ * Der Empfänger, wie er auf dem Beleg steht (§ 14 Abs. 4 Nr. 1 und 2 UStG).
+ *
+ * Wird beim Entwurf aus dem Abrechnungsprofil gezogen und mit dem Beleg
+ * eingefroren (`affiliate_payouts.recipient_snapshot`). Grund: das PDF ist nur
+ * die Darstellung der eingefrorenen Zahlen, und eine Anschrift, die sich
+ * zwischen Freigabe und Reparaturlauf ändert, machte aus derselben Belegnummer
+ * zwei verschiedene Dokumente (Abnahme B8/B9, Befund 10).
+ */
+export type AffiliatePayoutRecipientSnapshot = {
+  legal_name: string;
+  street: string;
+  postal_code: string;
+  city: string;
+  country: string;
+  vat_id: string | null;
+  tax_number: string | null;
+};
+
 export type AffiliatePayoutCandidate = {
   partner_id: string;
   program_id: string;
@@ -229,7 +267,35 @@ export type AffiliatePayoutCandidate = {
   method: AffiliatePayoutMethod;
   /** Nur für die Bestätigungsmaske („Sie zahlen … an … Partner aus."). */
   preview_total_cents: number;
+  /** Anschrift und Steuerkennzeichen des Empfängers, zum Einfrieren (7.2). */
+  recipient_snapshot: AffiliatePayoutRecipientSnapshot;
 };
+
+/**
+ * Die USt-IdNr. des AUSSTELLERS aus `tenants.legal` (Abnahme B8/B9, Befund 5).
+ *
+ * Gelesen wird `legal.entity.vatId` (ersatzweise `legal.entity.vat_id` — beide
+ * Schreibweisen kommen in gepflegten Mandantenzeilen vor). `resolveLegalEntity()`
+ * bleibt unverändert zuständig für Name, Anschrift und Registernummer; die
+ * USt-IdNr. steht bewusst nicht in dessen zod-Schema, weil sie für die
+ * Rechtsseiten keine Rolle spielt und dort nichts verloren hat.
+ *
+ * WARUM DAS ZÄHLT: bei `reverse_charge` sind nach § 14a Abs. 5 UStG BEIDE
+ * USt-IdNr. Pflichtangabe. Fehlt die des Ausstellers, ist die
+ * Steuerschuldnerschaft des Leistungsempfängers formal nicht belegt — die
+ * Befreiung wird versagt, und der Mandant schuldet 19 % auf jede so
+ * abgerechnete Provision rückwirkend (§ 233a AO obendrauf). Deshalb ist der
+ * Rückgabewert `null` ein SPERRGRUND und kein Gedankenstrich auf dem Beleg.
+ */
+export function resolveTenantVatId(legal: unknown): string | null {
+  const entity = (legal as { entity?: unknown } | null | undefined)?.entity as
+    | { vatId?: unknown; vat_id?: unknown }
+    | null
+    | undefined;
+  if (entity === null || entity === undefined || typeof entity !== "object") return null;
+  const raw = typeof entity.vatId === "string" ? entity.vatId : entity.vat_id;
+  return normalizeVatId(typeof raw === "string" ? raw : null);
+}
 
 export type AffiliatePayoutRunPlan =
   | { ok: false; reason: "program_missing" | "tenant_legal_entity_missing" | "balances_incomplete" }
@@ -318,6 +384,7 @@ export async function planAffiliatePayoutRun(
   if (tenantError || tenant === null) return { ok: false, reason: "tenant_legal_entity_missing" };
   const legalEntity = resolveLegalEntity(tenant.legal);
   if (legalEntity === null) return { ok: false, reason: "tenant_legal_entity_missing" };
+  const issuerVatId = resolveTenantVatId(tenant.legal);
 
   const minPayoutCents =
     typeof program.min_payout_cents === "number" && program.min_payout_cents > 0
@@ -333,6 +400,12 @@ export async function planAffiliatePayoutRun(
       .from("affiliate_commissions")
       .select(BALANCE_COLUMNS)
       .eq("tenant_id", params.tenantId)
+      // Abnahme B8/B9, Befund 11: OHNE diesen Filter erfasst der Lauf für
+      // Programm A auch die Partner von Programm B — geprüft gegen den
+      // Mindestbetrag von A, abgerechnet im Zeitraum von A, und Schritt 7 der
+      // Freigabe schlösse anschließend die Bücher von B mit einem Zeitraum aus
+      // dem Zeitplan von A.
+      .eq("program_id", params.programId)
       .order("id", { ascending: true })
       .range(from, to) as unknown as PromiseLike<{
       data: AffiliateBalanceInput[] | null;
@@ -353,6 +426,7 @@ export async function planAffiliatePayoutRun(
       .from("affiliate_partners")
       .select(PARTNER_COLUMNS)
       .eq("tenant_id", params.tenantId)
+      .eq("program_id", params.programId)
       .in("id", partnerIds)
       .order("id", { ascending: true })
       .range(from, to) as unknown as PromiseLike<{ data: PartnerRow[] | null; error: unknown }>,
@@ -383,6 +457,19 @@ export async function planAffiliatePayoutRun(
     // in der Liste wäre Lärm, der die echten Fälle verdeckt.
     if (available === 0) continue;
 
+    // WÄHRUNG VOR BETRAG (Abnahme B8/B9, Befund 12). `min_payout_cents` ist ein
+    // Betrag in der Währung des PROGRAMMS. Ihn gegen einen Saldo in einer
+    // anderen Währung zu halten, ist genau die Klasse „hier wird verglichen,
+    // was nicht verglichen werden darf", gegen die G12/5.11 im ganzen Modul
+    // sonst gearbeitet wird: 2.600 Rappen sind nicht 26,00 €, und ein
+    // stillschweigender Kurs existiert im Plan bewusst nicht. Der Saldo bleibt
+    // stehen und wird gemeldet, statt gegen eine fremde Schwelle geprüft zu
+    // werden.
+    if (currency !== program.currency) {
+      blocked.push(blocker(partnerId, currency, available, "foreign_currency"));
+      continue;
+    }
+
     // Ein negativer Saldo erzeugt keinen Satz und keine Schuld: die Zeilen
     // bleiben `approved` ohne `payout_id` und verrechnen sich mit künftigen
     // Provisionen (5.10). Er wird trotzdem gemeldet, weil ein Partner sonst
@@ -398,7 +485,17 @@ export async function planAffiliatePayoutRun(
     }
 
     const partner = partnerById.get(partnerId);
-    if (partner === undefined || partner.status !== "active") {
+    // `partner.program_id !== programId` kann nach dem Filter oben nur noch
+    // auftreten, wenn eine Provisionszeile auf ein anderes Programm zeigt als
+    // ihr Partner. Das wird VERWORFEN statt mitgenommen (Befund 11): ein Satz
+    // mit der Programmkennung des Partners, aber den Konditionen des Laufs
+    // wäre falsch belegt, und die Freigabe-RPC merkte nichts, weil beide Werte
+    // bei ihr übereinstimmen.
+    if (
+      partner === undefined ||
+      partner.program_id !== params.programId ||
+      partner.status !== "active"
+    ) {
       blocked.push(blocker(partnerId, currency, available, "partner_inactive"));
       continue;
     }
@@ -436,6 +533,16 @@ export async function planAffiliatePayoutRun(
       continue;
     }
 
+    // FAIL-CLOSED für den Reverse Charge (Abnahme B8/B9, Befund 5). Ohne die
+    // USt-IdNr. des Mandanten kann der Beleg die Pflichtangabe nach § 14a
+    // Abs. 5 UStG nicht tragen — dann darf er gar nicht erst entstehen. Vorher
+    // entstand er und trug an ihrer Stelle einen Gedankenstrich; auffallen
+    // konnte das erst bei einer Betriebsprüfung.
+    if (tax.tax_mode === "reverse_charge" && issuerVatId === null) {
+      blocked.push(blocker(partnerId, currency, available, "issuer_vat_id_missing"));
+      continue;
+    }
+
     if (profile.payout_method === null) {
       blocked.push(blocker(partnerId, currency, available, "payout_method_missing"));
       continue;
@@ -451,7 +558,7 @@ export async function planAffiliatePayoutRun(
 
     candidates.push({
       partner_id: partnerId,
-      program_id: partner.program_id,
+      program_id: params.programId,
       currency,
       available_cents: available,
       tax_mode: tax.tax_mode,
@@ -459,6 +566,17 @@ export async function planAffiliatePayoutRun(
       taxDocumentHint: tax.documentHint,
       method: profile.payout_method,
       preview_total_cents: tax.total_cents,
+      // Die vier Anschriftsfelder sind oben bereits als nicht leer geprüft;
+      // `String(...)` ist hier nur die Typverengung, kein zweiter Fallback.
+      recipient_snapshot: {
+        legal_name: String(profile.legal_name),
+        street: String(profile.street),
+        postal_code: String(profile.postal_code),
+        city: String(profile.city),
+        country: String(profile.country),
+        vat_id: profile.vat_id,
+        tax_number: profile.tax_number,
+      },
     });
   }
 
@@ -470,13 +588,66 @@ export async function planAffiliatePayoutRun(
 export type AffiliatePayoutDraftOutcome =
   | { status: "created"; payout_id: string; partner_id: string; currency: string; subtotal_cents: number; total_cents: number; claimed_rows: number }
   | { status: "skipped"; partner_id: string; currency: string; reason: "no_rows" | "below_minimum_after_claim" | "non_positive_after_claim" }
-  | { status: "failed"; partner_id: string; currency: string; reason: "insert_failed" | "claim_failed" | "finalize_failed" };
+  | {
+      status: "failed";
+      partner_id: string;
+      currency: string;
+      reason: "insert_failed" | "claim_failed" | "finalize_failed" | "cleanup_failed";
+    };
 
 const periodSchema = z.object({
   /** Abrechnungsperiode, ISO-Datum `JJJJ-MM-TT` (G14). */
   periodFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   periodTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
+
+/** Wie weit ein Abrechnungszeitraum zurückreichen darf (7.1). */
+export const AFFILIATE_PAYOUT_MAX_PERIOD_MONTHS = 24;
+
+export type AffiliatePayoutPeriodProblem = "reversed" | "future" | "too_old";
+
+/**
+ * Grenzen des Abrechnungszeitraums (Abnahme B8/B9, Befund 7).
+ *
+ * Der Zeitraum kommt aus zwei Datumsfeldern der Oberfläche und war bis dahin
+ * nur auf Form und Reihenfolge geprüft. Ein Vertipper („2099-12-31" statt
+ * „2026-09-30") wanderte unverändert in `affiliate_payouts.period_to` und von
+ * dort in Schritt 7 der Freigabe: `books_closed_until = greatest(…, period_to)`
+ * schließt die Bücher des GESAMTEN Programms — und `greatest()` nimmt das nie
+ * wieder zurück. Ab da datiert jede neue Provisionszeile um und trägt den
+ * unveränderlichen Nachbuchungsvermerk. Nebenbei wäre der Leistungszeitraum
+ * auf der Gutschrift nach § 14 Abs. 4 Nr. 6 UStG unbrauchbar.
+ *
+ * Rein rechnend, damit dieselbe Regel in der Server Action (für die Meldung an
+ * den Menschen) und im Lauf selbst (als Sperre) gilt. Die dritte Linie steht in
+ * `approve_affiliate_payout()`, wo alle Schreibwege vorbeikommen.
+ */
+export function checkAffiliatePayoutPeriodBounds(
+  periodFrom: string,
+  periodTo: string,
+  now: Date = new Date(),
+): AffiliatePayoutPeriodProblem | null {
+  if (periodTo < periodFrom) return "reversed";
+  const today = isoDate(now);
+  if (periodTo > today) return "future";
+
+  const earliest = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth() - AFFILIATE_PAYOUT_MAX_PERIOD_MONTHS,
+      now.getUTCDate(),
+    ),
+  );
+  if (periodFrom < isoDate(earliest)) return "too_old";
+  return null;
+}
+
+/** Der Folgetag als ISO-Datum — die obere Grenze eines Zeitraums als Zeitpunkt. */
+function nextIsoDay(iso: string): string {
+  const parsed = Date.parse(`${iso}T00:00:00.000Z`);
+  if (!Number.isFinite(parsed)) return iso;
+  return isoDate(new Date(parsed + 86_400_000));
+}
 
 /**
  * Erzeugt je Kandidat einen Entwurf (7.1).
@@ -485,7 +656,11 @@ const periodSchema = z.object({
  *
  *   1. Entwurfszeile mit NULLBETRÄGEN anlegen. Sie muss zuerst existieren,
  *      weil der Compare-and-Swap ihre `id` als Stempel braucht. Die CHECKs der
- *      Tabelle sind mit 0 = 0 + 0 erfüllt.
+ *      Tabelle lassen diesen Zwischenstand ausdrücklich zu — aber NUR für
+ *      `status = 'draft'` und erst seit der Abnahme B8/B9 (Befund 1): davor
+ *      stand dort ein hartes `check (subtotal_cents > 0)`, an dem jeder Insert
+ *      mit 23514 abbrach, während dieser Kommentar das Gegenteil behauptete.
+ *      Wer die Migration ändert, ändert diesen Satz mit.
  *   2. Zeilen per Compare-and-Swap einsammeln — mit `currency` im Filter. OHNE
  *      diesen Filter landeten EUR und CHF in einem Satz mit genau einem
  *      Währungsfeld (5.11), und der Beleg wiese einen Betrag aus, den es in
@@ -493,8 +668,9 @@ const periodSchema = z.object({
  *   3. Summen aus den EINGESAMMELTEN Zeilen bilden, Steuer darauf rechnen,
  *      Entwurf fortschreiben.
  *   4. Kommt nichts oder zu wenig zusammen, werden die Stempel wieder gelöst
- *      und die leere Entwurfszeile entfernt. Ein Entwurf über 0,00 € wäre
- *      keine Auszahlung, sondern eine Belegnummer im Wartestand.
+ *      und die leere Entwurfszeile VERWORFEN (`status = 'cancelled'`, nie
+ *      gelöscht). Ein Entwurf über 0,00 € wäre keine Auszahlung, sondern eine
+ *      Belegnummer im Wartestand.
  */
 export async function createAffiliatePayoutDrafts(
   admin: Admin,
@@ -505,12 +681,25 @@ export async function createAffiliatePayoutDrafts(
     periodFrom: string;
     periodTo: string;
     createdBy?: string | null;
+    /** Für die Zeitraumgrenzen; im Betrieb die Systemuhr. */
+    now?: Date;
   },
 ): Promise<AffiliatePayoutDraftOutcome[]> {
   const { periodFrom, periodTo } = periodSchema.parse({
     periodFrom: params.periodFrom,
     periodTo: params.periodTo,
   });
+  // Zweite Linie hinter der zod-Prüfung der Server Action (Befund 7): ein
+  // Zeitraum, der in der Zukunft endet, schlösse beim Freigeben die Bücher des
+  // Programms auf ein Datum, das nicht zurückzunehmen ist.
+  const periodProblem = checkAffiliatePayoutPeriodBounds(
+    periodFrom,
+    periodTo,
+    params.now ?? new Date(),
+  );
+  if (periodProblem !== null) {
+    throw new Error(`createAffiliatePayoutDrafts: Abrechnungszeitraum unzulässig (${periodProblem}).`);
+  }
   const outcomes: AffiliatePayoutDraftOutcome[] = [];
 
   for (const candidate of params.candidates) {
@@ -533,6 +722,11 @@ export async function createAffiliatePayoutDrafts(
         status: "draft",
         method: candidate.method,
         created_by: params.createdBy ?? null,
+        // Der Empfänger wird mit dem Beleg eingefroren (Befund 10). Das
+        // Gutschrift-PDF liest ihn von hier und nicht live aus dem Profil —
+        // sonst trüge ein PDF aus dem Reparaturlauf eine andere Anschrift als
+        // eines vom Freigabetag.
+        recipient_snapshot: candidate.recipient_snapshot,
       })
       .select("id")
       .maybeSingle<{ id: string }>();
@@ -558,13 +752,22 @@ export async function createAffiliatePayoutDrafts(
       .eq("currency", candidate.currency)
       .eq("status", "approved")
       .is("payout_id", null)
-      .lte("hold_until", periodTo)
+      // OBERGRENZE ALS ZEITPUNKT, nicht als Tag (Abnahme B8/B9, Befund 13).
+      // `hold_until` ist `timestamptz`; Postgres liest 'JJJJ-MM-TT' als
+      // Mitternacht. Mit `lte` fiel jede Zeile heraus, deren Sperrfrist am
+      // letzten Tag des Zeitraums um 14:00 Uhr endete — für den Partner ein
+      // unerklärlicher Monat Verzögerung. `lt` gegen den FOLGETAG nimmt den
+      // ganzen letzten Tag mit.
+      .lt("hold_until", `${nextIsoDay(periodTo)}T00:00:00.000Z`)
       .eq("is_test", false)
       .select(CLAIM_COLUMNS);
 
     if (claimError) {
       logDbError("Reservieren der Provisionszeilen", claimError);
-      await deleteEmptyDraft(admin, params.tenantId, draft.id);
+      if (!(await cancelEmptyDraft(admin, params.tenantId, draft.id))) {
+        outcomes.push(cleanupFailed(candidate));
+        continue;
+      }
       outcomes.push({
         status: "failed",
         partner_id: candidate.partner_id,
@@ -574,11 +777,14 @@ export async function createAffiliatePayoutDrafts(
       continue;
     }
 
-    const rows = (claimed ?? []) as Array<{ amount_cents: number }>;
+    const rows = (claimed ?? []) as Array<{ amount_cents: number; booked_at?: string | null }>;
     if (rows.length === 0) {
       // Ein zweiter, gleichzeitig laufender Entwurf war schneller. Kein
-      // Fehler: der andere Satz trägt die Zeilen, dieser verschwindet.
-      await deleteEmptyDraft(admin, params.tenantId, draft.id);
+      // Fehler: der andere Satz trägt die Zeilen, dieser wird verworfen.
+      if (!(await cancelEmptyDraft(admin, params.tenantId, draft.id))) {
+        outcomes.push(cleanupFailed(candidate));
+        continue;
+      }
       outcomes.push({
         status: "skipped",
         partner_id: candidate.partner_id,
@@ -590,19 +796,33 @@ export async function createAffiliatePayoutDrafts(
 
     let gross = 0;
     let reversal = 0;
+    let earliestBookedAt = periodFrom;
     for (const row of rows) {
       const amount = Math.trunc(Number(row.amount_cents) || 0);
       if (amount >= 0) gross += amount;
       else reversal += amount;
+      // Der Leistungszeitraum des Belegs muss zu seinem INHALT passen
+      // (§ 14 Abs. 4 Nr. 6 UStG, Befund 13). Liegengebliebene Zeilen — nach
+      // einem Auszahlungsstopp oder einem unterschrittenen Mindestbetrag —
+      // sind Monate älter als der Zeitraum des Laufs; der Beleg weist dann den
+      // tatsächlich frühesten Buchungstag aus statt einer Angabe, die seinen
+      // eigenen Positionen widerspricht.
+      const bookedAt = typeof row.booked_at === "string" ? row.booked_at.slice(0, 10) : null;
+      if (bookedAt !== null && bookedAt !== "" && bookedAt < earliestBookedAt) {
+        earliestBookedAt = bookedAt;
+      }
     }
     const subtotal = gross + reversal;
 
     if (subtotal <= 0 || subtotal < params.minPayoutCents) {
       // Zwischen Vorschau und Reservierung ist etwas dazwischengekommen (eine
-      // Erstattung, ein paralleler Lauf). Stempel lösen, Entwurf entfernen,
+      // Erstattung, ein paralleler Lauf). Stempel lösen, Entwurf verwerfen,
       // der Betrag wird vorgetragen (7.1).
       await releaseClaimedRows(admin, params.tenantId, draft.id);
-      await deleteEmptyDraft(admin, params.tenantId, draft.id);
+      if (!(await cancelEmptyDraft(admin, params.tenantId, draft.id))) {
+        outcomes.push(cleanupFailed(candidate));
+        continue;
+      }
       outcomes.push({
         status: "skipped",
         partner_id: candidate.partner_id,
@@ -617,6 +837,7 @@ export async function createAffiliatePayoutDrafts(
     const { error: finalizeError } = await admin
       .from("affiliate_payouts")
       .update({
+        period_from: earliestBookedAt,
         gross_cents: gross,
         reversal_cents: reversal,
         subtotal_cents: subtotal,
@@ -630,7 +851,10 @@ export async function createAffiliatePayoutDrafts(
     if (finalizeError) {
       logDbError("Fortschreiben der Entwurfssummen", finalizeError);
       await releaseClaimedRows(admin, params.tenantId, draft.id);
-      await deleteEmptyDraft(admin, params.tenantId, draft.id);
+      if (!(await cancelEmptyDraft(admin, params.tenantId, draft.id))) {
+        outcomes.push(cleanupFailed(candidate));
+        continue;
+      }
       outcomes.push({
         status: "failed",
         partner_id: candidate.partner_id,
@@ -693,22 +917,62 @@ async function releaseClaimedRows(
   return (data ?? []).length;
 }
 
+/** Ein nicht aufgeräumter Entwurf ist ein Fehlschlag des Laufs, keine Fußnote. */
+function cleanupFailed(candidate: AffiliatePayoutCandidate): AffiliatePayoutDraftOutcome {
+  return {
+    status: "failed",
+    partner_id: candidate.partner_id,
+    currency: candidate.currency,
+    reason: "cleanup_failed",
+  };
+}
+
 /**
- * Entfernt eine Entwurfszeile, die nie Inhalt bekommen hat. Nur `draft` und
- * nur ohne Belegnummer: ein Beleg wird NIE gelöscht (7.7), auch nicht der
- * eines fehlgeschlagenen Laufs — er wird durch eine Stornogutschrift mit
- * eigener Nummer neutralisiert.
+ * VERWIRFT eine Entwurfszeile, die nie Inhalt bekommen hat (Abnahme B8/B9,
+ * Befund 3).
+ *
+ * Hier stand bis zur Abnahme ein `delete()`. Das konnte gar nicht
+ * funktionieren: der Admin-Client läuft unter `service_role`, und
+ * `affiliate_payouts_delete_guard()` lässt ausschließlich
+ * 'postgres'/'supabase_admin' sowie Kaskaden (`pg_trigger_depth() > 1`) durch —
+ * 'service_role' steht dort bewusst NICHT, und die Migration schreibt den
+ * richtigen Weg ausdrücklich hin: „der normale Serverbetrieb loescht keinen
+ * Beleg, auch keinen verworfenen Entwurf — der bekommt status = cancelled".
+ *
+ * Die Folge des alten Wegs war kein Schönheitsfehler, sondern eine Sackgasse:
+ * der Fehler wurde nur protokolliert, die leere Entwurfszeile blieb stehen, und
+ * `affiliate_payouts_open_draft_uniq` (ein offener Entwurf je Mandant, Partner
+ * und Währung) ließ danach KEINEN weiteren Entwurf für diesen Partner mehr zu —
+ * jeder Lauf endete mit 23505, gemeldet als `insert_failed`. Der Partner wurde
+ * nie wieder ausgezahlt, und in der Liste stand ein 0,00-€-Entwurf, dem man das
+ * nicht ansieht.
+ *
+ * Rückgabewert statt Protokolleintrag: ein nicht aufgeräumter Entwurf MUSS den
+ * Lauf als `failed` melden, sonst wiederholt sich genau dieses stille Scheitern.
  */
-async function deleteEmptyDraft(admin: Admin, tenantId: string, payoutId: string): Promise<void> {
-  const { error } = await admin
+async function cancelEmptyDraft(
+  admin: Admin,
+  tenantId: string,
+  payoutId: string,
+): Promise<boolean> {
+  const { data, error } = await admin
     .from("affiliate_payouts")
-    .delete()
+    .update({ status: "cancelled" })
     .eq("id", payoutId)
     .eq("tenant_id", tenantId)
+    // Nur ein Entwurf ohne Nummer: ein Beleg wird NIE verworfen (7.7) — er
+    // wird durch eine Stornogutschrift mit eigener Nummer neutralisiert. Der
+    // Guard-Trigger kennt dieselbe Kante (draft -> cancelled) und ist die
+    // verbindliche Grenze; dieser Filter ist die zweite Linie davor.
     .eq("status", "draft")
-    .is("document_no", null);
+    .is("document_no", null)
+    .select("id");
 
-  if (error) logDbError("Entfernen eines leeren Entwurfs", error);
+  if (error) {
+    logDbError("Verwerfen eines leeren Entwurfs", error);
+    return false;
+  }
+  return (data ?? []).length > 0;
 }
 
 // --- Freigabe -----------------------------------------------------------
@@ -720,6 +984,7 @@ export type AffiliatePayoutApproval =
       reason:
         | "not_found"
         | "not_draft"
+        | "actor_missing"
         | "self_approval"
         | "integrity_mismatch"
         | "integrity_unknown"
@@ -756,11 +1021,22 @@ export async function approveAffiliatePayout(
   params: {
     tenantId: string;
     payoutId: string;
-    /** Der handelnde Mensch; `null` nur für einen Systemlauf ohne Interessenkonflikt. */
-    actorUserId: string | null;
+    /**
+     * Der handelnde Mensch. PFLICHT (Abnahme B8/B9, Befund 2): die RPC verlangt
+     * ihn seit Abweichung A4 und bricht ohne ihn mit
+     * `affiliate_payout_actor_required` ab. Den früher dokumentierten
+     * „Systemlauf ohne Interessenkonflikt" gibt es in der Datenbank nicht — er
+     * ist hier gestrichen statt als `null` weitergereicht, weil ein Aufruf, den
+     * die Datenbank ohnehin abweist, kein Aufrufmodus ist.
+     */
+    actorUserId: string;
     integrityReport?: AffiliateIntegrityReport;
   },
 ): Promise<AffiliatePayoutApproval> {
+  if (typeof params.actorUserId !== "string" || params.actorUserId.trim() === "") {
+    return { ok: false, reason: "actor_missing" };
+  }
+
   const { data: payout, error } = await admin
     .from("affiliate_payouts")
     .select("id, tenant_id, partner_id, status, subtotal_cents, currency")
@@ -771,7 +1047,7 @@ export async function approveAffiliatePayout(
   if (error || payout === null) return { ok: false, reason: "not_found" };
   if (payout.status !== "draft") return { ok: false, reason: "not_draft" };
 
-  if (params.actorUserId !== null) {
+  {
     const { data: partner, error: partnerError } = await admin
       .from("affiliate_partners")
       .select("id, user_id")
@@ -799,8 +1075,18 @@ export async function approveAffiliatePayout(
   );
   if (mismatch) return { ok: false, reason: "integrity_mismatch" };
 
+  // ALLE DREI PFLICHTARGUMENTE (Abnahme B8/B9, Befund 2). Die RPC prüft
+  // `p_tenant_id` gegen die Zeile (CLAUDE.md §2.15: die Auszahlungskennung
+  // kommt aus einem Formular) und `p_actor_user_id` gegen den Empfänger (G15).
+  // Vorher ging nur `p_payout_id` hinaus; die beiden fehlenden Argumente sind
+  // in der RPC mit `default null` deklariert, der Aufruf lief also durch und
+  // brach erst innen mit `affiliate_payout_tenant_required` ab — jede Freigabe,
+  // ausnahmslos. Die vorgelagerten Prüfungen oben ersetzen diese Argumente
+  // NICHT: sie sind die erste Linie, die RPC die verbindliche.
   const { data, error: rpcError } = await admin.rpc("approve_affiliate_payout", {
     p_payout_id: params.payoutId,
+    p_tenant_id: params.tenantId,
+    p_actor_user_id: params.actorUserId,
   });
 
   if (rpcError) {
@@ -941,19 +1227,91 @@ export async function markAffiliatePayoutPaid(
   return { ok: true, payout_id: params.payoutId, affected_rows: (rows ?? []).length };
 }
 
+export type AffiliatePayoutFailure =
+  | {
+      ok: true;
+      payout_id: string;
+      affected_rows: number;
+      /** Der Status, aus dem heraus der Fehlschlag vermerkt wurde — fürs Protokoll. */
+      previous_status: string;
+      /**
+       * Der Entwurf der Stornogutschrift. `null` heißt: er konnte NICHT
+       * angelegt werden — dann steht ein Beleg mit ausgewiesener Steuer im
+       * Bestand, dessen Leistung gleich noch einmal abgerechnet wird. Die
+       * Oberfläche muss das sagen (7.7).
+       */
+      reversal_payout_id: string | null;
+    }
+  | {
+      ok: false;
+      reason: "not_found" | "wrong_status" | "write_failed" | "confirmation_mismatch";
+    };
+
+/** Belegnummern werden zum Vergleich auf ihre Form reduziert, nicht auf Gleichheit getippt. */
+function normalizeDocumentNo(value: string | null | undefined): string {
+  return typeof value === "string" ? value.trim().toUpperCase() : "";
+}
+
 /**
  * Die Überweisung ist fehlgeschlagen (7.7): Satz auf `failed`, die Zeilen
  * werden freigegeben (`payout_id = null`, Status bleibt `approved`) und laufen
- * in den nächsten Entwurf.
+ * in den nächsten Entwurf — und der ausgestellte Beleg bekommt SOFORT den
+ * Entwurf seiner Stornogutschrift.
  *
- * Der Beleg bleibt bestehen. Ein einmal erzeugter Beleg wird NIE gelöscht —
- * neutralisiert wird er durch eine Stornogutschrift mit eigener Belegnummer,
- * sonst entstünde eine Lücke in der Nummernfolge (§ 14 UStG, GoBD).
+ * ## WARUM DIE BESTÄTIGUNG (Abnahme B8/B9, Befund 16)
+ *
+ * `failed` ist im Beleg-Guard ein Endzustand: keine ausgehende Kante, kein Weg
+ * zurück. Wer eine angekommene Überweisung im Kontoauszug falsch zuordnet und
+ * hier klickt, gibt die Provisionszeilen frei, und der nächste Lauf zahlt
+ * dieselbe Leistung ein zweites Mal aus. Deshalb muss die Belegnummer
+ * eingetippt werden — dieselbe Schwelle wie bei den übrigen unumkehrbaren
+ * Vorgängen des Projekts.
+ *
+ * ## WARUM DER STORNO-ENTWURF HIER ENTSTEHT (Befund 4)
+ *
+ * Der Kopf der Migration sagt dreimal zu, dass ein falscher Beleg durch eine
+ * Stornogutschrift mit EIGENER Nummer neutralisiert wird. Bis zur Abnahme gab
+ * es dafür weder Spalte noch Codepfad: die freigegebenen Zeilen liefen in einen
+ * neuen Satz, bekamen eine zweite Gutschrift über denselben Betrag, und die
+ * erste blieb mit ausgewiesener Umsatzsteuer stehen — nach § 14c Abs. 2 UStG
+ * geschuldet, bis sie berichtigt ist, und berichtigen konnte das System nicht.
+ * Der Entwurf entsteht deshalb im selben Vorgang, der die Zeilen freigibt; er
+ * trägt die GESPIEGELTEN Summen und wird wie jeder andere Entwurf von einem
+ * Menschen freigegeben, wobei er seine Nummer aus demselben Kreis zieht.
  */
 export async function markAffiliatePayoutFailed(
   admin: Admin,
-  params: { tenantId: string; payoutId: string },
-): Promise<AffiliatePayoutTransition> {
+  params: {
+    tenantId: string;
+    payoutId: string;
+    /** Die Belegnummer, wie sie der Mensch abgetippt hat (Befund 16). */
+    confirmDocumentNo: string;
+  },
+): Promise<AffiliatePayoutFailure> {
+  const { data: payout, error: readError } = await admin
+    .from("affiliate_payouts")
+    .select(
+      "id, tenant_id, program_id, partner_id, period_from, period_to, currency, " +
+        "gross_cents, reversal_cents, subtotal_cents, tax_mode, tax_rate_bp, tax_cents, " +
+        "total_cents, status, method, document_no, reverses_payout_id, recipient_snapshot",
+    )
+    .eq("tenant_id", params.tenantId)
+    .eq("id", params.payoutId)
+    .maybeSingle<FailingPayoutRow>();
+
+  if (readError) {
+    logDbError("Lesen des Satzes vor dem Fehlschlag", readError);
+    return { ok: false, reason: "write_failed" };
+  }
+  if (payout === null) return { ok: false, reason: "not_found" };
+  if (!PAYABLE_STATUSES.includes(payout.status)) return { ok: false, reason: "wrong_status" };
+  if (
+    normalizeDocumentNo(payout.document_no) === "" ||
+    normalizeDocumentNo(payout.document_no) !== normalizeDocumentNo(params.confirmDocumentNo)
+  ) {
+    return { ok: false, reason: "confirmation_mismatch" };
+  }
+
   const { data: updated, error } = await admin
     .from("affiliate_payouts")
     .update({ status: "failed" })
@@ -969,7 +1327,85 @@ export async function markAffiliatePayoutFailed(
   if ((updated ?? []).length === 0) return { ok: false, reason: "wrong_status" };
 
   const released = await releaseClaimedRows(admin, params.tenantId, params.payoutId);
-  return { ok: true, payout_id: params.payoutId, affected_rows: released };
+  const reversalId = await createReversalDraft(admin, payout);
+
+  return {
+    ok: true,
+    payout_id: params.payoutId,
+    affected_rows: released,
+    previous_status: payout.status,
+    reversal_payout_id: reversalId,
+  };
+}
+
+type FailingPayoutRow = {
+  id: string;
+  tenant_id: string;
+  program_id: string;
+  partner_id: string;
+  period_from: string;
+  period_to: string;
+  currency: string;
+  gross_cents: number;
+  reversal_cents: number;
+  subtotal_cents: number;
+  tax_mode: AffiliateTaxMode;
+  tax_rate_bp: number;
+  tax_cents: number;
+  total_cents: number;
+  status: string;
+  method: AffiliatePayoutMethod | null;
+  document_no: string | null;
+  reverses_payout_id: string | null;
+  recipient_snapshot: unknown;
+};
+
+/**
+ * Der Entwurf der Stornogutschrift: alle Zahlen des Ursprungsbelegs mit
+ * umgedrehtem Vorzeichen, derselbe Zeitraum, dieselbe Währung, derselbe
+ * Steuermodus. Die Nummer zieht er erst bei seiner eigenen Freigabe (7.3) —
+ * ein Entwurf verbrennt keine.
+ *
+ * Ein Storno auf einen Storno gibt es nicht: die Kette endet nach einem
+ * Schritt, sonst neutralisiert irgendwann jemand eine Neutralisierung.
+ */
+async function createReversalDraft(admin: Admin, payout: FailingPayoutRow): Promise<string | null> {
+  // Ohne Nummer gibt es keinen Beleg und damit nichts zu neutralisieren; ein
+  // Storno auf einen Storno ist ausgeschlossen.
+  if (payout.reverses_payout_id !== null) return null;
+  if (normalizeDocumentNo(payout.document_no) === "") return null;
+
+  const { data, error } = await admin
+    .from("affiliate_payouts")
+    .insert({
+      tenant_id: payout.tenant_id,
+      program_id: payout.program_id,
+      partner_id: payout.partner_id,
+      period_from: payout.period_from,
+      period_to: payout.period_to,
+      currency: payout.currency,
+      gross_cents: -payout.gross_cents,
+      reversal_cents: -payout.reversal_cents,
+      subtotal_cents: -payout.subtotal_cents,
+      tax_mode: payout.tax_mode,
+      tax_rate_bp: payout.tax_rate_bp,
+      tax_cents: -payout.tax_cents,
+      total_cents: -payout.total_cents,
+      status: "draft",
+      method: payout.method,
+      reverses_payout_id: payout.id,
+      // Der Empfänger des Stornos ist der des Ursprungsbelegs — und zwar so,
+      // wie er DORT eingefroren wurde, nicht wie er heute im Profil steht.
+      recipient_snapshot: payout.recipient_snapshot ?? null,
+    })
+    .select("id")
+    .maybeSingle<{ id: string }>();
+
+  if (error || data === null) {
+    logDbError("Anlegen des Storno-Entwurfs", error);
+    return null;
+  }
+  return data.id;
 }
 
 // --- Fälligkeit ---------------------------------------------------------

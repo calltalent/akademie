@@ -88,7 +88,8 @@ const INTEGRITY_COMMISSION_COLUMNS =
   "is_test, order_id, booked_at";
 
 const INTEGRITY_PAYOUT_COLUMNS =
-  "id, partner_id, currency, status, gross_cents, reversal_cents, subtotal_cents";
+  "id, partner_id, currency, status, gross_cents, reversal_cents, subtotal_cents, " +
+  "reverses_payout_id";
 
 const INTEGRITY_DAILY_STAT_COLUMNS = "partner_id, day, campaign, commission_cents";
 
@@ -116,6 +117,7 @@ type IntegrityPayoutRow = {
   gross_cents: number;
   reversal_cents: number;
   subtotal_cents: number;
+  reverses_payout_id?: string | null;
 };
 
 type IntegrityDailyStatRow = {
@@ -185,8 +187,27 @@ const REVERSIBLE_KINDS: ReadonlySet<AffiliateCommissionKind> = new Set([
   "tier2",
 ]);
 
-/** Statuswerte eines Auszahlungssatzes, der noch stillgelegt werden kann. */
-const QUARANTINABLE_PAYOUT_STATUSES = ["draft", "approved", "exported"];
+/**
+ * Statuswerte eines Auszahlungssatzes, der noch stillgelegt werden kann — und
+ * WOHIN er dabei geht (Abnahme B8/B9, Befund 9).
+ *
+ * 'draft' stand hier zusammen mit den anderen, und die Stilllegung setzte
+ * pauschal `status = 'failed'`. Das konnte nie gelingen: die Übergangstabelle
+ * im Beleg-Guard kennt keine Kante draft -> failed, und
+ * `check ((approved_at is not null) = (status not in ('draft','cancelled')))`
+ * wäre zusätzlich verletzt. Der UPDATE scheiterte also immer, der Befund blieb
+ * ohne `quarantined`, und der defekte Entwurf blockierte über
+ * `affiliate_payouts_open_draft_uniq` zugleich jeden neuen Entwurf für diesen
+ * Partner.
+ *
+ * Ein Entwurf hat keine Belegnummer gezogen; er wird VERWORFEN. Ein bereits
+ * freigegebener oder exportierter Satz hat eine — er wird stillgelegt.
+ */
+const QUARANTINE_TARGET: Record<string, "failed" | "cancelled"> = {
+  draft: "cancelled",
+  approved: "failed",
+  exported: "failed",
+};
 
 export type AffiliateIntegrityOptions = {
   now?: Date;
@@ -330,11 +351,47 @@ function checkPayoutSubtotals(
     sums.set(row.payout_id, (sums.get(row.payout_id) ?? 0) + toInt(row.amount_cents));
   }
 
+  const byId = new Map(payouts.map((payout) => [payout.id, payout]));
+
   const findings: AffiliateIntegrityFinding[] = [];
   for (const payout of payouts) {
     // Ein stornierter oder fehlgeschlagener Satz hat keine Zeilen mehr; ihn zu
     // vergleichen erzeugte einen Dauerbefund über einen erledigten Vorgang.
     if (payout.status === "cancelled" || payout.status === "failed") continue;
+
+    // DER LAUFENDE ENTWURF (Abnahme B8/B9, Befund 9). Zwischen dem INSERT mit
+    // Nullbeträgen und der Finalisierung ist JEDER Entwurf für Gleichung 1
+    // abweichend — das ist kein Befund, sondern der Zwischenstand, den die
+    // Tabelle ausdrücklich zulässt. Ein gleichzeitig laufender Abgleich mit
+    // `quarantine: true` erzeugte daraus Dauerrauschen aus kritischen Befunden
+    // über völlig gesunde Läufe.
+    if (payout.status === "draft" && toInt(payout.subtotal_cents) === 0) continue;
+
+    // DIE STORNOGUTSCHRIFT (7.7) hat keine eigenen Positionen — sie
+    // neutralisiert einen Beleg. Verglichen wird deshalb gegen den
+    // Ursprungsbeleg: ein Storno, der nicht exakt spiegelt, neutralisiert
+    // nicht, sondern verschiebt.
+    const reversesId = payout.reverses_payout_id ?? null;
+    if (reversesId !== null) {
+      const origin = byId.get(reversesId);
+      if (origin === undefined) continue;
+      const expected = -toInt(origin.subtotal_cents);
+      const actualReversal = toInt(payout.subtotal_cents);
+      if (actualReversal === expected) continue;
+      findings.push({
+        check: "payout_subtotal",
+        severity: "critical",
+        entity: "payout",
+        entity_id: payout.id,
+        partner_id: payout.partner_id,
+        currency: payout.currency,
+        expected_cents: expected,
+        actual_cents: actualReversal,
+        difference_cents: actualReversal - expected,
+        messageKey: "affiliate.integrity.payoutSubtotalMismatch",
+      });
+      continue;
+    }
 
     const actual = sums.get(payout.id) ?? 0;
     const expected = toInt(payout.subtotal_cents);
@@ -375,14 +432,20 @@ async function quarantineFailedPayouts(
   for (const finding of findings) {
     if (finding.check !== "payout_subtotal") continue;
     const payout = byId.get(finding.entity_id);
-    if (payout === undefined || !QUARANTINABLE_PAYOUT_STATUSES.includes(payout.status)) continue;
+    if (payout === undefined) continue;
+    const target = QUARANTINE_TARGET[payout.status];
+    if (target === undefined) continue;
 
     const { data, error } = await admin
       .from("affiliate_payouts")
-      .update({ status: "failed" })
+      .update({ status: target })
       .eq("id", finding.entity_id)
       .eq("tenant_id", tenantId)
-      .in("status", QUARANTINABLE_PAYOUT_STATUSES)
+      // Compare-and-Swap auf GENAU den Status, für den das Ziel gilt: zwischen
+      // Lesen und Schreiben kann der Satz weitergelaufen sein, und ein Entwurf
+      // darf nicht auf 'failed' und ein freigegebener Satz nicht auf
+      // 'cancelled' landen.
+      .eq("status", payout.status)
       .select("id");
 
     if (error) {
@@ -391,6 +454,11 @@ async function quarantineFailedPayouts(
           (error as { code?: string }).code ?? "unbekannt"
         }).`,
       );
+      // AUSDRÜCKLICH `false` statt „nichts sagen" (Befund 9): ein kritischer
+      // Befund, der NICHT stillgelegt werden konnte, muss den Export
+      // aufhalten. Ein `undefined` hätte an der Aufrufstelle wie „gar nicht
+      // versucht" ausgesehen.
+      finding.quarantined = false;
       continue;
     }
     finding.quarantined = (data ?? []).length > 0;
@@ -563,4 +631,19 @@ function toInt(value: number): number {
  */
 export function hasCriticalIntegrityFinding(report: AffiliateIntegrityReport): boolean {
   return report.findings.some((finding) => finding.severity === "critical");
+}
+
+/**
+ * Gibt es einen kritischen Befund, dessen Satz NICHT stillgelegt werden konnte
+ * (Abnahme B8/B9, Befund 9)?
+ *
+ * Der Unterschied ist nicht akademisch: ein stillgelegter Satz kann nicht mehr
+ * exportiert und nicht mehr überwiesen werden, ein nicht stillgelegter schon.
+ * Ein fehlgeschlagener Stilllegungsversuch stand vorher nur im Serverlog — und
+ * ein Log hält keine Überweisung auf.
+ */
+export function hasUnquarantinedCriticalFinding(report: AffiliateIntegrityReport): boolean {
+  return report.findings.some(
+    (finding) => finding.severity === "critical" && finding.quarantined === false,
+  );
 }

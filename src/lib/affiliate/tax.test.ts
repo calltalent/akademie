@@ -5,8 +5,11 @@ import {
   computeAffiliateTax,
   hasCurrentVatCheck,
   isEuCountry,
+  normalizeVatId,
   resolveAffiliateTax,
   resolveAffiliateTaxMode,
+  taxHintForMode,
+  vatIdCountryMatches,
   type AffiliateTaxProfileInput,
 } from "./tax";
 
@@ -216,6 +219,106 @@ describe("resolveAffiliateTaxMode — unvollständiges Profil", () => {
     expect(resolveAffiliateTaxMode(profile({ country: " de " }), NOW)).toMatchObject({
       tax_mode: "regular",
     });
+  });
+});
+
+/**
+ * Abnahme B8/B9, Befund 6. Vor der Berichtigung war JEDER dieser Tests rot:
+ * `resolveAffiliateTaxMode()` verzweigte allein über `profile.country` und
+ * `hasCurrentVatCheck()` prüfte nur Ergebnis, Alter und Nicht-Leere der Nummer.
+ * Damit entschied das frei eingetragene Land über die Rechtsfolge, während die
+ * geprüfte Nummer aus einem ganz anderen Land stammen durfte — in beide
+ * Richtungen ein § 14c-Fall, und beide entstehen still.
+ */
+describe("Länderpräfix der USt-IdNr. gegen das Profilland (Befund 6)", () => {
+  it("blockiert country = IT mit einer deutschen Nummer, statt Reverse Charge zu vergeben", () => {
+    const result = resolveAffiliateTaxMode(
+      profile({
+        country: "IT",
+        vat_id: "DE123456789",
+        vat_check_result: "valid",
+        vat_checked_at: daysAgo(1),
+      }),
+      NOW,
+    );
+
+    expect(result).toEqual({ ok: false, reason: "vat_country_mismatch" });
+  });
+
+  it("blockiert country = DE mit einer österreichischen Nummer, statt 19 % auszuweisen", () => {
+    const result = resolveAffiliateTaxMode(
+      profile({
+        country: "DE",
+        vat_id: "ATU12345678",
+        vat_check_result: "valid",
+        vat_checked_at: daysAgo(1),
+      }),
+      NOW,
+    );
+
+    expect(result).toEqual({ ok: false, reason: "vat_country_mismatch" });
+  });
+
+  it("zählt eine geprüfte Nummer aus dem falschen Land auch in hasCurrentVatCheck nicht", () => {
+    const mismatched = profile({
+      country: "IT",
+      vat_id: "DE123456789",
+      vat_check_result: "valid",
+      vat_checked_at: daysAgo(1),
+    });
+
+    expect(hasCurrentVatCheck(mismatched, NOW)).toBe(false);
+  });
+
+  it("setzt EL und GR gleich — ein griechischer Partner scheitert an keiner Schreibweise", () => {
+    expect(vatIdCountryMatches("EL123456789", "GR")).toBe(true);
+    expect(vatIdCountryMatches("EL123456789", "EL")).toBe(true);
+    expect(vatIdCountryMatches("GR123456789", "EL")).toBe(true);
+
+    const greek = profile({
+      country: "GR",
+      vat_id: "EL123456789",
+      vat_check_result: "valid",
+      vat_checked_at: daysAgo(1),
+    });
+    expect(resolveAffiliateTaxMode(greek, NOW)).toMatchObject({ tax_mode: "reverse_charge" });
+  });
+
+  it("lässt ein Drittlandprofil unberührt — dort entscheidet die Nummer nichts", () => {
+    // Ein Schweizer Partner, der seine nationale Nummer eingetragen hat, darf
+    // daran nicht scheitern: die Leistung ist ohnehin nicht im Inland
+    // steuerbar.
+    const result = resolveAffiliateTaxMode(
+      profile({ country: "CH", vat_id: "CHE116281277" }),
+      NOW,
+    );
+
+    expect(result).toMatchObject({ ok: true, tax_mode: "non_eu" });
+  });
+
+  it("normalisiert Schreibweisen, statt an einem Leerzeichen zu scheitern", () => {
+    expect(normalizeVatId(" at u123 456-78 ")).toBe("ATU12345678");
+    expect(normalizeVatId("12345678")).toBeNull();
+    expect(normalizeVatId(null)).toBeNull();
+    expect(vatIdCountryMatches(" atu 123 456 78 ", "at")).toBe(true);
+  });
+});
+
+/**
+ * Abnahme B8/B9, Befund 10: der Belegtext folgt dem EINGEFRORENEN Modus, nicht
+ * dem heutigen Profil. Sonst bliebe jeder Reverse-Charge-Beleg ohne PDF
+ * dauerhaft ohne PDF, sobald die VIES-Prüfung 90 Tage alt ist.
+ */
+describe("taxHintForMode — der Belegtext ohne Profilbezug (Befund 10)", () => {
+  it("liefert zu jedem Modus denselben Wortlaut wie die Ableitung aus dem Profil", () => {
+    const resolved = resolveAffiliateTaxMode(profile(), NOW);
+
+    expect(resolved.ok && taxHintForMode(resolved.tax_mode)).toBe(
+      resolved.ok ? resolved.documentHint : "",
+    );
+    expect(taxHintForMode("reverse_charge")).toContain("Art. 196 MwStSystRL");
+    expect(taxHintForMode("small_business")).toContain("§ 19 UStG");
+    expect(taxHintForMode("non_eu")).toBe("Nicht im Inland steuerbare Leistung.");
   });
 });
 

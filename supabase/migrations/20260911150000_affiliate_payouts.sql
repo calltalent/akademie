@@ -138,6 +138,32 @@
 -- ausschliesslich `method` -- der ZAHLWEG, nicht die Zahlungsverbindung.
 --
 -- =================================================================
+-- BERICHTIGUNGEN AUS DER ABNAHME B8/B9 (17.09.2026)
+-- =================================================================
+-- Vier Befunde der Abnahme lagen in dieser Datei bzw. an ihrer Naht zum
+-- TypeScript-Code. Sie sind hier behoben, jeder an der Stelle, an der er
+-- entstanden ist, und dort jeweils begruendet:
+--   B1  `check (subtotal_cents > 0)` (A5) brach JEDEN Entwurf mit 23514 ab:
+--       der Entwurf entsteht mit Nullbetraegen, weil der Compare-and-Swap
+--       seine `id` als Stempel braucht. Die Bedingung gilt jetzt fuer den
+--       BELEG, nicht fuer den Zwischenstand (Abschnitt 2.1).
+--   B4  Die im Kopf dreimal zugesagte Stornogutschrift war nicht baubar --
+--       es fehlten die Spalte, die Vorzeichen und der RPC-Zweig. Alle drei
+--       sind nachgetragen (`reverses_payout_id`, 2.1 und Abschnitt 5).
+--   B7  `books_closed_until` liess sich ueber ein Datumsfeld der Oberflaeche
+--       auf einen Wert in ferner Zukunft schieben, den `greatest()` nie
+--       wieder zurueckholt. Die RPC weist einen Zeitraum in der Zukunft ab.
+--   B8  Der Belegfrost griff erst ab vergebener Nummer; eine auf einem
+--       ENTWURF vorgesetzte Nummer ueberlebte damit die Freigabe und liess
+--       den gezogenen Zaehlerstand ungenutzt -- eine Luecke in der Folge.
+--       Jetzt: CHECK gegen jede Nummer am Entwurf plus Uebergangspruefung im
+--       Guard.
+-- Was NICHT geaendert wurde, obwohl es in der Abnahme steht: der Teil-Unique-
+-- Index auf offene Entwuerfe (er ist richtig; falsch war der fehlende Ausstieg
+-- im Anwendungscode) und der Loesch-Guard (er ist richtig; falsch war ein
+-- `delete` im Anwendungscode, das jetzt ein `status = 'cancelled'` ist).
+--
+-- =================================================================
 -- ABWEICHUNGEN VOM PLAN (jede mit Grund, keine still)
 -- =================================================================
 -- A1  `on delete restrict` WIRD ZU `on delete no action deferrable initially
@@ -504,8 +530,8 @@ create table public.affiliate_payouts (
   -- Netto-Honorar. Sie werden aus den TATSAECHLICH reservierten Zeilen
   -- gebildet, nie aus einer Vorschau, und approve_affiliate_payout() rechnet
   -- sie beim Freigeben gegen das Provisionsbuch nach (7.6, Gleichung 1).
-  gross_cents    int  not null check (gross_cents >= 0),
-  reversal_cents int  not null check (reversal_cents <= 0),
+  gross_cents    int  not null,
+  reversal_cents int  not null,
   subtotal_cents int  not null,
 
   -- Der Steuermodus wird aus affiliate_billing_profiles ABGELEITET (7.4), nie
@@ -515,7 +541,7 @@ create table public.affiliate_payouts (
   tax_mode       text not null check (tax_mode in
                    ('regular','small_business','reverse_charge','non_eu')),
   tax_rate_bp    int  not null default 0 check (tax_rate_bp between 0 and 10000),
-  tax_cents      int  not null default 0 check (tax_cents >= 0),
+  tax_cents      int  not null default 0,
   total_cents    int  not null,
 
   status         text not null default 'draft'
@@ -532,6 +558,32 @@ create table public.affiliate_payouts (
   document_path  text,
   document_issued_at timestamptz,
 
+  -- DIE STORNOGUTSCHRIFT (Plan 7.7; Abnahme B8/B9, Befund 4). Der Kopf dieser
+  -- Datei sagt dreimal zu, dass ein falscher Beleg nicht geloescht, sondern
+  -- durch eine Stornogutschrift mit EIGENER Nummer neutralisiert wird. Ohne
+  -- diese Spalte war das eine Zusage im Kommentar: es gab keinen Weg, einen
+  -- Beleg auf den von ihm stornierten zeigen zu lassen, und
+  -- `check (subtotal_cents > 0)` schloss einen negativen Belegkopf zusaetzlich
+  -- strukturell aus. Beides ist jetzt zu Ende gebaut -- gleiche Bauart wie
+  -- `reverses_id` im Provisionsbuch (20260911130000).
+  --   * zusammengesetzter Fremdschluessel ueber (id, tenant_id): ein Storno
+  --     kann nie auf einen Beleg eines FREMDEN Mandanten zeigen;
+  --   * `unique` je Ursprungsbeleg (Teilindex unten): zweimal stornieren
+  --     hiesse, dieselbe Leistung zweimal zu neutralisieren;
+  --   * die Summen sind die GESPIEGELTEN des Ursprungsbelegs -- deshalb sind
+  --     alle Vorzeichenbedingungen unten an dieser Spalte aufgehaengt.
+  reverses_payout_id uuid,
+
+  -- DER EMPFAENGER, EINGEFROREN (Plan 7.2; Abnahme B8/B9, Befund 10). Anschrift,
+  -- Steuernummer und USt-IdNr. des Partners sind Pflichtangaben nach
+  -- § 14 Abs. 4 Nr. 1 und 2 UStG. Wuerde das PDF sie beim Erzeugen LIVE aus dem
+  -- Abrechnungsprofil lesen, truege ein am Freigabetag erzeugtes PDF eine
+  -- andere Anschrift als eines aus dem Reparaturlauf drei Wochen spaeter -- genau die
+  -- Nicht-Determinismus-Falle, die Fall 3 im Kopf ausschliessen wollte.
+  -- Bewusst NICHT im Spaltenrecht unten: der Inhalt ist eine Anschrift und
+  -- gehoert keinem Client in die Hand, die Belegroute liefert das fertige PDF.
+  recipient_snapshot jsonb,
+
   -- Bankreferenz nach dem Abgleich (7.7), zod-validiert vom Aufrufer.
   reference      text,
   approved_at    timestamptz,
@@ -546,12 +598,40 @@ create table public.affiliate_payouts (
   -- --- Die Rechenkette, als Eigenschaft statt als Zusage ---
   check (subtotal_cents = gross_cents + reversal_cents),
   check (total_cents = subtotal_cents + tax_cents),
-  -- A5: eine Auszahlung ueber 0 oder weniger ist keine. Plan 7.1 traegt den
-  -- Fall bereits ("der Betrag bleibt stehen und wird vorgetragen"), aber nur
-  -- als Regel des Entwurfslaufs; hier wird daraus eine Grenze, an der ein
-  -- fehlerhafter Lauf abbricht, statt eine Belegnummer fuer nichts zu
-  -- verbrennen.
-  check (subtotal_cents > 0),
+  -- VORZEICHEN, an `reverses_payout_id` aufgehaengt. Ein gewoehnlicher Beleg
+  -- summiert positive Provisionen und negative Gegenbuchungen; eine
+  -- Stornogutschrift spiegelt beides. Ohne diese Fallunterscheidung waere ein
+  -- Storno strukturell nicht anlegbar (Befund 4).
+  check (
+    case when reverses_payout_id is null
+         then gross_cents >= 0 and reversal_cents <= 0
+         else gross_cents <= 0 and reversal_cents >= 0
+    end
+  ),
+  -- A5, BERICHTIGT (Abnahme B8/B9, Befund 1 und 4): eine Auszahlung ueber 0
+  -- oder weniger ist keine -- aber die Aussage gilt fuer den BELEG, nicht fuer
+  -- den Zwischenstand, aus dem er entsteht.
+  --   * Der Entwurf wird mit Nullbetraegen geboren und bekommt seine Summen
+  --     erst, nachdem der Compare-and-Swap die Provisionszeilen eingesammelt
+  --     hat -- er braucht dafuer seine `id` als Stempel. Der harte
+  --     `subtotal_cents > 0` liess diesen Zwischenstand nicht zu und brach
+  --     JEDEN Entwurf mit 23514 ab (Befund 1). Ein Entwurf zieht keine
+  --     Belegnummer, es wird also auch keine "fuer nichts verbrannt" -- die
+  --     Begruendung von A5 traegt fuer ihn nicht.
+  --   * Ein VERWORFENER Entwurf ('cancelled') ist derselbe Zwischenstand, nur
+  --     abgeschlossen. Waere er hier nicht ausgenommen, koennte der einzige
+  --     vorgesehene Ausstieg aus 'draft' (Abschnitt 2.3) fuer einen leer
+  --     gebliebenen Entwurf nicht genommen werden -- und genau diese Sackgasse
+  --     war Befund 3.
+  --   * Eine Stornogutschrift hat einen NEGATIVEN Belegkopf; das ist ihr Zweck.
+  -- Was bleibt: ein freigegebener Beleg ohne Storno-Verweis ist ueber 0.
+  check (
+    case
+      when reverses_payout_id is not null       then subtotal_cents < 0
+      when status in ('draft', 'cancelled')     then subtotal_cents >= 0
+      else                                           subtotal_cents > 0
+    end
+  ),
   -- A5 / Plan 7.4: die Steuertabelle kennt GENAU EINEN Modus mit Satz --
   -- 'regular' mit 1900 bp. 'small_business' (§ 19 UStG), 'reverse_charge'
   -- (Art. 196 MwStSystRL) und 'non_eu' weisen keine Steuer aus. Ein
@@ -581,10 +661,20 @@ create table public.affiliate_payouts (
   -- ((15850*1900 + 5000)/10000 = 30120000/10000 = 3012), Gesamt 18862 Cent =
   -- 188,62 EUR. Beide Werte lesend gegen PostgreSQL 17.6 nachgerechnet.
   -- `::bigint` ist Pflicht: 2,1 Mrd. Cent mal 10000 sprengt `int`.
-  -- Ganzzahldivision schneidet in Postgres gegen null ab; weil
-  -- subtotal_cents > 0 und tax_rate_bp >= 0 sind, ist das hier identisch mit
-  -- floor().
-  check (tax_cents = ((subtotal_cents::bigint * tax_rate_bp + 5000) / 10000)::int),
+  -- Ganzzahldivision schneidet in Postgres gegen null ab; im positiven Zweig
+  -- sind subtotal_cents >= 0 und tax_rate_bp >= 0, dort ist das also identisch
+  -- mit floor().
+  -- Die Formel gilt auf dem BETRAG; das Vorzeichen folgt dem Belegkopf. Ohne
+  -- die Fallunterscheidung wuerde eine Stornogutschrift nicht spiegeln:
+  -- Ganzzahldivision schneidet in Postgres gegen null ab, aus -15850 wuerden
+  -- -3011 statt der gespiegelten -3012 (nachgerechnet, siehe oben).
+  check (
+    tax_cents = case
+      when subtotal_cents >= 0
+        then  ((  subtotal_cents::bigint  * tax_rate_bp + 5000) / 10000)::int
+        else -((( - subtotal_cents)::bigint * tax_rate_bp + 5000) / 10000)::int
+    end
+  ),
   -- Die Provision ist auf den Nettoumsatz des Haendlers gerechnet und damit
   -- das NETTO-Honorar des Partners; die Steuer kommt oben drauf. Wer das
   -- umdreht, zahlt dauerhaft 19 % zu wenig oder weist eine Steuer aus, die
@@ -599,6 +689,13 @@ create table public.affiliate_payouts (
   -- Nummer und Ausstellungsdatum entstehen zusammen; eines ohne das andere
   -- waere ein halber Beleg.
   check ((document_no is null) = (document_issued_at is null)),
+  -- Abnahme B8/B9, Befund 8: ein ENTWURF traegt keine Nummer. Die Bedingung
+  -- darueber nimmt 'draft' von der Nummern-PFLICHT aus, sie verbot bisher aber
+  -- nicht, einem Entwurf eine Nummer VORZUSETZEN. Genau das riss die Luecke:
+  -- der Belegfrost im Guard greift erst, wenn `old.document_no` nicht mehr
+  -- null ist -- eine vorgesetzte Nummer ueberlebte damit die Freigabe und
+  -- verdraengte die regulaer gezogene, deren Zaehlerstand verbraucht blieb.
+  check (status <> 'draft' or document_no is null),
   -- Format aus 7.3: GS-<TENANT_SLUG>-<JAHR>-<6-stellig>, z. B.
   -- GS-DEMO-BLAU-2026-000173. Der Slug-Teil folgt
   -- `tenants.slug ~ '^[a-z0-9][a-z0-9-]{1,40}$'` in Grossschreibung
@@ -628,7 +725,16 @@ create table public.affiliate_payouts (
     on delete no action deferrable initially deferred,
   constraint affiliate_payouts_partner_fk
     foreign key (partner_id, tenant_id) references public.affiliate_partners (id, tenant_id)
-    on delete no action deferrable initially deferred
+    on delete no action deferrable initially deferred,
+  -- Der Storno zeigt auf den stornierten Beleg -- ueber (id, tenant_id), damit
+  -- er den Mandanten nicht verlassen kann. `no action` ohne Kaskade: geloescht
+  -- wird hier ohnehin nichts (2.7), und eine SET-NULL-Kaskade liefe als UPDATE
+  -- in den Guard und braeche dort am Belegfrost.
+  constraint affiliate_payouts_reverses_fk
+    foreign key (reverses_payout_id, tenant_id) references public.affiliate_payouts (id, tenant_id)
+    on delete no action deferrable initially deferred,
+  -- Ein Beleg storniert nicht sich selbst.
+  check (reverses_payout_id is null or reverses_payout_id <> id)
 );
 
 -- --- 2.2 Indizes -------------------------------------------------
@@ -658,9 +764,25 @@ create index affiliate_payouts_missing_document_idx
 -- A6: je (partner_id, currency) hoechstens EIN offener Entwurf (Plan 7.1).
 -- Zwei gleichzeitige Cron-Laeufe brechen damit mit 23505 ab statt mit einer
 -- Meldung ueber eine verletzte Summenbedingung.
+-- `reverses_payout_id is null` ist neu (Abnahme B8/B9, Befund 4): ein
+-- Storno-ENTWURF fuer denselben Partner und dieselbe Waehrung ist ein anderer
+-- Vorgang und darf den regulaeren Lauf nicht blockieren -- ihn deckt der
+-- Teilindex darunter ab.
+-- WICHTIG UND AUSDRUECKLICH (Befund 3): dieser Index setzt voraus, dass es
+-- einen funktionierenden AUSSTIEG aus 'draft' gibt. Den gibt es -- 'cancelled'
+-- (Uebergangstabelle im Guard); geloescht wird nichts (2.7). Der Anwendungscode
+-- MUSS einen leer gebliebenen Entwurf auf 'cancelled' setzen, sonst sperrt die
+-- erste leere Entwurfszeile die Auszahlungen dieses Partners dauerhaft.
 create unique index affiliate_payouts_open_draft_uniq
   on public.affiliate_payouts (tenant_id, partner_id, currency)
-  where status = 'draft';
+  where status = 'draft' and reverses_payout_id is null;
+-- Ein Beleg wird HOECHSTENS EINMAL storniert. Ohne diesen Index waeren zwei
+-- Stornogutschriften ueber denselben Beleg moeglich -- der Umsatz stuende dann
+-- einmal zu viel im Minus. Traegt zugleich den Fremdschluessel
+-- affiliate_payouts_reverses_fk (Advisor `unindexed_foreign_keys`).
+create unique index affiliate_payouts_reverses_uniq
+  on public.affiliate_payouts (tenant_id, reverses_payout_id)
+  where reverses_payout_id is not null;
 
 -- --- 2.3 Der Beleg-Guard (Plan 3.12, G8, G15) --------------------
 -- Er tut drei Dinge, und die Reihenfolge ist Teil der Aussage:
@@ -743,6 +865,10 @@ begin
   new.partner_id := old.partner_id;
   new.created_at := old.created_at;
   new.created_by := old.created_by;
+  -- Ein Beleg wechselt auch nie, WAS er storniert: aus einer Stornogutschrift
+  -- nachtraeglich eine gewoehnliche zu machen (oder umgekehrt) waere eine
+  -- Umwidmung einer bereits nummerierten Urkunde.
+  new.reverses_payout_id := old.reverses_payout_id;
 
   -- G15: kein Eigengeschaeft. Wer selbst Partner dieses Mandanten ist, ruehrt
   -- SEINEN EIGENEN Auszahlungssatz nicht an -- nicht den Status, nicht die
@@ -787,11 +913,31 @@ begin
   -- eine andere Tabelle ist. Die beiden ZEITSTEMPEL dagegen setzt die
   -- Datenbank: `now()` ist innerhalb einer Transaktion stabil, sie sind damit
   -- exakt derselbe Zeitpunkt, aus dem die RPC das Belegjahr abgeleitet hat.
+  -- Abnahme B8/B9, Befund 8: der Uebergang draft -> approved ist die EINZIGE
+  -- Stelle, an der eine Belegnummer entstehen darf. Vorher nagelte der
+  -- Belegfrost weiter unten `document_no` erst fest, wenn `old.document_no`
+  -- nicht mehr null war -- eine auf einem Entwurf VORGESETZTE Nummer lief also
+  -- durch und verdraengte beim Freigeben die regulaer gezogene. Der Zaehler war
+  -- dann verbraucht, ohne dass ein Beleg seine Nummer traegt: eine Luecke in
+  -- der Folge, die der Kopf dieser Datei in allen vier Faellen ausschliesst.
+  -- Die CHECK-Bedingung `status <> 'draft' or document_no is null` (2.1) deckt
+  -- dieselbe Luecke von der anderen Seite; hier steht sie zusaetzlich, weil ein
+  -- CHECK den UEBERGANG nicht sieht.
+  -- Erlaubnisliste wie beim Frost: 'postgres'/'supabase_admin' duerfen
+  -- berichtigen, 'service_role' NICHT.
+  if new.document_no is distinct from old.document_no
+     and not (old.status = 'draft' and new.status = 'approved')
+     and current_user not in ('postgres', 'supabase_admin') then
+    raise exception 'affiliate_payout_document_no_immutable';
+  end if;
+
   if old.status = 'draft' and new.status = 'approved' then
     if new.document_no is null then
       raise exception 'affiliate_payout_document_no_required';
     end if;
     new.approved_at        := now();
+    -- AUCH DANN, wenn der Aufrufer etwas mitgeschickt hat: das
+    -- Ausstellungsdatum gehoert der Datenbank (Befund 8).
     new.document_issued_at := now();
   end if;
 
@@ -842,6 +988,10 @@ begin
     new.document_no        := old.document_no;
     new.document_issued_at := old.document_issued_at;
     new.approved_at        := old.approved_at;
+    -- Der eingefrorene Empfaenger gehoert zu den Belegzahlen: eine Anschrift,
+    -- die sich nach der Nummernvergabe aendert, aendert den Beleg nicht mehr
+    -- (Befund 10).
+    new.recipient_snapshot := old.recipient_snapshot;
   end if;
 
   -- DER ZAHLUNGSFROST. Nach der Ueberweisung aendert sich auch das Drumherum
@@ -888,6 +1038,10 @@ revoke all on public.affiliate_payouts from anon, authenticated;
 --                     Versuchs, an der Belegroute vorbeizukommen. Wer den
 --                     Beleg will, holt ihn ueber die Route mit
 --                     Besitzpruefung und kurzlebiger Signed URL;
+--   recipient_snapshot -- Anschrift und Steuerkennzeichen des Empfaengers, wie
+--                     sie auf dem Beleg stehen. Der Partner sieht sie auf
+--                     seinem PDF; als Spalte gehoert sie keinem Client in die
+--                     Hand, und ein Manager braucht sie in der Liste nicht;
 --   created_by     -- welcher Mensch freigegeben hat. Das ist eine
 --                     Personalinformation des Mandanten, kein Belegdatum;
 --                     dieselbe Einordnung wie `internal_note` und
@@ -902,6 +1056,7 @@ grant select (id, tenant_id, program_id, partner_id,
               gross_cents, reversal_cents, subtotal_cents,
               tax_mode, tax_rate_bp, tax_cents, total_cents,
               status, method, document_no, document_issued_at,
+              reverses_payout_id,
               approved_at, paid_at, created_at, updated_at)
   on public.affiliate_payouts to authenticated;
 -- KEIN `grant insert/update/delete`: geschrieben wird ausschliesslich ueber
@@ -1079,6 +1234,7 @@ set search_path = public, pg_temp
 as $$
 declare
   v_payout        public.affiliate_payouts%rowtype;
+  v_origin        public.affiliate_payouts%rowtype;
   v_partner_status      text;
   v_partner_hold        boolean;
   v_partner_user_id     uuid;
@@ -1093,6 +1249,7 @@ declare
   v_bad_partner   int;
   v_bad_test      int;
   v_bad_flagged   int;
+  v_bad_program   int;
   -- Das Belegdatum in DEUTSCHER Zeitzone, nicht in UTC. Die Gutschrift ist
   -- ein deutscher Beleg (§ 14 Abs. 2 UStG, GoBD), und in der Stunde nach
   -- Mitternacht am 1. Januar wuerde UTC eine Nummer aus dem ALTEN Jahr auf
@@ -1153,6 +1310,19 @@ begin
   end if;
   if v_payout.status <> 'draft' then
     raise exception 'affiliate_payout_not_draft';
+  end if;
+
+  -- Abnahme B8/B9, Befund 7: der Abrechnungszeitraum kommt aus einem
+  -- Datumsfeld der Oberflaeche. Ein Vertipper (2099-12-31) schloesse in
+  -- Schritt 7 `books_closed_until` des gesamten Programms auf ein Datum, das
+  -- `greatest()` nie wieder zurueckholt -- ab da datierte JEDE neue
+  -- Provisionszeile um und truege den unveraenderlichen Nachbuchungsvermerk.
+  -- Nebenbei waere '01.09.2026 bis 31.12.2099' als Leistungszeitraum nach
+  -- § 14 Abs. 4 Nr. 6 UStG unbrauchbar. Die zod-Pruefung in der Server Action
+  -- faengt denselben Fall; die Regel steht ZUSAETZLICH hier, weil hier alle
+  -- Schreibwege vorbeikommen (gleiche Begruendung wie A6 im Provisionsbuch).
+  if v_payout.period_to > v_issued_on then
+    raise exception 'affiliate_payout_period_in_future';
   end if;
 
   -- --- 2. G15 -- kein Eigengeschaeft --------------------------------------
@@ -1221,6 +1391,53 @@ begin
     raise exception 'affiliate_payout_tenant_legal_entity_missing';
   end if;
 
+  -- --- 3b. Die Stornogutschrift (Plan 7.7; Abnahme B8/B9, Befund 4) -------
+  -- Ein Storno hat KEINE eigenen Positionen -- er neutralisiert einen Beleg,
+  -- nicht eine Menge Provisionszeilen. Der Kontrollabgleich aus Schritt 4
+  -- rechnet deshalb gegen den URSPRUNGSBELEG statt gegen das Provisionsbuch;
+  -- ohne diesen Zweig braeche jede Storno-Freigabe an
+  -- 'affiliate_payout_no_rows' ab.
+  if v_payout.reverses_payout_id is not null then
+    -- Sperrreihenfolge: der Ursprungsbeleg wird NACH dem Storno gesperrt. Ein
+    -- Deadlock ist ausgeschlossen, weil der Ursprung 'failed' ist -- ein
+    -- Endzustand, aus dem heraus keine zweite Freigabe laeuft.
+    select * into v_origin
+      from public.affiliate_payouts o
+     where o.id = v_payout.reverses_payout_id
+       and o.tenant_id = v_payout.tenant_id
+     for update;
+    if not found then
+      raise exception 'affiliate_payout_reversal_origin_missing';
+    end if;
+    if v_origin.document_no is null then
+      -- Ein Beleg ohne Nummer ist kein Beleg; es gibt nichts zu neutralisieren.
+      raise exception 'affiliate_payout_reversal_origin_unissued';
+    end if;
+    if v_origin.status <> 'failed' then
+      -- Storniert wird ein Beleg, dessen Ueberweisung zurueckgelaufen ist
+      -- (7.7). Ein bezahlter Beleg wird nicht storniert -- das Geld ist beim
+      -- Partner, und ein Minus-Beleg darueber waere eine Falschdarstellung.
+      raise exception 'affiliate_payout_reversal_origin_not_failed';
+    end if;
+    if v_origin.partner_id <> v_payout.partner_id
+       or v_origin.program_id <> v_payout.program_id
+       or v_origin.currency <> v_payout.currency
+       or v_origin.tax_mode <> v_payout.tax_mode
+       or v_origin.tax_rate_bp <> v_payout.tax_rate_bp then
+      raise exception 'affiliate_payout_reversal_origin_mismatch';
+    end if;
+    if v_payout.gross_cents    <> -v_origin.gross_cents
+       or v_payout.reversal_cents <> -v_origin.reversal_cents
+       or v_payout.subtotal_cents <> -v_origin.subtotal_cents
+       or v_payout.tax_cents      <> -v_origin.tax_cents
+       or v_payout.total_cents    <> -v_origin.total_cents then
+      -- Ein Storno, der nicht exakt spiegelt, neutralisiert nicht, sondern
+      -- verschiebt.
+      raise exception 'affiliate_payout_reversal_sums_mismatch';
+    end if;
+    v_rows := 0;
+  else
+
   -- --- 4. Kontrollabgleich (Plan 7.6, Gleichung 1) ------------------------
   -- Ohne diesen Schritt bindet NICHTS den Belegkopf an seine Positionen: die
   -- CHECK-Bedingung `subtotal = gross + reversal` prueft nur die Zeile mit
@@ -1247,9 +1464,11 @@ begin
          count(*) filter (where c.currency <> v_payout.currency)::int,
          count(*) filter (where c.partner_id <> v_payout.partner_id)::int,
          count(*) filter (where c.is_test)::int,
-         count(*) filter (where c.flagged)::int
+         count(*) filter (where c.flagged)::int,
+         count(*) filter (where c.program_id <> v_payout.program_id)::int
     into v_rows, v_gross, v_reversal,
-         v_bad_status, v_bad_currency, v_bad_partner, v_bad_test, v_bad_flagged
+         v_bad_status, v_bad_currency, v_bad_partner, v_bad_test, v_bad_flagged,
+         v_bad_program
     from public.affiliate_commissions c
    where c.tenant_id = v_payout.tenant_id
      and c.payout_id = v_payout.id;
@@ -1273,6 +1492,14 @@ begin
   if v_bad_partner > 0 then
     raise exception 'affiliate_payout_row_partner_mismatch';
   end if;
+  if v_bad_program > 0 then
+    -- Abnahme B8/B9, Befund 11: der Entwurfslauf filterte lange nur auf den
+    -- Mandanten. Eine Zeile aus einem ANDEREN Programm desselben Mandanten
+    -- waere damit unter den Konditionen und im Abrechnungszeitraum eines
+    -- fremden Programms abgerechnet worden -- und Schritt 7 schloesse dessen
+    -- Buecher mit einem Zeitraum, der aus einem anderen Zeitplan stammt.
+    raise exception 'affiliate_payout_row_program_mismatch';
+  end if;
   if v_bad_test > 0 then
     -- Plan 4.5: eine Testbuchung ist nie werthaltig.
     raise exception 'affiliate_payout_row_is_test';
@@ -1290,6 +1517,7 @@ begin
   end if;
   if v_gross + v_reversal <> v_payout.subtotal_cents then
     raise exception 'affiliate_payout_subtotal_mismatch';
+  end if;
   end if;
 
   -- --- 5. Die Belegnummer -------------------------------------------------
@@ -1327,10 +1555,22 @@ begin
   -- mit fester Summe existiert. Der Guard von affiliate_programs laesst
   -- `service_role` hier durch (20260910120000, Abschnitt 2) -- ein Client
   -- kaeme nicht vorbei.
-  update public.affiliate_programs pr
-     set books_closed_until = greatest(pr.books_closed_until, v_payout.period_to)
-   where pr.id = v_payout.program_id
-     and pr.tenant_id = v_payout.tenant_id;
+  -- OFFENER PUNKT, ausgesprochen statt vergessen (Abnahme B8/B9, Befund 7):
+  -- `books_closed_until` kennt keinen Rueckweg. `greatest()` laesst den Riegel
+  -- nur nach vorn wandern, der Guard von affiliate_programs laesst nur
+  -- `service_role` heran, und kein Codepfad bietet ein Zuruecksetzen an. Fuer
+  -- den Fall, dass ein Riegel doch einmal falsch gesetzt wurde, braucht es eine
+  -- eigene Migration mit Begruendung -- so, wie ein Beleg per Migration
+  -- berichtigt wird (2.3). Die Zeitraumpruefung oben macht diesen Fall
+  -- unwahrscheinlich, nicht unmoeglich.
+  -- NICHT fuer einen Storno: er neutralisiert einen Beleg aus einem bereits
+  -- geschlossenen Zeitraum und darf den Riegel nicht ein zweites Mal setzen.
+  if v_payout.reverses_payout_id is null then
+    update public.affiliate_programs pr
+       set books_closed_until = greatest(pr.books_closed_until, v_payout.period_to)
+     where pr.id = v_payout.program_id
+       and pr.tenant_id = v_payout.tenant_id;
+  end if;
 
   -- Die Rueckgabe traegt alles, was der Aufrufer fuer das PDF und die
   -- Benachrichtigung braucht -- und NICHTS aus dem Abrechnungsprofil: weder
@@ -1358,6 +1598,7 @@ begin
     'tax_cents',      v_payout.tax_cents,
     'total_cents',    v_payout.total_cents,
     'method',         v_payout.method,
+    'reverses_payout_id', v_payout.reverses_payout_id,
     'row_count',      v_rows
   );
 end;

@@ -159,7 +159,10 @@ export type AffiliateCreditNoteInput = {
 
   // Die eingefrorenen Zahlen des Belegkopfs. Werden NICHT nachgerechnet.
   grossCents: number;
-  /** Summe der Gegenbuchungen, kleiner oder gleich 0. */
+  /**
+   * Summe der Gegenbuchungen, kleiner oder gleich 0 — auf einer
+   * STORNOGUTSCHRIFT gespiegelt und damit größer oder gleich 0.
+   */
   reversalCents: number;
   subtotalCents: number;
   taxMode: AffiliateTaxMode;
@@ -171,6 +174,14 @@ export type AffiliateCreditNoteInput = {
 
   issuer: AffiliateCreditNoteIssuer;
   recipient: AffiliateCreditNoteRecipient;
+  /**
+   * Die Nummer des Belegs, den dieses Dokument STORNIERT (Plan 7.7; Abnahme
+   * B8/B9, Befund 4). Gesetzt heißt: alle Beträge sind negativ, das Dokument
+   * heißt „Stornogutschrift", und es nennt den neutralisierten Beleg — ohne
+   * diesen Verweis wäre eine Stornogutschrift ein zweiter Beleg über einen
+   * negativen Betrag und keine Berichtigung nach § 14c UStG.
+   */
+  reversesDocumentNo?: string | null;
   /** Anzeigename des Mandanten für die Kopfzeile (White Label). */
   tenantName: string;
   method?: AffiliatePayoutMethod | null;
@@ -270,7 +281,16 @@ export async function generateAffiliateCreditNotePdf(
   const bold = await pdfDoc.embedFont(base64ToUint8Array(MONTSERRAT_BOLD_BASE64));
   const writer: Writer = { page, regular, bold, y: H - MARGIN };
 
-  pdfDoc.setTitle(`Gutschrift ${input.documentNo}`);
+  const reversesDocumentNo =
+    typeof input.reversesDocumentNo === "string" && input.reversesDocumentNo.trim() !== ""
+      ? input.reversesDocumentNo.trim()
+      : null;
+  // Das WORT ist Pflichtangabe (§ 14 Abs. 4 Nr. 10) und trägt die Aussage des
+  // Dokuments; „Stornogutschrift" ist deshalb kein Untertitel, sondern der
+  // Titel.
+  const documentTitle = reversesDocumentNo === null ? "Gutschrift" : "Stornogutschrift";
+
+  pdfDoc.setTitle(`${documentTitle} ${input.documentNo}`);
   pdfDoc.setSubject("Provisionsabrechnung (Gutschrift nach § 14 Abs. 2 UStG)");
   // Erzeuger statt Produktname: der Beleg soll bei einer Prüfung erkennen
   // lassen, aus welchem System er stammt.
@@ -300,7 +320,11 @@ export async function generateAffiliateCreditNotePdf(
 
   // --- Titel: das Wort „Gutschrift" ist Pflichtangabe (§ 14 Abs. 4 Nr. 10) ---
   writer.y -= LINE * 2.5;
-  text(writer, "Gutschrift", { bold: true, size: 24 });
+  text(writer, documentTitle, { bold: true, size: 24 });
+  if (reversesDocumentNo !== null) {
+    writer.y -= LINE + 2;
+    text(writer, `Berichtigung der Gutschrift ${reversesDocumentNo}`, { size: 11, color: LABEL });
+  }
   writer.y -= LINE + 4;
   rule(writer, contentWidth);
 
@@ -356,9 +380,13 @@ export async function generateAffiliateCreditNotePdf(
   writer.y -= LINE + 6;
   text(
     writer,
-    `Vermittlungsleistung (Partnerprogramm) im Zeitraum ${formatCreditNoteDate(
-      input.periodFrom,
-    )} bis ${formatCreditNoteDate(input.periodTo)}`,
+    reversesDocumentNo === null
+      ? `Vermittlungsleistung (Partnerprogramm) im Zeitraum ${formatCreditNoteDate(
+          input.periodFrom,
+        )} bis ${formatCreditNoteDate(input.periodTo)}`
+      : `Neutralisierung der Gutschrift ${reversesDocumentNo} über die Vermittlungsleistung im Zeitraum ${formatCreditNoteDate(
+          input.periodFrom,
+        )} bis ${formatCreditNoteDate(input.periodTo)}`,
   );
 
   writer.y -= LINE + 6;
@@ -397,7 +425,13 @@ export async function generateAffiliateCreditNotePdf(
   writer.y -= LINE + 4;
   rule(writer, contentWidth);
   writer.y -= LINE + 6;
-  text(writer, "Auszahlungsbetrag", { bold: true, size: 13 });
+  // Auf einer Stornogutschrift wird nichts ausgezahlt; der Betrag berichtigt
+  // einen Beleg. Eine Zeile „Auszahlungsbetrag -1.190,00 EUR" wäre die falsche
+  // Aussage über einen Vorgang, bei dem kein Geld fließt.
+  text(writer, reversesDocumentNo === null ? "Auszahlungsbetrag" : "Berichtigungsbetrag", {
+    bold: true,
+    size: 13,
+  });
   textRight(writer, formatCreditNoteAmount(input.totalCents, input.currency), rightEdge, {
     bold: true,
     size: 13,
@@ -431,14 +465,24 @@ export async function generateAffiliateCreditNotePdf(
     { size: 10, color: LABEL },
   );
 
-  if (input.method !== null && input.method !== undefined) {
+  if (reversesDocumentNo !== null) {
+    writer.y -= LINE;
+    text(
+      writer,
+      `Dieser Beleg neutralisiert die Gutschrift ${reversesDocumentNo} vollständig; eine Auszahlung hat dazu nicht stattgefunden.`,
+      { size: 10, color: LABEL },
+    );
+  } else if (input.method !== null && input.method !== undefined) {
     writer.y -= LINE;
     text(writer, `Auszahlung per ${payoutMethodLabel(input.method)}.`, { size: 10, color: LABEL });
   }
 
   // --- Fußzeile ---
   writer.y = MARGIN;
-  text(writer, `${input.tenantName} · Beleg ${input.documentNo}`, { size: 10, color: LABEL });
+  text(writer, `${input.tenantName} · ${documentTitle} ${input.documentNo}`, {
+    size: 10,
+    color: LABEL,
+  });
 
   return pdfDoc.save();
 }

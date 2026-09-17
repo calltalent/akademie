@@ -626,22 +626,58 @@ function SettlementForms({
         successText={t("markPaidDone")}
       />
 
-      <form action={failedFormAction}>
+      {/* „Überweisung fehlgeschlagen" ist unumkehrbar: `failed` hat im
+          Beleg-Guard keine ausgehende Kante, die Provisionszeilen fallen
+          zurück in den Saldo, und der nächste Lauf zahlt sie erneut aus. Wer
+          eine angekommene Zahlung im Kontoauszug falsch zuordnet, löst damit
+          eine zweite Auszahlung über dieselbe Leistung aus. Deshalb die
+          Belegnummer abtippen — dieselbe Schwelle wie bei den übrigen
+          destruktiven Vorgängen des Projekts, und ein Textfeld statt eines
+          zweiten Knopfes, weil ein zweiter Knopf nur eine zweite Bewegung
+          verlangt, kein zweites Nachdenken. */}
+      <form action={failedFormAction} className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <input type="hidden" name="payoutId" value={row.id} />
+        <div className="sm:w-[280px]">
+          <label
+            htmlFor={`${idPrefix}-confirm-document`}
+            className={labelClass}
+            style={{ color: MUTED }}
+          >
+            {t("markFailedConfirmLabel")}
+          </label>
+          <input
+            id={`${idPrefix}-confirm-document`}
+            name="confirmDocumentNo"
+            type="text"
+            required
+            maxLength={60}
+            autoComplete="off"
+            aria-describedby={`${idPrefix}-confirm-document-hint`}
+            className={`${fieldClass} ${FOCUS_RING}`}
+            style={{ borderColor: CARD_BORDER, color: INK }}
+          />
+        </div>
         <button
           type="submit"
-          disabled={failedPending}
+          disabled={failedPending || row.documentNo === null}
           className={`${buttonClass} border ${FOCUS_RING}`}
           style={{
             borderColor: CARD_BORDER,
             color: DANGER,
             background: "#FFFFFF",
-            opacity: failedPending ? 0.7 : 1,
+            opacity: failedPending || row.documentNo === null ? 0.7 : 1,
           }}
         >
           {t("markFailed")}
         </button>
       </form>
+      <p
+        id={`${idPrefix}-confirm-document-hint`}
+        className="text-[13px]"
+        style={{ color: MUTED }}
+      >
+        {t("markFailedConfirmHint", { documentNo: row.documentNo ?? t("documentPending") })}
+      </p>
       <p className="text-[13px]" style={{ color: MUTED }}>
         {t("markFailedHint")}
       </p>

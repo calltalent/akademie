@@ -11,18 +11,24 @@ import {
   affiliateCreditNotePath,
   generateAffiliateCreditNotePdf,
 } from "@/lib/affiliate/credit-note";
-import { verifyAffiliateIntegrity } from "@/lib/affiliate/integrity";
 import {
+  hasUnquarantinedCriticalFinding,
+  verifyAffiliateIntegrity,
+} from "@/lib/affiliate/integrity";
+import {
+  AFFILIATE_PAYOUT_MAX_PERIOD_MONTHS,
   approveAffiliatePayout,
+  checkAffiliatePayoutPeriodBounds,
   createAffiliatePayoutDrafts,
   markAffiliatePayoutFailed,
   markAffiliatePayoutPaid,
   planAffiliatePayoutRun,
   resolveAffiliatePayoutPeriod,
+  resolveTenantVatId,
 } from "@/lib/affiliate/payout";
 import { getAffiliateProgram, listAffiliatePartners } from "@/lib/affiliate/queries";
 import { isValidIban } from "@/lib/affiliate/sepa";
-import { resolveAffiliateTaxMode } from "@/lib/affiliate/tax";
+import { taxHintForMode } from "@/lib/affiliate/tax";
 import type { AffiliatePayoutActionState } from "@/lib/affiliate/state";
 import type {
   AffiliateEntityKind,
@@ -229,6 +235,8 @@ const CONFIRM_MISSING = "Bitte die Freigabe im Bestätigungsschritt ausdrücklic
 const AMOUNT_CHANGED =
   "Die Beträge haben sich seit der Anzeige geändert. Bitte die Liste neu laden und erneut prüfen.";
 const NOTHING_SELECTED = "Bitte zuerst mindestens eine Auszahlung auswählen.";
+const CONFIRM_DOCUMENT_MISSING =
+  "Bitte die Belegnummer genau so eintragen, wie sie an der Auszahlung steht. Der Fehlschlag lässt sich nicht zurücknehmen.";
 const PAYOUT_PATH = "/admin/affiliate/auszahlungen";
 
 function logDbError(context: string, error: unknown): void {
@@ -275,8 +283,34 @@ async function runPayoutDraftsAction(
     if (!parsed.success) {
       return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
     }
-    if (parsed.data.periodTo < parsed.data.periodFrom) {
+    /**
+     * ZEITRAUMGRENZEN (Abnahme B8/B9, Befund 7). Geprüft wurden bis dahin nur
+     * Form und Reihenfolge. Ein Datum in der Zukunft — ein Vertipper genügt —
+     * schloss beim Freigeben `books_closed_until` des gesamten Programms auf
+     * diesen Wert, und `greatest()` nimmt das nie wieder zurück: ab da datiert
+     * jede neue Provisionszeile um und trägt den unveränderlichen
+     * Nachbuchungsvermerk. Dieselbe Regel steht in
+     * `createAffiliatePayoutDrafts()` und in `approve_affiliate_payout()`.
+     */
+    const now = new Date();
+    const periodProblem = checkAffiliatePayoutPeriodBounds(
+      parsed.data.periodFrom,
+      parsed.data.periodTo,
+      now,
+    );
+    if (periodProblem === "reversed") {
       return { error: "Das Ende des Zeitraums liegt vor seinem Anfang." };
+    }
+    if (periodProblem === "future") {
+      return {
+        error:
+          "Der Zeitraum endet in der Zukunft. Abgerechnet wird immer eine abgeschlossene Periode.",
+      };
+    }
+    if (periodProblem === "too_old") {
+      return {
+        error: `Der Zeitraum beginnt mehr als ${AFFILIATE_PAYOUT_MAX_PERIOD_MONTHS} Monate in der Vergangenheit. Bitte den Zeitraum eingrenzen.`,
+      };
     }
 
     const program = await getAffiliateProgram(tenant.id);
@@ -308,6 +342,7 @@ async function runPayoutDraftsAction(
       periodFrom: parsed.data.periodFrom,
       periodTo: parsed.data.periodTo,
       createdBy: user.id,
+      now,
     });
 
     const created = outcomes.filter((outcome) => outcome.status === "created");
@@ -423,11 +458,26 @@ async function approvePayoutsAction(
       if (expected.get(currency) !== cents) return { error: AMOUNT_CHANGED };
     }
 
-    const report = await verifyAffiliateIntegrity(admin, tenant.id);
+    // MIT `quarantine: true` — so, wie 7.6 es vorsieht und wie `integrity.ts`
+    // es beschreibt („Der Auszahlungsweg ruft ihn mit true"): ein Satz, dessen
+    // Positionssumme nicht zu seinem Kopf passt, wird stillgelegt, bevor
+    // irgendetwas freigegeben wird.
+    const report = await verifyAffiliateIntegrity(admin, tenant.id, { quarantine: true });
+    // Konnte eine Stilllegung NICHT geschrieben werden, steht ein kritischer
+    // Befund weiter exportierbar im Bestand (Befund 9). Dann wird gar nichts
+    // freigegeben — ein Log hält keine Überweisung auf.
+    if (hasUnquarantinedCriticalFinding(report)) {
+      return {
+        error:
+          "Der Kontrollabgleich hat einen kritischen Befund gefunden, der nicht stillgelegt werden konnte. Es wurde nichts freigegeben.",
+      };
+    }
 
     let approved = 0;
     let blocked = 0;
     let failed = 0;
+    /** Belege, deren PDF (noch) nicht im Bucket liegt — sichtbar, nicht nur im Log. */
+    let documentsPending = 0;
 
     for (const draft of drafts) {
       try {
@@ -473,7 +523,8 @@ async function approvePayoutsAction(
       });
 
       // Das PDF danach, bewusst außerhalb jeder Abbruchbedingung (7.2).
-      await storeCreditNote(tenant.id, tenant.name, tenant.legal, draft.id);
+      const stored = await storeCreditNote(tenant.id, tenant.name, tenant.legal, draft.id);
+      if (!stored) documentsPending += 1;
     }
 
     revalidatePath(PAYOUT_PATH);
@@ -483,6 +534,14 @@ async function approvePayoutsAction(
     if (blocked > 0 || failed > 0) {
       return {
         error: `${approved} Auszahlungen wurden freigegeben, ${blocked + failed} nicht. Bitte die Liste prüfen.`,
+      };
+    }
+    if (documentsPending > 0) {
+      // Die Freigabe GILT — die eingefrorenen Zahlen sind der Beleg (7.2).
+      // Gesagt werden muss es trotzdem: sonst sieht niemand, dass ein Partner
+      // sein PDF noch nicht herunterladen kann (Befund 15).
+      return {
+        error: `${approved} Auszahlungen wurden freigegeben. Für ${documentsPending} davon konnte das Beleg-PDF noch nicht abgelegt werden; die Belege sind gültig und werden nachgereicht.`,
       };
     }
     return { error: null, success: true };
@@ -557,11 +616,23 @@ async function markPaidAction(
   }
 }
 
+const failSchema = z.object({
+  payoutId: uuidSchema,
+  /** Die abgetippte Belegnummer (Abnahme B8/B9, Befund 16). */
+  confirmDocumentNo: z.string().trim().min(1).max(60),
+});
+
 /**
  * Die Überweisung ist fehlgeschlagen (7.7): Satz auf `failed`, die
  * Provisionszeilen werden freigegeben und laufen in den nächsten Entwurf. Der
  * Beleg bleibt bestehen — er wird nie gelöscht, sondern per Stornogutschrift
- * mit eigener Nummer neutralisiert.
+ * mit eigener Nummer neutralisiert; deren Entwurf legt
+ * `markAffiliatePayoutFailed()` im selben Vorgang an.
+ *
+ * `failed` ist ein Endzustand ohne ausgehende Kante. Deshalb muss die
+ * Belegnummer abgetippt werden (Befund 16): wer eine angekommene Überweisung im
+ * Kontoauszug falsch zuordnet, zahlt sonst mit dem nächsten Lauf dieselbe
+ * Provision ein zweites Mal aus.
  */
 async function markFailedAction(
   _state: AffiliatePayoutActionState,
@@ -571,15 +642,20 @@ async function markFailedAction(
   try {
     const { tenant, user } = await requireAffiliateManager();
 
-    const parsed = uuidSchema.safeParse(formData.get("payoutId"));
-    if (!parsed.success) return { error: PAYOUT_NOT_FOUND };
+    const parsed = failSchema.safeParse({
+      payoutId: formData.get("payoutId"),
+      confirmDocumentNo: String(formData.get("confirmDocumentNo") ?? ""),
+    });
+    if (!parsed.success) return { error: CONFIRM_DOCUMENT_MISSING };
 
     const admin = createAdminClient();
     const result = await markAffiliatePayoutFailed(admin, {
       tenantId: tenant.id,
-      payoutId: parsed.data,
+      payoutId: parsed.data.payoutId,
+      confirmDocumentNo: parsed.data.confirmDocumentNo,
     });
     if (!result.ok) {
+      if (result.reason === "confirmation_mismatch") return { error: CONFIRM_DOCUMENT_MISSING };
       return {
         error:
           result.reason === "write_failed"
@@ -593,12 +669,29 @@ async function markFailedAction(
       actorKind: "manager",
       actorUserId: user.id,
       entity: "payout",
-      entityId: parsed.data,
+      entityId: parsed.data.payoutId,
       action: "payout.mark_failed",
-      after: { released_rows: result.affected_rows },
+      // Vorher-/Nachher-Stand (Befund 16): der Vorgang ist unumkehrbar, also
+      // muss im Protokoll stehen, aus welchem Zustand heraus er ausgelöst wurde
+      // und welcher Beleg gemeint war.
+      before: { status: result.previous_status, document_no: parsed.data.confirmDocumentNo },
+      after: {
+        status: "failed",
+        released_rows: result.affected_rows,
+        reversal_payout_id: result.reversal_payout_id,
+      },
     });
 
     revalidatePath(PAYOUT_PATH);
+    if (result.reversal_payout_id === null) {
+      // Ohne Stornogutschrift bleibt ein Beleg mit ausgewiesener Steuer im
+      // Bestand, während dieselbe Leistung gleich erneut abgerechnet wird —
+      // § 14c UStG. Das darf nicht nur im Log stehen.
+      return {
+        error:
+          "Der Fehlschlag ist vermerkt, aber der Entwurf der Stornogutschrift konnte nicht angelegt werden. Bitte den Beleg vor dem nächsten Lauf prüfen.",
+      };
+    }
     return { error: null, success: true };
   } catch (e) {
     return { error: actionErrorMessage(e, "Fehlschlag vermerken") };
@@ -633,26 +726,38 @@ function actionErrorMessage(e: unknown, context: string): string {
  * deshalb nur zu einem Log-Eintrag ohne Werte; der Satz bleibt mit
  * `document_path = null` stehen und wird vom Reparaturlauf wiedergefunden.
  *
- * Zwei Dinge, die diese Funktion NICHT tut:
+ * Drei Dinge, die diese Funktion NICHT tut:
  *   - Sie rechnet nichts nach. Alle Zahlen kommen aus der Zeile, so wie sie
  *     eingefroren wurde; ein zweiter Rechenweg könnte ein PDF erzeugen, das
  *     seinem eigenen Belegkopf widerspricht.
- *   - Sie erfindet keinen Steuerhinweis. Der Pflichttext nach § 14 Abs. 4
- *     UStG kommt aus `tax.ts`, und zwar nur, wenn der dort aus dem
- *     Abrechnungsprofil abgeleitete Modus mit dem EINGEFRORENEN Modus des
- *     Belegs übereinstimmt. Hat sich das Profil seit dem Entwurf geändert,
- *     entsteht kein PDF — ein Beleg mit dem falschen Steuerhinweis ist ein
- *     § 14c-Fall und teurer als ein fehlendes PDF.
+ *   - Sie leitet den Steuerhinweis NICHT mehr aus dem heutigen Profil ab
+ *     (Abnahme B8/B9, Befund 10). Der Gedanke war richtig — kein PDF, das dem
+ *     Belegkopf widerspricht —, die Umsetzung machte die zugesagte
+ *     Deterministik aber kaputt: der Modus hängt über `hasCurrentVatCheck()`
+ *     an einer 90-Tage-Frist und altert von selbst. Nach 90 Tagen lieferte
+ *     `resolveAffiliateTaxMode()` `eu_vat_missing`, und JEDER
+ *     Reverse-Charge-Beleg ohne PDF blieb dauerhaft ohne PDF — bei zehn Jahren
+ *     Aufbewahrungsfrist und einem Partner, der über die Belegroute dauerhaft
+ *     409 bekommt. Der Hinweis folgt jetzt aus dem EINGEFRORENEN Modus des
+ *     Belegs (`taxHintForMode()`), sonst nichts.
+ *   - Sie liest die Anschrift des Empfängers nicht live aus dem Profil,
+ *     sondern aus `recipient_snapshot` (Befund 10, zweiter Teil). Nur für
+ *     Belege, die vor dieser Berichtigung entstanden sind, gibt es den
+ *     Rückfall auf das Profil — mit einem Vermerk im Log.
+ *
+ * Rückgabe `false` heißt: die Datei liegt NICHT im Bucket. Die Freigabe bleibt
+ * davon unberührt, aber die Oberfläche sagt es (Befund 15).
  */
 async function storeCreditNote(
   tenantId: string,
   tenantName: string,
   tenantLegal: unknown,
   payoutId: string,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const legalEntity = resolveLegalEntity(tenantLegal);
-    if (legalEntity === null) return;
+    if (legalEntity === null) return false;
+    const issuerVatId = resolveTenantVatId(tenantLegal);
 
     const admin = createAdminClient();
     const { data: payoutData, error: payoutError } = await admin
@@ -660,7 +765,7 @@ async function storeCreditNote(
       .select(
         "id, partner_id, period_from, period_to, currency, gross_cents, reversal_cents, " +
           "subtotal_cents, tax_mode, tax_rate_bp, tax_cents, total_cents, method, " +
-          "document_no, document_issued_at, document_path",
+          "document_no, document_issued_at, document_path, reverses_payout_id, recipient_snapshot",
       )
       .eq("tenant_id", tenantId)
       .eq("id", payoutId)
@@ -681,63 +786,48 @@ async function storeCreditNote(
         document_no: string | null;
         document_issued_at: string | null;
         document_path: string | null;
+        reverses_payout_id: string | null;
+        recipient_snapshot: unknown;
       }>();
 
-    if (payoutError || payoutData === null) return;
-    if (payoutData.document_no === null) return;
+    if (payoutError || payoutData === null) return false;
+    if (payoutData.document_no === null) return false;
     // Schon vorhanden: nichts überschreiben. Ein zweites PDF zu derselben
     // Nummer wäre ein zweiter Beleg.
-    if (payoutData.document_path !== null) return;
+    if (payoutData.document_path !== null) return true;
 
-    const { data: profile, error: profileError } = await admin
-      .from("affiliate_billing_profiles")
-      .select(
-        "partner_id, entity_kind, legal_name, street, postal_code, city, country, " +
-          "small_business, vat_id, tax_number, vat_check_result, vat_checked_at",
-      )
-      .eq("tenant_id", tenantId)
-      .eq("partner_id", payoutData.partner_id)
-      .maybeSingle<{
-        entity_kind: AffiliateEntityKind | null;
-        legal_name: string | null;
-        street: string | null;
-        postal_code: string | null;
-        city: string | null;
-        country: string | null;
-        small_business: boolean;
-        vat_id: string | null;
-        tax_number: string | null;
-        vat_check_result: AffiliateVatCheckResult | null;
-        vat_checked_at: string | null;
-      }>();
+    const recipient = await resolveCreditNoteRecipient(admin, tenantId, payoutData);
+    if (recipient === null) return false;
 
-    if (profileError || profile === null) return;
+    // FAIL-CLOSED (Befund 5): bei Reverse Charge sind nach § 14a Abs. 5 UStG
+    // BEIDE USt-IdNr. Pflichtangabe. Hier stand fest verdrahtet `vatId: null`,
+    // und das PDF trug an ihrer Stelle einen Gedankenstrich — formal nicht
+    // belegter Reverse Charge, technisch fehlerfrei, in keiner Prüfung
+    // sichtbar. Ohne die Nummer des Ausstellers entsteht deshalb kein PDF.
+    // Dass es gar nicht erst so weit kommt, dafür sorgt der Sperrgrund
+    // `issuer_vat_id_missing` im Lauf.
     if (
-      profile.legal_name === null ||
-      profile.street === null ||
-      profile.postal_code === null ||
-      profile.city === null ||
-      profile.country === null
+      payoutData.tax_mode === "reverse_charge" &&
+      (issuerVatId === null || (recipient.vatId ?? "").trim() === "")
     ) {
-      return;
+      console.error(
+        "[admin/affiliate/auszahlungen] USt-IdNr. fehlt; Reverse-Charge-Beleg nicht erzeugt.",
+      );
+      return false;
     }
 
-    const mode = resolveAffiliateTaxMode(
-      {
-        entity_kind: profile.entity_kind,
-        country: profile.country,
-        small_business: profile.small_business,
-        vat_id: profile.vat_id,
-        vat_check_result: profile.vat_check_result,
-        vat_checked_at: profile.vat_checked_at,
-      },
-      new Date(),
-    );
-    if (!mode.ok || mode.tax_mode !== payoutData.tax_mode) {
-      console.error(
-        "[admin/affiliate/auszahlungen] Steuermodus des Profils weicht vom Beleg ab; kein PDF erzeugt.",
-      );
-      return;
+    // Die Nummer des stornierten Belegs — sie gehört auf die Stornogutschrift
+    // (7.7), sonst ist sie ein zweiter Beleg über einen negativen Betrag.
+    let reversesDocumentNo: string | null = null;
+    if (payoutData.reverses_payout_id !== null) {
+      const { data: origin } = await admin
+        .from("affiliate_payouts")
+        .select("id, document_no")
+        .eq("tenant_id", tenantId)
+        .eq("id", payoutData.reverses_payout_id)
+        .maybeSingle<{ document_no: string | null }>();
+      if (origin === null || origin.document_no === null) return false;
+      reversesDocumentNo = origin.document_no;
     }
 
     const pdfBytes = await generateAffiliateCreditNotePdf({
@@ -756,17 +846,10 @@ async function storeCreditNote(
       taxRateBp: payoutData.tax_rate_bp,
       taxCents: payoutData.tax_cents,
       totalCents: payoutData.total_cents,
-      taxHint: mode.documentHint,
-      issuer: { legalEntity, vatId: null },
-      recipient: {
-        legalName: profile.legal_name,
-        street: profile.street,
-        postalCode: profile.postal_code,
-        city: profile.city,
-        country: profile.country,
-        vatId: profile.vat_id,
-        taxNumber: profile.tax_number,
-      },
+      taxHint: taxHintForMode(payoutData.tax_mode),
+      issuer: { legalEntity, vatId: issuerVatId },
+      recipient,
+      reversesDocumentNo,
       tenantName,
       method: payoutData.method,
     });
@@ -776,10 +859,18 @@ async function storeCreditNote(
     const path = affiliateCreditNotePath(tenantId, payoutData.id);
     const { error: uploadError } = await admin.storage
       .from("affiliate-documents")
-      .upload(path, pdfBytes, { contentType: "application/pdf", upsert: false });
+      // `upsert: true` (Abnahme B8/B9, Befund 15). Der Reparaturlauf setzt
+      // genau dort an, wo `document_path` null ist — und das ist auch dann der
+      // Fall, wenn der Upload beim ersten Versuch durchging und nur das
+      // nachfolgende UPDATE scheiterte. Mit `upsert: false` bekam jeder weitere
+      // Versuch „Duplicate" zurück, der Pfad blieb für immer null, und der
+      // Partner bekam dauerhaft 409, obwohl die Datei im Bucket lag. Ein
+      // Überschreiben ändert nichts: das PDF ist deterministisch aus den
+      // eingefrorenen Zahlen.
+      .upload(path, pdfBytes, { contentType: "application/pdf", upsert: true });
     if (uploadError) {
       console.error("[admin/affiliate/auszahlungen] Beleg-Upload fehlgeschlagen.");
-      return;
+      return false;
     }
 
     const { error: updateError } = await admin
@@ -788,15 +879,108 @@ async function storeCreditNote(
       .eq("tenant_id", tenantId)
       .eq("id", payoutData.id)
       .is("document_path", null);
-    if (updateError) logDbError("Belegpfad eintragen", updateError);
+    if (updateError) {
+      logDbError("Belegpfad eintragen", updateError);
+      // Die Datei liegt, der Verweis fehlt — der Satz bleibt für den
+      // Reparaturlauf sichtbar, und der Aufrufer erfährt es (Befund 15).
+      return false;
+    }
+    return true;
   } catch (e) {
     // Auch ein Fehler in pdf-lib darf die Freigabe nicht nachträglich
     // entwerten. Ohne Werte ins Log (§2.11).
     console.error("[admin/affiliate/auszahlungen] Belegerzeugung fehlgeschlagen.", {
       known: e instanceof Error,
     });
+    return false;
   }
 }
+
+/**
+ * Der Empfänger des Belegs: bevorzugt aus `recipient_snapshot` (eingefroren
+ * beim Entwurf), ersatzweise aus dem Abrechnungsprofil.
+ *
+ * Der Rückfall ist ausdrücklich der ZWEITE Weg und existiert für Belege aus der
+ * Zeit vor der Berichtigung zu Befund 10. Er ist nicht deterministisch — das
+ * ist der Grund, aus dem es den Schnappschuss gibt — und wird deshalb
+ * protokolliert.
+ */
+async function resolveCreditNoteRecipient(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  payout: { partner_id: string; recipient_snapshot: unknown },
+): Promise<{
+  legalName: string;
+  street: string;
+  postalCode: string;
+  city: string;
+  country: string;
+  vatId: string | null;
+  taxNumber: string | null;
+} | null> {
+  const parsed = recipientSnapshotSchema.safeParse(payout.recipient_snapshot);
+  if (parsed.success) {
+    return {
+      legalName: parsed.data.legal_name,
+      street: parsed.data.street,
+      postalCode: parsed.data.postal_code,
+      city: parsed.data.city,
+      country: parsed.data.country,
+      vatId: parsed.data.vat_id,
+      taxNumber: parsed.data.tax_number,
+    };
+  }
+
+  console.error(
+    "[admin/affiliate/auszahlungen] Beleg ohne eingefrorenen Empfänger; Rückfall auf das Abrechnungsprofil.",
+  );
+
+  const { data: profile, error } = await admin
+    .from("affiliate_billing_profiles")
+    .select("partner_id, legal_name, street, postal_code, city, country, vat_id, tax_number")
+    .eq("tenant_id", tenantId)
+    .eq("partner_id", payout.partner_id)
+    .maybeSingle<{
+      legal_name: string | null;
+      street: string | null;
+      postal_code: string | null;
+      city: string | null;
+      country: string | null;
+      vat_id: string | null;
+      tax_number: string | null;
+    }>();
+
+  if (error || profile === null) return null;
+  if (
+    profile.legal_name === null ||
+    profile.street === null ||
+    profile.postal_code === null ||
+    profile.city === null ||
+    profile.country === null
+  ) {
+    return null;
+  }
+  return {
+    legalName: profile.legal_name,
+    street: profile.street,
+    postalCode: profile.postal_code,
+    city: profile.city,
+    country: profile.country,
+    vatId: profile.vat_id,
+    taxNumber: profile.tax_number,
+  };
+}
+
+/** Der eingefrorene Empfänger, wie ihn der Entwurfslauf geschrieben hat. */
+const recipientSnapshotSchema = z.object({
+  legal_name: z.string().min(1),
+  street: z.string().min(1),
+  postal_code: z.string().min(1),
+  city: z.string().min(1),
+  country: z.string().min(1),
+  vat_id: z.string().nullable().default(null),
+  tax_number: z.string().nullable().default(null),
+});
 
 // --- Seite --------------------------------------------------------------
 

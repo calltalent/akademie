@@ -1,6 +1,11 @@
 import "server-only";
 import type { createAdminClient } from "@/lib/supabase/admin";
-import { AFFILIATE_VAT_VALIDITY_DAYS, isEuCountry } from "@/lib/affiliate/tax";
+import {
+  AFFILIATE_VAT_VALIDITY_DAYS,
+  isEuCountry,
+  normalizeVatId,
+  vatIdCountryMatches,
+} from "@/lib/affiliate/tax";
 import type { AffiliateVatCheckLog, AffiliateVatCheckResult } from "@/lib/affiliate/types";
 
 /**
@@ -61,15 +66,16 @@ const VIES_LOG_MAX_CHARS = 4000;
 
 // --- Normalisierung -----------------------------------------------------
 
-/**
- * Eine USt-IdNr. besteht aus zwei Buchstaben Länderpräfix und 2 bis 12
- * alphanumerischen Zeichen. Leerzeichen, Punkte und Bindestriche kommen in
- * jeder Eingabe vor und werden entfernt — sie sind Schreibweise, nicht Inhalt.
- */
-const VAT_ID_PATTERN = /^[A-Z]{2}[0-9A-Z]{2,12}$/;
-
 export type AffiliateVatIdParts = {
-  /** Länderpräfix der Nummer, z. B. `AT` — nicht zwingend `profile.country`. */
+  /**
+   * Länderpräfix der Nummer, z. B. `AT`.
+   *
+   * Es ist NICHT zwangsläufig `profile.country` — und genau daraus entstand
+   * Befund 6 der Abnahme B8/B9: die Abweichung stand hier als Kommentar, und
+   * kein Konsument verglich die beiden. Verglichen wird jetzt in
+   * `vatIdCountryMatches()` (tax.ts), und `refreshPartnerVatCheck()` unten
+   * lässt eine Nummer aus dem falschen Land gar nicht erst auf `valid` laufen.
+   */
   country_code: string;
   /** Der Teil hinter dem Präfix. */
   number: string;
@@ -85,10 +91,11 @@ export type AffiliateVatIdParts = {
  * eine URL).
  */
 export function parseVatId(raw: string | null | undefined): AffiliateVatIdParts | null {
-  if (typeof raw !== "string") return null;
-
-  const normalized = raw.replace(/[\s.\-/]/g, "").toUpperCase();
-  if (!VAT_ID_PATTERN.test(normalized)) return null;
+  // Muster und Normalisierung stehen in `tax.ts` — dort, wo auch der
+  // Ländervergleich steht. Zwei Kopien desselben Musters wären zwei Stellen,
+  // an denen eine Landesregel später nachgezogen werden müsste.
+  const normalized = normalizeVatId(raw);
+  if (normalized === null) return null;
 
   return {
     country_code: normalized.slice(0, 2),
@@ -119,6 +126,8 @@ export const AFFILIATE_VIES_REASONS = [
   "service_error",
   "unexpected_response",
   "manual_override",
+  /** Nummer und Profilland passen nicht zusammen (Abnahme B8/B9, Befund 6). */
+  "country_mismatch",
 ] as const;
 export type AffiliateViesReason = (typeof AFFILIATE_VIES_REASONS)[number];
 
@@ -344,18 +353,28 @@ export async function refreshPartnerVatCheck(
     .select(VIES_PROFILE_COLUMNS)
     .eq("tenant_id", params.tenantId)
     .eq("partner_id", params.partnerId)
-    .maybeSingle<{ vat_id: string | null }>();
+    .maybeSingle<{ vat_id: string | null; country: string | null }>();
 
   if (error || profile === null) return { ok: false, reason: "profile_missing" };
   if (typeof profile.vat_id !== "string" || profile.vat_id.trim() === "") {
     return { ok: false, reason: "vat_id_missing" };
   }
 
-  const outcome = await checkVatIdAgainstVies(profile.vat_id, {
-    now: params.now,
-    fetchImpl: params.fetchImpl,
-    timeoutMs: params.timeoutMs,
-  });
+  /**
+   * Abnahme B8/B9, Befund 6: `country` wurde hier schon immer mitgelesen und
+   * nie verglichen. Eine Nummer aus einem anderen Land als dem des Profils
+   * wird gar nicht erst angefragt — sie würde in Brüssel als gültig bestätigt
+   * und stünde danach als `valid` auf einem Profil, für das sie nichts belegt.
+   * Das Ergebnis ist `invalid` und nicht `unchecked`: es ist eine Aussage über
+   * die Eingabe, kein Ausfall des Dienstes.
+   */
+  const outcome = vatIdCountryMatches(profile.vat_id, profile.country)
+    ? await checkVatIdAgainstVies(profile.vat_id, {
+        now: params.now,
+        fetchImpl: params.fetchImpl,
+        timeoutMs: params.timeoutMs,
+      })
+    : buildCountryMismatchOutcome(profile.country, params.now);
 
   const { error: writeError } = await admin
     .from("affiliate_billing_profiles")
@@ -377,6 +396,30 @@ export async function refreshPartnerVatCheck(
   }
 
   return { ok: true, outcome };
+}
+
+/**
+ * Das Protokollobjekt für eine Nummer, die nicht zum Land des Profils gehört.
+ * Es trägt AUSSCHLIESSLICH das Länderkennzeichen des Profils, nie die Nummer —
+ * dieselbe Zurückhaltung wie im Serverlog (CLAUDE.md §2.11).
+ */
+function buildCountryMismatchOutcome(
+  profileCountry: string | null,
+  now: Date | undefined,
+): AffiliateVatCheckOutcome {
+  const checkedAt = (now ?? new Date()).toISOString();
+  return {
+    result: "invalid",
+    reason: "country_mismatch",
+    checked_at: checkedAt,
+    log: {
+      source: "vies",
+      checked_at: checkedAt,
+      result: "invalid",
+      reason: "country_mismatch",
+      profile_country: profileCountry,
+    },
+  };
 }
 
 /**

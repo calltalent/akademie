@@ -29,6 +29,11 @@ import type {
  *     so aussieht. Wie mit Privatpersonen umgegangen wird, ist eine
  *     kaufmännische Entscheidung (Plan 12.4) und ausdrücklich keine, die diese
  *     Datei still trifft.
+ *   - NACHGETRAGEN (Abnahme B8/B9, Befund 6): USt-IdNr. aus einem anderen Land
+ *     als dem des Profils. Bis dahin entschied allein das frei eingetragene
+ *     Land über die Rechtsfolge, während die geprüfte Nummer aus einem
+ *     beliebigen anderen Land stammen durfte — in beide Richtungen ein
+ *     § 14c-Fall. Siehe `vatIdCountryMatches()`.
  *
  * Deshalb ist der Rückgabewert eine unterschiedene Vereinigung und kein
  * `AffiliateTaxMode | null`: ein `null` hätte an der Aufrufstelle zu einem
@@ -86,6 +91,64 @@ export const AFFILIATE_VAT_VALIDITY_DAYS = 90;
 
 const MS_PER_DAY = 86_400_000;
 
+// --- USt-IdNr.: Schreibweise und Länderpräfix ---------------------------
+
+/**
+ * Eine USt-IdNr. besteht aus zwei Buchstaben Länderpräfix und 2 bis 12
+ * alphanumerischen Zeichen. Leerzeichen, Punkte, Schrägstriche und Bindestriche
+ * sind Schreibweise, nicht Inhalt.
+ *
+ * Das Muster steht HIER und nicht in `vies.ts`, obwohl es dort gebraucht wird:
+ * `vies.ts` ist `server-only`, diese Datei ist rein. Zwei Muster für dieselbe
+ * Sache wären zwei Stellen, an denen später eine Landesregel nachgezogen
+ * werden müsste — `parseVatId()` baut deshalb auf dieser Funktion auf.
+ */
+const VAT_ID_PATTERN = /^[A-Z]{2}[0-9A-Z]{2,12}$/;
+
+/** Normalisierte Form (Großbuchstaben, ohne Trennzeichen) oder `null`. */
+export function normalizeVatId(raw: string | null | undefined): string | null {
+  if (typeof raw !== "string") return null;
+  const normalized = raw.replace(/[\s.\-/]/g, "").toUpperCase();
+  return VAT_ID_PATTERN.test(normalized) ? normalized : null;
+}
+
+/**
+ * Griechenland führt VIES unter `EL`, ISO-3166 unter `GR`. Beide meinen
+ * dasselbe Land, und ein griechischer Partner darf nicht an der Schreibweise
+ * scheitern — dieselbe Gleichsetzung wie in `EU_COUNTRIES`.
+ */
+function canonicalCountry(code: string): string {
+  return code === "EL" ? "GR" : code;
+}
+
+/**
+ * Gehört die USt-IdNr. zum Land des Abrechnungsprofils (7.4/7.5)?
+ *
+ * DIESE FRAGE ENTSCHEIDET ÜBER EINEN STEUERAUSWEIS. Ohne sie bestimmt allein
+ * das vom Partner frei eingetragene Land die Rechtsfolge, während die geprüfte
+ * Nummer aus einem ganz anderen Land stammen darf:
+ *
+ *   - `country = IT`, `vat_id = DE…`: VIES bestätigt die deutsche Nummer, der
+ *     EU-Zweig liefert Reverse Charge — für einen Leistenden, der im Inland
+ *     umsatzsteuerlich registriert ist. Der Umsatz ist in Deutschland
+ *     steuerbar, es hätten 19 % ausgewiesen werden müssen.
+ *   - `country = DE`, `vat_id = ATU…`: der Inlandszweig weist 19 % aus, wo
+ *     Reverse Charge richtig gewesen wäre.
+ *
+ * Beide Richtungen sind § 14c-Fälle, und beide entstehen still. `false` heißt
+ * hier deshalb immer „nicht verwendbar", nie „vielleicht doch".
+ */
+export function vatIdCountryMatches(
+  vatId: string | null | undefined,
+  country: string | null | undefined,
+): boolean {
+  const normalized = normalizeVatId(vatId);
+  if (normalized === null) return false;
+  const profileCountry = typeof country === "string" ? country.trim().toUpperCase() : "";
+  if (profileCountry === "") return false;
+  return canonicalCountry(normalized.slice(0, 2)) === canonicalCountry(profileCountry);
+}
+
 // --- Eingabe und Ergebnis ----------------------------------------------
 
 /**
@@ -119,6 +182,7 @@ export const AFFILIATE_TAX_BLOCK_REASONS = [
   "country_missing",
   "private_entity",
   "eu_vat_missing",
+  "vat_country_mismatch",
 ] as const;
 export type AffiliateTaxBlockReason = (typeof AFFILIATE_TAX_BLOCK_REASONS)[number];
 
@@ -172,6 +236,24 @@ const TAX_MODES: Record<
   },
 };
 
+/**
+ * Der Pflichthinweis zu einem EINGEFRORENEN Steuermodus — ohne jeden Bezug auf
+ * ein Abrechnungsprofil (7.4; Abnahme B8/B9, Befund 10).
+ *
+ * Der Belegtext gehört zum Beleg, nicht zum heutigen Stand des Profils. Wer ihn
+ * für ein fehlendes PDF neu aus dem Profil ableitet, bekommt ihn nach 90 Tagen
+ * gar nicht mehr: die VIES-Prüfung altert von selbst, `resolveAffiliateTaxMode()`
+ * liefert dann `eu_vat_missing`, und ein gültiger, nummerierter Beleg mit
+ * zehnjähriger Aufbewahrungsfrist bliebe dauerhaft ohne Darstellung. Dieselbe
+ * Falle greift, wenn der Partner umzieht oder seine Rechtsform berichtigt.
+ *
+ * Deshalb: der Modus steht auf der Auszahlungszeile, der Text folgt aus dem
+ * Modus, und zwar für immer aus diesem einen Nachschlagewerk.
+ */
+export function taxHintForMode(mode: AffiliateTaxMode): string {
+  return TAX_MODES[mode].documentHint;
+}
+
 function resolved(mode: AffiliateTaxMode): AffiliateTaxResolution {
   const entry = TAX_MODES[mode];
   return {
@@ -193,11 +275,19 @@ function resolved(mode: AffiliateTaxMode): AffiliateTaxResolution {
  * daraus eine Steuerbefreiung abzuleiten ist genau der § 14c-Fall.
  */
 export function hasCurrentVatCheck(
-  profile: Pick<AffiliateTaxProfileInput, "vat_id" | "vat_check_result" | "vat_checked_at">,
+  profile: Pick<
+    AffiliateTaxProfileInput,
+    "country" | "vat_id" | "vat_check_result" | "vat_checked_at"
+  >,
   now: Date,
 ): boolean {
   if (profile.vat_check_result !== "valid") return false;
   if (typeof profile.vat_id !== "string" || profile.vat_id.trim() === "") return false;
+  // Eine geprüfte Nummer aus einem anderen Land als dem des Profils belegt für
+  // dieses Profil nichts (siehe `vatIdCountryMatches()`). Die Prüfung steht
+  // zusätzlich hier und nicht nur in `resolveAffiliateTaxMode()`, damit sie
+  // auch ein künftiger zweiter Aufrufer mitbekommt.
+  if (!vatIdCountryMatches(profile.vat_id, profile.country)) return false;
   if (typeof profile.vat_checked_at !== "string") return false;
 
   const checkedAt = Date.parse(profile.vat_checked_at);
@@ -230,6 +320,20 @@ export function resolveAffiliateTaxMode(
   const country =
     typeof profile.country === "string" ? profile.country.trim().toUpperCase() : "";
   if (country === "") return { ok: false, reason: "country_missing" };
+
+  // Länderpräfix der USt-IdNr. gegen das Land des Profils (7.5). Nur für
+  // EU-Länder: außerhalb der EU ist die Leistung ohnehin nicht im Inland
+  // steuerbar, und ein Drittlandpartner, der in das Feld seine nationale
+  // Steuernummer geschrieben hat, darf daran nicht scheitern. Innerhalb der EU
+  // entscheidet genau dieser Vergleich zwischen Reverse Charge und 19 %.
+  if (
+    isEuCountry(country) &&
+    typeof profile.vat_id === "string" &&
+    profile.vat_id.trim() !== "" &&
+    !vatIdCountryMatches(profile.vat_id, country)
+  ) {
+    return { ok: false, reason: "vat_country_mismatch" };
+  }
 
   if (country === AFFILIATE_TAX_HOME_COUNTRY) {
     // Fälle 1 und 2: Inland. Der Kleinunternehmer weist keine Steuer aus,
