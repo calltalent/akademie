@@ -1784,7 +1784,15 @@
           "save": "Sačuvaj",
           "saved": "Sačuvano.",
           "pending": "Izvršava se …",
-          "reasonOptional": "(opcionalno)"
+          "reasonOptional": "(opcionalno)",
+          "anonymize": "Anonimiziraj podatke",
+          "anonymizeHeading": "Ispuni zahtjev za brisanje (čl. 17 GDPR)",
+          "anonymizePending": "Postoji otvoren zahtjev za brisanje od {date}.",
+          "anonymizeHint": "Ime, firma, e-mail adresa, adresa, poreski broj, PDV broj i podaci za plaćanje postaju neprepoznatljivi; klikovi i preporuke se brišu. Već izdata knjižna odobrenja ostaju kao knjigovodstveni dokumenti — akademija ih mora čuvati deset godina. Radnja se ne može poništiti.",
+          "anonymizeReasonLabel": "Razlog (doslovno ulazi u revizijski zapis)",
+          "anonymizeConfirmLabel": "Partner kod za potvrdu",
+          "anonymizeConfirmHint": "Molimo unesite {code}. Radnja se ne može poništiti.",
+          "anonymizeDone": "Podaci su anonimizirani. Otvoren zahtjev za brisanje je zatvoren."
         },
         "banking": {
           "heading": "Podaci za plaćanje i poreski podaci",
@@ -2117,7 +2125,11 @@
           "documentNo": "Broj dokumenta",
           "period": "Period",
           "taxMode": "Poreski tretman"
-        }
+        },
+        "reversalBadge": "Storno knjižno odobrenje",
+        "reversalOf": "Storno za {documentNo} — ovaj zapis ne isplaćuje ništa, on poništava dokument.",
+        "reversalOfUnknown": "Storno za dokument bez broja — ovaj zapis ne isplaćuje ništa, on poništava dokument.",
+        "releaseConfirmReversal": "{count, plural, one {# od njih je storno: ne isplaćuje ništa, nego poništava već izdati dokument. Zato je iznos negativan.} other {# od njih su storna: ne isplaćuju ništa, nego poništavaju već izdate dokumente. Zato je iznos negativan.}}"
       },
       "creatives": {
         "title": "Promotivni materijal",

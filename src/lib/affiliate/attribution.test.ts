@@ -487,6 +487,67 @@ describe("R5 — `?aff=`-Token aus der URL", () => {
     );
     expect(result.meta.rule).toBe("R9");
   });
+
+  // --- Fremdes Konto (Geldumlenkung) ------------------------------------
+  //
+  // Das Token steht sichtbar in der Adresszeile (`?aff=`). Wer es kennt,
+  // könnte es ohne diese Prüfung an beliebige fremde Käufer weiterreichen
+  // und deren Käufe einsammeln — an jedem Missbrauchsschutz des Klick-Pfads
+  // vorbei. `bind.ts` (Schritt 5) und R7 prüfen dieselbe Spalte.
+
+  it("ignoriert ein Token, das bereits an ein FREMDES Konto gebunden ist", () => {
+    const foreignBuyer = "eeeeeeee-0000-4000-8000-00000000000e";
+    const result = resolveAttribution(
+      input({
+        urlReferral: referral({ id: "ref-1", partner_id: PARTNER_A, user_id: foreignBuyer }),
+      }),
+    );
+
+    expect(result.meta.rule).toBe("R9");
+    expect(result.partnerId).toBeNull();
+    expect(result.referralId).toBeNull();
+    expect(result.token).toBeNull();
+  });
+
+  it("greift weiter, wenn der Käufer SEIN EIGENES gebundenes Token mitbringt", () => {
+    // Gegenrichtung: der ehrliche Partner darf seine Provision nicht dadurch
+    // verlieren, dass sein geworbener Kunde denselben Link ein zweites Mal
+    // benutzt.
+    const result = resolveAttribution(
+      input({
+        urlReferral: referral({ id: "ref-1", partner_id: PARTNER_A, user_id: BUYER }),
+      }),
+    );
+
+    expect(result.meta).toEqual({ rule: "R5", reason: "url_token" });
+    expect(result.partnerId).toBe(PARTNER_A);
+    expect(result.referralId).toBe("ref-1");
+  });
+
+  it("greift weiter, wenn das Token noch ungebunden ist (`user_id = null`)", () => {
+    // Zweite Gegenrichtung: der einwilligungsfreie Pfad und der Erstkauf.
+    const result = resolveAttribution(
+      input({ urlReferral: referral({ id: "ref-1", partner_id: PARTNER_A, user_id: null }) }),
+    );
+
+    expect(result.meta).toEqual({ rule: "R5", reason: "url_token" });
+    expect(result.partnerId).toBe(PARTNER_A);
+  });
+
+  it("lässt bei fremd gebundenem Token die Lifetime-Bindung entscheiden (R4)", () => {
+    // Ein fremd gebundenes Token darf nicht nur selbst nicht greifen, es darf
+    // die rechtmäßige Bindung des Käufers auch nicht verdrängen.
+    const foreignBuyer = "eeeeeeee-0000-4000-8000-00000000000e";
+    const result = resolveAttribution(
+      input({
+        urlReferral: referral({ id: "ref-1", partner_id: PARTNER_A, user_id: foreignBuyer }),
+        binding: binding({ partner_id: PARTNER_B }),
+      }),
+    );
+
+    expect(result.meta).toEqual({ rule: "R4", reason: "lifetime" });
+    expect(result.partnerId).toBe(PARTNER_B);
+  });
 });
 
 // --- R6 ------------------------------------------------------------------
@@ -503,6 +564,46 @@ describe("R6 — `ct_aff`-Cookie", () => {
     expect(result.meta).toEqual({ rule: "R6", reason: "cookie_token" });
     expect(result.partnerId).toBe(PARTNER_B);
     expect(result.referralId).toBe("ref-2");
+  });
+
+  it("ignoriert ein Cookie-Token, das bereits an ein FREMDES Konto gebunden ist", () => {
+    // Geteiltes Gerät: das Cookie des Vorbenutzers darf den Kauf des
+    // nächsten Anmelders nicht an dessen Partner hängen.
+    const foreignBuyer = "eeeeeeee-0000-4000-8000-00000000000e";
+    const result = resolveAttribution(
+      input({
+        cookieReferral: referral({ id: "ref-2", partner_id: PARTNER_B, user_id: foreignBuyer }),
+      }),
+    );
+
+    expect(result.meta.rule).toBe("R9");
+    expect(result.partnerId).toBeNull();
+    expect(result.token).toBeNull();
+  });
+
+  it("greift weiter, wenn der Käufer SEIN EIGENES gebundenes Cookie mitbringt", () => {
+    const result = resolveAttribution(
+      input({
+        cookieReferral: referral({ id: "ref-2", partner_id: PARTNER_B, user_id: BUYER }),
+      }),
+    );
+
+    expect(result.meta).toEqual({ rule: "R6", reason: "cookie_token" });
+    expect(result.partnerId).toBe(PARTNER_B);
+    expect(result.referralId).toBe("ref-2");
+  });
+
+  it("fällt bei fremd gebundenem Cookie auf den Serverzustand zurück (R7)", () => {
+    const foreignBuyer = "eeeeeeee-0000-4000-8000-00000000000e";
+    const result = resolveAttribution(
+      input({
+        cookieReferral: referral({ id: "ref-2", partner_id: PARTNER_B, user_id: foreignBuyer }),
+        userReferrals: [referral({ id: "ref-3", partner_id: PARTNER_C, user_id: BUYER })],
+      }),
+    );
+
+    expect(result.meta).toEqual({ rule: "R7", reason: "server_state" });
+    expect(result.partnerId).toBe(PARTNER_C);
   });
 });
 

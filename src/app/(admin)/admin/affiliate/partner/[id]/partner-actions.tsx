@@ -3,6 +3,7 @@
 import { useActionState, useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
+  anonymizeAffiliatePartnerAction,
   approveAffiliatePartner,
   rejectAffiliatePartner,
   saveAffiliatePartnerAdminFields,
@@ -63,6 +64,8 @@ export function PartnerDetailActions({
   currency,
   groups,
   partners,
+  partnerCode,
+  pendingDeletionAt,
 }: {
   partnerId: string;
   status: AffiliatePartnerStatus;
@@ -74,6 +77,10 @@ export function PartnerDetailActions({
   currency: string;
   groups: Array<{ id: string; name: string }>;
   partners: Array<{ id: string; name: string }>;
+  /** Der Code, den der Manager zur Bestätigung abtippen muss (7.8). */
+  partnerCode: string;
+  /** Datum eines OFFENEN Löschantrags (Art. 17 DSGVO), sonst `null`. */
+  pendingDeletionAt: string | null;
 }) {
   const t = useTranslations("admin.affiliate");
 
@@ -147,7 +154,140 @@ export function PartnerDetailActions({
       {/* Dieselbe Komponente wie in der Provisionsliste, hier mit fester
           Partnerzeile (11.17 steht damit nur an einer Stelle). */}
       <ManualBookingForm partnerId={partnerId} currency={currency} />
+
+      <AnonymizeForm
+        partnerId={partnerId}
+        partnerCode={partnerCode}
+        pendingDeletionAt={pendingDeletionAt}
+      />
     </div>
+  );
+}
+
+/**
+ * ANONYMISIERUNG AUF EINEN LÖSCHANTRAG HIN (7.8, Art. 17 DSGVO; Abnahme,
+ * Befund S5).
+ *
+ * Eigene Karte, ganz unten und optisch abgesetzt: der Vorgang ist nicht
+ * zurücknehmbar, und er gehört nicht zwischen „Sperren" und „Handbuchung", wo
+ * ihn jemand im Vorbeigehen auslöst.
+ *
+ * Die Karte steht IMMER da, nicht nur bei offenem Antrag. Zwei Gründe: ein
+ * Antrag kann auch per Mail oder Telefon eingehen (die Tabelle kennt nur den
+ * Selbstbedienungsweg), und ein Knopf, der nur manchmal existiert, ist im
+ * Bedarfsfall der Knopf, den niemand findet. Liegt ein Antrag vor, steht sein
+ * Datum darüber — als Text, nicht als Farbe (8.5).
+ *
+ * Die Bestätigung ist der PARTNER-CODE, abgetippt; dieselbe Bauart wie die
+ * Belegnummer bei „Überweisung fehlgeschlagen". Geprüft wird sie in der
+ * Server Action, nicht hier — eine Prüfung im Browser wäre ein Vorschlag,
+ * keine Grenze.
+ */
+function AnonymizeForm({
+  partnerId,
+  partnerCode,
+  pendingDeletionAt,
+}: {
+  partnerId: string;
+  partnerCode: string;
+  pendingDeletionAt: string | null;
+}) {
+  const t = useTranslations("admin.affiliate");
+  const [state, formAction, pending] = useActionState(
+    anonymizeAffiliatePartnerAction,
+    initialAffiliatePartnerActionState,
+  );
+  const statusRef = useStatusFocus(Boolean(state.success) || Boolean(state.error));
+  const idPrefix = useId();
+
+  return (
+    <section
+      aria-labelledby={`${idPrefix}-heading`}
+      className={`${CARD_CLASS} p-[22px_24px] xl:col-span-2`}
+      style={{ borderColor: "#B24343" }}
+    >
+      <h2 id={`${idPrefix}-heading`} className="text-[17px] font-bold" style={{ color: INK }}>
+        {t("partner.actions.anonymizeHeading")}
+      </h2>
+
+      {pendingDeletionAt !== null && (
+        <p className="mt-1 text-[15px] font-bold" style={{ color: "#B24343" }}>
+          {t("partner.actions.anonymizePending", { date: pendingDeletionAt })}
+        </p>
+      )}
+
+      <p className="mt-2 text-[15px]" style={{ color: MUTED }}>
+        {t("partner.actions.anonymizeHint")}
+      </p>
+
+      <form action={formAction} className="mt-4 flex flex-col">
+        <input type="hidden" name="partnerId" value={partnerId} />
+
+        <label htmlFor={`${idPrefix}-reason`} className={labelClass} style={{ color: MUTED }}>
+          {t("partner.actions.anonymizeReasonLabel")}
+        </label>
+        <textarea
+          id={`${idPrefix}-reason`}
+          name="reason"
+          rows={2}
+          required
+          minLength={3}
+          maxLength={500}
+          className={`${fieldClass} mb-3 resize-y ${FOCUS_RING}`}
+          style={{ borderColor: CARD_BORDER, color: INK }}
+        />
+
+        <label htmlFor={`${idPrefix}-confirm`} className={labelClass} style={{ color: MUTED }}>
+          {t("partner.actions.anonymizeConfirmLabel")}
+        </label>
+        <input
+          id={`${idPrefix}-confirm`}
+          name="confirm"
+          type="text"
+          required
+          autoComplete="off"
+          aria-describedby={`${idPrefix}-confirm-hint`}
+          className={`${fieldClass} ${FOCUS_RING}`}
+          style={{ borderColor: CARD_BORDER, color: INK }}
+        />
+        <p id={`${idPrefix}-confirm-hint`} className="mt-1 mb-3 text-[13px]" style={{ color: MUTED }}>
+          {t("partner.actions.anonymizeConfirmHint", { code: partnerCode })}
+        </p>
+
+        {state.error && (
+          <p
+            ref={statusRef}
+            tabIndex={-1}
+            role="alert"
+            className="mb-3 text-[15px] font-semibold outline-none"
+            style={{ color: "#B24343" }}
+          >
+            {state.error}
+          </p>
+        )}
+        {state.success && !state.error && (
+          <p
+            ref={statusRef}
+            tabIndex={-1}
+            role="status"
+            aria-live="polite"
+            className="mb-3 text-[15px] font-semibold outline-none"
+            style={{ color: SUCCESS }}
+          >
+            {t("partner.actions.anonymizeDone")}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={pending}
+          className={`min-h-[44px] self-start rounded-[11px] px-[18px] text-[15px] font-bold disabled:opacity-50 ${FOCUS_RING}`}
+          style={{ background: "#B24343", color: "#FFFFFF" }}
+        >
+          {pending ? t("partner.actions.pending") : t("partner.actions.anonymize")}
+        </button>
+      </form>
+    </section>
   );
 }
 

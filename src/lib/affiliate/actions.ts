@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertNoSelfApproval, requireAffiliateManager } from "@/lib/affiliate/access";
+import { anonymizeAffiliatePartner } from "@/lib/affiliate/anonymize";
 import { writeAuditEntry } from "@/lib/affiliate/audit";
 import {
   buildDedupKey,
@@ -18,6 +19,7 @@ import {
   affiliateGroupSchema,
   affiliateManualBookingSchema,
   affiliatePartnerAdminSchema,
+  affiliatePartnerAnonymizeSchema,
   affiliatePartnerCreateSchema,
   affiliatePartnerStatusSchema,
   affiliateProgramSettingsSchema,
@@ -104,6 +106,16 @@ const ORDER_NOT_FOUND = "Die Bestellung wurde in dieser Akademie nicht gefunden.
 const COMMISSION_NOT_FOUND = "Die Buchung wurde in dieser Akademie nicht gefunden.";
 const CONDITION_NOT_FOUND = "Die Kondition wurde in dieser Akademie nicht gefunden.";
 const GROUP_NOT_FOUND = "Die Gruppe wurde in dieser Akademie nicht gefunden.";
+/** Anonymisierung (7.8, Befund S5): die abgetippte Bestätigung passt nicht. */
+const ANONYMIZE_CONFIRM_MISMATCH =
+  "Bitte den Partner-Code genau so eintragen, wie er an der Partnerakte steht. Die Anonymisierung lässt sich nicht zurücknehmen.";
+/**
+ * Solange ein Beleg noch aussteht, wird die Anschrift für die Gutschrift
+ * gebraucht (§ 14 Abs. 4 UStG). Eine halbe Anonymisierung wäre schlimmer als
+ * eine verschobene — der Text sagt deshalb, WAS zu tun ist.
+ */
+const ANONYMIZE_PAYOUT_OPEN =
+  "Für diesen Partner steht noch eine Auszahlung offen (Entwurf, freigegeben oder exportiert). Bitte sie zuerst abschließen; danach ist die Anonymisierung möglich.";
 const PRODUCT_NOT_FOUND = "Das Produkt wurde in dieser Akademie nicht gefunden.";
 const PROGRAM_MISSING =
   "Für diese Akademie ist noch kein Partnerprogramm eingerichtet. Bitte zuerst die Einstellungen speichern.";
@@ -138,6 +150,8 @@ const AFFILIATE_PATH = "/admin/affiliate";
  */
 const USER_FACING_MESSAGES: ReadonlySet<string> = new Set([
   PARTNER_NOT_FOUND,
+  ANONYMIZE_CONFIRM_MISMATCH,
+  ANONYMIZE_PAYOUT_OPEN,
   ORDER_NOT_FOUND,
   COMMISSION_NOT_FOUND,
   CONDITION_NOT_FOUND,
@@ -780,6 +794,164 @@ export async function suspendAffiliatePartner(
       status: "suspended",
       action: "partner.suspend",
     });
+  } catch (e) {
+    return partnerState(e);
+  }
+}
+
+// =======================================================================
+// 3b. Anonymisierung auf einen Löschantrag hin (Art. 17 DSGVO, Plan 7.8)
+// =======================================================================
+
+/**
+ * DER LÖSCHWEG, VERDRAHTET (Abnahme, Befund S5).
+ *
+ * `anonymizeAffiliatePartner()` (anonymize.ts) war gebaut, geprüft — und hatte
+ * im ganzen Repo KEINEN Aufrufer. Gleichzeitig hat das Modul die Partnerzeile
+ * bewusst praktisch unlöschbar gemacht (`affiliate_partners_manager_delete`
+ * verlangt `status in ('pending','rejected') and user_id is null and
+ * terms_accepted_at is null`, dazu der Lösch-Guard und `on delete no action`
+ * aus dem Provisionsbuch), und beide Migrationen verweisen für den Löschfall
+ * ausdrücklich auf genau diese Funktion. Das Ergebnis war ein Modul, das
+ * Auskunft nach Art. 15 liefert, aber keine Löschung nach Art. 17: der
+ * Partner stellt über `/profil` einen Antrag, der Manager öffnet die
+ * Partnerakte — und findet keinen Weg, ihm nachzukommen.
+ *
+ * DIE VERBINDUNG ZUM ANTRAG. Der Selbstbedienungsweg legt eine Zeile in
+ * `deletion_requests` an (`status = 'pending'`, Migration
+ * 20260711222020). Diese Action schließt sie mit: `status = 'completed'`,
+ * `processed_at`, `processed_by`. Ohne das bliebe der Antrag für immer offen
+ * und der nächste Manager bearbeitete ihn ein zweites Mal.
+ *
+ * ZWEI REIHENFOLGEN, die nicht vertauscht werden dürfen:
+ *   1. `user_id` VOR der Anonymisierung lesen — sie wird dabei auf `null`
+ *      gesetzt, und ohne sie findet sich der Antrag hinterher nicht mehr.
+ *   2. Den Antrag ERST NACH der Anonymisierung schließen. Andersherum stünde
+ *      ein erledigter Antrag über nicht anonymisierten Daten, und niemand
+ *      käme je darauf zurück.
+ *
+ * WAS DIESE ACTION NICHT TUT: das Nutzerkonto selbst löschen. Der Antrag aus
+ * `/profil` betrifft die PERSON im Mandanten; diese Action erledigt den
+ * Anteil, den das Partnerprogramm hält. Ein Konto ohne Partnerakte bleibt ein
+ * eigener, manueller Vorgang — deshalb wird der Antrag auch nur dann
+ * geschlossen, wenn es zu diesem Konto überhaupt eine Partnerakte gab.
+ */
+export async function anonymizeAffiliatePartnerAction(
+  _prevState: AffiliatePartnerActionState,
+  formData: FormData,
+): Promise<AffiliatePartnerActionState> {
+  try {
+    const { tenant, user } = await requireAffiliateManager();
+
+    const parsed = affiliatePartnerAnonymizeSchema.safeParse({
+      partnerId: String(formData.get("partnerId") ?? ""),
+      reason: String(formData.get("reason") ?? ""),
+      confirm: String(formData.get("confirm") ?? ""),
+    });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+    }
+    const input = parsed.data;
+
+    const admin = createAdminClient();
+
+    // SCHRITT 1: Mandantenbindung der client-gelieferten ID, VOR allem
+    // anderen (§2.15). Gelesen wird zugleich `user_id` — siehe Reihenfolge 1
+    // im Kopf — und `code` für die Bestätigung.
+    const { data: existing, error: readError } = await admin
+      .from("affiliate_partners")
+      .select("id, code, user_id, status")
+      .eq("tenant_id", tenant.id)
+      .eq("id", input.partnerId)
+      .maybeSingle();
+    if (readError) {
+      console.error(`[affiliate/actions] Partner lesen fehlgeschlagen (Code ${readError.code}).`);
+      return { error: PARTNER_NOT_FOUND };
+    }
+    if (existing === null) return { error: PARTNER_NOT_FOUND };
+
+    const partner = existing as { code: string; user_id: string | null; status: string };
+
+    // SCHRITT 2: die abgetippte Bestätigung. Groß-/Kleinschreibung und
+    // Randleerzeichen spielen keine Rolle — der Mensch soll die richtige Akte
+    // bestätigen, kein Diktat bestehen.
+    if (input.confirm.toLowerCase() !== partner.code.trim().toLowerCase()) {
+      return { error: ANONYMIZE_CONFIRM_MISMATCH };
+    }
+
+    // SCHRITT 3: G15. Wer selbst dieser Partner ist, löscht seine eigene
+    // Akte nicht — der Vorgang vernichtet unter anderem den
+    // Zustimmungsnachweis, und das ist eine Entscheidung über den eigenen
+    // Vorgang. `assertNoSelfApproval()` wirft und protokolliert den Versuch.
+    await assertNoSelfApproval({
+      tenantId: tenant.id,
+      userId: user.id,
+      partnerId: input.partnerId,
+      entity: "partner",
+      attemptedAction: "partner.anonymize",
+    });
+
+    // SCHRITT 4: die Anonymisierung selbst. Sie schreibt ihren eigenen
+    // Prüfpfad-Eintrag (`partner.anonymize`) und wirft, wenn der nicht
+    // geschrieben werden konnte.
+    const result = await anonymizeAffiliatePartner(admin, {
+      tenant_id: tenant.id,
+      partner_id: input.partnerId,
+      reason: input.reason,
+      actor_user_id: user.id,
+    });
+
+    if (!result.ok) {
+      if (result.reason === "payout_open") return { error: ANONYMIZE_PAYOUT_OPEN };
+      if (result.reason === "not_found") return { error: PARTNER_NOT_FOUND };
+      return { error: "Die Anonymisierung ist fehlgeschlagen. Bitte später erneut versuchen." };
+    }
+
+    // SCHRITT 5: den Löschantrag schließen — siehe Reihenfolge 2 im Kopf.
+    // Fail-soft und NACH dem Prüfpfad: die Daten sind fort, das ist der
+    // Vorgang; ein offen gebliebener Antrag ist ein Arbeitsvorrat, kein
+    // Grund, den Erfolg in eine Fehlermeldung zu verwandeln. Sichtbar wird er
+    // trotzdem, weil die Partnerseite ihn weiter als offen anzeigt.
+    let requestClosed = false;
+    if (partner.user_id !== null) {
+      const { data: closed, error: closeError } = await admin
+        .from("deletion_requests")
+        .update({
+          status: "completed",
+          processed_at: new Date().toISOString(),
+          processed_by: user.id,
+        })
+        .eq("tenant_id", tenant.id)
+        .eq("user_id", partner.user_id)
+        .eq("status", "pending")
+        .select("id");
+      if (closeError) {
+        console.error(
+          `[affiliate/actions] Löschantrag nicht geschlossen (Code ${closeError.code}).`,
+        );
+      }
+      requestClosed = (closed ?? []).length > 0;
+    }
+
+    await writeAuditEntry({
+      tenantId: tenant.id,
+      actorKind: "manager",
+      actorUserId: user.id,
+      entity: "partner",
+      entityId: input.partnerId,
+      action: "partner.anonymize_requested",
+      before: { status: partner.status, had_user_account: partner.user_id !== null },
+      after: {
+        reason: input.reason,
+        deletion_request_closed: requestClosed,
+        payout_snapshots_cleared: result.payout_snapshots_cleared,
+      },
+    });
+
+    revalidatePath(AFFILIATE_PATH);
+    revalidatePath(`${AFFILIATE_PATH}/partner`);
+    revalidatePath(`${AFFILIATE_PATH}/partner/${input.partnerId}`);
+    return { error: null, success: true, partnerId: input.partnerId };
   } catch (e) {
     return partnerState(e);
   }

@@ -119,3 +119,48 @@ export type AffiliatePayoutActionState = {
 };
 
 export const initialAffiliatePayoutActionState: AffiliatePayoutActionState = { error: null };
+
+/**
+ * DIE BESTÄTIGUNGSSUMME DER FREIGABE — Erzeuger und Prüfer an EINER Stelle
+ * (Plan 7.2, 11.17; Abnahme, Befund N1).
+ *
+ * Die Bestätigungskarte in `lauf-form.tsx` baut je Währung einen Wert
+ * `<waehrung>:<cent>`, und die Server Action in `page.tsx` prüft ihn gegen ein
+ * Muster und rechnet ihn nach. Beides stand getrennt und in verschiedenen
+ * Dateien — und lief auseinander: das Muster verbot ein Minuszeichen, während
+ * eine STORNOGUTSCHRIFT eine negative Summe hat. Der Manager las daraufhin
+ * „Bitte zuerst mindestens eine Auszahlung auswählen", obwohl er eine
+ * ausgewählt hatte, und der Korrekturweg nach § 14c UStG war über die
+ * Oberfläche nicht begehbar. Kein Test sah es, weil die Testsuite
+ * `approveAffiliatePayout()` direkt aufruft und die Server Action mit ihrem
+ * zod-Schema nie anfasst.
+ *
+ * Seither gibt es nur noch diese eine Definition. Wer das Format ändert,
+ * ändert Erzeuger und Prüfer zwangsläufig gemeinsam.
+ */
+
+/**
+ * Das Muster des Bestätigungswerts. Das Vorzeichen ist Pflichtbestandteil und
+ * keine Nachlässigkeit — siehe oben.
+ */
+export const AFFILIATE_PAYOUT_EXPECTED_PATTERN = /^[a-z]{3}:-?\d{1,12}$/;
+
+/** Erzeugt den Bestätigungswert, den die Karte anzeigt und mitschickt. */
+export function formatAffiliatePayoutExpected(currency: string, cents: number): string {
+  return `${currency}:${cents}`;
+}
+
+/**
+ * Liest ihn zurück. `null` heißt „nicht lesbar" und führt in der Server Action
+ * zum Abbruch — nie zu einem stillen Standardwert, denn der Wert entscheidet
+ * darüber, ob die angezeigte Summe der tatsächlichen entspricht.
+ */
+export function parseAffiliatePayoutExpected(
+  raw: string,
+): { currency: string; cents: number } | null {
+  if (!AFFILIATE_PAYOUT_EXPECTED_PATTERN.test(raw)) return null;
+  const separator = raw.indexOf(":");
+  const cents = Number(raw.slice(separator + 1));
+  if (!Number.isSafeInteger(cents)) return null;
+  return { currency: raw.slice(0, separator), cents };
+}

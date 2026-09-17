@@ -12,6 +12,7 @@ import {
   generateAffiliateCreditNotePdf,
 } from "@/lib/affiliate/credit-note";
 import {
+  countPendingReversals,
   hasUnquarantinedCriticalFinding,
   verifyAffiliateIntegrity,
 } from "@/lib/affiliate/integrity";
@@ -29,7 +30,11 @@ import {
 import { getAffiliateProgram, listAffiliatePartners } from "@/lib/affiliate/queries";
 import { isValidIban } from "@/lib/affiliate/sepa";
 import { taxHintForMode } from "@/lib/affiliate/tax";
-import type { AffiliatePayoutActionState } from "@/lib/affiliate/state";
+import {
+  AFFILIATE_PAYOUT_EXPECTED_PATTERN,
+  parseAffiliatePayoutExpected,
+  type AffiliatePayoutActionState,
+} from "@/lib/affiliate/state";
 import type {
   AffiliateEntityKind,
   AffiliatePayoutMethod,
@@ -165,7 +170,7 @@ const PAYOUT_LIST_COLUMNS =
   "id, tenant_id, partner_id, period_from, period_to, currency, " +
   "gross_cents, reversal_cents, subtotal_cents, tax_mode, tax_rate_bp, " +
   "tax_cents, total_cents, status, method, document_no, document_path, " +
-  "document_issued_at, reference, approved_at, paid_at, created_at";
+  "document_issued_at, reference, reverses_payout_id, approved_at, paid_at, created_at";
 
 /** Höchstzahl der Zeilen je Reiter — dieselbe Größenordnung wie die Buchungsliste. */
 const PAYOUT_LIST_LIMIT = 200;
@@ -188,6 +193,14 @@ type PayoutListRow = {
   document_no: string | null;
   document_path: string | null;
   reference: string | null;
+  /**
+   * Gesetzt, wenn dieser Satz eine STORNOGUTSCHRIFT ist: er zahlt nichts aus,
+   * er neutralisiert den Beleg, auf den er zeigt (§ 14c UStG). Ohne diese
+   * Spalte stünde er im Reiter „Entwürfe" als gewöhnlicher Entwurf mit
+   * negativen Beträgen, und der Manager gäbe etwas anderes frei, als er
+   * gelesen hat.
+   */
+  reverses_payout_id: string | null;
 };
 
 /**
@@ -235,6 +248,16 @@ const CONFIRM_MISSING = "Bitte die Freigabe im Bestätigungsschritt ausdrücklic
 const AMOUNT_CHANGED =
   "Die Beträge haben sich seit der Anzeige geändert. Bitte die Liste neu laden und erneut prüfen.";
 const NOTHING_SELECTED = "Bitte zuerst mindestens eine Auszahlung auswählen.";
+/**
+ * Getrennt von `NOTHING_SELECTED`, weil die beiden Fälle verschiedene
+ * Handlungen verlangen: „nichts ausgewählt" ist ein Bedienhinweis, ein am
+ * Schema gescheitertes Formular ist ein Fehler der Seite. Ein Text, der das
+ * Gegenteil dessen sagt, was los ist, kostet im Zweifel eine Stunde Suche am
+ * falschen Ende — genau so ist die Stornofreigabe zuletzt unbemerkt
+ * ausgefallen.
+ */
+const FORM_INVALID =
+  "Die Freigabe konnte nicht gelesen werden. Bitte die Seite neu laden und erneut versuchen.";
 const CONFIRM_DOCUMENT_MISSING =
   "Bitte die Belegnummer genau so eintragen, wie sie an der Auszahlung steht. Der Fehlschlag lässt sich nicht zurücknehmen.";
 const PAYOUT_PATH = "/admin/affiliate/auszahlungen";
@@ -384,8 +407,17 @@ async function runPayoutDraftsAction(
 
 const approveSchema = z.object({
   payoutIds: z.array(uuidSchema).min(1).max(50),
-  /** `<waehrung>:<cent>`, genau so, wie die Bestätigungskarte es angezeigt hat. */
-  expected: z.array(z.string().regex(/^[a-z]{3}:\d{1,12}$/)).max(10),
+  /**
+   * `<waehrung>:<cent>`, genau so, wie die Bestätigungskarte es angezeigt hat.
+   *
+   * Das Vorzeichen ist PFLICHTBESTANDTEIL des Musters und keine Nachlässigkeit:
+   * eine Stornogutschrift (`reverses_payout_id is not null`) hat gespiegelte,
+   * also negative Summen. Ein Muster ohne `-` sperrt genau den Korrekturweg
+   * nach § 14c UStG — der Manager kann den Beleg, den er neutralisieren muss,
+   * über die Oberfläche nicht freigeben. Die nachfolgende Summenprüfung
+   * rechnet mit `Number()` und trägt das Vorzeichen bereits mit.
+   */
+  expected: z.array(z.string().regex(AFFILIATE_PAYOUT_EXPECTED_PATTERN)).max(10),
   confirm: z.string(),
 });
 
@@ -416,7 +448,12 @@ async function approvePayoutsAction(
       expected: formData.getAll("expected").map(String),
       confirm: String(formData.get("confirm") ?? ""),
     });
-    if (!parsed.success) return { error: NOTHING_SELECTED };
+    if (!parsed.success) {
+      // Kein Satz markiert ist der Bedienfall; alles andere ist ein Fehler
+      // des Formulars und darf nicht als Bedienfehler ausgegeben werden.
+      const nothingPicked = formData.getAll("payoutIds").length === 0;
+      return { error: nothingPicked ? NOTHING_SELECTED : FORM_INVALID };
+    }
     if (parsed.data.confirm !== "yes") return { error: CONFIRM_MISSING };
 
     const admin = createAdminClient();
@@ -446,8 +483,11 @@ async function approvePayoutsAction(
 
     const expected = new Map<string, number>();
     for (const entry of parsed.data.expected) {
-      const [currency, cents] = entry.split(":");
-      expected.set(currency, Number(cents));
+      // Derselbe Leser wie der Erzeuger in `lauf-form.tsx` — beide hängen an
+      // `state.ts`. Ein unlesbarer Wert bricht ab, statt als 0 durchzugehen.
+      const parsedEntry = parseAffiliatePayoutExpected(entry);
+      if (parsedEntry === null) return { error: AMOUNT_CHANGED };
+      expected.set(parsedEntry.currency, parsedEntry.cents);
     }
     const actual = new Map<string, number>();
     for (const draft of drafts) {
@@ -470,6 +510,24 @@ async function approvePayoutsAction(
       return {
         error:
           "Der Kontrollabgleich hat einen kritischen Befund gefunden, der nicht stillgelegt werden konnte. Es wurde nichts freigegeben.",
+      };
+    }
+
+    // Der Abgleich legt einen nummerierten Satz stillschweigend still und
+    // erzeugt dabei den Storno-Entwurf (Befund N3). Gelingt der nicht, bleibt
+    // ein Beleg mit ausgewiesener Steuer ohne Berichtigungsweg im Bestand —
+    // und der Befund kommt beim nächsten Lauf NICHT wieder, weil ein
+    // 'failed'-Satz übersprungen wird. Also hier aussprechen.
+    const pendingReversals = countPendingReversals(report);
+    if (pendingReversals > 0) {
+      // Abbruch VOR der Schleife, wie beim nicht stillgelegten Befund darüber:
+      // eine Freigabe, die erst läuft und dann meldet, dass die Bücher offen
+      // sind, hat das Geld schon bewegt. Der Abgleich blockiert dadurch genau
+      // EINEN Lauf — beim nächsten ist der Satz 'failed' und wird von
+      // `checkPayoutSubtotals()` übersprungen, der Befund kommt also nicht
+      // wieder und niemand sitzt fest.
+      return {
+        error: `Der Kontrollabgleich hat ${pendingReversals} Beleg(e) stillgelegt, für die der Entwurf der Stornogutschrift nicht angelegt werden konnte. Es wurde nichts freigegeben; bitte diese Belege prüfen.`,
       };
     }
 
@@ -554,6 +612,53 @@ async function approvePayoutsAction(
 const SELF_DEALING =
   "Dieser Vorgang gehört zur eigenen Partnerzeile und muss von einer anderen Person entschieden werden.";
 
+/**
+ * G15 FÜR DIE BEIDEN ABSCHLUSS-AKTIONEN (Abnahme, Befund S6).
+ *
+ * Von den vier Aktionen dieser Seite prüfte nur die Freigabe den
+ * Interessenkonflikt. G15 nennt aber „eine Auszahlung an sich selbst" als
+ * eigenen Fall, nicht nur deren Freigabe — und beide Abschluss-Aktionen sind
+ * Entscheidungen über eigenes Geld an einem Beleg, den der Entscheidende
+ * selbst empfängt:
+ *   * „bezahlt" stellt zusätzlich alle zugehörigen Provisionszeilen auf
+ *     `paid` — ein Endzustand;
+ *   * „fehlgeschlagen" löst sie zurück auf `approved` (sie laufen damit in
+ *     den nächsten Lauf) und legt eine Stornogutschrift mit eigener Nummer
+ *     an, während der erste Beleg neutralisiert wird.
+ *
+ * Die `partner_id` steht nicht im Formular — sie wird mandantengebunden aus
+ * dem Satz gelesen, BEVOR geschrieben wird (§2.15). Ein fehlender Satz ergibt
+ * `null` und denselben Text wie „gehört einem anderen Mandanten" (11.15).
+ */
+async function assertNotOwnPayout(
+  admin: ReturnType<typeof createAdminClient>,
+  params: { tenantId: string; userId: string; payoutId: string; action: string },
+): Promise<"ok" | "not_found"> {
+  const { data, error } = await admin
+    .from("affiliate_payouts")
+    .select("partner_id")
+    .eq("tenant_id", params.tenantId)
+    .eq("id", params.payoutId)
+    .maybeSingle();
+
+  if (error) {
+    logDbError("Partnerzeile der Auszahlung lesen", error);
+    return "not_found";
+  }
+  const row = data as { partner_id: string } | null;
+  if (row === null) return "not_found";
+
+  // Wirft und schreibt den abgewiesenen Versuch selbst ins Protokoll.
+  await assertNoSelfApproval({
+    tenantId: params.tenantId,
+    userId: params.userId,
+    partnerId: row.partner_id,
+    entity: "payout",
+    attemptedAction: params.action,
+  });
+  return "ok";
+}
+
 const settleSchema = z.object({
   payoutId: uuidSchema,
   reference: z.string().optional(),
@@ -579,6 +684,19 @@ async function markPaidAction(
     if (!parsed.success) return { error: PAYOUT_NOT_FOUND };
 
     const admin = createAdminClient();
+
+    // G15 nach dem zod-Parse und VOR dem Schreiben (Befund S6).
+    if (
+      (await assertNotOwnPayout(admin, {
+        tenantId: tenant.id,
+        userId: user.id,
+        payoutId: parsed.data.payoutId,
+        action: "payout.mark_paid",
+      })) === "not_found"
+    ) {
+      return { error: PAYOUT_NOT_FOUND };
+    }
+
     const result = await markAffiliatePayoutPaid(admin, {
       tenantId: tenant.id,
       payoutId: parsed.data.payoutId,
@@ -649,6 +767,19 @@ async function markFailedAction(
     if (!parsed.success) return { error: CONFIRM_DOCUMENT_MISSING };
 
     const admin = createAdminClient();
+
+    // G15 nach dem zod-Parse und VOR dem Schreiben (Befund S6).
+    if (
+      (await assertNotOwnPayout(admin, {
+        tenantId: tenant.id,
+        userId: user.id,
+        payoutId: parsed.data.payoutId,
+        action: "payout.mark_failed",
+      })) === "not_found"
+    ) {
+      return { error: PAYOUT_NOT_FOUND };
+    }
+
     const result = await markAffiliatePayoutFailed(admin, {
       tenantId: tenant.id,
       payoutId: parsed.data.payoutId,
@@ -1053,6 +1184,34 @@ export default async function AdminAffiliatePayoutsPage({
   }
   const profileByPartner = new Map(profiles.map((row) => [row.partner_id, row]));
 
+  // Belegnummern der neutralisierten Sätze. Eine Stornogutschrift muss in der
+  // Liste sagen, WAS sie storniert — „minus 714,00 €" allein ist keine
+  // Auskunft. Gelesen mit Mandantenfilter wie jede andere Abfrage dieser
+  // Seite; ein Satz aus einem fremden Mandanten taucht damit gar nicht erst
+  // als Name auf.
+  const reversedIds = [
+    ...new Set(
+      payouts
+        .map((row) => row.reverses_payout_id)
+        .filter((value): value is string => value !== null),
+    ),
+  ];
+  const reversedDocumentById = new Map<string, string | null>();
+  if (reversedIds.length > 0) {
+    const { data: reversedData, error: reversedError } = await admin
+      .from("affiliate_payouts")
+      .select("id, document_no")
+      .eq("tenant_id", access.tenant.id)
+      .in("id", reversedIds);
+    if (reversedError) logDbError("Stornierte Belege lesen", reversedError);
+    for (const entry of (reversedData ?? []) as unknown as Array<{
+      id: string;
+      document_no: string | null;
+    }>) {
+      reversedDocumentById.set(entry.id, entry.document_no);
+    }
+  }
+
   const money = (cents: number, currency: string) =>
     format.number(centsToAmount(cents), {
       style: "currency",
@@ -1126,6 +1285,13 @@ export default async function AdminAffiliatePayoutsPage({
       documentNo: row.document_no,
       documentReady: row.document_path !== null,
       reference: row.reference,
+      isReversal: row.reverses_payout_id !== null,
+      // `null` bei gesetztem `isReversal` heißt „Beleg (noch) ohne Nummer",
+      // nicht „kein Storno" — die Oberfläche unterscheidet beides.
+      reversesDocumentNo:
+        row.reverses_payout_id === null
+          ? null
+          : (reversedDocumentById.get(row.reverses_payout_id) ?? null),
       completenessText: state.text,
       complete: state.complete,
     };

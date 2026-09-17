@@ -1351,9 +1351,33 @@ begin
   -- gesperrt oder auf Auszahlungsstopp gesetzt, ist die Freigabe der letzte
   -- Moment, an dem das noch folgenlos auffallen kann -- danach ist eine
   -- Belegnummer verbraucht.
-  if v_partner_status <> 'active' or v_partner_hold then
+  --
+  -- NICHT FUER EINE STORNOGUTSCHRIFT (Abnahme, Befund N2). Die Auszahlbarkeit
+  -- ist eine Frage an eine ZAHLUNG; ein Storno zahlt nichts, er neutralisiert
+  -- einen bereits ausgestellten Beleg mit ausgewiesener Steuer. Die Regel
+  -- stuende hier ueber einer gesetzlichen Berichtigungspflicht (§ 14c UStG) --
+  -- dieselbe Fehlerform wie ein Mengendeckel ueber einem Widerruf.
+  -- Der Ablauf, um den es geht, ist der NAHELIEGENDE: die Ueberweisung laeuft
+  -- an einer toten IBAN zurueck, der Manager setzt den Partner daraufhin auf
+  -- Auszahlungsstopp oder 'suspended' -- und genau dann darf die Berichtigung
+  -- nicht mehr blockiert sein. Ein gesperrter Partner bekommt dadurch KEIN
+  -- Geld: die Stornogutschrift ist negativ, sie steht in keiner Exportdatei,
+  -- und jede kuenftige echte Auszahlung laeuft wieder durch diese Pruefung.
+  if v_payout.reverses_payout_id is null
+     and (v_partner_status <> 'active' or v_partner_hold) then
     raise exception 'affiliate_payout_partner_not_payable';
   end if;
+  -- Die beiden folgenden Pruefungen gelten dem BELEG und bleiben deshalb auch
+  -- fuer den Storno stehen:
+  --   * das Programm, weil ein Beleg unter dem falschen Programm mit falschen
+  --     Konditionen und in einem fremden Abrechnungszeitraum stuende;
+  --   * der Zahlweg, weil `check (status in ('draft','cancelled') or method is
+  --     not null)` ihn ohnehin erzwingt -- ihn hier fuer den Storno zu
+  --     ueberspringen wuerde die sprechende Kennung nur gegen ein nacktes
+  --     23514 im UPDATE tauschen, ohne irgendetwas freizugeben. Der
+  --     Storno-Entwurf uebernimmt den Zahlweg des Ursprungsbelegs
+  --     (`createReversalDraft()`), der als freigegebener Beleg zwingend einen
+  --     hatte; der Fall ist damit ohnehin nicht erreichbar.
   if v_partner_program_id <> v_payout.program_id then
     -- Die beiden zusammengesetzten Fremdschluessel binden Partner und
     -- Programm je an den Mandanten, aber nicht aneinander. Ein Satz, der

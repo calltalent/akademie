@@ -25,13 +25,31 @@ import { writeAuditEntry } from "./audit";
  *
  * Daraus folgt die Aufteilung, die diese Datei vornimmt:
  *
- *   BLEIBEN UNVERÄNDERT — `affiliate_commissions`, `affiliate_payouts`.
- *     Das sind die Buchungsbelege selbst (Betrag, Satz, Steuermodus,
- *     Belegnummer). Sie werden nicht angefasst, nicht überschrieben, nicht
- *     „geleert": ein Beleg, dessen Zahlen jemand nachträglich ändert, ist
- *     keiner mehr. Die Anschrift, die auf der Gutschrift stehen muss
- *     (§ 14 Abs. 4 UStG), steht dort bereits in der PDF — genau deshalb darf
- *     das Abrechnungsprofil weg.
+ *   BLEIBEN UNVERÄNDERT — `affiliate_commissions` und jeder NUMMERIERTE Satz
+ *     in `affiliate_payouts`. Das sind die Buchungsbelege selbst (Betrag,
+ *     Satz, Steuermodus, Belegnummer). Sie werden nicht angefasst, nicht
+ *     überschrieben, nicht „geleert": ein Beleg, dessen Zahlen jemand
+ *     nachträglich ändert, ist keiner mehr. Die Anschrift, die auf der
+ *     Gutschrift stehen muss (§ 14 Abs. 4 UStG), steht dort in der PDF UND
+ *     seit der Berichtigung zu Befund 10 zusätzlich in
+ *     `affiliate_payouts.recipient_snapshot` (legal_name, street,
+ *     postal_code, city, country, vat_id, tax_number) — genau deshalb darf
+ *     das Abrechnungsprofil weg, und genau deshalb steht die Abgrenzung
+ *     gleich darunter.
+ *
+ *   DIE GRENZE LÄUFT AN DER BELEGNUMMER, nicht an der Tabelle (Abnahme,
+ *     Befund N4). Der Kopf dieser Datei behauptete früher, in
+ *     `affiliate_payouts` stehe keine Anschrift; seit `recipient_snapshot`
+ *     stimmt das nicht mehr, und die Datei wurde dabei nicht nachgezogen.
+ *       * BELEG MIT NUMMER (`document_no is not null`) — bleibt vollständig.
+ *         Art. 17 Abs. 3 lit. b DSGVO deckt ihn, und der Belegfrost im Guard
+ *         ließe eine Änderung ohnehin nicht zu.
+ *       * ENTWURF OHNE NUMMER — geht. Ein verworfener Entwurf
+ *         ('cancelled') hat nie eine Nummer gezogen, ist kein Buchungsbeleg
+ *         und steht nicht in `OPEN_PAYOUT_STATUSES`; er blockiert die
+ *         Anonymisierung also nicht und behielte Anschrift, Steuernummer und
+ *         USt-IdNr. sonst auf Dauer, obwohl der Partner die Löschung
+ *         verlangt hat. Schritt 5b nullt dort `recipient_snapshot`.
  *
  *   WERDEN UNKENNTLICH — die Personendaten in `affiliate_partners`. Nach
  *     dieser Funktion trägt die Zeile keinen Namen, keine Firma, keine
@@ -131,6 +149,12 @@ export type AffiliateAnonymizeResult =
       billing_profile_deleted: boolean;
       referrals_deleted: number;
       clicks_deleted: number;
+      /**
+       * Wie viele Auszahlungs-ENTWÜRFE ohne Belegnummer ihre eingefrorene
+       * Anschrift verloren haben (Befund N4). Nummerierte Belege sind nie
+       * dabei — siehe Kopf.
+       */
+      payout_snapshots_cleared: number;
     }
   | {
       ok: false;
@@ -260,6 +284,29 @@ export async function anonymizeAffiliatePartner(
     return { ok: false, reason: "write_failed" };
   }
 
+  // --- Schritt 5b: Anschrift an Entwürfen ohne Belegnummer ----------------
+  // Siehe Kopf, „DIE GRENZE LÄUFT AN DER BELEGNUMMER" (Befund N4). Der Filter
+  // `is("document_no", null)` ist die Grenze selbst und nicht nur eine
+  // Vorsichtsmaßnahme: ohne ihn liefe die Anweisung in den Belegfrost des
+  // Guards, der `recipient_snapshot` ab vergebener Nummer auf den alten Wert
+  // zurücksetzt — die Anweisung ginge durch, ohne etwas zu bewirken, und der
+  // Rückgabewert läge über der Wirklichkeit.
+  //
+  // Nach Schritt 2 kann hier ohnehin nur ein 'cancelled'-Entwurf stehen:
+  // draft/approved/exported sind ausgeschlossen, paid und failed tragen eine
+  // Nummer.
+  const { data: clearedSnapshots, error: snapshotError } = await admin
+    .from("affiliate_payouts")
+    .update({ recipient_snapshot: null })
+    .eq("tenant_id", tenantId)
+    .eq("partner_id", partnerId)
+    .is("document_no", null)
+    .select("id");
+  if (snapshotError) {
+    logDbError("Anschrift an Entwürfen ohne Beleg löschen", snapshotError);
+    return { ok: false, reason: "write_failed" };
+  }
+
   // --- Schritt 6: Prüfpfad ------------------------------------------------
   // `writeAuditEntry()` wirft, wenn der Eintrag nicht geschrieben wurde — und
   // hier wird das bewusst NICHT gefangen (anders als im Bewerbungspfad, der
@@ -287,6 +334,7 @@ export async function anonymizeAffiliatePartner(
       billing_profile_deleted: (deletedProfiles ?? []).length > 0,
       commissions_kept: true,
       payouts_kept: true,
+      payout_snapshots_cleared: (clearedSnapshots ?? []).length,
     },
   });
 
@@ -296,5 +344,6 @@ export async function anonymizeAffiliatePartner(
     billing_profile_deleted: (deletedProfiles ?? []).length > 0,
     referrals_deleted: (deletedReferrals ?? []).length,
     clicks_deleted: (deletedClicks ?? []).length,
+    payout_snapshots_cleared: (clearedSnapshots ?? []).length,
   };
 }

@@ -3,7 +3,10 @@
 import { useActionState, useId, useMemo, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import type { AffiliatePayoutActionState } from "@/lib/affiliate/state";
-import { initialAffiliatePayoutActionState } from "@/lib/affiliate/state";
+import {
+  formatAffiliatePayoutExpected,
+  initialAffiliatePayoutActionState,
+} from "@/lib/affiliate/state";
 import type { AffiliatePayoutMethod } from "@/lib/affiliate/types";
 
 import { useStatusFocus } from "../use-status-focus";
@@ -160,6 +163,15 @@ export type PayoutRowView = {
   /** Das PDF liegt im Bucket. `false` heißt „Beleg gültig, Datei folgt" (7.2). */
   documentReady: boolean;
   reference: string | null;
+  /**
+   * Stornogutschrift (7.7, § 14c UStG): der Satz zahlt nichts aus, er
+   * neutralisiert einen bereits nummerierten Beleg. Die Beträge sind
+   * gespiegelt, also negativ — ohne dieses Merkmal sähe die Zeile aus wie ein
+   * gewöhnlicher Entwurf, bei dem sich jemand im Vorzeichen vertan hat.
+   */
+  isReversal: boolean;
+  /** Belegnummer des neutralisierten Satzes; `null`, solange er keine trägt. */
+  reversesDocumentNo: string | null;
   /** Vollständigkeit des Abrechnungsprofils als TEXT, nie nur als Farbe. */
   completenessText: string;
   complete: boolean;
@@ -490,6 +502,17 @@ function PayoutRow({
           >
             {row.statusText}
           </span>
+          {/* Die Stornogutschrift steht NEBEN dem Status, nicht statt seiner:
+              sie ist ein Merkmal des Satzes, kein eigener Zustand. Text und
+              nicht nur Farbe (8.5). */}
+          {row.isReversal && (
+            <span
+              className="ml-2 inline-flex items-center rounded-[8px] px-2 py-1 text-[13px] font-bold"
+              style={{ color: DANGER, background: "#FDECEC" }}
+            >
+              {t("reversalBadge")}
+            </span>
+          )}
         </span>
       </div>
 
@@ -507,6 +530,13 @@ function PayoutRow({
             <span style={{ color: DANGER }}> — {t("documentFileMissing")}</span>
           )}
         </span>
+        {row.isReversal && (
+          <span style={{ color: INK }}>
+            {row.reversesDocumentNo === null
+              ? t("reversalOfUnknown")
+              : t("reversalOf", { documentNo: row.reversesDocumentNo })}
+          </span>
+        )}
         {row.reference !== null && (
           <span>
             {t("columnReference")}:{" "}
@@ -747,6 +777,12 @@ function ApprovalPanel({
       }));
   }, [rows, format]);
 
+  /** Wie viele der markierten Sätze sind Stornogutschriften (7.7, § 14c UStG)? */
+  const reversalCount = useMemo(
+    () => rows.filter((row) => row.isReversal).length,
+    [rows],
+  );
+
   if (rows.length === 0) {
     return (
       <p className="text-[15px]" style={{ color: MUTED }}>
@@ -819,6 +855,15 @@ function ApprovalPanel({
               </li>
             ))}
           </ul>
+          {/* Ein negativer Gesamtbetrag ohne Erklärung ist die gefährlichste
+              Anzeige dieser Seite: der Manager glaubt an einen Vorzeichenfehler
+              und bricht ab — oder er gibt frei, ohne zu wissen, dass er einen
+              Beleg neutralisiert. Deshalb steht es ausdrücklich da. */}
+          {reversalCount > 0 && (
+            <p className="mt-2 text-[15px] font-semibold" style={{ color: DANGER }}>
+              {t("releaseConfirmReversal", { count: reversalCount })}
+            </p>
+          )}
           <p className="mt-2 text-[15px]" style={{ color: MUTED }}>
             {t("releaseConfirmHint")}
           </p>
@@ -835,7 +880,7 @@ function ApprovalPanel({
                   key={entry.currency}
                   type="hidden"
                   name="expected"
-                  value={`${entry.currency}:${entry.cents}`}
+                  value={formatAffiliatePayoutExpected(entry.currency, entry.cents)}
                 />
               ))}
               <input type="hidden" name="confirm" value="yes" />

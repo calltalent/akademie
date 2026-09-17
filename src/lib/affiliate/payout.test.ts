@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { verifyAffiliateIntegrity } from "./integrity";
 import {
+  AFFILIATE_PAYOUT_EXPECTED_PATTERN,
+  formatAffiliatePayoutExpected,
+  parseAffiliatePayoutExpected,
+} from "./state";
+import {
   approveAffiliatePayout,
   createAffiliatePayoutDrafts,
   markAffiliatePayoutFailed,
@@ -123,6 +128,8 @@ function str(value: unknown): string | null {
 
 const PAYOUT_STATUSES = ["draft", "approved", "exported", "paid", "failed", "cancelled"];
 const TAX_MODES = ["regular", "small_business", "reverse_charge", "non_eu"];
+/** `check (method in ('sepa','paypal','manual'))` — Migration Abschnitt 2.1. */
+const PAYOUT_METHODS = ["sepa", "paypal", "manual"];
 const DOCUMENT_NO_PATTERN = /^GS-[A-Z0-9][A-Z0-9-]{1,40}-[0-9]{4}-[0-9]{6}$/;
 
 /** `check (...)`-Verletzung: derselbe SQLSTATE wie in Postgres. */
@@ -151,6 +158,11 @@ function assertPayoutChecks(row: Row): void {
   const approvedAt = str(row.approved_at);
   const paidAt = str(row.paid_at);
 
+  // `check (period_to >= period_from)`. Heute nicht erreichbar — die
+  // Finalisierung schiebt `period_from` nur nach UNTEN (`earliestBookedAt`) —,
+  // aber eine Treue-Lücke bleibt eine Treue-Lücke: für `subtotal_cents > 0`
+  // galt dasselbe Argument, bis es nicht mehr galt.
+  check(String(row.period_to ?? "") >= String(row.period_from ?? ""), "period_to >= period_from");
   check(/^[a-z]{3}$/.test(String(row.currency ?? "")), "currency");
   check(PAYOUT_STATUSES.includes(status), "status");
   check(TAX_MODES.includes(taxMode), "tax_mode");
@@ -194,6 +206,13 @@ function assertPayoutChecks(row: Row): void {
   );
   check((status === "paid") === (paidAt !== null), "paid_at");
   check(status === "draft" || status === "cancelled" || str(row.method) !== null, "method");
+  // Die WERTEMENGE, nicht nur „gesetzt": `method` stammt heute aus
+  // `affiliate_billing_profiles.payout_method` und ist dort DB-seitig verengt
+  // — der Mock darf sich darauf trotzdem nicht verlassen.
+  check(
+    str(row.method) === null || PAYOUT_METHODS.includes(String(row.method)),
+    "method in (sepa, paypal, manual)",
+  );
   check(reverses === null || reverses !== row.id, "kein Selbst-Storno");
 }
 
@@ -365,6 +384,87 @@ const PAYOUT_DEFAULTS: Row = {
   created_by: null,
 };
 
+// --- Die Regeln von `affiliate_commissions` (Abnahme, Befund A6) --------
+//
+// DREI Funktionen aus payout.ts schreiben in diese Tabelle: der Stempel-CAS
+// des Entwurfs, `releaseClaimedRows()` und `markAffiliatePayoutPaid()`. Ohne
+// Guard und CHECKs hier bliebe der Test grün, während die Datenbank
+// `affiliate_commission_payout_stamp_forbidden` wirft — dieselbe Fehlerklasse,
+// die für `affiliate_payouts` bereits geschlossen ist, eine Tabelle weiter.
+// Nachgebaut aus Migration 20260911130000 (Abschnitt 2.1, Z. 817-819, und der
+// Guard, Z. 1216-1250).
+
+const COMMISSION_STATUSES = ["pending", "on_hold", "approved", "paid", "cancelled"];
+
+/** Die Übergangstabelle aus Plan 6.3. 'paid' und 'cancelled' sind Endzustände. */
+const COMMISSION_TRANSITIONS: Record<string, readonly string[]> = {
+  pending: ["on_hold", "approved", "cancelled"],
+  on_hold: ["approved", "cancelled"],
+  approved: ["paid"],
+  paid: [],
+  cancelled: [],
+};
+
+function commissionCheck(condition: boolean, name: string): void {
+  if (!condition) throw new DbError("23514", `affiliate_commissions_check: ${name}`);
+}
+
+/** Die drei CHECKs, die den Auszahlungsweg betreffen. */
+function assertCommissionChecks(row: Row): void {
+  const status = String(row.status ?? "");
+  const payoutId = row.payout_id ?? null;
+  const paidAt = row.paid_at ?? null;
+
+  commissionCheck(COMMISSION_STATUSES.includes(status), "status");
+  commissionCheck(
+    payoutId === null || status === "approved" || status === "paid",
+    "payout_id is null or status in (approved, paid)",
+  );
+  commissionCheck((status === "paid") === (paidAt !== null), "paid_at");
+  commissionCheck(status !== "paid" || payoutId !== null, "status <> paid or payout_id not null");
+}
+
+/**
+ * `affiliate_commissions_guard()`, UPDATE-Zweig — auf den Teil verengt, den
+ * der Auszahlungsweg berührt. G4 (Unveränderlichkeit von Betrag, Satz und
+ * Herkunft) und G15 sind nicht nachgebaut: der Mock ist `service_role`, und
+ * keine der drei Funktionen schreibt diese Spalten.
+ */
+function commissionUpdateGuard(old: Row, patched: Row): Row {
+  const next = { ...patched };
+
+  next.id = old.id;
+  next.tenant_id = old.tenant_id;
+  next.program_id = old.program_id;
+  next.partner_id = old.partner_id;
+  next.amount_cents = old.amount_cents;
+  next.currency = old.currency;
+  next.booked_at = old.booked_at;
+  next.is_test = old.is_test;
+
+  const oldStatus = String(old.status ?? "");
+  const newStatus = String(next.status ?? "");
+  if (newStatus !== oldStatus && !(COMMISSION_TRANSITIONS[oldStatus] ?? []).includes(newStatus)) {
+    throw guardError("affiliate_commission_status_transition_forbidden");
+  }
+
+  // G8, erste Hälfte: `payout_id` wandert NUR an einer Zeile, die vor UND
+  // nach dem Update 'approved' ist. Genau diese Regel fängt einen verlorenen
+  // `.eq("status","approved")`-Filter in payout.ts ab.
+  if ((next.payout_id ?? null) !== (old.payout_id ?? null)) {
+    if (oldStatus !== "approved" || newStatus !== "approved") {
+      throw guardError("affiliate_commission_payout_stamp_forbidden");
+    }
+  }
+
+  // G8, zweite Hälfte: `paid_at` kommt aus der DATENBANK und wird nie wieder
+  // angefasst.
+  if (newStatus === "paid" && oldStatus !== "paid") next.paid_at = db.now.toISOString();
+  if ((old.paid_at ?? null) !== null) next.paid_at = old.paid_at;
+
+  return next;
+}
+
 // --- Die Abfragekette ---------------------------------------------------
 
 type Predicate = (row: Row) => boolean;
@@ -475,9 +575,10 @@ class MockUpdate extends Filters {
           assertPayoutChecks(guarded);
           return guarded;
         }
-        // Der Guard-Trigger setzt `paid_at` selbst (G8, zweite Hälfte).
-        if (this.tableName === "affiliate_commissions" && this.patch.status === "paid") {
-          next.paid_at = db.now.toISOString();
+        if (this.tableName === "affiliate_commissions") {
+          const guarded = commissionUpdateGuard(row, next);
+          assertCommissionChecks(guarded);
+          return guarded;
         }
         return next;
       });
@@ -611,7 +712,13 @@ function approveRpc(args: Record<string, unknown>): { data: unknown; error: Mock
     if ((partner.user_id ?? null) !== null && partner.user_id === args.p_actor_user_id) {
       throw guardError("affiliate_payout_self_dealing_forbidden");
     }
-    if (partner.status !== "active" || partner.payout_hold === true) {
+    // Die Auszahlbarkeit gilt einer ZAHLUNG. Eine Stornogutschrift zahlt
+    // nichts, sie neutralisiert einen Beleg (§ 14c UStG) und ist deshalb
+    // ausgenommen — wortgleich mit Schritt 3 der Migration.
+    if (
+      (payout.reverses_payout_id ?? null) === null &&
+      (partner.status !== "active" || partner.payout_hold === true)
+    ) {
       throw guardError("affiliate_payout_partner_not_payable");
     }
     if (partner.program_id !== payout.program_id) {
@@ -2068,6 +2175,190 @@ describe("Kontrollabgleich und Stilllegung (7.6, Befund 9)", () => {
     // Ordnung. Ein Vergleich gegen das Provisionsbuch hätte ihn als kritischen
     // Dauerbefund gemeldet.
     expect(report.findings.filter((entry) => entry.check === "payout_subtotal")).toHaveLength(0);
+  });
+});
+
+// --- Die Naht zwischen Bestätigungskarte und Server Action --------------
+
+/**
+ * DIE NAHT, DIE IN DIESEM MODUL DREIMAL GERISSEN IST (Abnahme, Befund N1).
+ *
+ * Die Bestätigungskarte (`lauf-form.tsx`) ERZEUGT den Wert, die Server Action
+ * (`page.tsx`) PRÜFT ihn gegen ein zod-Muster und rechnet ihn nach. Beides lag
+ * in zwei Dateien, und das Muster verbot ein Minuszeichen — womit die
+ * Stornogutschrift, deren Summe negativ ist, über die Oberfläche nicht
+ * freigebbar war. Die Meldung lautete ausgerechnet „Bitte zuerst mindestens
+ * eine Auszahlung auswählen".
+ *
+ * Getestet wird deshalb der Vertrag selbst und nicht die Seite: Erzeuger,
+ * Muster und Leser stehen seither zusammen in `state.ts`, und diese Tests
+ * fahren genau die Werte durch, die die Karte für einen Storno baut.
+ */
+describe("Bestätigungssumme der Freigabe (7.2, 11.17; Befund N1)", () => {
+  it("lässt die NEGATIVE Summe einer Stornogutschrift durch", () => {
+    // Genau der Fall aus der Abnahme: ein Storno über -714,00 EUR.
+    const value = formatAffiliatePayoutExpected("eur", -71_400);
+
+    expect(value).toBe("eur:-71400");
+    expect(AFFILIATE_PAYOUT_EXPECTED_PATTERN.test(value)).toBe(true);
+    expect(parseAffiliatePayoutExpected(value)).toEqual({ currency: "eur", cents: -71_400 });
+  });
+
+  it("lässt die gewöhnliche positive Summe unverändert durch", () => {
+    // Gegenrichtung: die Erweiterung um das Vorzeichen darf den Regelfall
+    // nicht anfassen.
+    const value = formatAffiliatePayoutExpected("eur", 71_400);
+
+    expect(value).toBe("eur:71400");
+    expect(parseAffiliatePayoutExpected(value)).toEqual({ currency: "eur", cents: 71_400 });
+  });
+
+  it("liest eine Summe von 0 als 0 und nicht als „nicht lesbar“", () => {
+    expect(parseAffiliatePayoutExpected("eur:0")).toEqual({ currency: "eur", cents: 0 });
+    expect(parseAffiliatePayoutExpected("eur:-0")).toEqual({ currency: "eur", cents: -0 });
+  });
+
+  it("weist alles zurück, was keine Summe je Währung ist", () => {
+    for (const bad of [
+      "",
+      "eur",
+      "eur:",
+      "EUR:100",
+      "eu:100",
+      "eur:1,00",
+      "eur:1.00",
+      "eur:--1",
+      "eur:-",
+      "eur:1e5",
+      "eur:1000000000000000",
+      "eur:100 ",
+      " eur:100",
+      "eur:100:200",
+    ]) {
+      expect(parseAffiliatePayoutExpected(bad)).toBeNull();
+    }
+  });
+
+  it("bildet die Summe mehrerer Zeilen derselben Währung ab, auch gemischt", () => {
+    // Ein Storno gemeinsam mit einem gewöhnlichen Entwurf: die Karte zeigt
+    // EINE Summe je Währung, und die kann in jede Richtung ausschlagen.
+    const mixed = formatAffiliatePayoutExpected("eur", 71_400 + -71_400);
+    expect(parseAffiliatePayoutExpected(mixed)).toEqual({ currency: "eur", cents: 0 });
+
+    const negative = formatAffiliatePayoutExpected("chf", 10_000 + -71_400);
+    expect(parseAffiliatePayoutExpected(negative)).toEqual({ currency: "chf", cents: -61_400 });
+  });
+});
+
+// --- Die Regeln der Nachbartabelle, am Mock selbst ----------------------
+
+/**
+ * Der Guard von `affiliate_commissions` beißt — sonst wäre er Zierde
+ * (Abnahme, Befund A6). Drei Funktionen aus payout.ts schreiben dorthin; jede
+ * trägt heute den nötigen `.eq("status","approved")`-Filter. Diese Tests
+ * zeigen, was passierte, wenn einer davon wegfiele.
+ */
+describe("Guard und CHECKs von affiliate_commissions (Befund A6)", () => {
+  beforeEach(() => {
+    table("affiliate_partners").push(partner("p1"));
+  });
+
+  it("verbietet den Auszahlungsstempel an einer Zeile, die nicht approved ist", async () => {
+    table("affiliate_commissions").push(commission({ id: "com_x", status: "pending" }));
+
+    const { error } = await admin
+      .from("affiliate_commissions")
+      .update({ payout_id: "pay_1" })
+      .eq("tenant_id", TENANT)
+      .eq("id", "com_x")
+      .select("id");
+
+    expect(error).toMatchObject({ code: "P0001" });
+    expect(String(error?.message)).toContain("affiliate_commission_payout_stamp_forbidden");
+    expect(table("affiliate_commissions")[0].payout_id).toBeNull();
+  });
+
+  it("verbietet das Entstempeln einer bereits bezahlten Zeile", async () => {
+    table("affiliate_commissions").push(
+      commission({
+        id: "com_x",
+        status: "paid",
+        payout_id: "pay_1",
+        paid_at: "2026-10-01T06:00:00.000Z",
+      }),
+    );
+
+    const { error } = await admin
+      .from("affiliate_commissions")
+      .update({ payout_id: null })
+      .eq("tenant_id", TENANT)
+      .eq("id", "com_x")
+      .select("id");
+
+    expect(error).toMatchObject({ code: "P0001" });
+    expect(table("affiliate_commissions")[0].payout_id).toBe("pay_1");
+  });
+
+  it("lässt Stempeln und Lösen an einer approved-Zeile zu — die Gegenrichtung", async () => {
+    table("affiliate_commissions").push(commission({ id: "com_x" }));
+
+    const stamped = await admin
+      .from("affiliate_commissions")
+      .update({ payout_id: "pay_1" })
+      .eq("tenant_id", TENANT)
+      .eq("id", "com_x")
+      .eq("status", "approved")
+      .select("id");
+    expect(stamped.error).toBeNull();
+    expect(table("affiliate_commissions")[0].payout_id).toBe("pay_1");
+
+    const released = await admin
+      .from("affiliate_commissions")
+      .update({ payout_id: null })
+      .eq("tenant_id", TENANT)
+      .eq("id", "com_x")
+      .eq("status", "approved")
+      .select("id");
+    expect(released.error).toBeNull();
+    expect(table("affiliate_commissions")[0].payout_id).toBeNull();
+  });
+
+  it("kennt die Übergangstabelle: approved -> cancelled gibt es nicht", async () => {
+    table("affiliate_commissions").push(commission({ id: "com_x" }));
+
+    const { error } = await admin
+      .from("affiliate_commissions")
+      .update({ status: "cancelled" })
+      .eq("tenant_id", TENANT)
+      .eq("id", "com_x")
+      .select("id");
+
+    expect(error).toMatchObject({ code: "P0001" });
+    expect(String(error?.message)).toContain("status_transition_forbidden");
+  });
+
+  it("setzt `paid_at` selbst und verbietet 'paid' ohne Auszahlungsstempel", async () => {
+    table("affiliate_commissions").push(commission({ id: "com_x" }));
+
+    // Ohne Stempel: `check (status <> 'paid' or payout_id is not null)`.
+    const withoutStamp = await admin
+      .from("affiliate_commissions")
+      .update({ status: "paid" })
+      .eq("tenant_id", TENANT)
+      .eq("id", "com_x")
+      .select("id");
+    expect(withoutStamp.error).toMatchObject({ code: "23514" });
+
+    table("affiliate_commissions")[0].payout_id = "pay_1";
+    const withStamp = await admin
+      .from("affiliate_commissions")
+      .update({ status: "paid" })
+      .eq("tenant_id", TENANT)
+      .eq("id", "com_x")
+      .select("id");
+    expect(withStamp.error).toBeNull();
+    // Der Zeitpunkt kommt aus der Datenbank, nicht aus dem Aufrufer.
+    expect(table("affiliate_commissions")[0].paid_at).toBe(NOW.toISOString());
   });
 });
 

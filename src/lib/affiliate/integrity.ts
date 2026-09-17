@@ -1,5 +1,10 @@
 import "server-only";
 import type { createAdminClient } from "@/lib/supabase/admin";
+import {
+  AFFILIATE_REVERSAL_SOURCE_COLUMNS,
+  createAffiliateReversalDraft,
+  type AffiliateReversalSourceRow,
+} from "@/lib/affiliate/payout-reversal";
 import type {
   AffiliateCommissionKind,
   AffiliateCommissionStatus,
@@ -162,6 +167,22 @@ export type AffiliateIntegrityFinding = {
   messageKey: string;
   /** Wurde der Auszahlungssatz daraufhin stillgelegt (nur Gleichung 1)? */
   quarantined?: boolean;
+  /**
+   * Kennung des daraufhin angelegten Storno-Entwurfs (Abnahme, Befund N3).
+   *
+   * Gesetzt, sobald ein bereits NUMMERIERTER Satz stillgelegt wurde — dort
+   * bleibt sonst ein Beleg mit ausgewiesener Steuer ohne jeden Weg zur
+   * Berichtigung nach § 14c UStG im Bestand, weil 'failed' im Guard keine
+   * ausgehende Kante hat. `null` bei gesetztem `reversal_pending` heißt „hätte
+   * einen geben müssen und gibt keinen".
+   */
+  reversal_payout_id?: string | null;
+  /**
+   * `true` heißt: für diesen Satz FEHLT die Stornogutschrift. Ein eigener,
+   * sichtbarer Zustand und kein Logeintrag — dieselbe Form, in der
+   * `markAffiliatePayoutFailed()` es an seinen Aufrufer meldet.
+   */
+  reversal_pending?: boolean;
 };
 
 export type AffiliateIntegrityReport = {
@@ -461,7 +482,53 @@ async function quarantineFailedPayouts(
       finding.quarantined = false;
       continue;
     }
-    finding.quarantined = (data ?? []).length > 0;
+    const quarantined = (data ?? []).length > 0;
+    finding.quarantined = quarantined;
+
+    // DIE STORNOGUTSCHRIFT AN DERSELBEN KANTE (Abnahme, Befund N3).
+    //
+    // 'cancelled' trifft nur Entwürfe — die haben nie eine Nummer gezogen, es
+    // gibt nichts zu neutralisieren. 'failed' trifft einen bereits
+    // NUMMERIERTEN Beleg mit ausgewiesener Steuer; ohne Storno-Entwurf bliebe
+    // er dauerhaft im Bestand, denn 'failed' hat im Guard keine ausgehende
+    // Kante und `markAffiliatePayoutFailed()` verlangt approved/exported.
+    // Genau dieser Endzustand sollte mit Befund 4 verschwinden — über den
+    // zweiten Eingang stand er noch offen.
+    //
+    // Die Provisionszeilen bleiben dabei gestempelt, anders als bei der
+    // fehlgeschlagenen Überweisung: hier ist ungeklärt, WARUM die Summen
+    // auseinanderlaufen, und die Stempel sind der einzige Beweis dafür,
+    // welche Zeilen der Satz einmal eingesammelt hatte.
+    if (!quarantined || target !== "failed") continue;
+
+    const { data: sourceData, error: sourceError } = await admin
+      .from("affiliate_payouts")
+      .select(AFFILIATE_REVERSAL_SOURCE_COLUMNS)
+      .eq("tenant_id", tenantId)
+      .eq("id", finding.entity_id)
+      .maybeSingle<AffiliateReversalSourceRow>();
+
+    if (sourceError !== null || sourceData === null) {
+      console.error(
+        `[affiliate/integrity] Beleg für den Storno-Entwurf nicht gelesen (Code ${
+          (sourceError as { code?: string } | null)?.code ?? "unbekannt"
+        }).`,
+      );
+      finding.reversal_payout_id = null;
+      finding.reversal_pending = true;
+      continue;
+    }
+
+    const reversal = await createAffiliateReversalDraft(admin, sourceData);
+    if (reversal.status === "created") {
+      finding.reversal_payout_id = reversal.payout_id;
+      finding.reversal_pending = false;
+      continue;
+    }
+    finding.reversal_payout_id = null;
+    // `not_applicable` heißt hier: der stillgelegte Satz war selbst schon ein
+    // Storno oder trug keine Nummer. Beides ist kein offener Punkt.
+    finding.reversal_pending = reversal.status === "failed";
   }
 }
 
@@ -646,4 +713,19 @@ export function hasUnquarantinedCriticalFinding(report: AffiliateIntegrityReport
   return report.findings.some(
     (finding) => finding.severity === "critical" && finding.quarantined === false,
   );
+}
+
+/**
+ * Wie viele stillgelegte Belege warten auf eine Stornogutschrift, die nicht
+ * angelegt werden konnte (Abnahme, Befund N3)?
+ *
+ * Bewusst KEIN Riegel vor der Freigabe: der stillgelegte Satz ist bereits
+ * 'failed' und geht nirgendwo mehr hinaus, es ist also nichts aufzuhalten.
+ * Aufzuholen ist etwas — und ein fehlender Storno verschwindet sonst
+ * lautlos, weil `checkPayoutSubtotals()` einen 'failed'-Satz beim nächsten
+ * Lauf überspringt und der Befund nie wiederkommt. Deshalb eine Zahl, die die
+ * Oberfläche ausspricht, statt einer Zeile im Serverlog.
+ */
+export function countPendingReversals(report: AffiliateIntegrityReport): number {
+  return report.findings.filter((finding) => finding.reversal_pending === true).length;
 }

@@ -1784,7 +1784,15 @@
           "save": "Speichern",
           "saved": "Gespeichert.",
           "pending": "Wird ausgeführt …",
-          "reasonOptional": "(optional)"
+          "reasonOptional": "(optional)",
+          "anonymize": "Daten anonymisieren",
+          "anonymizeHeading": "Löschantrag erfüllen (Art. 17 DSGVO)",
+          "anonymizePending": "Es liegt ein offener Löschantrag vom {date} vor.",
+          "anonymizeHint": "Name, Firma, E-Mail-Adresse, Anschrift, Steuernummer, USt-IdNr. und Zahlungsverbindung werden unkenntlich gemacht; Klicks und Zuordnungen werden gelöscht. Ausgestellte Gutschriften bleiben als Buchungsbelege bestehen — dazu ist die Akademie zehn Jahre verpflichtet. Der Vorgang lässt sich nicht zurücknehmen.",
+          "anonymizeReasonLabel": "Anlass (steht wörtlich im Prüfprotokoll)",
+          "anonymizeConfirmLabel": "Partner-Code zur Bestätigung",
+          "anonymizeConfirmHint": "Bitte {code} eintragen. Der Vorgang lässt sich nicht zurücknehmen.",
+          "anonymizeDone": "Die Daten sind anonymisiert. Ein offener Löschantrag wurde geschlossen."
         },
         "banking": {
           "heading": "Zahlungs- und Steuerdaten",
@@ -2117,7 +2125,11 @@
           "documentNo": "Belegnummer",
           "period": "Zeitraum",
           "taxMode": "Steuermodus"
-        }
+        },
+        "reversalBadge": "Stornogutschrift",
+        "reversalOf": "Stornogutschrift zu {documentNo} — dieser Satz zahlt nichts aus, er neutralisiert den Beleg.",
+        "reversalOfUnknown": "Stornogutschrift zu einem Beleg ohne Nummer — dieser Satz zahlt nichts aus, er neutralisiert den Beleg.",
+        "releaseConfirmReversal": "{count, plural, one {# davon ist eine Stornogutschrift: sie zahlt nichts aus, sondern neutralisiert einen bereits ausgestellten Beleg. Die Summe ist deshalb negativ.} other {# davon sind Stornogutschriften: sie zahlen nichts aus, sondern neutralisieren bereits ausgestellte Belege. Die Summe ist deshalb negativ.}}"
       },
       "creatives": {
         "title": "Werbemittel",

@@ -4733,3 +4733,217 @@ Fehler, `vitest run` 867 von 867 grün (Baseline vorher 785).
    `pg_trigger_depth() > 1`. Das heißt „aus irgendeinem Trigger", nicht „aus
    einer Fremdschlüsselkaskade". Heute existiert kein anderer Trigger auf
    diesem Weg; wer einen baut, umgeht den Schutz lautlos.
+
+## Affiliate-System: Abnahmerunde 3 — Attribution, Auszahlungsweg, DSGVO (17.09.2026)
+
+Nachprüfung der Korrekturrunde zu B8/B9 und Sicherheitsprüfung des
+Gesamtmoduls. Diese Runde behebt einen Geldfehler an einer Blockgrenze, drei
+Riegel, die die Korrekturrunde selbst vor die Stornogutschrift gelegt hatte,
+und vier Befunde an den Rändern des Moduls (DSGVO-Export, Löschweg,
+Interessenkonflikt, Rate-Limit).
+
+### Erledigt
+
+1. **S1 (HOCH) — fremdes Referral-Token einlösbar.** `isFreshTokenUsable()`
+   (`src/lib/affiliate/attribution.ts`) sah `candidate.user_id` nicht an. R7
+   prüfte die Spalte, `bind.ts` verweigert die Bindung an ein zweites Konto
+   ausdrücklich — R5 (URL) und R6 (Cookie) lösten dasselbe Token für JEDEN
+   fremden Käufer ein. Ein Partner musste nur seinen eigenen Link einmal
+   abrufen, das Token aus der Adresszeile lesen und verteilen; jeder fremde
+   Kauf darüber lief regelkonform bis zum Beleg durch, und zwar am gesamten
+   Missbrauchsschutz vorbei (keine Klickzeile, keine Entdoppelung, keine
+   Tagesobergrenze, kein Bot-Filter, keine Einwilligung, kein Rate-Limit —
+   die hängen alle am Klick-Pfad). Behoben: ein gebundenes Token gilt nur
+   noch für sein eigenes Konto; ungebunden (`user_id is null`) und
+   „derselbe Käufer" bleiben unverändert gültig, damit ein ehrlicher
+   Partner beim Wiederkauf seines Geworbenen nichts verliert. Sieben neue
+   Tests, je Richtung und je Regel.
+2. **N1 (HOCH) — Stornogutschrift über die Oberfläche nicht freigebbar.** Das
+   zod-Muster der Bestätigungssumme verbot ein Minuszeichen; ein Storno hat
+   eine negative Summe. Die Aktion scheiterte am Schema und meldete „Bitte
+   zuerst mindestens eine Auszahlung auswählen" — das Gegenteil dessen, was
+   los war. Erzeuger, Muster und Leser stehen jetzt gemeinsam in
+   `src/lib/affiliate/state.ts` (`formatAffiliatePayoutExpected()`,
+   `AFFILIATE_PAYOUT_EXPECTED_PATTERN`, `parseAffiliatePayoutExpected()`);
+   `lauf-form.tsx` und `page.tsx` benutzen dieselbe Definition. Ein
+   gescheitertes Schema liefert außerdem nicht mehr den Bedientext.
+   Getestet wird die Naht selbst, nicht die Seite.
+3. **N2 (HOCH) — Auszahlbarkeitsprüfung stand vor dem Storno-Zweig.** In
+   `approve_affiliate_payout()` lief Schritt 3 (`partner_not_payable`) vor
+   Schritt 3b. Ein Storno überweist aber nichts. Der naheliegende Ablauf —
+   Rückläufer von toter IBAN, Partner daraufhin auf Auszahlungsstopp — hätte
+   die Berichtigung nach § 14c UStG dauerhaft blockiert: eine Geschäftsregel
+   über einer gesetzlichen Pflicht. `payout_hold` und `status <> 'active'`
+   gelten jetzt nur noch für echte Zahlungen. Programm-Zugehörigkeit,
+   Zahlweg und Rechtsträger bleiben auch für den Storno geprüft (der
+   Zahlweg, weil der CHECK der Tabelle ihn ohnehin erzwingt — ihn hier zu
+   überspringen tauschte nur die sprechende Kennung gegen ein nacktes
+   23514). Der Mock in `payout.test.ts` bildet die Ausnahme wortgleich ab.
+4. **N3 (HOCH) — Quarantäne erzeugte keine Stornogutschrift.**
+   `quarantineFailedPayouts()` setzte einen bereits nummerierten Satz auf
+   'failed', ohne den Storno-Entwurf anzulegen, den
+   `markAffiliatePayoutFailed()` an derselben Kante erzeugt. Danach gab es
+   keinen Weg mehr: 'failed' hat im Guard keine ausgehende Kante, und
+   `markFailedAction` verlangt approved/exported. Beide Wege teilen sich
+   jetzt `createAffiliateReversalDraft()` in der neuen Datei
+   `src/lib/affiliate/payout-reversal.ts` (eigene Datei, weil `payout.ts`
+   bereits `integrity.ts` importiert — die Gegenrichtung wäre ein
+   Modulzyklus). Ein nicht angelegter Storno ist ein eigener, sichtbarer
+   Zustand (`reversal_pending` am Befund, `countPendingReversals()`) und
+   hält die nächste Freigabe an, statt in einem Logeintrag zu verschwinden.
+5. **N4 (MITTEL) — `recipient_snapshot` unterlief die Anonymisierung.** Seit
+   der Korrektur zu Befund 10 trägt `affiliate_payouts` Anschrift,
+   Steuernummer und USt-IdNr. eingefroren mit; `anonymize.ts` behauptete im
+   Kopf weiter, dort stehe keine Anschrift. Für einen NUMMERIERTEN Beleg
+   trägt Art. 17 Abs. 3 lit. b DSGVO das, für einen 'cancelled'-Entwurf ohne
+   Nummer nicht — und der blockiert die Anonymisierung auch nicht. Schritt 5b
+   nullt `recipient_snapshot` genau dort (`document_no is null`); die Grenze
+   läuft jetzt an der Belegnummer und nicht an der Tabelle, und der
+   Kopfkommentar sagt das ausdrücklich.
+6. **S5 (MITTEL) — der Löschweg nach Art. 17 DSGVO war tot.**
+   `anonymizeAffiliatePartner()` hatte im ganzen Repo keinen Aufrufer,
+   während die Partnerzeile bewusst praktisch unlöschbar ist. Das Modul
+   lieferte Auskunft nach Art. 15, aber keine Löschung. Verdrahtet:
+   `anonymizeAffiliatePartnerAction()` in `src/lib/affiliate/actions.ts`
+   (Rolle, zod, abgetippter Partner-Code als Bestätigung, G15, Prüfpfad) und
+   eine eigene, abgesetzte Karte in `/admin/affiliate/partner/[id]`. Die
+   Partnerakte zeigt jetzt einen OFFENEN Löschantrag aus `deletion_requests`
+   mit Datum, und die Aktion schließt ihn nach getaner Arbeit
+   (`status = 'completed'`, `processed_at`, `processed_by`).
+7. **S3 (MITTEL) — der DSGVO-Export öffnete die Käuferdatengrenze wieder.**
+   `src/lib/gdpr/export.ts` führte `order_id`, `stripe_invoice_id`,
+   `stripe_subscription_id`, `stripe_charge_id` und `dedup_key` — also genau
+   die Spalten, die Migration 20260911130000 dem Spaltenrecht mit der
+   Begründung „exportierbare Liste der Bestellkennungen seiner Käufer"
+   entzogen hat. Der Export läuft über `service_role` und umgeht Spaltenrecht
+   wie RLS; die Grenze muss dort wiederholt werden. Ebenfalls gestrichen:
+   `affiliate_payouts.reference` (Bankauszugszeile des Mandanten) und
+   `document_path`. Die Provisionszeile bleibt vollständig nachrechenbar.
+8. **S6 (NIEDRIG) — G15 fehlte an zwei der vier Auszahlungsaktionen.**
+   „Als gezahlt markieren" und „fehlgeschlagen" prüften den
+   Interessenkonflikt nicht; beide sind Entscheidungen über eigenes Geld an
+   einem Beleg, den der Entscheidende selbst empfängt. Beide holen die
+   `partner_id` jetzt mandantengebunden aus dem Satz und rufen
+   `assertNoSelfApproval()` vor dem Schreiben.
+9. **N6 (NIEDRIG) — eine Stornogutschrift war in der Liste nicht erkennbar.**
+   `reverses_payout_id` wird mitgelesen, die Zeile trägt ein Textmerkmal
+   („Stornogutschrift") und nennt den neutralisierten Beleg mit Nummer, und
+   die Bestätigungskarte erklärt die negative Summe, statt sie unkommentiert
+   zu zeigen.
+10. **S8 (NIEDRIG) — Rate-Limit der Einwilligung ohne Mandantentrennung.**
+    `checkRateLimit("consent-grant", …)` lief ohne `extraKey`, eine IP hatte
+    damit 60 Zustimmungen pro Stunde über ALLE Mandanten hinweg. Der Aufruf
+    steht jetzt hinter dem Mandanten-Gate und schlüsselt auf
+    `${tenant.id}:${ip}`. Die ablehnende Richtung bleibt wie bisher
+    ungedrosselt (Art. 7 Abs. 3 DSGVO).
+11. **A5/A6 — Mock-Treue.** `assertPayoutChecks()` kennt jetzt auch
+    `check (period_to >= period_from)` und die Wertemenge von `method`.
+    `affiliate_commissions` hat im Mock erstmals Guard und CHECKs:
+    Übergangstabelle, die G8-Stempelregel (`payout_id` wandert nur an einer
+    Zeile, die vor UND nach dem Update 'approved' ist), `paid_at` aus der
+    Datenbank und die drei CHECKs der Tabelle. Drei Funktionen aus
+    `payout.ts` schreiben dorthin; fiele in einer davon der
+    `.eq('status','approved')`-Filter weg, war der Test bisher grün und die
+    Datenbank warf `affiliate_commission_payout_stamp_forbidden`.
+
+### Entscheidungen dieser Runde
+
+1. **Fremdwährung (N5): das Modul rechnet in genau EINER Währung je
+   Programm.** Kein Mindestbetrag je Währung, keine Umrechnung — ein Kurs
+   existiert im Plan bewusst nicht, und ein stillschweigender Kurs wäre eine
+   Vermögensentscheidung ohne Beleg. Ein CHF-/USD-Saldo ist damit kein
+   Auszahlungsfall, sondern ein Fehler weiter vorn. Bis die Durchsetzung an
+   der Buchung steht (siehe Risiken), bleibt die Meldung unter „Nicht
+   auszahlbar" der richtige Zustand: sichtbar statt still.
+2. **`note` und `flag_reason` bleiben im DSGVO-Export**, obwohl das
+   Spaltenrecht sie dem Partner entzieht. Ein Vermerk ÜBER den Betroffenen
+   ist sein personenbezogenes Datum; Art. 15 nimmt interne Notizen nicht aus.
+   Was er in der Oberfläche sieht, ist eine andere Frage als das, was ihm auf
+   Auskunftsverlangen zusteht. Dasselbe gilt für `internal_note` und
+   `status_reason` an der Partnerzeile. `condition_snapshot` bleibt, weil die
+   Provisionszeile ohne ihn nicht nachrechenbar ist; er enthält keine
+   Käuferdaten.
+3. **Der Zahlweg wird auch für einen Storno geprüft.** Der CHECK
+   `status in ('draft','cancelled') or method is not null` erzwingt ihn
+   ohnehin; die Prüfung in der RPC zu überspringen hätte nur die sprechende
+   Kennung gegen ein 23514 getauscht, ohne irgendetwas freizugeben.
+4. **Ein fehlender Storno-Entwurf hält die nächste Freigabe an**, statt
+   protokolliert zu werden. Er blockiert genau EINEN Lauf: beim nächsten ist
+   der Satz 'failed' und wird vom Abgleich übersprungen.
+
+### Offen / Risiken
+
+1. **Der Einwilligungsnachweis hängt am Service-Role-Key (S4).** `hashIp()`
+   in `src/lib/consent/actions.ts` und `terms_accepted_ip_hash` in
+   `src/lib/affiliate/apply.ts` leiten ihr HMAC aus `SUPABASE_SERVICE_ROLE_KEY`
+   mit STATISCHEM Salz ab, damit der Nachweis nach Art. 7 Abs. 1 DSGVO
+   dauerhaft überprüfbar bleibt. Der Key ist aber ein rotierbares
+   Betriebsgeheimnis, und eine Rotation ist nach jedem Leck Pflicht (dieses
+   Dokument führt bereits eine ausstehende). Nach einer Rotation ist kein
+   einziger früher geschriebener Hash mehr nachrechenbar — nicht falsch,
+   sondern nicht mehr prüfbar, und das fällt erst im Streitfall auf. Die
+   Behebung ist ein zusammenhängendes Vorhaben und bewusst NICHT in dieser
+   Runde gemacht worden, weil ein halber Umbau denselben Schaden anrichtet:
+   sie braucht (a) ein eigenes, nie rotiertes Secret (`CONSENT_PROOF_SALT`)
+   in `env.ts`, `.env.example` und den Worker-Secrets, (b) dieselbe
+   Umstellung in `apply.ts` und (c) eine Versionsspalte `hash_key_version` an
+   `tracking_consents` UND `affiliate_partners`, damit die Umstellung die
+   alten Zeilen kennzeichnet statt sie stumm zu entwerten. Vor der Rotation
+   erledigen.
+2. **Fremdwährung wird noch nicht an der Buchung verhindert (N5).**
+   `affiliate_programs.currency` ist per CHECK auf 'eur' festgenagelt,
+   `affiliate_commissions.currency` erlaubt jedes `^[a-z]{3}$`, und die
+   Währung stammt aus `orders.currency` — ein in CHF bepreistes
+   Stripe-Produkt erzeugt heute eine CHF-Provisionszeile, die dauerhaft in
+   `blocked` fällt. Die Durchsetzung gehört als CHECK an
+   `affiliate_commissions.currency` bzw. als Vorprüfung in den Verarbeiter,
+   nicht in den Auszahlungslauf: dort kostet sie ein nicht gebuchtes Ereignis
+   mit sprechendem Grund, hier kostet sie Geld, das im System steht und
+   niemandem gehört.
+3. **Betriebsreihenfolge des Deploys (S2), harte Freigabebedingung.** Die
+   sieben Affiliate-Migrationen sind NICHT angewendet (Stand 17.09.2026:
+   `supabase_migrations.schema_migrations` endet bei 20260909183704, keine
+   `affiliate_*`-Tabelle existiert). Der Anwendungscode ist aber gemergt und
+   ruft `recordAffiliateEvent()` bedingungslos in beiden Checkout-Pfaden und
+   bei `invoice.paid`. Wird der aktuelle Stand ausgeliefert, BEVOR
+   `npx supabase db push` gelaufen ist, liefert PostgREST 42P01, der
+   Stripe-Webhook antwortet 500 — und zwar für JEDEN Mandanten, auch ohne
+   Partnerprogramm: keine Zahlungsbestätigungsmail, unbegrenzte Retrys, der
+   Endpunkt gilt im Stripe-Dashboard als dauerhaft fehlerhaft. ERST die
+   Migrationen anwenden, DANN ausliefern. Empfohlen zusätzlich:
+   `recordAffiliateEvent()` behandelt `42P01` wie `23505` — einmal
+   `console.error` und still zurück; das kostet im Fehlerfall nur die
+   Affiliate-Zeilen des Zeitraums (über `/api/admin/affiliate/backfill`
+   nachholbar), der heutige Zustand kostet die Kauferfüllung des ganzen
+   Produkts. (Nicht in dieser Runde umgesetzt — fremde Datei.)
+4. **`net_cents` im Marketplace-Ledger (S7)** ist bei einem Kauf über einen
+   Partnerlink systematisch zu hoch, und zwar um die Affiliate-Provision.
+   `/portal/marketplace` stellt die Zahl als Verkäufer-Auszahlung dar. Additiv
+   lösen (Spalte `affiliate_cents` an `marketplace_ledger`, Anzeige auf
+   `net_cents - affiliate_cents`); bis dahin ein Hinweistext an der Zahl. Eine
+   stille Umdeutung von `net_cents` wäre schlechter als die benannte
+   Ungenauigkeit.
+5. **Zweite Linie im Verarbeiter fehlt noch (S1).** Die Korrektur sitzt in
+   `attribution.ts`, also beim Erzeugen der Checkout-Session. Empfohlen als
+   Tiefenverteidigung, nicht als Ersatz: in `src/lib/affiliate/process.ts`
+   nach dem Laden der Referral-Zeile `referral.user_id` gegen `order.user_id`
+   prüfen, damit eine manipulierte Stripe-Metadata nicht am Verarbeiter
+   vorbeikommt; dazu ein Befund in `integrity.ts` für Partner mit
+   Bestellungen ohne zugehörige Klicks. (Nicht in dieser Runde umgesetzt —
+   fremde Datei.)
+6. **`books_closed_until` hat weiterhin keinen Rücknahmeweg.** `greatest()`
+   lässt den Riegel nur nach vorn wandern, der Guard von
+   `affiliate_programs` lässt nur `service_role` heran, und kein Codepfad
+   bietet ein Zurücksetzen an. Ein falsch gesetzter Riegel braucht eine
+   eigene Migration mit Begründung — so, wie ein Beleg per Migration
+   berichtigt wird. Die Zeitraumprüfung in der RPC macht den Fall
+   unwahrscheinlich, nicht unmöglich.
+
+### Verifikation
+
+`rm -f tsconfig.tsbuildinfo && npx tsc --noEmit` 0 Fehler,
+`npx eslint --max-warnings 0` 0 Fehler, `npx vitest run` 1351 von 1351 grün
+(Baseline vorher 1329; 22 neue Tests). Gefahren wurde mit einer
+Platzhalter-`.env` (git-ignoriert, keine echten Werte) — ohne sie scheitern
+`src/lib/env.test.ts` und `src/lib/tenant/resolve.test.ts` unabhängig von
+dieser Runde.

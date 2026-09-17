@@ -5,6 +5,11 @@ import { resolveLegalEntity, type LegalEntity } from "@/lib/legal/company";
 import { computeBalances } from "@/lib/affiliate/compute";
 import { verifyAffiliateIntegrity, type AffiliateIntegrityReport } from "@/lib/affiliate/integrity";
 import { notifyAffiliatePayoutPaid } from "@/lib/affiliate/notify";
+import {
+  AFFILIATE_REVERSAL_SOURCE_COLUMNS,
+  createAffiliateReversalDraft,
+  type AffiliateReversalSourceRow,
+} from "@/lib/affiliate/payout-reversal";
 import { isValidIban } from "@/lib/affiliate/sepa";
 import {
   computeAffiliateTax,
@@ -465,6 +470,33 @@ export async function planAffiliatePayoutRun(
     // stillschweigender Kurs existiert im Plan bewusst nicht. Der Saldo bleibt
     // stehen und wird gemeldet, statt gegen eine fremde Schwelle geprüft zu
     // werden.
+    //
+    // DIE ENTSCHEIDUNG DAZU, festgeschrieben (Abnahme, Befund N5). Die
+    // Sperre ist richtig, aber sie war eine Sackgasse ohne Ausgang:
+    // `affiliate_programs.currency` ist per CHECK auf 'eur' festgenagelt,
+    // `affiliate_commissions.currency` erlaubt dagegen jedes `^[a-z]{3}$` —
+    // ein CHF- oder USD-Saldo entstünde also, fiele hier dauerhaft in
+    // `blocked` und würde NIE ausgezahlt. Vorher wurde er (falsch geschwellt,
+    // aber) ausgezahlt.
+    //
+    // ENTSCHIEDEN: das Modul rechnet in genau EINER Währung je Programm.
+    // Fremdwährungen werden NICHT unterstützt — weder mit einem Mindestbetrag
+    // je Währung noch mit einer Umrechnung (ein Kurs existiert im Plan
+    // bewusst nicht, und ein stillschweigender Kurs wäre eine
+    // Vermögensentscheidung ohne Beleg). Ein Fremdwährungssaldo ist damit
+    // kein Auszahlungsfall, sondern ein FEHLER WEITER VORN: er darf gar nicht
+    // erst entstehen.
+    //
+    // OFFEN, ausgesprochen statt vergessen: die Durchsetzung fehlt noch an
+    // der Stelle, an der sie hingehört — der Buchung. Die Währung stammt aus
+    // `orders.currency` (process.ts), nicht aus dem Programm; ein in CHF
+    // bepreistes Stripe-Produkt erzeugt heute eine CHF-Provisionszeile. Die
+    // Durchsetzung gehört als CHECK an `affiliate_commissions.currency` bzw.
+    // als Vorprüfung in den Verarbeiter, nicht hierher: dort kostet sie ein
+    // nicht gebuchtes Ereignis mit sprechendem Grund, hier kostet sie einen
+    // Saldo, der im System steht und niemandem gehört. Bis dahin ist die
+    // Meldung der richtige Zustand — sichtbar und nicht still. Der Punkt
+    // steht in PHASENSTATUS.md unter „Risiken".
     if (currency !== program.currency) {
       blocked.push(blocker(partnerId, currency, available, "foreign_currency"));
       continue;
@@ -1290,14 +1322,12 @@ export async function markAffiliatePayoutFailed(
 ): Promise<AffiliatePayoutFailure> {
   const { data: payout, error: readError } = await admin
     .from("affiliate_payouts")
-    .select(
-      "id, tenant_id, program_id, partner_id, period_from, period_to, currency, " +
-        "gross_cents, reversal_cents, subtotal_cents, tax_mode, tax_rate_bp, tax_cents, " +
-        "total_cents, status, method, document_no, reverses_payout_id, recipient_snapshot",
-    )
+    // Dieselbe Liste, die der Storno-Entwurf braucht — geteilt mit dem
+    // Quarantäneweg, damit sie nicht an einem der beiden verkürzt wird.
+    .select(AFFILIATE_REVERSAL_SOURCE_COLUMNS)
     .eq("tenant_id", params.tenantId)
     .eq("id", params.payoutId)
-    .maybeSingle<FailingPayoutRow>();
+    .maybeSingle<AffiliateReversalSourceRow>();
 
   if (readError) {
     logDbError("Lesen des Satzes vor dem Fehlschlag", readError);
@@ -1327,85 +1357,23 @@ export async function markAffiliatePayoutFailed(
   if ((updated ?? []).length === 0) return { ok: false, reason: "wrong_status" };
 
   const released = await releaseClaimedRows(admin, params.tenantId, params.payoutId);
-  const reversalId = await createReversalDraft(admin, payout);
+  // Gemeinsame Hilfsfunktion mit `quarantineFailedPayouts()`: beide Wege
+  // enden an derselben Kante, und einer von beiden hat den Storno bisher
+  // nicht angelegt (Befund N3).
+  const reversal = await createAffiliateReversalDraft(admin, payout);
 
   return {
     ok: true,
     payout_id: params.payoutId,
     affected_rows: released,
     previous_status: payout.status,
-    reversal_payout_id: reversalId,
+    // `not_applicable` und `failed` werden hier weiterhin zu `null`
+    // zusammengefasst: für den Aufrufer heißt beides „es gibt keinen
+    // Storno-Entwurf, sieh nach". Ein 'failed'-Ursprung kommt an dieser
+    // Stelle ohnehin nicht vor — `PAYABLE_STATUSES` lässt nur
+    // approved/exported herein, und die tragen zwingend eine Belegnummer.
+    reversal_payout_id: reversal.status === "created" ? reversal.payout_id : null,
   };
-}
-
-type FailingPayoutRow = {
-  id: string;
-  tenant_id: string;
-  program_id: string;
-  partner_id: string;
-  period_from: string;
-  period_to: string;
-  currency: string;
-  gross_cents: number;
-  reversal_cents: number;
-  subtotal_cents: number;
-  tax_mode: AffiliateTaxMode;
-  tax_rate_bp: number;
-  tax_cents: number;
-  total_cents: number;
-  status: string;
-  method: AffiliatePayoutMethod | null;
-  document_no: string | null;
-  reverses_payout_id: string | null;
-  recipient_snapshot: unknown;
-};
-
-/**
- * Der Entwurf der Stornogutschrift: alle Zahlen des Ursprungsbelegs mit
- * umgedrehtem Vorzeichen, derselbe Zeitraum, dieselbe Währung, derselbe
- * Steuermodus. Die Nummer zieht er erst bei seiner eigenen Freigabe (7.3) —
- * ein Entwurf verbrennt keine.
- *
- * Ein Storno auf einen Storno gibt es nicht: die Kette endet nach einem
- * Schritt, sonst neutralisiert irgendwann jemand eine Neutralisierung.
- */
-async function createReversalDraft(admin: Admin, payout: FailingPayoutRow): Promise<string | null> {
-  // Ohne Nummer gibt es keinen Beleg und damit nichts zu neutralisieren; ein
-  // Storno auf einen Storno ist ausgeschlossen.
-  if (payout.reverses_payout_id !== null) return null;
-  if (normalizeDocumentNo(payout.document_no) === "") return null;
-
-  const { data, error } = await admin
-    .from("affiliate_payouts")
-    .insert({
-      tenant_id: payout.tenant_id,
-      program_id: payout.program_id,
-      partner_id: payout.partner_id,
-      period_from: payout.period_from,
-      period_to: payout.period_to,
-      currency: payout.currency,
-      gross_cents: -payout.gross_cents,
-      reversal_cents: -payout.reversal_cents,
-      subtotal_cents: -payout.subtotal_cents,
-      tax_mode: payout.tax_mode,
-      tax_rate_bp: payout.tax_rate_bp,
-      tax_cents: -payout.tax_cents,
-      total_cents: -payout.total_cents,
-      status: "draft",
-      method: payout.method,
-      reverses_payout_id: payout.id,
-      // Der Empfänger des Stornos ist der des Ursprungsbelegs — und zwar so,
-      // wie er DORT eingefroren wurde, nicht wie er heute im Profil steht.
-      recipient_snapshot: payout.recipient_snapshot ?? null,
-    })
-    .select("id")
-    .maybeSingle<{ id: string }>();
-
-  if (error || data === null) {
-    logDbError("Anlegen des Storno-Entwurfs", error);
-    return null;
-  }
-  return data.id;
 }
 
 // --- Fälligkeit ---------------------------------------------------------

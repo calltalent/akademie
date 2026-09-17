@@ -68,6 +68,11 @@ class MockQuery {
     this.rows = this.rows.slice(0, count);
     return this;
   }
+  /** `.is(col, null)` — die Grenze „Beleg mit Nummer / Entwurf ohne" (N4). */
+  is(column: string, value: null): this {
+    this.rows = this.rows.filter((r) => (r[column] ?? null) === value);
+    return this;
+  }
 
   private apply(): { data: Row[] | null; error: MockError } {
     const error = db.errors[`${this.tableName}:${this.mode}`] ?? null;
@@ -168,6 +173,48 @@ function seed(): void {
         status: "paid",
         document_no: "GS-2026-000004",
         total_cents: 18860,
+        // Seit Befund 10 trägt der Beleg die Anschrift eingefroren mit. Für
+        // einen NUMMERIERTEN Beleg deckt Art. 17 Abs. 3 lit. b DSGVO das.
+        recipient_snapshot: {
+          legal_name: "Musterfrau GmbH",
+          street: "Musterweg 1",
+          postal_code: "12345",
+          city: "Musterstadt",
+          country: "DE",
+          vat_id: "DE123456789",
+          tax_number: "12/345/67890",
+        },
+      },
+      {
+        // Ein VERWORFENER Entwurf: nie eine Nummer gezogen, kein Beleg, und
+        // er steht nicht in OPEN_PAYOUT_STATUSES — er blockiert die
+        // Anonymisierung also nicht und behielte die Anschrift sonst dauerhaft
+        // (Befund N4).
+        id: "pay-2",
+        tenant_id: TENANT,
+        partner_id: PARTNER,
+        status: "cancelled",
+        document_no: null,
+        total_cents: 0,
+        recipient_snapshot: {
+          legal_name: "Musterfrau GmbH",
+          street: "Geheimweg 7",
+          postal_code: "12345",
+          city: "Musterstadt",
+          country: "DE",
+          vat_id: "DE123456789",
+          tax_number: "12/345/67890",
+        },
+      },
+      {
+        // Gegenprobe Mandantengrenze: gleicher Partnername, fremder Mandant.
+        id: "pay-fremd",
+        tenant_id: OTHER_TENANT,
+        partner_id: PARTNER,
+        status: "cancelled",
+        document_no: null,
+        total_cents: 0,
+        recipient_snapshot: { legal_name: "Fremd GmbH", street: "Fremdweg 3" },
       },
     ],
   };
@@ -178,9 +225,11 @@ function seed(): void {
 beforeEach(seed);
 
 describe("anonymizeAffiliatePartner", () => {
-  it("lässt Provisionen und Auszahlungen Zeichen für Zeichen unverändert", async () => {
+  it("lässt Provisionen und NUMMERIERTE Belege Zeichen für Zeichen unverändert", async () => {
     const commissionsBefore = JSON.stringify(db.tables.affiliate_commissions);
-    const payoutsBefore = JSON.stringify(db.tables.affiliate_payouts);
+    const issuedBefore = JSON.stringify(
+      db.tables.affiliate_payouts.find((row) => row.id === "pay-1"),
+    );
 
     const result = await anonymizeAffiliatePartner(admin, {
       tenant_id: TENANT,
@@ -190,7 +239,41 @@ describe("anonymizeAffiliatePartner", () => {
 
     expect(result.ok).toBe(true);
     expect(JSON.stringify(db.tables.affiliate_commissions)).toBe(commissionsBefore);
-    expect(JSON.stringify(db.tables.affiliate_payouts)).toBe(payoutsBefore);
+    // Der Beleg mit Nummer bleibt vollständig — einschließlich seiner
+    // eingefrorenen Anschrift. Art. 17 Abs. 3 lit. b DSGVO deckt ihn, und der
+    // Belegfrost im Guard ließe eine Änderung ohnehin nicht zu.
+    expect(JSON.stringify(db.tables.affiliate_payouts.find((row) => row.id === "pay-1"))).toBe(
+      issuedBefore,
+    );
+  });
+
+  // --- Die Grenze an der Belegnummer (Abnahme, Befund N4) ----------------
+
+  it("nimmt einem verworfenen Entwurf OHNE Nummer die eingefrorene Anschrift", async () => {
+    const result = await anonymizeAffiliatePartner(admin, {
+      tenant_id: TENANT,
+      partner_id: PARTNER,
+      reason: "Löschantrag vom 12.09.2026",
+    });
+
+    expect(result).toMatchObject({ ok: true, payout_snapshots_cleared: 1 });
+    const draft = db.tables.affiliate_payouts.find((row) => row.id === "pay-2");
+    expect(draft?.recipient_snapshot).toBeNull();
+    // Und die Zeile selbst bleibt stehen: gelöscht wird hier nichts, der
+    // Lösch-Guard der Tabelle ließe es auch gar nicht zu.
+    expect(draft).toBeDefined();
+    expect(draft?.status).toBe("cancelled");
+  });
+
+  it("fasst den Entwurf eines FREMDEN Mandanten nicht an", async () => {
+    await anonymizeAffiliatePartner(admin, {
+      tenant_id: TENANT,
+      partner_id: PARTNER,
+      reason: "Löschantrag",
+    });
+
+    const foreign = db.tables.affiliate_payouts.find((row) => row.id === "pay-fremd");
+    expect(foreign?.recipient_snapshot).toMatchObject({ legal_name: "Fremd GmbH" });
   });
 
   it("macht Name, Firma, Adresse, Konto und Zustimmungsnachweis unkenntlich", async () => {
@@ -214,12 +297,20 @@ describe("anonymizeAffiliatePartner", () => {
     expect(partner.code).toBe("erika-m");
     expect(partner.status).toBe("active");
 
-    // Und nichts vom alten Datensatz ist irgendwo übrig geblieben.
+    // Und nichts vom alten Datensatz ist irgendwo übrig geblieben — mit
+    // GENAU EINER benannten Ausnahme: der nummerierte Beleg behält seine
+    // eingefrorene Anschrift (§ 14 Abs. 4 UStG, Art. 17 Abs. 3 lit. b DSGVO).
+    // Die Anschrift des Entwurfs ohne Nummer ist dagegen fort (Befund N4).
     const dump = JSON.stringify(db.tables);
     expect(dump).not.toContain("Erika Musterfrau");
     expect(dump).not.toContain("erika@example.invalid");
-    expect(dump).not.toContain("Musterweg 1");
     expect(dump).not.toContain("DE00000000000000000000");
+    expect(dump).not.toContain("Geheimweg 7");
+
+    const issued = db.tables.affiliate_payouts.find((row) => row.id === "pay-1");
+    expect(issued?.recipient_snapshot).toMatchObject({ street: "Musterweg 1" });
+    // Außerhalb des Belegs steht sie nirgends mehr.
+    expect(db.tables.affiliate_billing_profiles).toHaveLength(0);
   });
 
   it("löscht Abrechnungsprofil, Zuordnungen und Klicks — nur die des Partners", async () => {

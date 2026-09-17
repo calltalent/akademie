@@ -386,6 +386,27 @@ function isPartnerUsable(
  * `false`, die Zeile fällt also heraus statt mit einem stillen Standardwert
  * zu gelten — gleiche Richtung wie bei den Konditionsfenstern in
  * `compute.ts`.
+ *
+ * ZUSATZ ZUM PLAN, sicherheitskritisch: eine bereits an ein KONTO gebundene
+ * Zeile (`user_id <> null`, gesetzt von `bindReferral()`, 4.3) gilt nur noch
+ * für genau dieses Konto. Ohne diese Bedingung ist das Token ein
+ * übertragbares Inhaberpapier auf fremdes Geld: es steht sichtbar in der
+ * Adresszeile (`?aff=`), und wer es kennt — allen voran der Partner selbst,
+ * der seinen eigenen Link einmal abruft — kann es beliebig verteilen und
+ * bekommt die Provision für jeden fremden Kauf. Der gesamte
+ * Missbrauchsschutz des Moduls (Klickzeile, Entdopplung über `dedup_key`,
+ * Tagesobergrenze, Bot-Filter, Einwilligung, Rate-Limit) sitzt auf dem
+ * KLICK-Pfad und wäre damit vollständig umgangen.
+ *
+ * Es sind genau dieselben zwei Fälle erlaubt wie in `bind.ts` (Schritt 5,
+ * `reason: "other-user"`) und in `isServerStateUsable()` (R7):
+ *   - `user_id = null` — noch ungebunden. Das ist der einwilligungsfreie
+ *     Pfad und der Erstkauf; hier gibt es kein Konto, gegen das zu prüfen
+ *     wäre, und die Zeile ist ein frischer Klick wie vorgesehen.
+ *   - `user_id = Käufer` — der rechtmäßige Wiederkauf. Ein ehrlicher Partner
+ *     darf seine Provision NICHT dadurch verlieren, dass sein geworbener
+ *     Kunde das eigene Token ein zweites Mal mitbringt.
+ * Alles dazwischen ist eine Geldumlenkung und fällt heraus.
  */
 function isFreshTokenUsable(
   candidate: AffiliateReferralCandidate | null | undefined,
@@ -397,6 +418,7 @@ function isFreshTokenUsable(
   if (candidate.program_id !== program.id) return false;
   if (candidate.status !== "active") return false;
   if (candidate.is_bot === true) return false;
+  if (candidate.user_id !== null && candidate.user_id !== input.buyer.userId) return false;
   if (!(Date.parse(candidate.expires_at) > input.at.getTime())) return false;
   if (candidate.partner_id !== candidate.partner?.id) return false;
   return isPartnerUsable(candidate.partner, input.tenantId, program.id);

@@ -839,3 +839,29 @@ export const affiliateBillingProfileSchema = z
     }
   });
 export type AffiliateBillingProfileInput = z.infer<typeof affiliateBillingProfileSchema>;
+
+/**
+ * Anonymisierung eines Partners auf einen Löschantrag hin (7.8; Abnahme,
+ * Befund S5).
+ *
+ * `confirm` ist der PARTNER-CODE, abgetippt. Gleiche Bauart wie die
+ * Belegnummer beim Vermerk „Überweisung fehlgeschlagen": der Vorgang ist
+ * nicht zurücknehmbar — Name, Firma, Anschrift, Steuernummer und IBAN sind
+ * danach fort —, und ein Knopf allein ist dafür keine Entscheidung (11.17).
+ * Der Code steht sichtbar auf der Partnerseite; wer ihn abtippt, hat die
+ * richtige Akte vor sich.
+ *
+ * `reason` ist Pflicht und wandert wörtlich ins Prüfprotokoll: eine
+ * Anonymisierung ohne festgehaltenen Anlass ist gegenüber einer
+ * Aufsichtsbehörde nicht erklärbar.
+ */
+export const affiliatePartnerAnonymizeSchema = z.object({
+  partnerId: z.string().uuid("Ungültiger Partner."),
+  reason: z
+    .string()
+    .trim()
+    .min(3, "Bitte den Anlass angeben (z. B. „Löschantrag vom …“).")
+    .max(500, "Der Anlass darf höchstens 500 Zeichen haben."),
+  confirm: z.string().trim().min(1, "Bitte den Partner-Code zur Bestätigung eintragen."),
+});
+export type AffiliatePartnerAnonymizeInput = z.infer<typeof affiliatePartnerAnonymizeSchema>;

@@ -73,6 +73,33 @@ let cachedIpHashKey: CryptoKey | null = null;
  * altern, hier ist er Teil eines Nachweises nach Art. 7 Abs. 1 DSGVO. Ein
  * Nachweis, der nach 24 Stunden nicht mehr überprüfbar ist, ist keiner
  * (Plan 11.6).
+ *
+ * BENANNTES RISIKO, nicht gelöst (Abnahme, Befund S4). Genau aus diesen zwei
+ * Sätzen folgt ein Widerspruch: das Schlüsselmaterial ist ein ROTIERBARES
+ * Betriebsgeheimnis, der Nachweis soll ZEHN JAHRE überprüfbar bleiben. Wird
+ * der Service-Role-Key rotiert — und nach jedem Leck ist das Pflicht;
+ * PHASENSTATUS.md führt bereits eine ausstehende Rotation —, erzeugt
+ * `hashIp()` für dieselbe IP einen anderen Wert. Jeder vorher geschriebene
+ * `tracking_consents.ip_hash` und jeder
+ * `affiliate_partners.terms_accepted_ip_hash` (apply.ts) ist ab diesem
+ * Moment nicht mehr nachrechenbar. Die Zeilen bleiben stehen und sehen
+ * unverändert plausibel aus; nichts protokolliert den Bruch, und auffallen
+ * würde er erst im Streitfall — also genau dann, wenn der Nachweis gebraucht
+ * wird.
+ *
+ * WARUM HIER TROTZDEM NICHTS UMGEBAUT WIRD: die Behebung ist ein eigenes,
+ * zusammenhängendes Vorhaben und keine Zeile in dieser Datei. Sie braucht
+ *   (a) ein eigenes, NIE rotiertes Secret (z. B. `CONSENT_PROOF_SALT`) in
+ *       `env.ts`, `.env.example` und den Worker-Secrets,
+ *   (b) dieselbe Umstellung in `affiliate/apply.ts`, sonst laufen die beiden
+ *       Nachweis-Hashes auseinander, und
+ *   (c) eine Versionsspalte (`hash_key_version`) an BEIDEN Tabellen per
+ *       Migration — sonst entwertet allein die Umstellung genau die alten
+ *       Zeilen, um die es geht, statt sie als „mit altem Schlüssel"
+ *       zu kennzeichnen.
+ * Ein halber Umbau — neues Secret ohne Versionsspalte — wäre exakt der
+ * Schaden, den er verhindern soll. Der Punkt steht deshalb als benanntes
+ * Risiko in PHASENSTATUS.md, mit diesen drei Teilen.
  */
 async function ipHashKey(): Promise<CryptoKey> {
   if (cachedIpHashKey) return cachedIpHashKey;
@@ -143,14 +170,6 @@ export async function setTrackingConsent(
     const { decision: entscheidung, category: kategorie } = parsed.data;
     const grants = entscheidung === "granted";
 
-    // Rate-Limiting NUR für die zustimmende Richtung. Ein Limiter, der einen
-    // Widerruf abweisen kann, verletzt Art. 7 Abs. 3 DSGVO — Nein sagen muss
-    // jederzeit durchgehen. Missbrauchspotenzial hat ohnehin nur die
-    // Richtung, die Zeilen mit Zustimmung erzeugt.
-    if (grants && !(await checkRateLimit("consent-grant", { maxRequests: 60, windowSeconds: 3600 }))) {
-      return { ok: false, error: RATE_LIMIT_MESSAGE };
-    }
-
     const tenant = await getTenant();
     if (!tenant) {
       // Ohne Mandanten gibt es keine Zeile (tracking_consents.tenant_id ist
@@ -158,6 +177,42 @@ export async function setTrackingConsent(
       // Mandanten-Hosts gerendert; dieser Zweig ist die Absicherung dagegen,
       // dass er versehentlich woanders auftaucht.
       return { ok: false, error: "Einwilligung konnte nicht gespeichert werden." };
+    }
+
+    // Rate-Limiting NUR für die zustimmende Richtung. Ein Limiter, der einen
+    // Widerruf abweisen kann, verletzt Art. 7 Abs. 3 DSGVO — Nein sagen muss
+    // jederzeit durchgehen. Missbrauchspotenzial hat ohnehin nur die
+    // Richtung, die Zeilen mit Zustimmung erzeugt.
+    //
+    // MANDANTENTRENNUNG IM SCHLÜSSEL (Abnahme, Befund S8). `extraKey` ERSETZT
+    // die IP im Schlüssel, deshalb steht sie hier ausgeschrieben mit drin:
+    // ohne sie zählte EIN Eimer für alle Besucher eines Mandanten. Ohne
+    // `extraKey` wiederum schlüsselt der Limiter allein auf die IP — und
+    // eine IP hätte dann 60 Zustimmungen pro Stunde über ALLE Mandanten der
+    // Plattform hinweg, während jeder andere Aufruf des Moduls seinen
+    // Mandanten mitgibt. Deshalb steht dieser Aufruf jetzt HINTER dem
+    // Mandanten-Gate.
+    //
+    // WAS DAMIT NICHT GELÖST IST, ausgesprochen statt verschwiegen: hinter
+    // einem Firmen-NAT, einem Schul-Proxy oder einem Mobilfunk-CGNAT teilen
+    // sich weiterhin viele echte Besucher DESSELBEN Mandanten eine IP. Auf
+    // die opake `consentId` aus dem Cookie zu schlüsseln würde sie trennen —
+    // sie ist aber vom Client frei wählbar, und ein Eimer je frei wählbarem
+    // Wert ist kein Limit. Die IP bleibt deshalb der Anker; der Limiter ist
+    // fail-open, betroffen ist nur die zustimmende Richtung, und die
+    // ablehnende geht in jedem Fall durch.
+    const h = await headers();
+    const ip =
+      h.get("cf-connecting-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+    if (
+      grants &&
+      !(await checkRateLimit("consent-grant", {
+        maxRequests: 60,
+        windowSeconds: 3600,
+        extraKey: `${tenant.id}:${ip ?? "unknown"}`,
+      }))
+    ) {
+      return { ok: false, error: RATE_LIMIT_MESSAGE };
     }
 
     const cookieStore = await cookies();
@@ -176,10 +231,6 @@ export async function setTrackingConsent(
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
-    const h = await headers();
-    const ip =
-      h.get("cf-connecting-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 
     const { error } = await createAdminClient()
       .from("tracking_consents")

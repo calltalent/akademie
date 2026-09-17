@@ -14,19 +14,69 @@ const AFFILIATE_PARTNER_EXPORT_COLUMNS =
   "internal_note, application, terms_version_accepted, terms_accepted_at, " +
   "notify_sale, notify_reversal, notify_payout, created_at, updated_at";
 
+/**
+ * DIE KÄUFERDATENGRENZE (Abnahme, Befund S3).
+ *
+ * Fünf Spalten fehlen hier ABSICHTLICH, und zwar dieselben fünf, die
+ * Migration 20260911130000 (Abschnitt 2.5) dem `authenticated`-Spaltenrecht
+ * mit ausdrücklicher Begründung entzogen hat: `order_id`,
+ * `stripe_invoice_id`, `stripe_subscription_id`, `stripe_charge_id` und —
+ * der unauffälligste Weg — `dedup_key`, der genau diese Kennungen im
+ * Klartext trägt (`sale:<order_id>`, `recurring:<stripe_invoice_id>`).
+ *
+ * Warum das hier eigens dastehen muss: dieser Export läuft über
+ * `createAdminClient()`, und `service_role` umgeht RLS UND Spaltenrechte.
+ * Die Datenbankgrenze greift an dieser Stelle also gerade NICHT — sie muss
+ * hier wiederholt werden, sonst baut die Selbstauskunft genau die
+ * exportierbare Bestellliste der Käufer wieder auf, die das Spaltenrecht
+ * zugemauert hat (Plan 11.15).
+ *
+ * Art. 15 Abs. 1 DSGVO verlangt die Daten ÜBER DIE PERSON, nicht die
+ * Bestellkennungen ihrer Kunden. Die Provisionszeile bleibt ohne die fünf
+ * Spalten vollständig nachvollziehbar: `kind`, `base_cents`, `rate_kind`,
+ * `rate_bp`, `fixed_cents`, `amount_cents`, `currency`, `booked_at`,
+ * `condition_snapshot` und `status` ergeben die Rechnung Zeile für Zeile.
+ *
+ * DREI SPALTEN BLEIBEN BEWUSST DRIN, obwohl das Spaltenrecht sie ebenfalls
+ * nicht hergibt — das ist eine Entscheidung, kein Versehen:
+ *   * `note` und `flag_reason` sind Vermerke ÜBER DEN BETROFFENEN
+ *     („Verdacht auf Eigenbestellungen"). Ein Vermerk über eine Person IST
+ *     ihr personenbezogenes Datum, und Art. 15 nimmt interne Notizen nicht
+ *     aus; dieselbe Abwägung wie bei `internal_note` und `status_reason`
+ *     oben. Dass ein Partner sie in der OBERFLÄCHE nicht sieht, ist eine
+ *     andere Frage als die, was ihm auf Auskunftsverlangen zusteht.
+ *   * `condition_snapshot` ist der eingefrorene Rechenweg SEINER eigenen
+ *     Provision — ohne ihn ist die Zeile nicht nachrechenbar. Er enthält
+ *     keine Käuferdaten, sondern Programm- und Konditionsparameter.
+ * Der Widerspruch zum Spaltenrecht ist damit benannt und begrenzt; er gehört
+ * zusätzlich nach PHASENSTATUS.md.
+ */
 const AFFILIATE_COMMISSION_EXPORT_COLUMNS =
-  "id, tenant_id, program_id, partner_id, kind, order_id, stripe_invoice_id, " +
-  "stripe_subscription_id, stripe_charge_id, product_id, campaign, referral_id, " +
+  "id, tenant_id, program_id, partner_id, kind, product_id, campaign, referral_id, " +
   "parent_id, reverses_id, base_cents, basis_kind, rate_kind, rate_bp, fixed_cents, " +
   "amount_cents, currency, condition_id, condition_snapshot, status, cancel_reason, " +
   "hold_until, booked_at, payout_id, paid_at, flagged, flag_reason, is_test, note, " +
-  "dedup_key, created_at, updated_at";
+  "created_at, updated_at";
 
+/**
+ * Ohne `document_path` und `reference`, aus demselben Grund wie oben.
+ *   * `reference` ist die ZAHLUNGSREFERENZ AUS DEM BANKAUSZUG DES MANDANTEN
+ *     („SEPA-2026-10-01/17") — eine interne Betriebsangabe des Auftraggebers,
+ *     kein Datum über den Partner. Migration 20260911150000 entzieht sie dem
+ *     Spaltenrecht mit genau dieser Begründung.
+ *   * `document_path` ist der Ablageort im privaten Bucket. Er ist allein
+ *     nicht ausnutzbar (der Bucket hat keine Client-Policy), aber er ist auch
+ *     zu nichts nütze: das Beleg-PDF bekommt der Partner über die Belegroute,
+ *     und ein Speicherpfad ist kein personenbezogenes Datum.
+ * Was ihm zusteht, bleibt vollständig: Zeitraum, Summen, Steuermodus,
+ * Steuerbetrag, Status, Zahlweg, BELEGNUMMER und Ausstellungsdatum — also
+ * alles, was auf der Gutschrift steht.
+ */
 const AFFILIATE_PAYOUT_EXPORT_COLUMNS =
   "id, tenant_id, program_id, partner_id, period_from, period_to, currency, " +
   "gross_cents, reversal_cents, subtotal_cents, tax_mode, tax_rate_bp, tax_cents, " +
-  "total_cents, status, method, document_no, document_path, document_issued_at, " +
-  "reference, approved_at, paid_at, created_at, updated_at";
+  "total_cents, status, method, document_no, document_issued_at, " +
+  "reverses_payout_id, approved_at, paid_at, created_at, updated_at";
 
 /**
  * Das Abrechnungsprofil MIT Bankverbindung: der Empfänger dieses Exports ist

@@ -9,6 +9,7 @@ import {
   listAffiliatePartners,
   listAffiliateProducts,
 } from "@/lib/affiliate/queries";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { buildTenantUrl } from "@/lib/tenant/url";
 import {
   AffiliateAccessNotice,
@@ -87,6 +88,28 @@ export default async function AdminAffiliatePartnerDetailPage({
         <AffiliateProgramMissing />
       </AffiliateShell>
     );
+  }
+
+  // OFFENER LÖSCHANTRAG (Art. 17 DSGVO; Abnahme, Befund S5). Der Partner
+  // stellt ihn über `/profil`; die Partnerakte ist der Ort, an dem ein
+  // Mandanten-Admin ihm nachkommen kann. Ohne diese Anzeige stünde der Antrag
+  // in einer Tabelle, die in der Oberfläche niemand sieht.
+  //
+  // Gelesen über `createAdminClient()` NACH dem Manager-Gate und mit
+  // Mandantenfilter: `deletion_requests` hat eine eigene RLS-Policy für
+  // Staff, aber die Partnerakte liest ohnehin durchweg mandantengebunden, und
+  // ein zweiter Filter kostet nichts.
+  let pendingDeletionRequestedAt: string | null = null;
+  if (detail.partner.user_id !== null) {
+    const { data: deletionRequest } = await createAdminClient()
+      .from("deletion_requests")
+      .select("requested_at")
+      .eq("tenant_id", access.tenant.id)
+      .eq("user_id", detail.partner.user_id)
+      .eq("status", "pending")
+      .maybeSingle();
+    const row = deletionRequest as { requested_at: string } | null;
+    pendingDeletionRequestedAt = row?.requested_at ?? null;
   }
 
   const money = (cents: number, currency: string) =>
@@ -387,6 +410,10 @@ export default async function AdminAffiliatePartnerDetailPage({
           id: row.id,
           name: row.display_name,
         }))}
+        partnerCode={detail.partner.code}
+        pendingDeletionAt={
+          pendingDeletionRequestedAt === null ? null : day(pendingDeletionRequestedAt)
+        }
       />
 
       {/* 4. Kontoauszug. */}

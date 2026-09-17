@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { hasCriticalIntegrityFinding, verifyAffiliateIntegrity } from "./integrity";
+import {
+  countPendingReversals,
+  hasCriticalIntegrityFinding,
+  verifyAffiliateIntegrity,
+} from "./integrity";
 
 /**
  * Affiliate-System, Block B8 — KONTROLLABGLEICH (PLAN_Affiliate-System.md 7.6).
@@ -79,7 +83,48 @@ class MockSelect extends Chain {
       onFulfilled({ data: this.matches(table(this.tableName)).map((r) => ({ ...r })), error: null }),
     );
   }
+
+  /** Einzelzeile für das Nachladen des Belegs vor dem Storno-Entwurf (N3). */
+  maybeSingle<T = Row>(): Promise<{ data: T | null; error: MockError | null }> {
+    const error = db.errors[this.tableName];
+    if (error) return Promise.resolve({ data: null, error });
+    if (this.columns.trim() === "*") {
+      return Promise.resolve({
+        data: null,
+        error: { code: "42501", message: "permission denied" },
+      });
+    }
+    const hit = this.matches(table(this.tableName))[0];
+    return Promise.resolve({ data: (hit === undefined ? null : { ...hit }) as T | null, error: null });
+  }
 }
+
+/**
+ * INSERT für den Storno-Entwurf (Abnahme, Befund N3). Bewusst schmal — die
+ * CHECK-Bedingungen der Tabelle prüft `payout.test.ts`; hier geht es allein
+ * darum, DASS der Quarantäneweg den Entwurf anlegt.
+ */
+class MockInsert {
+  constructor(
+    private tableName: string,
+    private values: Row,
+  ) {}
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Signatur muss zu admin.from().insert().select(cols) passen
+  select(_columns: string): MockInsert {
+    return this;
+  }
+  maybeSingle<T = Row>(): Promise<{ data: T | null; error: MockError | null }> {
+    const error = db.errors[`${this.tableName}:insert`] ?? db.errors[this.tableName];
+    if (error) return Promise.resolve({ data: null, error });
+    insertCounter += 1;
+    const row: Row = { id: `ins_${insertCounter}`, ...this.values };
+    table(this.tableName).push(row);
+    return Promise.resolve({ data: { ...row } as T, error: null });
+  }
+}
+
+let insertCounter = 0;
 
 class MockUpdate extends Chain {
   constructor(
@@ -107,6 +152,7 @@ const mockAdmin = {
     return {
       select: (columns: string) => new MockSelect(tableName, columns),
       update: (patch: Row) => new MockUpdate(tableName, patch),
+      insert: (values: Row) => new MockInsert(tableName, values),
     };
   },
 };
@@ -141,12 +187,25 @@ function payout(patch: Row = {}): Row {
   return {
     id: "pay_1",
     tenant_id: TENANT,
+    program_id: "prog-1",
     partner_id: "p1",
+    period_from: "2026-09-01",
+    period_to: "2026-09-30",
     currency: "eur",
     status: "approved",
     gross_cents: 10_000,
     reversal_cents: 0,
     subtotal_cents: 10_000,
+    tax_mode: "regular",
+    tax_rate_bp: 1900,
+    tax_cents: 1_900,
+    total_cents: 11_900,
+    method: "sepa",
+    // Ein freigegebener Satz TRÄGT eine Belegnummer (CHECK der Tabelle).
+    // Genau daran hängt die Storno-Pflicht beim Stilllegen (N3).
+    document_no: "GS-DEMO-2026-000001",
+    reverses_payout_id: null,
+    recipient_snapshot: null,
     ...patch,
   };
 }
@@ -155,6 +214,7 @@ beforeEach(() => {
   db.tables = {};
   db.errors = {};
   idCounter = 0;
+  insertCounter = 0;
   table("affiliate_commissions");
   table("affiliate_payouts");
   table("affiliate_daily_stats");
@@ -240,6 +300,84 @@ describe("Gleichung 1: Belegkopf gegen seine Positionen", () => {
     await verify({ quarantine: true });
 
     expect(table("affiliate_commissions")[0].payout_id).toBe("pay_1");
+  });
+
+  // --- Die Stornogutschrift am Quarantäneweg (Abnahme, Befund N3) --------
+  //
+  // Der Quarantäneweg setzt einen bereits NUMMERIERTEN Beleg auf 'failed'.
+  // 'failed' hat im Guard keine ausgehende Kante, und `markAffiliatePayoutFailed()`
+  // verlangt approved/exported — ohne Storno-Entwurf an genau dieser Stelle
+  // bleibt ein Beleg mit ausgewiesener Steuer dauerhaft unneutralisierbar
+  // (§ 14c UStG).
+
+  it("legt beim Stilllegen eines nummerierten Belegs den Storno-Entwurf an", async () => {
+    table("affiliate_payouts").push(payout({ subtotal_cents: 12_000 }));
+    table("affiliate_commissions").push(commission({ payout_id: "pay_1", amount_cents: 9_000 }));
+
+    const report = await verify({ quarantine: true });
+    const finding = payoutFindings(report)[0];
+
+    expect(finding.quarantined).toBe(true);
+    expect(finding.reversal_pending).toBe(false);
+    expect(finding.reversal_payout_id).not.toBeNull();
+
+    const reversal = table("affiliate_payouts").find(
+      (row) => row.reverses_payout_id === "pay_1",
+    );
+    expect(reversal).toBeDefined();
+    // Gespiegelte Summen, gleicher Zeitraum, gleicher Steuermodus, Entwurf
+    // ohne eigene Nummer — die Nummer zieht er erst bei seiner Freigabe.
+    expect(reversal).toMatchObject({
+      tenant_id: TENANT,
+      partner_id: "p1",
+      program_id: "prog-1",
+      currency: "eur",
+      status: "draft",
+      gross_cents: -10_000,
+      subtotal_cents: -12_000,
+      tax_cents: -1_900,
+      total_cents: -11_900,
+      method: "sepa",
+    });
+    expect(reversal?.document_no).toBeUndefined();
+  });
+
+  it("meldet einen NICHT angelegten Storno als eigenen Zustand", async () => {
+    table("affiliate_payouts").push(payout({ subtotal_cents: 12_000 }));
+    table("affiliate_commissions").push(commission({ payout_id: "pay_1", amount_cents: 9_000 }));
+    // Nur der INSERT scheitert; Lesen und Stilllegen laufen weiter.
+    db.errors["affiliate_payouts:insert"] = { code: "23505", message: "duplicate key" };
+
+    const report = await verify({ quarantine: true });
+    const finding = payoutFindings(report)[0];
+
+    expect(finding.quarantined).toBe(true);
+    expect(finding.reversal_pending).toBe(true);
+    expect(finding.reversal_payout_id).toBeNull();
+    // Die Zahl, die die Freigabeaktion ausspricht statt sie zu protokollieren.
+    expect(countPendingReversals(report)).toBe(1);
+  });
+
+  it("legt für einen VERWORFENEN Entwurf keinen Storno an — er hat nie eine Nummer", async () => {
+    // Gegenrichtung: 'draft' -> 'cancelled' neutralisiert keinen Beleg. Ein
+    // Storno darauf wäre ein Minus-Beleg über eine Leistung, die nie
+    // abgerechnet wurde.
+    table("affiliate_payouts").push(
+      payout({ status: "draft", document_no: null, subtotal_cents: 12_000 }),
+    );
+    table("affiliate_commissions").push(commission({ payout_id: "pay_1", amount_cents: 9_000 }));
+
+    const finding = payoutFindings(await verify({ quarantine: true }))[0];
+
+    expect(finding.quarantined).toBe(true);
+    expect(table("affiliate_payouts")[0].status).toBe("cancelled");
+    // Gar nicht gesetzt statt `false`: für einen verworfenen Entwurf stellt
+    // sich die Frage nach einem Storno nicht — dieselbe Form wie bei
+    // `quarantined`, das nur auftaucht, wo stillgelegt wurde.
+    expect(finding.reversal_pending).toBeUndefined();
+    expect(table("affiliate_payouts").some((row) => row.reverses_payout_id === "pay_1")).toBe(
+      false,
+    );
   });
 
   it("fasst einen bereits bezahlten Satz nicht mehr an", async () => {

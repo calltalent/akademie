@@ -1784,7 +1784,15 @@
           "save": "Save",
           "saved": "Saved.",
           "pending": "Running …",
-          "reasonOptional": "(optional)"
+          "reasonOptional": "(optional)",
+          "anonymize": "Anonymise data",
+          "anonymizeHeading": "Fulfil erasure request (Art. 17 GDPR)",
+          "anonymizePending": "There is an open erasure request from {date}.",
+          "anonymizeHint": "Name, company, email address, postal address, tax number, VAT ID and payment details are made unrecognisable; clicks and referrals are deleted. Credit notes already issued remain as accounting records — the academy is required to keep them for ten years. This cannot be undone.",
+          "anonymizeReasonLabel": "Reason (recorded verbatim in the audit log)",
+          "anonymizeConfirmLabel": "Partner code to confirm",
+          "anonymizeConfirmHint": "Please enter {code}. This cannot be undone.",
+          "anonymizeDone": "The data has been anonymised. An open erasure request was closed."
         },
         "banking": {
           "heading": "Payment and tax details",
@@ -2117,7 +2125,11 @@
           "documentNo": "Document number",
           "period": "Period",
           "taxMode": "Tax treatment"
-        }
+        },
+        "reversalBadge": "Credit reversal",
+        "reversalOf": "Reversal of {documentNo} — this record pays out nothing, it neutralises the document.",
+        "reversalOfUnknown": "Reversal of a document without a number — this record pays out nothing, it neutralises the document.",
+        "releaseConfirmReversal": "{count, plural, one {# of these is a reversal: it pays out nothing, it neutralises a document already issued. That is why the total is negative.} other {# of these are reversals: they pay out nothing, they neutralise documents already issued. That is why the total is negative.}}"
       },
       "creatives": {
         "title": "Promotional material",
