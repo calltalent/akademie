@@ -51,7 +51,8 @@ Sprache: Deutsch (Antworten, Commits, UI-Texte). Code, Bezeichner und Kommentare
 3. Nach jedem Feature: `tester`-Agent (Vitest + Playwright). Nach jeder Phase: `security-reviewer`-Agent (RLS-Audit, OWASP-Checkliste, Secret-Scan).
 4. `PHASENSTATUS.md` nach jedem Arbeitsblock aktualisieren: Erledigt / Offen / Risiken.
 5. Bei Unklarheit: SPEC.md befolgen; wenn SPEC schweigt, einfachste Lösung wählen und Entscheidung in PHASENSTATUS.md notieren.
-6. Nichts löschen oder deployen ohne ausdrückliche Freigabe von Josip.
+6. Deployen darf ich ohne Rückfrage, wenn `main` grün ist (CI bestanden) und der Deploy aus dem committeten Stand läuft. Was ausgerollt wurde, notiere ich danach in PHASENSTATUS.md.
+7. Löschen bleibt freigabepflichtig, sobald Daten oder produktive Konfiguration betroffen sind: Datenbankzeilen, Storage-Objekte, DNS-Einträge, Worker-Routen, Stripe-Objekte, Branches, Secrets. Ohne Rückfrage lösche ich nur, was ich in derselben Sitzung selbst angelegt habe und was sonst niemand benutzt. (Freigabe Josip, 19.09.2026)
 
 ## 5. Befehle (ab Phase 1 gültig)
 
