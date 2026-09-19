@@ -62,7 +62,7 @@ npm run test         # Vitest
 npm run e2e          # Playwright
 npm run lint         # ESLint + TypeScript-Check
 npx supabase db push # Migrationen anwenden (lokal verlinktes Projekt)
-npm run deploy       # OpenNext-Build + Cloudflare Workers Deploy (nur nach Freigabe)
+npm run deploy       # OpenNext-Build + Cloudflare Workers Deploy (main grün, siehe §4.6)
 ```
 
 ## 6. Phasenplan (Definition of Done je Phase in SPEC 8)
