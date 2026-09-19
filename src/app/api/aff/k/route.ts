@@ -139,6 +139,28 @@ import { TRACKING_CONSENT_COOKIE } from "@/lib/consent/schema";
  *   Die datenbankseitige Obergrenze von 50 000 Klicks je Partner und Tag
  *   bleibt unabhängig davon bestehen; sie ist die letzte Grenze, nicht die
  *   erste.
+ *
+ *   STAND 19.09.2026 — die erste Regel IST eingerichtet (Zone calltalent.ai,
+ *   Regel-ID ea057c24004d465eb55c48305773c538, aktiv). Die Bedingung für den
+ *   Live-Gang aus G18 ist damit erfüllt. Live nachgelesen über
+ *   `GET /zones/{zone}/rulesets/phases/http_ratelimit/entrypoint`, nicht
+ *   angenommen: Ausdruck, Schwelle 20/10 s und Merkmale `ip.src` +
+ *   `cf.colo.id` decken sich mit der Vorgabe oben. Zwei Abweichungen:
+ *
+ *     - Aktion `block` statt `managed_challenge`. Nicht gewählt, sondern
+ *       erzwungen: ein PATCH auf `managed_challenge` antwortet mit
+ *       `not entitled to use the managed_challenge action in ratelimiting`.
+ *       Der Einwand aus dem Absatz oben gilt damit unverändert — hinter
+ *       einem Firmen- oder Mobilfunk-NAT verliert ein echter Besucher
+ *       seinen Klick ersatzlos. Behebbar nur über den Tarif.
+ *     - Sperrdauer 10 s statt der vorgesehenen 60 s. Die 60 s waren für eine
+ *       Challenge gedacht, bei der ein Mensch durchkommt. Bei `block` kommt
+ *       niemand durch, deshalb der kürzere Wert: er hält den Schaden auf
+ *       einer geteilten IP klein. Ein Skript schafft damit 20 Anfragen je
+ *       20 s statt je 70 s und bleibt weit unter der Tagesgrenze.
+ *
+ *   Die zweite Regel (`affiliate-klick-code`) bleibt offen; sie braucht
+ *   weiterhin Business oder Enterprise.
  * ------------------------------------------------------------------------
  *
  * ## Kein `verifySameOrigin()`

@@ -5118,3 +5118,49 @@ fest und ist geprüft gültiges JSON: Pfad `/api/aff/k`, Aktion
 
 Zu erledigen vor dem ersten echten Partnerlink, weil `/api/aff/k` sonst
 ungebremst Klickzeilen schreiben kann.
+
+### Korrektur und Abschluss am 19.09.2026
+
+Der Abschnitt „Blockiert: Rate-Limiting auf /api/aff/k" weiter oben enthält
+eine falsche Diagnose. Dort steht, es sei nicht zu trennen, ob der Token oder
+der Free-Tarif die WAF-Phasen sperrt. Es war der Token.
+
+Mit einem Token, der zusätzlich `#worker:edit`, `#zone:edit` und
+`#zone_settings:edit` trägt, antwortet
+`GET /zones/{zone}/rulesets/phases/http_ratelimit/entrypoint` mit HTTP 200.
+Die Rulesets-API ist auf dem Free-Tarif also sehr wohl nutzbar; `#waf:edit`
+allein reicht für diese Phasen nur nicht aus.
+
+Das Argument, mit dem die falsche Diagnose begründet wurde — eine Meldung ohne
+Fehlercode spreche für eine Tarifsperre — war ebenfalls falsch. Cloudflare
+benennt eine Tarifsperre ausdrücklich. Beim Versuch, die Aktion auf
+`managed_challenge` zu setzen, lautet die Antwort wörtlich
+`not entitled to use the managed_challenge action in ratelimiting`. So sieht
+eine Entitlement-Meldung aus; `request is not authorized` ohne Code war eine
+Rechte-Meldung.
+
+**Regel steht.** Zone calltalent.ai, Regel-ID
+`ea057c24004d465eb55c48305773c538`, aktiv, live nachgelesen:
+Ausdruck `(http.request.uri.path eq "/api/aff/k")`, 20 Anfragen je 10 Sekunden,
+Merkmale `ip.src` und `cf.colo.id`. Die Live-Gang-Bedingung aus G18 ist erfüllt.
+Zwei Abweichungen von der Vorgabe in `route.ts`, beide dort begründet: Aktion
+`block` statt `managed_challenge` (Tarif), Sperrdauer 10 s statt 60 s
+(Folgeentscheidung, weil bei `block` niemand durchkommt).
+
+**Worker-Routen, erstmals live gelesen.** Auch das korrigiert einen früheren
+Eintrag: die Route `*.calltalent.ai/*` hat nie gefehlt.
+
+| Zone | Muster | Worker |
+|---|---|---|
+| calltalent.ai | `*.calltalent.ai/*` | calltalent-akademie |
+| calltalent.ai | `academy.calltalent.ai/*` | calltalent-akademie |
+| calltalent.ai | `portal.calltalent.ai/*` | calltalent-akademie |
+| calltalent.ai | `crm.calltalent.ai/*` | calltalent-crm |
+| salestalent.app | `salestalent.app/*` | calltalent-akademie |
+| salestalent.app | `www.salestalent.app/*` | calltalent-akademie |
+
+Zwei Anmerkungen dazu. `portal.calltalent.ai/*` steht nicht in
+`wrangler.jsonc` und verschwindet beim nächsten Deploy, weil wrangler die
+Routenliste eines Workers vollständig aus der Konfiguration ersetzt. Das ist
+folgenlos, da `*.calltalent.ai/*` denselben Host abdeckt. `crm.calltalent.ai/*`
+gehört einem anderen Worker und bleibt davon unberührt.
