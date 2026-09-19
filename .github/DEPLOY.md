@@ -48,12 +48,14 @@ des Kontaktformulars weiter.
 
 Pfad: Settings, dann Environments, dann New environment, Name `production`.
 
-Trage dich dort unter **Required reviewers** selbst ein. Danach wartet jeder
-Deploy auf deinen Klick. Das ist die Freigabe, die CLAUDE.md §4.6 verlangt,
-und sie kostet dich pro Deploy einen Knopfdruck statt eines Terminal-Laufs.
+Trägst du dich dort unter **Required reviewers** selbst ein, wartet jeder
+Deploy auf deinen Klick. Seit dem 19.09.2026 ist das keine Pflicht mehr:
+CLAUDE.md §4.6 gibt Deployen aus grünem `main` frei, freigabepflichtig bleibt
+nur noch das Löschen (§4.7).
 
-Willst du später vollautomatisch ausliefern, nimm den Reviewer wieder heraus.
-Das ist eine bewusste Änderung an §4.6 und gehört in `PHASENSTATUS.md`.
+Der Reviewer-Eintrag ist damit vom Regel-Gate zum Not-Aus geworden. Lass ihn
+stehen, solange du bei jedem Deploy hinsehen willst; nimm ihn heraus, sobald
+vollautomatisch ausgeliefert werden soll. Beides ist zulässig.
 
 ## 4. Branch-Schutz auf `main`
 
