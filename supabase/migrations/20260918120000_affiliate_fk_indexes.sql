@@ -65,7 +65,7 @@
 --
 -- ANWENDUNGSSTATUS
 -- Geschrieben am 18.09.2026, angewendet am 19.09.2026 auf das Projekt
--- vklqksdiyiijzoirntyt (Freigabe durch Josip, CLAUDE.md §4.6). Beide Indizes
+-- vklqksdiyiijzoirntyt (Freigabe durch Josip). Beide Indizes
 -- danach in pg_indexes nachgelesen, nicht angenommen; `get_advisors(performance)`
 -- meldet `unindexed_foreign_keys` seither nur noch fuer courses,
 -- marketplace_ledger und marketplace_listings -- also keinen Affiliate-Fall mehr.

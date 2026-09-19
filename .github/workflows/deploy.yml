@@ -2,10 +2,16 @@
 # Stand, der laeuft. Der Drift zwischen Repo und Produktion (main vom
 # 24.08., Worker vom 08.09.) war der teuerste Zustand des Projekts.
 #
-# CLAUDE.md §4.6 verlangt fuer jeden Deploy Josips ausdrueckliche Freigabe.
-# Deshalb haengt der Job an der GitHub-Umgebung `production`: traegt Josip
-# dort unter "Required reviewers" sich selbst ein, wartet jeder Lauf auf
-# seinen Klick. Die Freigabe bleibt, die Handarbeit entfaellt.
+# CLAUDE.md §4.6 verlangte bis zum 19.09.2026 fuer JEDEN Deploy Josips
+# ausdrueckliche Freigabe. Seither gilt die Freigabepflicht nur noch fuers
+# Loeschen (§4.7); Deployen aus gruenem `main` ist frei.
+#
+# Die Bindung an die GitHub-Umgebung `production` bleibt trotzdem stehen, und
+# zwar bewusst: sie ist kein Regel-Gate mehr, sondern ein Not-Aus. Traegt Josip
+# unter Settings -> Environments -> production bei "Required reviewers" sich
+# selbst ein, wartet jeder Lauf auf seinen Klick; traegt er niemanden ein,
+# laeuft der Deploy durch. Welches von beidem gilt, entscheidet er dort und
+# nicht diese Datei.
 name: Deploy
 
 on:

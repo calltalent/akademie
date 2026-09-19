@@ -8,8 +8,8 @@ import { processVideoTranscript } from "@/lib/video/transcript";
 /**
  * Bunny-Stream-Webhook (Phase 3, Block 6 — Auto-Transkript). Bibliotheksweiter
  * Webhook, den Josip PRODUKTIV im Bunny-Dashboard (Library-Einstellungen ->
- * Webhook-URL) einträgt — kein Deployment/keine Eintragung in diesem Block
- * (CLAUDE.md §4.6: "Nichts löschen oder deployen ohne ausdrückliche Freigabe").
+ * Webhook-URL) einträgt — kein Deployment/keine Eintragung in diesem Block.
+ * Die Eintragung ist produktive Fremdkonfiguration und bleibt bei Josip.
  * Lokal ohne öffentlich erreichbare URL nicht testbar — Ersatzweg ist
  * `refreshLessonTranscript()` (src/lib/video/actions.ts).
  *

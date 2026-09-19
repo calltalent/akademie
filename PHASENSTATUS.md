@@ -5164,3 +5164,50 @@ Zwei Anmerkungen dazu. `portal.calltalent.ai/*` steht nicht in
 Routenliste eines Workers vollständig aus der Konfiguration ersetzt. Das ist
 folgenlos, da `*.calltalent.ai/*` denselben Host abdeckt. `crm.calltalent.ai/*`
 gehört einem anderen Worker und bleibt davon unberührt.
+
+## Regeländerung 19.09.2026 — §4.6 trennt Deployen von Löschen
+
+CLAUDE.md §4.6 lautete bis heute „Nichts löschen oder deployen ohne
+ausdrückliche Freigabe von Josip". Josip hat die Regel selbst geteilt und
+eingetragen (Commit `57a2225`):
+
+- **§4.6** — Deployen ohne Rückfrage, wenn `main` grün ist und der Deploy aus
+  dem committeten Stand läuft. Was ausgerollt wurde, kommt danach hierher.
+- **§4.7** — Löschen bleibt freigabepflichtig, sobald Daten oder produktive
+  Konfiguration betroffen sind: Datenbankzeilen, Storage-Objekte,
+  DNS-Einträge, Worker-Routen, Stripe-Objekte, Branches, Secrets. Ohne
+  Rückfrage nur das, was in derselben Sitzung selbst angelegt wurde.
+
+Grund für die Trennung ist die Umkehrbarkeit. Ein Deploy lässt sich zurücknehmen:
+`main` ist per Definition der laufende Stand, ein schlechter Deploy wird vom
+nächsten überschrieben. Ein Löschen lässt sich das meist nicht — ein entfernter
+DNS-Eintrag, eine gelöschte Provisionszeile, ein gelöschtes Storage-Objekt sind
+weg. Dazu kommt ein Argument aus dem Projekt selbst: der Kopf von `deploy.yml`
+nennt den Drift zwischen Repo und Produktion den teuersten Zustand des Projekts
+(`main` vom 24.08. gegen einen Worker vom 08.09.). Häufigeres Deployen ohne
+Rückfrage arbeitet gegen ein Problem, das es hier schon gab.
+
+### Zwei Schranken, die davon unberührt bleiben
+
+1. Das GitHub-Gate unter Settings → Environments → production. Steht Josip dort
+   bei „Required reviewers", wartet jeder Deploy weiter auf seinen Klick. Das
+   ist seit heute kein Regel-Gate mehr, sondern ein Not-Aus, und bleibt seine
+   Entscheidung. Stand dieses Eintrags: nicht geprüft, unverändert gelassen.
+2. Die Prüfung im Werkzeug selbst bei DNS- und Selbstmodifikations-Aktionen.
+   Sie kennt weder den Cloudflare-Token noch CLAUDE.md und verlangt eine
+   konkret benannte Absicht. Vier Versuche, die Nachträge unten ohne solche
+   Benennung zu schreiben, wurden abgelehnt; mit benanntem Auftrag liefen sie
+   durch.
+
+### Nachgezogen
+
+`.github/DEPLOY.md` Abschnitt 3, der Kopfkommentar in
+`.github/workflows/deploy.yml`, der Kommentar in
+`src/app/api/bunny/webhook/route.ts` und der Abschnittsverweis in
+`supabase/migrations/20260918120000_affiliate_fk_indexes.sql` zitierten die
+alte Fassung und sind berichtigt.
+
+Bewusst NICHT angefasst: die älteren Migrationsköpfe (`shift_calendar`,
+`affiliate_core` und weitere) sowie `PROJEKTANALYSE_2026-09-08.md`. Sie
+protokollieren, was zum damaligen Zeitpunkt galt. Ein Verlaufseintrag wird
+nicht rückwirkend umgeschrieben.
