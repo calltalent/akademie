@@ -5065,3 +5065,56 @@ im Mock, fehlender Guard im Provisionsbuch-Mock), eine doppelte
 IP-Ableitung in `consent/actions.ts`, ein irreführendes `payouts_kept: true`
 im Prüfpfad der Anonymisierung, und die Fremdwährungssperre, die an der
 Buchung noch nicht durchgesetzt ist. Alle einzeln in den Dateien vermerkt.
+
+## Nachtrag 19.09.2026 — Fremdschlüssel-Indizes angewendet, Rate-Limiting blockiert
+
+### Erledigt
+
+1. `20260918120000_affiliate_fk_indexes.sql` ist auf Projekt `vklqksdiyiijzoirntyt`
+   angewendet. Beide Indizes danach in `pg_indexes` nachgelesen:
+   `affiliate_billing_profiles_partner_tenant_idx` auf `(partner_id, tenant_id)`
+   und `affiliate_payouts_reverses_idx` auf `(reverses_payout_id, tenant_id)`.
+   `get_advisors(performance)` meldet `unindexed_foreign_keys` seither nur noch
+   für `courses` (2), `marketplace_ledger` (1) und `marketplace_listings` (2) —
+   alle fünf aus dem Bestand, kein Affiliate-Fall mehr.
+
+2. Der Befund aus dem Dateikopf hat sich beim Nachsehen bestätigt: für
+   `affiliate_payouts` gab es nur `affiliate_payouts_reverses_uniq` auf
+   `(tenant_id, reverses_payout_id)`, mit `tenant_id` als führender Spalte. Für
+   die Prüfung der referenziellen Integrität, die nach einer bestimmten
+   `reverses_payout_id` sucht, taugt dieser Index nicht.
+
+3. Drift verhindert: der Supabase-MCP-Weg verbucht eine Migration unter der
+   Uhrzeit der Anwendung, hier `20260919104440`. Die Zeile in
+   `supabase_migrations.schema_migrations` wurde auf `20260918120000` korrigiert,
+   damit sie zum committeten Dateinamen passt. Ohne das hätte
+   `npx supabase db push` die Datei für unangewendet gehalten — dieselbe Klasse
+   von Drift, die am 17.09.2026 vierzig Dateien betraf.
+
+### Blockiert: Rate-Limiting auf /api/aff/k
+
+Die Regel konnte nicht gesetzt werden. `PUT` auf
+`/zones/{zone}/rulesets/phases/http_ratelimit/entrypoint` antwortet mit HTTP 403
+und `request is not authorized`. Ein Vergleich über drei Phasen zeigt, dass es
+nicht am Regelaufbau liegt:
+
+| Phase | HTTP |
+|---|---|
+| `http_request_firewall_custom` | 403 |
+| `http_ratelimit` | 403 |
+| `http_request_dynamic_redirect` | 200 |
+
+Der Token ist gültig (`/user/tokens/verify` → active) und seine Zonenrechte
+lauten `#waf:read`, `#waf:edit`, `#dns_records:read`, `#dns_records:edit`,
+`#zone:read`. Lesen des Regelsatz-Verzeichnisses (`GET /zones/{zone}/rulesets`)
+funktioniert. Die Zone läuft auf dem Tarif „Free Website".
+
+Zwei Erklärungen sind möglich und von hier aus nicht zu trennen: entweder fehlt
+dem Token das eigene Recht `Zone → Rate Limit`, oder der Free-Tarif gibt die
+WAF-Phasen über die Rulesets-API nicht frei. Der geplante Regelinhalt steht
+fest und ist geprüft gültiges JSON: Pfad `/api/aff/k`, Aktion
+`managed_challenge`, 20 Anfragen je 10 Sekunden, Merkmale `ip.src` und
+`cf.colo.id` (auf Free-Tarifen vorgeschrieben).
+
+Zu erledigen vor dem ersten echten Partnerlink, weil `/api/aff/k` sonst
+ungebremst Klickzeilen schreiben kann.

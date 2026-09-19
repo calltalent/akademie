@@ -64,8 +64,19 @@
 -- des Bestands.
 --
 -- ANWENDUNGSSTATUS
--- Geschrieben am 18.09.2026, NICHT angewendet. Anwenden ueber
--- `npx supabase db push` (CLAUDE.md §4.6, Freigabe durch Josip).
+-- Geschrieben am 18.09.2026, angewendet am 19.09.2026 auf das Projekt
+-- vklqksdiyiijzoirntyt (Freigabe durch Josip, CLAUDE.md §4.6). Beide Indizes
+-- danach in pg_indexes nachgelesen, nicht angenommen; `get_advisors(performance)`
+-- meldet `unindexed_foreign_keys` seither nur noch fuer courses,
+-- marketplace_ledger und marketplace_listings -- also keinen Affiliate-Fall mehr.
+--
+-- Eine Sache gehoert dazu, weil sie sonst beim naechsten Mal wieder passiert:
+-- angewendet wurde ueber den Supabase-MCP-Weg, und der verbucht die Migration
+-- unter der Uhrzeit der Anwendung, hier 20260919104440. Die Zeile in
+-- supabase_migrations.schema_migrations wurde anschliessend auf 20260918120000
+-- korrigiert, damit sie zum Dateinamen passt. Ohne diese Korrektur haette
+-- `npx supabase db push` die Datei fuer unangewendet gehalten und erneut
+-- eingespielt -- dieselbe Drift-Klasse, die am 17.09.2026 40 Dateien betraf.
 
 create index if not exists affiliate_billing_profiles_partner_tenant_idx
   on public.affiliate_billing_profiles (partner_id, tenant_id);
