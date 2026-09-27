@@ -86,7 +86,8 @@ const { storeRef, tableRows, currentUserRef, mockClient, mockAdminClient } = vi.
 
     const settings = (quiz.settings ?? {}) as { attempts_allowed?: number | null };
     const attemptsAllowed = settings.attempts_allowed ?? null;
-    const userId = currentUserRef.current;
+    // Seit S1 (27.09.2026) kommt der Nutzer als Parameter, nicht aus auth.uid().
+    const userId = params.p_user_id;
     const used = tableRows("attempts").filter((a) => a.quiz_id === params.p_quiz_id && a.user_id === userId).length;
 
     if (attemptsAllowed !== null && used >= attemptsAllowed) {
@@ -111,11 +112,14 @@ const { storeRef, tableRows, currentUserRef, mockClient, mockAdminClient } = vi.
       getUser: () => Promise.resolve({ data: { user: { id: currentUserRef.current } } }),
     },
     from: (table: string) => new MockQueryBuilder(table),
-    rpc,
+    // Kein `rpc` am Nutzer-Client: seit S1 ist `submit_quiz_attempt` nur für
+    // service_role ausführbar. Ruft submitAttempt() die RPC versehentlich
+    // wieder über den Nutzer-Client auf, scheitert der Test mit TypeError.
   };
 
   const mockAdminClient = {
     from: (table: string) => new MockQueryBuilder(table),
+    rpc,
   };
 
   return { storeRef, tableRows, currentUserRef, mockClient, mockAdminClient };
@@ -228,5 +232,19 @@ describe("submitAttempt — Versuchslimit per Doppelklick (verifizierter Fehler,
     expect(forUserOne.ok).toBe(true);
     expect(forUserTwo.ok).toBe(true);
     expect(tableRows("attempts")).toHaveLength(2);
+  });
+});
+
+describe("submitAttempt — Bewertung ausschließlich serverseitig (Sicherheitsaudit S1, 27.09.2026)", () => {
+  it("schreibt Nutzer aus der Session und Punktzahl aus gradeAttempt(), nicht aus Client-Eingaben", async () => {
+    seedQuizWithAttemptLimit(null);
+    const result = await submitAttempt(QUIZ_ID, { "3fa85f64-5717-4562-b3fc-2c963f66afa6": "opt-b" });
+
+    expect(result.ok).toBe(true);
+    const stored = tableRows("attempts");
+    expect(stored).toHaveLength(1);
+    expect(stored[0].user_id).toBe("user-1");
+    expect(stored[0].score_pct).toBe(0);
+    expect(stored[0].passed).toBe(false);
   });
 });

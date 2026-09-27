@@ -39,4 +39,18 @@ describe("resolveSafeNextParam", () => {
   it("lehnt einen Pfad ohne führenden Slash ab (`evil.example`)", () => {
     expect(resolveSafeNextParam("evil.example")).toBeNull();
   });
+
+  // Sicherheitsaudit 27.09.2026 (S10): Backslash und Steuerzeichen.
+  it("lehnt einen Backslash nach dem Slash ab (`/\\evil.example`)", () => {
+    expect(resolveSafeNextParam("/\\evil.example")).toBeNull();
+  });
+
+  it("lehnt einen Backslash an späterer Stelle ab", () => {
+    expect(resolveSafeNextParam("/kurs\\..\\x")).toBeNull();
+  });
+
+  it("lehnt Tab und Zeilenumbruch ab, die der URL-Parser entfernt (`/\\t/evil.example`)", () => {
+    expect(resolveSafeNextParam("/\t/evil.example")).toBeNull();
+    expect(resolveSafeNextParam("/\n/evil.example")).toBeNull();
+  });
 });

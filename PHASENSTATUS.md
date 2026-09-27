@@ -4588,3 +4588,18 @@ Bericht: `SICHERHEITSAUDIT_2026-09-27.md`. Nur gelesen, nichts an Code oder Date
 **Offen, MITTEL/NIEDRIG:** S5 bis S21 und zehn NIEDRIG-Punkte laut Bericht.
 
 **Risiko:** S1 und S2 sind mit einem einzigen Request ausnutzbar. Fixes brauchen eine Migration, Anwendung nur nach Josips Freigabe.
+
+## Sicherheitsaudit, Position 1 umgesetzt (27.09.2026, Josips Freigabe „Punkt 1")
+
+**Erledigt (Code auf Branch `claude/brave-clarke-iuwdox`, noch NICHT live):**
+1. S1: Migration `20260927120000_quiz_attempt_server_only_and_submission_guard.sql`. `submit_quiz_attempt` nur noch `service_role`, Nutzer als Parameter, Punktzahl 0 bis 100 geprüft; alte 4-Parameter-Fassung entfernt; Policy `attempts_own_insert` entfernt; Trigger `submissions_review_fields_guard` setzt Bewertungsfelder für Nicht-Staff zurück. `src/lib/quiz/actions.ts` ruft die RPC nach `gradeAttempt()` über den Admin-Client auf.
+2. S2: `src/lib/users/import.ts` überschreibt bestehende Mitgliedschaften (Rolle, Status) und fremde Profile (`full_name`) nicht mehr (`ignoreDuplicates`).
+3. S10: `resolveSafeNextParam()` lehnt Backslash und Steuerzeichen ab und prüft den aufgelösten Origin.
+
+**Verifikation:** 37 betroffene Unit-Tests grün, davon 4 neu; Gesamtsuite 781 von 782 grün (der eine Fehler `env.test.ts` und `resolve.test.ts` scheitern ohne `.env` auch auf dem Stand vor der Änderung). `tsc --noEmit` und ESLint ohne Befund. Migration gegen lokales Postgres 16 mit Minimal-Schema getestet: Lernender kann RPC nicht aufrufen und nicht direkt in `attempts` schreiben, Selbstbewertung einer Abgabe wird auf `submitted` zurückgesetzt, Trainer darf bewerten, `service_role` schreibt, Versuchslimit, Nicht-Mitglied und Punktzahl 101 werden abgelehnt.
+
+**Offen:**
+1. Migration live anwenden und Code deployen, beides braucht Josips Freigabe. Reihenfolge: Migration und Deploy direkt nacheinander. Dazwischen scheitert die Quiz-Abgabe, weil alter Code die alte Signatur ruft bzw. neuer Code die neue.
+2. S13 kann nur Josip im Supabase-Dashboard setzen: Authentication → Sessions (Time-box, Inactivity timeout; Pro-Plan nötig) und Authentication → Passwords → „Leaked password protection".
+
+**Entscheidung:** Ein erneut eingeladenes, gesperrtes Mitglied bleibt gesperrt; Reaktivierung nur über „Mitglied aktivieren".

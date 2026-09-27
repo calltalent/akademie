@@ -400,20 +400,16 @@ export async function submitAttempt(quizId: string, answersInput: unknown): Prom
 
     const grading = gradeAttempt(questions, parsedAnswers.data, quizRow.pass_pct);
 
-    // BUGFIX (Builder, 07.09.2026, tester-Fund): Zählung (oben, `existingAttempts`)
-    // und Insert liefen bisher als ZWEI getrennte Anfragen ohne Sperre — ein
-    // Doppelklick/zwei Tabs konnten beide `count = 0` lesen und beide einen
-    // Versuch anlegen, trotz `attempts_allowed = 1`. Die Zählung oben bleibt
-    // als schneller Vorab-Check (gute UX, spart die Fragen-/Bewertungsarbeit
-    // im Normalfall), ist aber NICHT mehr die durchsetzende Instanz — das
-    // erledigt jetzt atomar die RPC `submit_quiz_attempt` (Zählung+Insert in
-    // EINER Datenbankanweisung/Transaktion samt Advisory-Lock, siehe
-    // Migration 20260907091500_quiz_attempt_limit_rpc.sql). Läuft bewusst
-    // über den regulären RLS-Client (nicht `admin`): die Funktion ist
-    // `security definer`, leitet Mandant/Mitgliedschaft aber selbst aus
-    // `auth.uid()` ab, genau wie die bisherige `attempts_own_insert`-Policy.
-    const { data: attemptRow, error: rpcError } = await supabase.rpc("submit_quiz_attempt", {
+    // Schreiben über `submit_quiz_attempt` (Zählung + Insert atomar mit
+    // Advisory-Lock, Migration 20260907091500). Seit dem Sicherheitsaudit vom
+    // 27.09.2026 (S1) ist die Funktion nur noch für `service_role` ausführbar
+    // und bekommt den Nutzer als Parameter: vorher konnte jeder Lernende sie
+    // direkt per PostgREST mit `p_passed: true` aufrufen und die Bewertung
+    // oben umgehen (Migration 20260927120000). Punktzahl und Bestanden-Status
+    // kommen ausschließlich aus gradeAttempt(), user.id aus der Session.
+    const { data: attemptRow, error: rpcError } = await admin.rpc("submit_quiz_attempt", {
       p_quiz_id: quizId,
+      p_user_id: user.id,
       p_answers: parsedAnswers.data,
       p_score_pct: grading.scorePct,
       p_passed: grading.passed,

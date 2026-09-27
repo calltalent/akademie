@@ -281,6 +281,12 @@ export async function importOneUser(
     // existiert bereits, ggf. in einem anderen Mandanten oder mit selbst
     // gewählter Sprache) also tatsächlich bestehende Spalten — ein
     // Re-Import/Verknüpfen darf eine schon gewählte Locale nicht zurücksetzen.
+    //
+    // Sicherheitsaudit 27.09.2026 (S2): Bei "linked" gehört das Profil einer
+    // Person, die schon existiert, womöglich in einem fremden Mandanten.
+    // `full_name` ist mandantenübergreifend; ein Admin von Mandant A darf ihn
+    // nicht per Import umschreiben. Deshalb bei "linked" nur ein fehlendes
+    // Profil anlegen (`ignoreDuplicates`), nie ein bestehendes ändern.
     await admin.from("profiles").upsert(
       {
         id: userId,
@@ -288,7 +294,7 @@ export async function importOneUser(
         full_name: row.fullName ?? null,
         ...(status === "created" && locale ? { locale } : {}),
       },
-      { onConflict: "id" },
+      { onConflict: "id", ignoreDuplicates: status === "linked" },
     );
 
     // Block 7 (Webhooks): vor dem Upsert prüfen, ob die Mitgliedschaft
@@ -306,6 +312,13 @@ export async function importOneUser(
     // memberships-Upsert — unique(tenant_id, user_id). Kein invited_by-Feld
     // im Schema (siehe 0001_init.sql); wer eingeladen hat, steht im
     // Server-Log der Server Action, nicht in dieser Tabelle.
+    //
+    // Sicherheitsaudit 27.09.2026 (S2): Früher `ignoreDuplicates: false` über
+    // den Admin-Client. Eine bestehende Zeile wurde damit auf role "member"
+    // und status "active" überschrieben, an RLS vorbei. Ein Admin konnte so
+    // den Owner herabstufen (Policy 20260801150000 griff nicht) und gesperrte
+    // Mitglieder reaktivieren. Bestehende Mitgliedschaften bleiben jetzt
+    // unverändert; Rolle und Status ändern nur die dafür vorgesehenen Actions.
     const { error: membershipError } = await admin.from("memberships").upsert(
       {
         tenant_id: tenantId,
@@ -313,7 +326,7 @@ export async function importOneUser(
         role: "member",
         status: "active",
       },
-      { onConflict: "tenant_id,user_id", ignoreDuplicates: false },
+      { onConflict: "tenant_id,user_id", ignoreDuplicates: true },
     );
     if (membershipError) {
       return { email: row.email, status: "error", message: translateDbError(membershipError), emailSent: false };
