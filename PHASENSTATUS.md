@@ -4592,7 +4592,7 @@ Bericht: `SICHERHEITSAUDIT_2026-09-27.md`. Nur gelesen, nichts an Code oder Date
 ## Sicherheitsaudit, Position 1 umgesetzt (27.09.2026, Josips Freigabe „Punkt 1")
 
 **Erledigt (Code auf Branch `claude/brave-clarke-iuwdox`, noch NICHT live):**
-1. S1: Migration `20260927120000_quiz_attempt_server_only_and_submission_guard.sql`. `submit_quiz_attempt` nur noch `service_role`, Nutzer als Parameter, Punktzahl 0 bis 100 geprüft; alte 4-Parameter-Fassung entfernt; Policy `attempts_own_insert` entfernt; Trigger `submissions_review_fields_guard` setzt Bewertungsfelder für Nicht-Staff zurück. `src/lib/quiz/actions.ts` ruft die RPC nach `gradeAttempt()` über den Admin-Client auf.
+1. S1: Migration `20260927215834_quiz_attempt_server_only_and_submission_guard.sql`. `submit_quiz_attempt` nur noch `service_role`, Nutzer als Parameter, Punktzahl 0 bis 100 geprüft; alte 4-Parameter-Fassung entfernt; Policy `attempts_own_insert` entfernt; Trigger `submissions_review_fields_guard` setzt Bewertungsfelder für Nicht-Staff zurück. `src/lib/quiz/actions.ts` ruft die RPC nach `gradeAttempt()` über den Admin-Client auf.
 2. S2: `src/lib/users/import.ts` überschreibt bestehende Mitgliedschaften (Rolle, Status) und fremde Profile (`full_name`) nicht mehr (`ignoreDuplicates`).
 3. S10: `resolveSafeNextParam()` lehnt Backslash und Steuerzeichen ab und prüft den aufgelösten Origin.
 
@@ -4603,3 +4603,9 @@ Bericht: `SICHERHEITSAUDIT_2026-09-27.md`. Nur gelesen, nichts an Code oder Date
 2. S13 kann nur Josip im Supabase-Dashboard setzen: Authentication → Sessions (Time-box, Inactivity timeout; Pro-Plan nötig) und Authentication → Passwords → „Leaked password protection".
 
 **Entscheidung:** Ein erneut eingeladenes, gesperrtes Mitglied bleibt gesperrt; Reaktivierung nur über „Mitglied aktivieren".
+
+## Sicherheitsaudit, Position 1 live geschaltet (27.09.2026, Josips Freigabe „Live-Schaltung")
+
+1. Migration per MCP angewendet, Live-Version `20260927215834`; Repo-Datei auf diese Version umbenannt. Gegengeprüft: `submit_quiz_attempt` hat nur noch die 5-Parameter-Fassung, EXECUTE nur `service_role` (anon/authenticated false); auf `attempts` existiert nur noch `attempts_select`; Trigger `submissions_review_fields_guard` vorhanden.
+2. Live-Stand vor dem Anwenden: 0 Quizze, 0 Versuche, 0 Abgaben. Das Fenster zwischen Migration und Deploy traf niemanden.
+3. Code per Fast-Forward nach `main` geschoben; Deploy läuft über `.github/workflows/deploy.yml` (Umgebung `production`).

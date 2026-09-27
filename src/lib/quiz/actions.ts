@@ -405,7 +405,7 @@ export async function submitAttempt(quizId: string, answersInput: unknown): Prom
     // 27.09.2026 (S1) ist die Funktion nur noch für `service_role` ausführbar
     // und bekommt den Nutzer als Parameter: vorher konnte jeder Lernende sie
     // direkt per PostgREST mit `p_passed: true` aufrufen und die Bewertung
-    // oben umgehen (Migration 20260927120000). Punktzahl und Bestanden-Status
+    // oben umgehen (Migration 20260927215834). Punktzahl und Bestanden-Status
     // kommen ausschließlich aus gradeAttempt(), user.id aus der Session.
     const { data: attemptRow, error: rpcError } = await admin.rpc("submit_quiz_attempt", {
       p_quiz_id: quizId,
