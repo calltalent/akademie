@@ -4596,7 +4596,7 @@ Bericht: `SICHERHEITSAUDIT_2026-09-27.md`. Nur gelesen, nichts an Code oder Date
 2. S2: `src/lib/users/import.ts` überschreibt bestehende Mitgliedschaften (Rolle, Status) und fremde Profile (`full_name`) nicht mehr (`ignoreDuplicates`).
 3. S10: `resolveSafeNextParam()` lehnt Backslash und Steuerzeichen ab und prüft den aufgelösten Origin.
 
-**Verifikation:** 37 betroffene Unit-Tests grün, davon 4 neu; Gesamtsuite 781 von 782 grün (der eine Fehler `env.test.ts` und `resolve.test.ts` scheitern ohne `.env` auch auf dem Stand vor der Änderung). `tsc --noEmit` und ESLint ohne Befund. Migration gegen lokales Postgres 16 mit Minimal-Schema getestet: Lernender kann RPC nicht aufrufen und nicht direkt in `attempts` schreiben, Selbstbewertung einer Abgabe wird auf `submitted` zurückgesetzt, Trainer darf bewerten, `service_role` schreibt, Versuchslimit, Nicht-Mitglied und Punktzahl 101 werden abgelehnt.
+**Verifikation:** 37 betroffene Unit-Tests grün, davon 4 neu; Gesamtsuite 781 von 782 grün (`env.test.ts` und `resolve.test.ts` scheitern ohne `.env` auch auf dem Stand vor der Änderung). `tsc --noEmit` und ESLint ohne Befund. Migration gegen lokales Postgres 16 mit Minimal-Schema getestet: Lernender kann RPC nicht aufrufen und nicht direkt in `attempts` schreiben, Selbstbewertung einer Abgabe wird auf `submitted` zurückgesetzt, Trainer darf bewerten, `service_role` schreibt, Versuchslimit, Nicht-Mitglied und Punktzahl 101 werden abgelehnt.
 
 **Offen:**
 1. Migration live anwenden und Code deployen, beides braucht Josips Freigabe. Reihenfolge: Migration und Deploy direkt nacheinander. Dazwischen scheitert die Quiz-Abgabe, weil alter Code die alte Signatur ruft bzw. neuer Code die neue.
