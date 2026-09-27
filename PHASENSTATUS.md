@@ -4609,3 +4609,9 @@ Bericht: `SICHERHEITSAUDIT_2026-09-27.md`. Nur gelesen, nichts an Code oder Date
 1. Migration per MCP angewendet, Live-Version `20260927215834`; Repo-Datei auf diese Version umbenannt. Gegengeprüft: `submit_quiz_attempt` hat nur noch die 5-Parameter-Fassung, EXECUTE nur `service_role` (anon/authenticated false); auf `attempts` existiert nur noch `attempts_select`; Trigger `submissions_review_fields_guard` vorhanden.
 2. Live-Stand vor dem Anwenden: 0 Quizze, 0 Versuche, 0 Abgaben. Das Fenster zwischen Migration und Deploy traf niemanden.
 3. Code per Fast-Forward nach `main` geschoben; Deploy läuft über `.github/workflows/deploy.yml` (Umgebung `production`).
+
+## Deploy-Lauf 36353716487 gescheitert: Cloudflare-Token ungültig (27.09.2026, 22:05 UTC)
+
+1. Prüfen, Typecheck, Lint, Tests und Build im Deploy-Lauf grün; Abbruch erst beim Ausliefern: Cloudflare antwortet `Invalid access token [code: 9109]` und `Authentication error [code: 10000]`. Der Code ist in Ordnung, der Token im GitHub-Secret `CLOUDFLARE_API_TOKEN` ist abgelaufen oder widerrufen (am 09.09. noch gültig).
+2. Folge: Live läuft weiterhin der Worker-Stand vom 09.09. auf der bereits migrierten Datenbank. Die Quiz-Abgabe ruft dort die entfernte 4-Parameter-RPC auf und scheitert. Live gibt es 0 Quizze, also niemand betroffen. S2 und S10 sind live noch offen, bis der Deploy durchläuft.
+3. Nur Josip kann das lösen: neuen Token laut `.github/DEPLOY.md` Zeile 17 anlegen, in GitHub unter Settings → Secrets and variables → Actions → `CLOUDFLARE_API_TOKEN` ersetzen, dann den Lauf mit „Re-run all jobs" wiederholen.
