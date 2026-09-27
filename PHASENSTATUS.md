@@ -4572,3 +4572,19 @@ zu klären. Entschieden hat erst die lokale Gegenprobe gegen
 ungültig" von „Berechtigung fehlt", bevor eine Freigabe verbraucht wird. Bei
 einem Secret, das dreimal hintereinander abgelehnt wird, gehört dieser Test an
 den Anfang, nicht ans Ende.
+
+## Sicherheitsaudit des Gesamtprojekts (27.09.2026, Josips Auftrag)
+
+Bericht: `SICHERHEITSAUDIT_2026-09-27.md`. Nur gelesen, nichts an Code oder Datenbank geändert. Neun Prüf-Agenten plus eigene Verifikation aller HOCH-Funde am Code und an der Live-Datenbank (Advisor, `pg_policies`, Grants, Funktionsrümpfe).
+
+**Erledigt:** Prüfung von `main`, Live-DB und Affiliate-Branch. Bestätigt behoben: K1, K2, H3, H30, H35, H36, Header-Spoofing, Callback-Redirect, Logout-CSRF.
+
+**Offen, HOCH:**
+1. S1 `submit_quiz_attempt` übernimmt `p_score_pct`/`p_passed` vom Aufrufer; `attempts_own_insert` und `submissions_insert` ohne Spaltenschutz (NEU/H2).
+2. S2 Einladung/CSV-Import überschreibt `memberships.role` per `service_role`: Admin stuft Owner herab (NEU).
+3. S3 Stripe: `payment_status` und Erstattungen (H5, H11).
+4. S4 Acht Affiliate-Migrationen (20260910120000 bis 20260918120000) live, aber nicht in `main` (NEU).
+
+**Offen, MITTEL/NIEDRIG:** S5 bis S21 und zehn NIEDRIG-Punkte laut Bericht.
+
+**Risiko:** S1 und S2 sind mit einem einzigen Request ausnutzbar. Fixes brauchen eine Migration, Anwendung nur nach Josips Freigabe.
