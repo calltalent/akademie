@@ -4615,3 +4615,10 @@ Bericht: `SICHERHEITSAUDIT_2026-09-27.md`. Nur gelesen, nichts an Code oder Date
 1. Prüfen, Typecheck, Lint, Tests und Build im Deploy-Lauf grün; Abbruch erst beim Ausliefern: Cloudflare antwortet `Invalid access token [code: 9109]` und `Authentication error [code: 10000]`. Der Code ist in Ordnung, der Token im GitHub-Secret `CLOUDFLARE_API_TOKEN` ist abgelaufen oder widerrufen (am 09.09. noch gültig).
 2. Folge: Live läuft weiterhin der Worker-Stand vom 09.09. auf der bereits migrierten Datenbank. Die Quiz-Abgabe ruft dort die entfernte 4-Parameter-RPC auf und scheitert. Live gibt es 0 Quizze, also niemand betroffen. S2 und S10 sind live noch offen, bis der Deploy durchläuft.
 3. Nur Josip kann das lösen: neuen Token laut `.github/DEPLOY.md` Zeile 17 anlegen, in GitHub unter Settings → Secrets and variables → Actions → `CLOUDFLARE_API_TOKEN` ersetzen, dann den Lauf mit „Re-run all jobs" wiederholen.
+
+## Position 1 vollständig live (28.09.2026, 12:10 UTC)
+
+1. Josip hat `CLOUDFLARE_API_TOKEN` erneuert; Deploy-Lauf 36353716487, Versuch 2, grün. Worker `calltalent-akademie` läuft jetzt auf `a075f3f`.
+2. Damit live: S1 (Datenbank und Server-Action), S2 (Einladung/Import überschreibt keine Rollen und fremden Profile mehr), S10 (Backslash-Weiterleitung). Die Quiz-Abgabe ruft wieder die passende RPC-Signatur.
+3. Nicht geprüft: Aufruf der Live-Seite, weil der Proxy dieses Containers `academy.calltalent.ai` sperrt (403). Die Weiterleitungslogik ist lokal gegen den deployten Code-Stand bestätigt.
+4. Offen bei Josip: S13 im Supabase-Dashboard (Sessions, Leaked password protection).

@@ -125,4 +125,4 @@ Einen KRITISCH-Fund gibt es in dieser Runde nicht.
 2. **Diese Woche:** S4 (Affiliate-Migrationen nach `main`), S3 (Stripe `payment_status` oder Dashboard auf Karte beschränken), S7, S8, S9 als eine gemeinsame RLS-Migration, S5, S16.
 3. **In 30 Tagen:** S6 (private Buckets mit signierten URLs), S11, S12 (CSP), S14, S15, S17 bis S21, die NIEDRIG-Liste.
 
-Alle Datenbankänderungen brauchen Josips Freigabe zum Anwenden (CLAUDE.md §4.6). Stand 27.09.2026 abends: S1, S2 und S10 sind auf diesem Branch umgesetzt und getestet (siehe `PHASENSTATUS.md`), aber noch nicht live. S13 liegt bei Josip im Supabase-Dashboard.
+Alle Datenbankänderungen brauchen Josips Freigabe zum Anwenden (CLAUDE.md §4.6). Stand 28.09.2026: S1, S2 und S10 sind umgesetzt und live (Migration `20260927215834`, Deploy vom 28.09., siehe `PHASENSTATUS.md`). S13 liegt bei Josip im Supabase-Dashboard.
