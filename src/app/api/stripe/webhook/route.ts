@@ -11,6 +11,7 @@ import { resolveTenantEmailLocale } from "@/i18n/config";
 import { dispatchWebhookEvent } from "@/lib/webhooks/dispatch";
 import { genericErrorMessage } from "@/lib/errors/generic";
 import { handleMarketplacePurchase } from "@/lib/marketplace/fulfil";
+import { isCheckoutSettled, revokePurchase } from "@/lib/stripe/fulfilment";
 
 /**
  * Stripe-Webhook (Phase 2, Block 5). REIHENFOLGE STRENG WIE VORGEGEBEN:
@@ -63,8 +64,30 @@ export async function POST(request: Request) {
   try {
     switch (event.type) {
       case "checkout.session.completed":
+      // S3 (Sicherheitsaudit 27.09.2026): Bei SEPA/Überweisung/Klarna kommt
+      // das Geld erst mit diesem Ereignis; handleCheckoutCompleted() schaltet
+      // nur bei payment_status "paid" frei (isCheckoutSettled).
+      case "checkout.session.async_payment_succeeded":
         await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
         break;
+      case "checkout.session.async_payment_failed":
+        // Nichts freigeschaltet, nichts zurückzunehmen. Nur protokollieren.
+        console.error(
+          "[stripe/webhook] Asynchrone Zahlung fehlgeschlagen, kein Zugang erteilt:",
+          (event.data.object as Stripe.Checkout.Session).id,
+        );
+        break;
+      case "charge.refunded": {
+        const charge = event.data.object as Stripe.Charge;
+        // Teilerstattungen (Kulanz) lassen den Zugang bestehen.
+        if (charge.refunded) await handleAccessRevocation(charge.payment_intent);
+        break;
+      }
+      case "charge.dispute.closed": {
+        const dispute = event.data.object as Stripe.Dispute;
+        if (dispute.status === "lost") await handleAccessRevocation(dispute.payment_intent);
+        break;
+      }
       case "invoice.paid":
         await handleInvoicePaid(event.data.object as Stripe.Invoice);
         break;
@@ -87,6 +110,11 @@ export async function POST(request: Request) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  if (!isCheckoutSettled(session)) {
+    // Asynchrone Zahlart, Geld noch nicht da. Kein Auftrag, kein Zugang, keine
+    // Zahlungsmail; das folgt mit checkout.session.async_payment_succeeded.
+    return;
+  }
   const rawMetadata = session.metadata ?? {};
 
   // Marketplace M5 (Plan "ich-möchte-einen-eigenen-groovy-toast.md" Abschnitt
@@ -440,4 +468,59 @@ async function handleSubscriptionChanged(subscription: Stripe.Subscription) {
   // Vereinfachung (mit Josip/architect abgestimmt, siehe PHASENSTATUS.md):
   // eine Kuendigung entfernt KEINE enrollments-Zeile - historischer Zugriff
   // bleibt bestehen. Bewusst kein Code hier fuer den Enrollment-Entzug.
+}
+
+/**
+ * S3 (Sicherheitsaudit 27.09.2026, vorher H11): Vollständige Erstattung oder
+ * verlorener Chargeback. Die Checkout-Session wird über den PaymentIntent bei
+ * Stripe nachgeschlagen, damit Mandant, Nutzer und Kurse wieder AUSSCHLIESSLICH
+ * aus der signierten Metadata stammen, genau wie beim Kauf.
+ */
+async function handleAccessRevocation(paymentIntent: string | Stripe.PaymentIntent | null) {
+  const paymentIntentId = typeof paymentIntent === "string" ? paymentIntent : paymentIntent?.id;
+  if (!paymentIntentId) return;
+
+  const stripe = createStripeClient();
+  const sessions = await stripe.checkout.sessions.list({ payment_intent: paymentIntentId, limit: 1 });
+  const session = sessions.data[0];
+  if (!session) return; // Zahlung ohne Checkout (z. B. Abo-Folgerechnung) - kein Einzelkauf zurückzunehmen.
+
+  const admin = createAdminClient();
+  const rawMetadata = session.metadata ?? {};
+
+  const marketplaceMeta = marketplaceCheckoutMetadataSchema.safeParse(rawMetadata);
+  if (marketplaceMeta.success) {
+    const { tenant_id: tenantId, user_id: userId, listing_id: listingId } = marketplaceMeta.data;
+    const { data: listing } = await admin
+      .from("marketplace_listings")
+      .select("course_id")
+      .eq("id", listingId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    await revokePurchase(admin, {
+      tenantId,
+      userId,
+      courseIds: listing?.course_id ? [listing.course_id as string] : [],
+      checkoutSessionId: session.id,
+      marketplace: true,
+    });
+    return;
+  }
+
+  const parsedMeta = checkoutMetadataSchema.safeParse(rawMetadata);
+  if (!parsedMeta.success) return;
+  const { tenant_id: tenantId, product_id: productId, user_id: userId } = parsedMeta.data;
+  const { data: product } = await admin
+    .from("products")
+    .select("course_ids")
+    .eq("id", productId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  await revokePurchase(admin, {
+    tenantId,
+    userId,
+    courseIds: (product?.course_ids as string[] | null) ?? [],
+    checkoutSessionId: session.id,
+    marketplace: false,
+  });
 }
