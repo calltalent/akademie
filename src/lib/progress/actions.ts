@@ -12,9 +12,10 @@ import { translateDbError } from "@/lib/errors/db";
 export type ProgressActionState = { error: string | null; success?: boolean };
 
 /**
- * RLS `progress_own` erlaubt jedem angemeldeten Nutzer nur seine eigene
- * Zeile (user_id = auth.uid()) — keine Mitgliedschafts- oder Enrollment-
- * Prüfung nötig, das erzwingt die Datenbank bereits.
+ * RLS `progress_own_insert/update` erlaubt nur die eigene Zeile, nur mit
+ * Mitgliedschaft im Mandanten und nur für Lektionen dieses Mandanten
+ * (Migration 20260929090000). Die Action prüft zusätzlich, dass die Lektion
+ * veröffentlicht ist.
  */
 export async function completeLesson(
   lessonId: string,
@@ -28,6 +29,19 @@ export async function completeLesson(
 
   const tenant = await getTenant();
   if (!tenant) return { error: "Kein Mandant zu diesem Host gefunden." };
+
+  // Sicherheitsaudit 27.09.2026 (S8): lessonId kommt vom Client. Vorher
+  // wurde jede beliebige ID als abgeschlossen gespeichert, auch aus fremden
+  // Mandanten oder unveröffentlichten Kursen. Die RLS-Policy prüft Mandant
+  // und Lektion seit Migration 20260929090000 zusätzlich.
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("id")
+    .eq("id", lessonId)
+    .eq("tenant_id", tenant.id)
+    .eq("status", "published")
+    .maybeSingle();
+  if (!lesson) return { error: "Lektion nicht gefunden." };
 
   const { error } = await supabase.from("progress").upsert(
     {
