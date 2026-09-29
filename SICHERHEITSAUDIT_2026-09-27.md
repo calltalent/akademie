@@ -126,3 +126,5 @@ Einen KRITISCH-Fund gibt es in dieser Runde nicht.
 3. **In 30 Tagen:** S6 (private Buckets mit signierten URLs), S11, S12 (CSP), S14, S15, S17 bis S21, die NIEDRIG-Liste.
 
 Alle Datenbankänderungen brauchen Josips Freigabe zum Anwenden (CLAUDE.md §4.6). Stand 28.09.2026: S1, S2 und S10 sind umgesetzt und live (Migration `20260927215834`, Deploy vom 28.09., siehe `PHASENSTATUS.md`). S13 liegt bei Josip im Supabase-Dashboard.
+
+Stand 29.09.2026: Position 2 (S3, S4, S5, S7, S8, S9, S16) ist auf dem Branch umgesetzt und getestet, Live-Schaltung ausstehend (siehe `PHASENSTATUS.md`).

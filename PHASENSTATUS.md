@@ -4622,3 +4622,20 @@ Bericht: `SICHERHEITSAUDIT_2026-09-27.md`. Nur gelesen, nichts an Code oder Date
 2. Damit live: S1 (Datenbank und Server-Action), S2 (Einladung/Import überschreibt keine Rollen und fremden Profile mehr), S10 (Backslash-Weiterleitung). Die Quiz-Abgabe ruft wieder die passende RPC-Signatur.
 3. Nicht geprüft: Aufruf der Live-Seite, weil der Proxy dieses Containers `academy.calltalent.ai` sperrt (403). Die Weiterleitungslogik ist lokal gegen den deployten Code-Stand bestätigt.
 4. Offen bei Josip: S13 im Supabase-Dashboard (Sessions, Leaked password protection).
+
+## Sicherheitsaudit, Position 2 umgesetzt (29.09.2026, Josips Freigabe „Position 2")
+
+**Erledigt (Branch `claude/brave-clarke-iuwdox`, noch NICHT live):**
+1. S4: Die acht live angewendeten Affiliate-Migrationen (20260910120000 bis 20260918120000) unverändert nach `main`-Stand übernommen; der Affiliate-Code bleibt auf seinem Branch.
+2. S3: Stripe-Webhook schaltet nur bei `payment_status` `paid` oder `no_payment_required` frei; `checkout.session.async_payment_succeeded` läuft durch denselben Pfad; `charge.refunded` (nur Vollerstattung) und `charge.dispute.closed` mit `lost` setzen `orders.status = refunded` und lassen Kauf-Einschreibungen sofort ablaufen (`src/lib/stripe/fulfilment.ts`). Marketplace-Ledger-Storno bleibt manuell (M28), der Fall wird geloggt.
+3. S7, S8, S9: Migration `20260929090000_rls_progress_submissions_storage_time_entries.sql`. Abgaben-Dateien nur im eigenen Mandanten, Fortschritt nur mit Mitgliedschaft und Lektion desselben Mandanten, Einstempeln ohne Endzeit, Ausstempeln in die Zukunft wird auf jetzt gekappt. `completeLesson()` prüft die Lektion auf Mandant und Veröffentlichung.
+4. S5: Block-URLs (Bild, Audio, Datei, Einbettung) nur `https://`, zweite Prüfung im Renderer, `iframe` mit `sandbox`. Live gab es keine Block-URLs, also keine Bestandsdaten betroffen.
+5. S16: `refreshLessonTranscript()` mit Rate-Limit 5/h je Mandant.
+
+**Verifikation:** Gesamtsuite 794 von 795 grün (der eine Fehler ist der bekannte `.env`-Fall), 18 neue Tests. `tsc` und ESLint ohne Befund. RLS-Migration gegen lokales Postgres 16 mit neun Fällen getestet, alle wie erwartet.
+
+**Offen vor/bei Live-Schaltung:**
+1. Josips Freigabe für Migration `20260929090000` und Deploy.
+2. Josip im Stripe-Dashboard, Developers → Webhooks → Endpunkt der Akademie: zusätzlich die Ereignisse `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `charge.refunded`, `charge.dispute.closed` abonnieren. Ohne das greift die Erstattungslogik nicht.
+
+**Entscheidungen:** Keine Domain-Allowlist für Einbettungen (würde Loom, Canva, Google Slides u. a. sperren), stattdessen https plus Sandbox. Teilerstattungen entziehen keinen Zugang.
