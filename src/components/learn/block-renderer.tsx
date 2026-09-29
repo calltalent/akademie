@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { ExternalLink, File as FileIcon } from "lucide-react";
-import { DEFAULT_FILE_BLOCK_DESCRIPTION, type Block } from "@/lib/courses/schema";
+import { DEFAULT_FILE_BLOCK_DESCRIPTION, HTTPS_URL_PATTERN, type Block } from "@/lib/courses/schema";
 import { getBunnyVideo, getPlayerConfig } from "@/lib/bunny/client";
 import { BunnyPlayer } from "@/components/player/bunny-player";
 import { VideoProcessingStatus } from "@/components/learn/video-processing-status";
@@ -94,7 +94,7 @@ async function BlockView({
       // BUGFIX (23.07.2026, Block-Audit): url kann seit dem Schema-Fix
       // (courses/schema.ts, emptyOrUrl) leer sein — ein frisch angelegter,
       // noch nicht befüllter Block. Ohne diese Prüfung: kaputtes <img>.
-      if (!block.url) {
+      if (!isSafeBlockUrl(block.url)) {
         return <div className="rounded-md border p-6 text-center text-base text-gray-500">{t("noImage")}</div>;
       }
       // eslint-disable-next-line @next/next/no-img-element -- externe/Storage-URLs, kein next/image-Loader konfiguriert
@@ -161,13 +161,13 @@ async function BlockView({
 
     case "audio":
       // BUGFIX (23.07.2026, Block-Audit): s. Kommentar im "image"-Fall oben.
-      if (!block.url) {
+      if (!isSafeBlockUrl(block.url)) {
         return <div className="rounded-md border p-6 text-center text-base text-gray-500">{t("noAudio")}</div>;
       }
       return <audio controls src={block.url} className="w-full" />;
 
     case "file":
-      if (!block.url) {
+      if (!isSafeBlockUrl(block.url)) {
         return <div className="rounded-md border p-6 text-center text-base text-gray-500">{t("noFile")}</div>;
       }
       // Karten-Darstellung statt nacktem Textlink (Josips Auftrag,
@@ -216,10 +216,20 @@ async function BlockView({
       );
 
     case "embed":
-      if (!block.url) {
+      if (!isSafeBlockUrl(block.url)) {
         return <div className="rounded-md border p-6 text-center text-base text-gray-500">{t("noEmbedUrl")}</div>;
       }
-      return <iframe src={block.url} className="aspect-video w-full rounded-md border" title={t("embedTitle")} />;
+      return <iframe
+          src={block.url}
+          className="aspect-video w-full rounded-md border"
+          title={t("embedTitle")}
+          // S5 (Sicherheitsaudit 27.09.2026): fremde Einbettung ohne Zugriff auf
+          // Top-Navigation und Formulare der Akademie; Video-Player brauchen
+          // Skripte, eigenen Origin und Vollbild.
+          sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+        />;
 
     case "quiz": {
       if (!block.quizId) {
@@ -268,4 +278,14 @@ async function BlockView({
       );
     }
   }
+}
+
+/**
+ * S5 (Sicherheitsaudit 27.09.2026): Zweite Schranke neben dem Schema in
+ * `courses/schema.ts`. Alte oder direkt in die Datenbank geschriebene Blöcke
+ * mit `javascript:`, `data:` oder `http:` werden wie ein leerer Block
+ * behandelt und zeigen den Platzhalter.
+ */
+function isSafeBlockUrl(url: string | undefined | null): url is string {
+  return typeof url === "string" && HTTPS_URL_PATTERN.test(url);
 }

@@ -27,7 +27,17 @@ const baseBlock = z.object({
  * Lernansicht einen eigenen Platzhaltertext statt eines kaputten
  * `<img>`/`<audio>`/Downloads/iframes.
  */
-const emptyOrUrl = z.union([z.literal(""), z.string().url()]);
+//
+// Sicherheitsaudit 27.09.2026 (S5, vorher M23): `z.string().url()` prüft kein
+// Schema und ließ `javascript:` und `data:text/html` durch. Diese URLs landen
+// in `<a href>`, `<img src>`, `<audio src>` und `<iframe src>`. Erlaubt ist
+// nur noch https; hochgeladene Dateien (Supabase Storage, Bunny) sind immer
+// https. Gleiches Muster wie sidebarLinkSchema in settings/actions.ts.
+export const HTTPS_URL_PATTERN = /^https:\/\//i;
+const emptyOrUrl = z.union([
+  z.literal(""),
+  z.string().url().refine((v) => HTTPS_URL_PATTERN.test(v), "Nur https-Adressen erlaubt."),
+]);
 
 /**
  * Sicherheits-Fix (security-reviewer-Audit 11.07.2026, HOCH — blockierte

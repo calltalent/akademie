@@ -71,3 +71,27 @@ describe("courseCategorySchema", () => {
     expect(courseCategorySchema.safeParse({ name: "a".repeat(61) }).success).toBe(false);
   });
 });
+
+describe("Block-URLs nur https (Sicherheitsaudit S5, 27.09.2026)", () => {
+  const cases: Array<[string, Record<string, unknown>]> = [
+    ["file", { type: "file" }],
+    ["embed", { type: "embed" }],
+    ["image", { type: "image" }],
+    ["audio", { type: "audio" }],
+  ];
+
+  for (const [name, base] of cases) {
+    it(`${name}: lehnt javascript:, data: und http: ab`, () => {
+      const empty = { ...createEmptyBlock(base.type as never) };
+      for (const url of ["javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "http://example.com/a"]) {
+        expect(blockSchema.safeParse({ ...empty, url }).success).toBe(false);
+      }
+    });
+
+    it(`${name}: akzeptiert https und den leeren Platzhalter`, () => {
+      const empty = { ...createEmptyBlock(base.type as never) };
+      expect(blockSchema.safeParse({ ...empty, url: "https://example.com/a" }).success).toBe(true);
+      expect(blockSchema.safeParse({ ...empty, url: "" }).success).toBe(true);
+    });
+  }
+});

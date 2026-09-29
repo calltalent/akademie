@@ -4,6 +4,7 @@ import { requireStaffTenant } from "@/lib/auth/staff";
 import { getBunnyVideo, triggerTranscription } from "@/lib/bunny/client";
 import { processVideoTranscript } from "@/lib/video/transcript";
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/security/rate-limit";
 
 /**
  * Phase 3, Block 6 (Auto-Transkript). Manueller Ersatzweg für den lokal
@@ -36,6 +37,19 @@ export type RefreshTranscriptResult = { ok: boolean; message: string };
 export async function refreshLessonTranscript(lessonId: string): Promise<RefreshTranscriptResult> {
   try {
     const { tenant, supabase } = await requireStaffTenant();
+
+    // S16 (Sicherheitsaudit 27.09.2026): Jeder Aufruf kostet Bunny-
+    // Transkription und einen Claude-Aufruf (Zusammenfassung), `force: true`
+    // umgeht die Idempotenz-Sperre. Gleiche Schranke wie die KI-Schichtplanung.
+    if (
+      !(await checkRateLimit("video-refresh-transcript", {
+        maxRequests: 5,
+        windowSeconds: 3600,
+        extraKey: tenant.id,
+      }))
+    ) {
+      return { ok: false, message: RATE_LIMIT_MESSAGE };
+    }
 
     const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
