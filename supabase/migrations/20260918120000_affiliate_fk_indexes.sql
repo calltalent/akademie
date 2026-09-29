@@ -1,0 +1,85 @@
+-- Affiliate-Modul, Nachtrag zum Performance-Advisor (18.09.2026).
+--
+-- Diese Datei legt keine Tabelle, keine Funktion und keine Policy an. Sie
+-- ergaenzt zwei fehlende Indizes, die der Supabase-Performance-Advisor nach
+-- dem Anwenden der sieben Affiliate-Migrationen gemeldet hat.
+--
+-- ANLASS
+-- `get_advisors(performance)` vom 17.09.2026, Kategorie
+-- `unindexed_foreign_keys`. Von sieben gemeldeten Fremdschluesseln stammen
+-- zwei aus diesem Modul:
+--
+--   affiliate_billing_profiles_partner_id_tenant_id_fkey
+--     FOREIGN KEY (partner_id, tenant_id)
+--     REFERENCES affiliate_partners (id, tenant_id) ON DELETE CASCADE
+--
+--   affiliate_payouts_reverses_fk
+--     FOREIGN KEY (reverses_payout_id, tenant_id)
+--     REFERENCES affiliate_payouts (id, tenant_id) DEFERRABLE INITIALLY DEFERRED
+--
+-- Die uebrigen fuenf gehoeren zum Bestand (courses, marketplace_ledger,
+-- marketplace_listings) und bleiben hier unangetastet.
+--
+-- BEFUND
+-- Ein Fremdschluessel ohne deckenden Index auf der KINDseite zwingt Postgres
+-- bei jedem Loeschen oder Schluesselwechsel auf der ELTERNseite zu einem
+-- sequentiellen Durchlauf der Kindtabelle, um die referenzierende
+-- Integritaet zu pruefen. Bei leeren Tabellen kostet das nichts -- genau
+-- deshalb wird der Nachtrag JETZT gemacht und nicht spaeter: ein Index auf
+-- einer gefuellten Tabelle sperrt sie waehrend des Anlegens.
+--
+-- Die beiden Faelle sind NICHT gleich schwer, und das gehoert hierher, damit
+-- niemand spaeter aus der gemeinsamen Datei auf gleiche Dringlichkeit schliesst
+-- (Indexliste am 18.09.2026 aus pg_indexes gelesen, nicht angenommen):
+--
+--   (a) affiliate_billing_profiles: der Primaerschluessel liegt auf
+--       `(partner_id)` allein. Postgres KANN ihn fuer die RI-Pruefung
+--       benutzen -- die fuehrende Spalte des Fremdschluessels ist dieselbe,
+--       `tenant_id` wird danach gefiltert. Der Advisor meldet trotzdem, weil
+--       kein Index das Paar vollstaendig deckt. Der Gewinn ist hier also
+--       klein; der Index kommt mit, weil er nichts kostet und den Befund
+--       schliesst.
+--
+--   (b) affiliate_payouts ist der echte Fall. Fuer `reverses_payout_id`
+--       existiert nur `affiliate_payouts_reverses_uniq` auf
+--       `(tenant_id, reverses_payout_id) where reverses_payout_id is not null`.
+--       Dort steht `tenant_id` VORNE -- eine Spalte mit sehr wenigen
+--       verschiedenen Werten. Fuer die RI-Pruefung, die nach einer bestimmten
+--       `reverses_payout_id` sucht, taugt dieser Index deshalb nicht: die
+--       fuehrende Spalte passt nicht. Ohne den neuen Index laeuft jedes
+--       Loeschen einer Auszahlungszeile sequentiell ueber die Tabelle.
+--
+-- LOESUNG
+-- Zwei zusammengesetzte Indizes in der Spaltenreihenfolge des jeweiligen
+-- Fremdschluessels. Die Reihenfolge ist nicht beliebig: Postgres nutzt einen
+-- Index fuer die RI-Pruefung nur, wenn die fuehrenden Spalten mit den
+-- referenzierenden Spalten uebereinstimmen.
+--
+-- `if not exists` ueberall, damit die Datei ohne Schaden zweimal laufen kann
+-- (Lehre aus dem Gegenlesen von affiliate_core.sql, Befund 11).
+--
+-- VORBILD
+-- supabase/migrations/20260712233000_perf_advisors_fk_indexes_rls_initplan.sql
+-- -- dieselbe Advisor-Klasse, dasselbe Vorgehen, dort fuer 18 Fremdschluessel
+-- des Bestands.
+--
+-- ANWENDUNGSSTATUS
+-- Geschrieben am 18.09.2026, angewendet am 19.09.2026 auf das Projekt
+-- vklqksdiyiijzoirntyt (Freigabe durch Josip). Beide Indizes
+-- danach in pg_indexes nachgelesen, nicht angenommen; `get_advisors(performance)`
+-- meldet `unindexed_foreign_keys` seither nur noch fuer courses,
+-- marketplace_ledger und marketplace_listings -- also keinen Affiliate-Fall mehr.
+--
+-- Eine Sache gehoert dazu, weil sie sonst beim naechsten Mal wieder passiert:
+-- angewendet wurde ueber den Supabase-MCP-Weg, und der verbucht die Migration
+-- unter der Uhrzeit der Anwendung, hier 20260919104440. Die Zeile in
+-- supabase_migrations.schema_migrations wurde anschliessend auf 20260918120000
+-- korrigiert, damit sie zum Dateinamen passt. Ohne diese Korrektur haette
+-- `npx supabase db push` die Datei fuer unangewendet gehalten und erneut
+-- eingespielt -- dieselbe Drift-Klasse, die am 17.09.2026 40 Dateien betraf.
+
+create index if not exists affiliate_billing_profiles_partner_tenant_idx
+  on public.affiliate_billing_profiles (partner_id, tenant_id);
+
+create index if not exists affiliate_payouts_reverses_idx
+  on public.affiliate_payouts (reverses_payout_id, tenant_id);
